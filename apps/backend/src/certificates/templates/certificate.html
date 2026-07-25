@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 40px; color: #111; }
+    .header { text-align: center; margin-bottom: 32px; }
+    .logo { max-height: 80px; }
+    h1 { font-size: 28px; color: #1A56DB; margin: 8px 0; }
+    h2 { font-size: 18px; font-weight: normal; color: #444; }
+    .body { margin: 40px 0; font-size: 16px; line-height: 1.8; }
+    .highlight { font-size: 22px; font-weight: bold; }
+    .signatures { display: flex; justify-content: space-around; margin-top: 60px; }
+    .sig { text-align: center; }
+    .sig img { height: 60px; display: block; margin: 0 auto 8px; }
+    .sig-line { border-top: 1px solid #333; width: 200px; margin: 0 auto 4px; }
+    .footer { text-align: center; margin-top: 40px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    {{#if company.logoUrl}}<img class="logo" src="{{company.logoUrl}}" alt="{{company.name}}">{{/if}}
+    <h1>Certificado de Participação</h1>
+    <h2>{{course.name}}</h2>
+  </div>
+
+  <div class="body">
+    <p>Certificamos que</p>
+    <p class="highlight">{{participant.name}}</p>
+    <p>participou do treinamento de segurança no trânsito <strong>{{course.name}}</strong>,
+    realizado em <strong>{{session.city}}/{{session.state}}</strong>,
+    com carga horária de <strong>{{course.theoryHours}}h teóricas</strong> e <strong>{{course.practiceHours}}h práticas</strong>.</p>
+    <p>{{course.description}}</p>
+  </div>
+
+  <div class="signatures">
+    <div class="sig">
+      <img src="{{consultant.signatureUrl}}" alt="Assinatura">
+      <div class="sig-line"></div>
+      <p>{{consultant.name}}<br>Instrutor Responsável</p>
+    </div>
+    <div class="sig">
+      <div class="sig-line"></div>
+      <p>{{participant.name}}<br>Participante</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    SIM Treinamentos · simtc.com.br · CNPJ: 00.000.000/0001-00
+  </div>
+</body>
+</html>
