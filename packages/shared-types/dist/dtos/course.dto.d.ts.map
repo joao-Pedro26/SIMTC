@@ -1,0 +1,1 @@
+{"version":3,"file":"course.dto.d.ts","sourceRoot":"","sources":["../../src/dtos/course.dto.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,WAAW,EAAE,MAAM,UAAU,CAAC;AAEvC,MAAM,WAAW,eAAe;IAC9B,IAAI,EAAE,MAAM,CAAC;IACb,WAAW,EAAE,WAAW,CAAC;IACzB,WAAW,EAAE,MAAM,CAAC;IACpB,aAAa,CAAC,EAAE,MAAM,CAAC;IACvB,WAAW,EAAE,MAAM,CAAC;CACrB;AAED,MAAM,WAAW,eAAgB,SAAQ,OAAO,CAAC,eAAe,CAAC;CAAG"}
