@@ -1,0 +1,290 @@
+// ─── SIMTC — Prisma Schema ───────────────────────────────────────────────────
+// Gerado a partir do documento arquitetura-simtc.md v2.1
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── EMPRESAS ────────────────────────────────────────────────────────────────
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String   @unique
+  address   String?
+  city      String?
+  state     String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts  CompanyContact[]
+  trainings TrainingSession[]
+  demands   DemandPipeline[]
+}
+
+model CompanyContact {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  email     String
+  phone     String?
+  isPrimary Boolean @default(false)
+
+  company   Company @relation(fields: [companyId], references: [id])
+  user      User?
+}
+
+// ─── CONSULTORES ─────────────────────────────────────────────────────────────
+
+model Consultant {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  signatureUrl String?
+  createdAt    DateTime @default(now())
+
+  user               User?
+  sessionConsultants SessionConsultant[]
+  assessments        PracticalAssessment[]
+  demands            DemandPipeline[]
+  trainingSessions   TrainingSession[]
+}
+
+// ─── CURSOS ──────────────────────────────────────────────────────────────────
+
+model Course {
+  id            String      @id @default(cuid())
+  name          String
+  vehicleType   VehicleType
+  theoryHours   Float
+  practiceHours Float       @default(0)
+  description   String
+  createdAt     DateTime    @default(now())
+
+  trainings TrainingSession[]
+  demands   DemandPipeline[]
+}
+
+enum VehicleType {
+  LEVE
+  PESADO
+  MOTO
+}
+
+// ─── CATEGORIAS E INFRAÇÕES ──────────────────────────────────────────────────
+
+model AssessmentCategory {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  description String?
+  order       Int          @default(0)
+
+  infractions Infraction[]
+}
+
+model Infraction {
+  id          String             @id @default(cuid())
+  categoryId  String
+  description String
+  order       Int                @default(0)
+
+  category AssessmentCategory @relation(fields: [categoryId], references: [id])
+  notes    InfractionNote[]
+}
+
+model InfractionNote {
+  id           String   @id @default(cuid())
+  infractionId String
+  noteType     NoteType
+  comment      String?
+  deduction    Int
+
+  infraction      Infraction       @relation(fields: [infractionId], references: [id])
+  assessmentItems AssessmentItem[]
+
+  @@unique([infractionId, noteType])
+}
+
+enum NoteType {
+  B
+  PM
+  M
+}
+
+// ─── FUNIL DE DEMANDAS (Kanban) ──────────────────────────────────────────────
+
+model DemandPipeline {
+  id               String       @id @default(cuid())
+  companyId        String
+  consultantId     String
+  courseId         String
+  status           DemandStatus @default(QUALIFICACAO)
+  participantCount Int?
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  company    Company    @relation(fields: [companyId], references: [id])
+  consultant Consultant @relation(fields: [consultantId], references: [id])
+  course     Course     @relation(fields: [courseId], references: [id])
+}
+
+enum DemandStatus {
+  QUALIFICACAO
+  ANALISE
+  PROPOSTA
+  AGENDAMENTO
+  CONCLUIDO
+  PERDIDO
+}
+
+// ─── TREINAMENTOS ────────────────────────────────────────────────────────────
+
+model TrainingSession {
+  id                      String         @id @default(cuid())
+  companyId               String
+  courseId                String
+  responsibleConsultantId String
+  city                    String
+  state                   String
+  date                    DateTime?
+  participantCount        Int?
+  notes                   String?
+  status                  TrainingStatus @default(PLANEJADO)
+  qrCodeToken             String         @unique @default(cuid())
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  company               Company               @relation(fields: [companyId], references: [id])
+  course                Course                @relation(fields: [courseId], references: [id])
+  responsibleConsultant Consultant            @relation(fields: [responsibleConsultantId], references: [id])
+  consultants           SessionConsultant[]
+  participants          TrainingParticipant[]
+}
+
+enum TrainingStatus {
+  PLANEJADO
+  EM_ANDAMENTO
+  CONCLUIDO
+  CANCELADO
+}
+
+model SessionConsultant {
+  trainingSessionId String
+  consultantId      String
+
+  training   TrainingSession @relation(fields: [trainingSessionId], references: [id])
+  consultant Consultant      @relation(fields: [consultantId], references: [id])
+
+  @@id([trainingSessionId, consultantId])
+}
+
+// ─── PARTICIPANTES ───────────────────────────────────────────────────────────
+
+model Participant {
+  id            String    @id @default(cuid())
+  name          String
+  cpf           String    @unique
+  email         String?
+  cnhCategory   String?
+  cnhExpiration DateTime?
+  createdAt     DateTime  @default(now())
+
+  trainings TrainingParticipant[]
+}
+
+model TrainingParticipant {
+  id                String            @id @default(cuid())
+  trainingSessionId String
+  participantId     String
+  participationType ParticipationType @default(TEORICA_E_PRATICA)
+  status            ParticipantStatus @default(PENDENTE)
+  registeredAt      DateTime          @default(now())
+
+  training    TrainingSession      @relation(fields: [trainingSessionId], references: [id])
+  participant Participant          @relation(fields: [participantId], references: [id])
+  assessment  PracticalAssessment?
+  certificate Certificate?
+
+  @@unique([trainingSessionId, participantId])
+}
+
+enum ParticipationType {
+  SOMENTE_TEORICA
+  TEORICA_E_PRATICA
+}
+
+enum ParticipantStatus {
+  PENDENTE
+  EM_AVALIACAO
+  APROVADO
+  NECESSITA_REAVALIACAO
+}
+
+// ─── AVALIAÇÃO PRÁTICA ───────────────────────────────────────────────────────
+
+model PracticalAssessment {
+  id                    String    @id @default(cuid())
+  trainingParticipantId String    @unique
+  consultantId          String
+  date                  DateTime
+  startTime             DateTime
+  endTime               DateTime?
+  synced                Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+
+  trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
+  consultant          Consultant          @relation(fields: [consultantId], references: [id])
+  items               AssessmentItem[]
+}
+
+model AssessmentItem {
+  id               String @id @default(cuid())
+  assessmentId     String
+  infractionNoteId String
+
+  assessment     PracticalAssessment @relation(fields: [assessmentId], references: [id])
+  infractionNote InfractionNote      @relation(fields: [infractionNoteId], references: [id])
+}
+
+// ─── CERTIFICADOS ────────────────────────────────────────────────────────────
+
+model Certificate {
+  id                    String   @id @default(cuid())
+  trainingParticipantId String   @unique
+  generatedAt           DateTime @default(now())
+  pdfUrl                String?
+  sentToParticipant     Boolean  @default(false)
+  sentToCompany         Boolean  @default(false)
+
+  trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
+}
+
+// ─── USUÁRIOS / AUTH ─────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime  @default(now())
+  lastLogin    DateTime?
+
+  consultantId String?         @unique
+  contactId    String?         @unique
+  consultant   Consultant?     @relation(fields: [consultantId], references: [id])
+  contact      CompanyContact? @relation(fields: [contactId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  CONSULTANT
+  CLIENT
+}
