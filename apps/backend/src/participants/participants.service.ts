@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
 
@@ -20,6 +20,10 @@ export class ParticipantsService {
     const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { qrCodeToken },
     });
+
+    if (session.status === 'CANCELADO' || session.status === 'CONCLUIDO') {
+      throw new BadRequestException('Inscrições encerradas para este treinamento');
+    }
 
     // 2. De-duplicação: se CPF já existe, reutiliza o participante
     let participant = await this.prisma.participant.findUnique({

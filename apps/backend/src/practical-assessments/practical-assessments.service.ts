@@ -1,7 +1,7 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
-import { calculateCategoryScore, calculateOverallScore } from '@simtc/shared-types';
+import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 
 @Injectable()
 export class PracticalAssessmentsService {
@@ -18,7 +18,6 @@ export class PracticalAssessmentsService {
   }
 
   private async syncOne(dto: SyncPracticalAssessmentDto) {
-    // Verifica se já existe (evita duplicata)
     const existing = await this.prisma.practicalAssessment.findUnique({
       where: { trainingParticipantId: dto.trainingParticipantId },
     });
@@ -40,18 +39,41 @@ export class PracticalAssessmentsService {
           create: dto.items.map((item) => ({ infractionNoteId: item.infractionNoteId })),
         },
       },
-      include: { items: { include: { infractionNote: true } } },
+      include: {
+        items: {
+          include: {
+            infractionNote: {
+              include: { infraction: { include: { category: true } } },
+            },
+          },
+        },
+      },
     });
 
-    // Calcula score e atualiza status do participante
-    const deductions = assessment.items.map((i) => i.infractionNote.deduction);
-    const score = calculateCategoryScore(deductions); // simplificado — ver scoring.ts para lógica completa
-    const status = score >= 70 ? 'APROVADO' : 'NECESSITA_REAVALIACAO';
+    // Agrupa deduções por categoria e calcula score de cada uma separadamente
+    const byCategory = new Map<string, number[]>();
+    for (const item of assessment.items) {
+      const categoryId = item.infractionNote.infraction.category.id;
+      if (!byCategory.has(categoryId)) byCategory.set(categoryId, []);
+      byCategory.get(categoryId)!.push(item.infractionNote.deduction);
+    }
 
-    await this.prisma.trainingParticipant.update({
-      where: { id: dto.trainingParticipantId },
-      data: { status },
-    });
+    const categoryScores = Array.from(byCategory.values()).map((deductions) =>
+      calculateCategoryScore(deductions),
+    );
+    const overallScore = calculateOverallScore(categoryScores);
+    const status = getApprovalStatus(overallScore);
+
+    await this.prisma.$transaction([
+      this.prisma.practicalAssessment.update({
+        where: { id: assessment.id },
+        data: { score: overallScore },
+      }),
+      this.prisma.trainingParticipant.update({
+        where: { id: dto.trainingParticipantId },
+        data: { status },
+      }),
+    ]);
 
     return assessment;
   }

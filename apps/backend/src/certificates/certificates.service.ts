@@ -25,7 +25,12 @@ export class CertificatesService {
         course: true,
         responsibleConsultant: true,
         participants: {
-          where: { status: 'APROVADO' },
+          where: {
+            OR: [
+              { status: 'APROVADO' },
+              { participationType: 'SOMENTE_TEORICA' },
+            ],
+          },
           include: {
             participant: true,
             assessment: { include: { items: { include: { infractionNote: true } } } },
