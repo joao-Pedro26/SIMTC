@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
 
 @Injectable()
 export class CompaniesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async createCompany(dto: CreateCompanyDto) {
     
@@ -84,6 +88,15 @@ export class CompaniesService {
     include: { contacts: true },
   });
   }
+
+  async uploadCompanyLogo(id: string, buffer: Buffer, contentType: string) {
+  await this.findCompanyById(id);
+  const url = await this.storage.upload('logos', id, buffer, contentType);
+  return this.prisma.company.update({
+    where: { id },
+    data: { logoUrl: url },
+  });
+}
 }
 
 
