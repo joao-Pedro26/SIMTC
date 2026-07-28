@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsOptional, Matches } from "class-validator";
+import { IsEmail, IsString, IsOptional, Matches, MinLength } from "class-validator";
 
 export class CreateConsultantDto {
 
@@ -12,4 +12,8 @@ export class CreateConsultantDto {
     @IsString()
     @IsOptional()
     phone?: string;
+
+    @IsString()
+    @MinLength(8, { message: 'A senha de ter no mínimo 8 caracteres.' })
+    password!: string;
 }

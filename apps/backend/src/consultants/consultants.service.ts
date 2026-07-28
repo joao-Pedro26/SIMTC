@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateConsultantDto } from './dto/create-consultant.dto';
 import { UpdateConsultantDto } from './dto/update-consultant.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ConsultantsService {
@@ -20,7 +21,27 @@ export class ConsultantsService {
       throw new ConflictException('Já existe um consultor com este e-mail.');
     }
 
-    return this.prisma.consultant.create({data: dto});
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    return this.prisma.$transaction(async (tx) => {
+      const consultant = await tx.consultant.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          phone: dto.phone
+        },
+      });
+
+      await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          role: 'CONSULTANT',
+          consultantId: consultant.id,
+        },
+      });
+       return consultant;
+    });
   }
 
   async findAllConsultants() {
@@ -48,11 +69,10 @@ export class ConsultantsService {
 
   async uploadSignature(id: string, buffer: Buffer, contentType: string) {
     await this.findConsultantById(id);
-    const path = `${id}`;
-    await this.storage.upload('signatures', path, buffer, contentType);
+    const publicUrl = await this.storage.upload('signatures', id, buffer, contentType);
     return this.prisma.consultant.update({
       where: { id },
-      data: { signatureUrl: path },
+      data: { signatureUrl: publicUrl },
     });
   }
 }
