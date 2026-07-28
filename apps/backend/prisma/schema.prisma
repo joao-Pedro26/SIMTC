@@ -54,6 +54,7 @@ model Consultant {
   assessments        PracticalAssessment[]
   demands            DemandPipeline[]
   trainingSessions   TrainingSession[]
+  assignedParticipants  TrainingParticipant[] @relation("AssignedParticipants")
 }
 
 // ─── CURSOS ──────────────────────────────────────────────────────────────────
@@ -206,6 +207,8 @@ model TrainingParticipant {
   participantId     String
   participationType ParticipationType @default(TEORICA_E_PRATICA)
   status            ParticipantStatus @default(PENDENTE)
+  assignedConsultantId  String?
+  assignedConsultant    Consultant? @relation("AssignedParticipants", fields: [assignedConsultantId], references: [id])
   registeredAt      DateTime          @default(now())
 
   training    TrainingSession      @relation(fields: [trainingSessionId], references: [id])
@@ -238,6 +241,7 @@ model PracticalAssessment {
   startTime             DateTime
   endTime               DateTime?
   synced                Boolean   @default(false)
+  score                 Float?
   createdAt             DateTime  @default(now())
 
   trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
