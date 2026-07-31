@@ -276,10 +276,12 @@ model Certificate {
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
-  passwordHash String
+  passwordHash String?
   role         UserRole
   createdAt    DateTime  @default(now())
   lastLogin    DateTime?
+  otpCode      String?
+  otpExpiresAt DateTime?
 
   consultantId String?         @unique
   contactId    String?         @unique

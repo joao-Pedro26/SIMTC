@@ -3,12 +3,16 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, AuthTokensDto, JwtPayload } from '@simtc/shared-types';
+import { EmailService } from 'src/email/email.service';
+import { randomInt } from 'crypto';
+import { use } from 'passport';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly email: EmailService,
   ) {}
 
   async login(dto: LoginDto): Promise<AuthTokensDto> {
@@ -21,6 +25,7 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
 
+    if (!user.passwordHash) throw new UnauthorizedException('Credenciais inválidas');
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Credenciais inválidas');
 
@@ -59,5 +64,58 @@ export class AuthService {
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
     });
     return { accessToken, refreshToken };
+  }
+
+  async requestOtp(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({where: { email } });
+    if (!user || user.role !== 'CLIENT') {
+      return;
+    }
+
+    const code = randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { email },
+      data: {
+        otpCode: code,
+        otpExpiresAt: expiresAt
+      },
+    });
+
+    await this.email.sendOtpCode(email, code);
+  }
+
+  async verifyOtp(email: string, code: string): Promise<AuthTokensDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { contact: {select: {companyId: true } } },
+    });
+
+    if (
+      !user ||
+      user.role !== 'CLIENT' ||
+      user.otpCode !== code ||
+      !user.otpExpiresAt ||
+      user.otpExpiresAt < new Date()
+    ) {
+      throw new UnauthorizedException('Código inválido ou expirado');
+    }
+
+    await this.prisma.user.update({
+      where: { email },
+      data: {
+        otpCode: null,
+        otpExpiresAt: null,
+        lastLogin: new Date()
+      },
+    });
+
+    return this.generateTokens({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.contact?.companyId ?? undefined,
+    })
   }
 }

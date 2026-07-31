@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CreateContactUserDto } from './dto/create-contact-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('companies')
@@ -37,6 +38,16 @@ export class CompaniesController {
     return this.service.updateCompany(id, dto);
   }
 
+  @Post(':id/contacts')
+  addContact(@Param('id') id: string, @Body() dto: CreateContactUserDto) {
+    return this.service.addContact(id, dto);
+  }
+
+  @Delete(':id/contacts/:contactId')
+  removeContact(@Param('id') id: string, @Param('contactId') contactId: string) {
+    return this.service.removeContact(id, contactId);
+  }
+
   @Patch(':id/logo')
 @UseInterceptors(FileInterceptor('file'))
 uploadCompanyLogo(
@@ -53,4 +64,5 @@ uploadCompanyLogo(
 ) {
   return this.service.uploadCompanyLogo(id, file.buffer, file.mimetype);
 }
+
 }

@@ -22,6 +22,17 @@ export class EmailService {
     });
   }
 
+  async sendOtpCode(to: string, code: string) {
+    await this.resend.emails.send({
+      from: 'SIM Treinamentos <noreply@simtc.com.br>',
+      to,
+      subject: 'Seu código de acesso — SIM Treinamentos',
+      html: `<p>Seu código de acesso ao Portal do Cliente é:</p>
+             <h2 style="letter-spacing: 4px">${code}</h2>
+             <p>Válido por 10 minutos. Não compartilhe este código.</p>`,
+    });
+  }
+
   async sendClientPortalAccess(to: string, name: string, tempPassword: string) {
     await this.resend.emails.send({
       from: 'SIM Treinamentos <noreply@simtc.com.br>',

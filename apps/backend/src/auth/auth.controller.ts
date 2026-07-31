@@ -1,7 +1,9 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from '@simtc/shared-types';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -18,5 +20,18 @@ export class AuthController {
   @ApiOperation({ summary: 'Renovar access token usando refresh token' })
   refresh(@Body('refreshToken') refreshToken: string) {
     return this.authService.refresh(refreshToken);
+  }
+
+  @Post('client/request-code')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Envia código OTP para o e-mail do cliente' })
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto.email);
+  }
+
+  @Post('client/verify')
+  @ApiOperation({ summary: 'Valida código OTP e retorna JWT' })
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.email, dto.code);
   }
 }
