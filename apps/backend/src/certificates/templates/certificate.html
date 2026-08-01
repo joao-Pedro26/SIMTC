@@ -3,54 +3,201 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 40px; color: #111; }
-    .header { text-align: center; margin-bottom: 32px; }
-    .logo { max-height: 80px; }
-    h1 { font-size: 28px; color: #1A56DB; margin: 8px 0; }
-    h2 { font-size: 18px; font-weight: normal; color: #444; }
-    .body { margin: 40px 0; font-size: 16px; line-height: 1.8; }
-    .highlight { font-size: 22px; font-weight: bold; }
-    .result { font-size: 16px; margin-top: 8px; color: #1A56DB; font-weight: bold; }
-    .signatures { display: flex; justify-content: space-around; margin-top: 60px; }
+    @page { size: A4 landscape; margin: 0; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+      width: 297mm;
+      height: 210mm;
+      background: #ffffff;
+      color: #111;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Área principal ─────────────────────────────────── */
+    .page {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 32px 52px 0 52px;
+    }
+
+    /* ── Cabeçalho ──────────────────────────────────────── */
+    .header {
+      display: grid;
+      grid-template-columns: 200px 1fr 200px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .client-logo {
+      max-height: 70px;
+      max-width: 190px;
+      object-fit: contain;
+    }
+
+    .title-block {
+      text-align: center;
+    }
+
+    .title-block h1 {
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #111;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .title-block .subtitle {
+      font-size: 15px;
+      font-weight: bold;
+      color: #333;
+      margin-top: 8px;
+    }
+
+    /* ── Corpo ──────────────────────────────────────────── */
+    .body {
+      font-size: 16px;
+      line-height: 1.85;
+      color: #111;
+      flex: 1;
+    }
+
+    .body strong { font-weight: bold; }
+    .body em     { font-style: italic; }
+
+    .result {
+      margin-top: 10px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #1a3a6a;
+    }
+
+    /* ── Assinaturas ────────────────────────────────────── */
+    .signatures {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 24px;
+      margin-bottom: 22px;
+      align-items: flex-end;
+    }
+
     .sig { text-align: center; }
-    .sig img { height: 60px; display: block; margin: 0 auto 8px; }
-    .sig-line { border-top: 1px solid #333; width: 200px; margin: 0 auto 4px; }
-    .footer { text-align: center; margin-top: 40px; font-size: 12px; color: #888; }
+
+    .sig-img {
+      height: 54px;
+      display: block;
+      margin: 0 auto 4px;
+    }
+
+    .sig-line {
+      border-top: 1px solid #333;
+      width: 240px;
+      margin: 0 auto 5px;
+    }
+
+    .sig-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: #111;
+    }
+
+    .sig-info {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    /* ── Onda + logo SIM (rodapé) ───────────────────────── */
+    .wave-area {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 58px;
+      overflow: hidden;
+    }
+
+    .wave-area svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .sim-logo {
+      position: absolute;
+      bottom: 7px;
+      right: 26px;
+      height: 46px;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    {{#if company.logoUrl}}<img class="logo" src="{{company.logoUrl}}" alt="{{company.name}}">{{/if}}
-    <h1>Certificado de Participação</h1>
-    <h2>{{course.name}}</h2>
-  </div>
+  <div class="page">
 
-  <div class="body">
-    <p>Certificamos que</p>
-    <p class="highlight">{{participant.name}}</p>
-    <p>participou do treinamento de segurança no trânsito <strong>{{course.name}}</strong>,
-    realizado em <strong>{{session.city}}/{{session.state}}</strong>
-    {{#if session.date}}em <strong>{{session.date}}</strong>{{/if}},
-    com carga horária de <strong>{{course.theoryHours}}h teóricas</strong> e <strong>{{course.practiceHours}}h práticas</strong>.</p>
-    {{#if course.description}}<p>{{course.description}}</p>{{/if}}
-    {{#if result}}<p class="result">Resultado: {{result}}</p>{{/if}}
-  </div>
-
-  <div class="signatures">
-    <div class="sig">
-      {{#if consultant.signatureUrl}}<img src="{{consultant.signatureUrl}}" alt="Assinatura">{{/if}}
-      <div class="sig-line"></div>
-      <p>{{consultant.name}}<br>Instrutor Responsável</p>
+    <!-- Cabeçalho -->
+    <div class="header">
+      <div>
+        {{#if company.logoUrl}}
+          <img class="client-logo" src="{{{company.logoUrl}}}" alt="{{company.name}}">
+        {{/if}}
+      </div>
+      <div class="title-block">
+        <h1>CERTIFICADO</h1>
+        <p class="subtitle">{{course.name}}</p>
+      </div>
+      <div></div>
     </div>
-    <div class="sig">
-      <div class="sig-line"></div>
-      <p>{{participant.name}}<br>Participante</p>
+
+    <!-- Corpo -->
+    <div class="body">
+      <p>
+        Certificamos que <strong>{{participant.name}}</strong>{{#if participant.cpf}},
+        CPF <em>{{participant.cpf}}</em>,{{/if}}
+        concluiu o treinamento de <em>{{course.name}}</em>
+        com <em>{{{cargaHoraria}}}</em>,
+        realizado no dia <em>{{session.date}}</em>
+        {{#if session.city}}<em>{{session.city}}-{{session.state}}</em>{{/if}}.
+      </p>
+      {{#if result}}<p class="result">Resultado: {{result}}</p>{{/if}}
     </div>
+
+    <!-- Assinaturas -->
+    <div class="signatures">
+      <div class="sig">
+        {{#if consultant.signatureUrl}}
+          <img class="sig-img" src="{{{consultant.signatureUrl}}}" alt="Assinatura">
+        {{/if}}
+        <div class="sig-line"></div>
+        <p class="sig-name">{{consultant.name}}</p>
+        {{#if consultant.credentialDetran}}<p class="sig-info">{{consultant.credentialDetran}}</p>{{/if}}
+        {{#if consultant.regMte}}<p class="sig-info">{{consultant.regMte}}</p>{{/if}}
+      </div>
+      <div class="sig">
+        <div class="sig-line"></div>
+        <p class="sig-name">{{participant.name}}</p>
+        <p class="sig-info">Participante</p>
+      </div>
+    </div>
+
   </div>
 
-  <div class="footer">
-    SIM Treinamentos · simtc.com.br · CNPJ: 00.000.000/0001-00
-    {{#if certificateId}}<br>Certificado Nº {{certificateId}}{{/if}}
+  <!-- Onda decorativa + logo SIM -->
+  <div class="wave-area">
+    <svg viewBox="0 0 1122 58" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,24 C180,4 360,48 560,26 C760,4 950,42 1122,16 L1122,58 L0,58 Z" fill="#1a2d4a"/>
+      <path d="M0,34 C200,14 420,54 640,32 C860,10 1010,46 1122,28 L1122,58 L0,58 Z" fill="#243858" opacity="0.55"/>
+    </svg>
+    {{#if simLogoUrl}}
+      <img class="sim-logo" src="{{{simLogoUrl}}}" alt="SIM Treinamentos">
+    {{/if}}
   </div>
+
 </body>
 </html>

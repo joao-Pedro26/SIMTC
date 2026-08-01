@@ -8,6 +8,7 @@ import { AssessmentCategoriesService } from './assessment-categories.service';
 import { CreateAssessmentCategoryDto, CreateInfractionDto } from './dto/create-assessment-category.dto';
 import { UpdateAssessmentCategoryDto } from './dto/update-assessment-category.dto';
 import { UpdateInfractionDto } from './dto/update-infraction.dto';
+import { UpdateNoteDto } from './dto/update-note.dto';
 
 @ApiTags('assessment-categories')
 @ApiBearerAuth()
@@ -77,5 +78,15 @@ removeInfraction(
   @Param('infractionId') infractionId: string,
 ) {
   return this.service.removeInfraction(id, infractionId);
+}
+
+@Patch(':id/infractions/:infractionId/notes/:noteType')
+@Roles(UserRole.ADMIN)
+updateNote(
+  @Param('infractionId') infractionId: string,
+  @Param('noteType') noteType: string,
+  @Body() dto: UpdateNoteDto,
+) {
+  return this.service.updateNote(infractionId, noteType, dto);
 }
 }

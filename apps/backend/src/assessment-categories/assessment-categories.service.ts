@@ -4,6 +4,7 @@ import { CreateAssessmentCategoryDto } from './dto/create-assessment-category.dt
 import { UpdateAssessmentCategoryDto } from './dto/update-assessment-category.dto';
 import { CreateInfractionDto } from './dto/create-assessment-category.dto';
 import { UpdateInfractionDto } from './dto/update-infraction.dto';
+import { UpdateNoteDto } from './dto/update-note.dto';
 
 @Injectable()
 export class AssessmentCategoriesService {
@@ -104,6 +105,18 @@ export class AssessmentCategoriesService {
 
       await tx.infraction.deleteMany({ where: { categoryId: id } });
       return tx.assessmentCategory.delete({ where: {id } });
+    });
+  }
+
+  async updateNote(infractionId: string, noteType: string, dto: UpdateNoteDto) {
+    const note = await this.prisma.infractionNote.findUnique({
+      where: { infractionId_noteType: { infractionId, noteType: noteType as any } },
+    });
+    if (!note) throw new NotFoundException('Nota não encontrada');
+
+    return this.prisma.infractionNote.update({
+      where: { infractionId_noteType: { infractionId, noteType: noteType as any } },
+      data: { comment: dto.comment, deduction: dto.deduction },
     });
   }
 

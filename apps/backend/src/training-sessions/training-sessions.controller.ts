@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards, Request, Res, Delete, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, UseGuards, Request, Res, Delete, Patch, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -10,6 +10,7 @@ import { QrCodeService } from './qr-code.service';
 import { JwtPayload } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('training-sessions')
 @ApiBearerAuth()
@@ -23,8 +24,8 @@ export class TrainingSessionsController {
 
   @Get()
   @ApiOperation({ summary: 'Lista sessões — ADMIN vê tudo, CONSULTANT vê só as suas' })
-  findAll(@CurrentUser() user: JwtPayload) {
-    return this.service.findAll(user);
+  findAll(@CurrentUser() user: JwtPayload, @Query() pagination: PaginationDto) {
+    return this.service.findAll(user, pagination);
   }
 
   @Get(':id')

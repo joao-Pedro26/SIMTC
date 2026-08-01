@@ -3,31 +3,39 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class TrainingSessionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** ADMIN vê todas as sessões; CONSULTANT vê apenas as suas */
-  findAll(user: JwtPayload) {
+  async findAll(user: JwtPayload, pagination: PaginationDto) {
     const where =
       user.role === 'CONSULTANT'
-        ? {
-            consultants: {
-              some: { consultantId: user.consultantId },
-            },
-          }
+        ? { consultants: { some: { consultantId: user.consultantId } } }
         : {};
 
-    return this.prisma.trainingSession.findMany({
-      where,
-      include: {
-        company: { select: { id: true, name: true } },
-        course: { select: { id: true, name: true } },
-        responsibleConsultant: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const page = pagination.page ?? 1;
+    const limit = pagination.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.trainingSession.findMany({
+        where,
+        include: {
+          company: { select: { id: true, name: true } },
+          course: { select: { id: true, name: true } },
+          responsibleConsultant: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.trainingSession.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findTrainingSessionById(id: string) {

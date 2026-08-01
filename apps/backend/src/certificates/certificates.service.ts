@@ -58,9 +58,11 @@ export class CertificatesService {
     });
 
     const result = this.resolveResult(trainingParticipant);
-    const sessionDate = session.date
-      ? new Date(session.date).toLocaleDateString('pt-BR')
-      : null;
+    const sessionDate = session.date ? this.formatDate(new Date(session.date)) : null;
+    const cargaHoraria = this.formatCargaHoraria(
+      session.course.theoryHours,
+      session.course.practiceHours,
+    );
 
     const pdf = await this.pdfGenerator.renderCertificate({
       participant: trainingParticipant.participant,
@@ -70,6 +72,7 @@ export class CertificatesService {
       consultant: session.responsibleConsultant,
       result,
       certificateId: cert.id,
+      cargaHoraria,
     });
 
     const fileName = `${session.id}/${trainingParticipant.participantId}.pdf`;
@@ -79,6 +82,25 @@ export class CertificatesService {
       where: { id: cert.id },
       data: { pdfUrl: url },
     });
+  }
+
+  private formatDate(date: Date): string {
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    ];
+    return `${String(date.getDate()).padStart(2, '0')} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
+  }
+
+  private formatCargaHoraria(theoryHours: number, practiceHours: number): string {
+    const total = theoryHours + practiceHours;
+    if (practiceHours > 0) {
+      const practiceStr = Number.isInteger(practiceHours)
+        ? `${practiceHours}h00`
+        : `${practiceHours}h`;
+      return `${total} horas (${theoryHours} horas teóricas e ${practiceStr} horas prática)`;
+    }
+    return `${total} horas teóricas`;
   }
 
   private resolveResult(trainingParticipant: any): string | null {
