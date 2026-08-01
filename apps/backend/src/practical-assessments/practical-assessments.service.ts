@@ -1,6 +1,7 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
+import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 
 @Injectable()
@@ -91,5 +92,30 @@ export class PracticalAssessmentsService {
         },
       },
     });
+  }
+
+  async assignParticipants(dto: AssignParticipantsDto, consultantId: string) {
+    const records = await this.prisma.trainingParticipant.findMany({
+      where: { id: { in: dto.participantIds } },
+    });
+
+    if (records.length !== dto.participantIds.length) {
+      throw new ConflictException('Um o mais participantes não foram encontrados');
+    }
+
+    const alreadyAssigned = records.filter(
+      (r) => r.status === 'EM_AVALIACAO' && r.assignedConsultantId !== consultantId,
+    );
+    if ( alreadyAssigned.length > 0) {
+      throw new ConflictException(
+        'Um ou mais participantes já estão atribuídos a outro consultor');
+    }
+
+    await this.prisma.trainingParticipant.updateMany({
+      where: { id: { in: dto.participantIds } },
+      data: { assignedConsultantId: consultantId, status: 'EM_AVALIACAO' },
+    });
+
+    return { assigned: dto.participantIds.length };
   }
 }
