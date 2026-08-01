@@ -23,7 +23,7 @@ export class ReportsController {
   }
 
   @Get('companies/:id/history')
-  getCompanyHistory(@Param('id') companyId: string) {
-    return this.service.getCompanyHistory(companyId);
+  getCompanyHistory(@Param('id') companyId: string, @CurrentUser() user: JwtPayload) {
+    return this.service.getCompanyHistory(companyId, user);
   }
 }

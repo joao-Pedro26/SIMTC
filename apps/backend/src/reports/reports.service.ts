@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from '@simtc/shared-types';
 
@@ -55,7 +55,11 @@ export class ReportsService {
     });
   }
 
-  async getCompanyHistory(companyId: string) {
+  async getCompanyHistory(companyId: string, user: JwtPayload) {
+    if (user.role === 'CLIENT' && user.companyId !== companyId) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
     return this.prisma.trainingSession.findMany({
       where: { companyId },
       include: {
