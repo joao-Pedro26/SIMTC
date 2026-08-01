@@ -1,6 +1,8 @@
-import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
+import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto';
+import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 
 @Injectable()
 export class ParticipantsService {
@@ -58,6 +60,82 @@ export class ParticipantsService {
 
     return this.prisma.trainingParticipant.create({
       data: { trainingSessionId: session.id, participantId: participant.id },
+    });
+  }
+
+  async addParticipant(trainingSessionId: string, dto: AddParticipantDto) {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { id: trainingSessionId },
+    });
+
+    if (!session) throw new NotFoundException('Sessão de treinamento não encontrada');
+    if(session.status === 'CANCELADO' || session.status === 'CONCLUIDO') {
+      throw new BadRequestException('Inscrições encerradas para este treinamento');
+    }
+
+    let participant = await this.prisma.participant.findUnique({
+      where: { cpf: dto.cpf },
+    });
+
+    if(!participant) {
+      participant = await this.prisma.participant.create({
+        data: {
+          name: dto.name,
+          cpf: dto.cpf,
+          email: dto.email,
+          cnhCategory: dto.cnhCategory,
+          cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
+        }
+      });
+    }
+
+    const existing = await this.prisma.trainingParticipant.findUnique({
+      where: {
+        trainingSessionId_participantId: {
+          trainingSessionId,
+          participantId: participant.id,
+        },
+      },  
+    });
+
+    if (existing) {
+      throw new ConflictException('CPF já inscrito neste treinamento');
+    }
+
+    return this.prisma.trainingParticipant.create({
+      data: {
+        trainingSessionId,
+        participantId: participant.id,
+        participationType: dto.participationType,
+      },
+      include: { participant: true },
+    });
+  }
+
+  updateParticipationType( participantId: string, dto: UpdateParticipantTypeDto) {
+    const record = this.prisma.trainingParticipant.findUnique({
+      where: { id: participantId },
+    });
+    if (!record) throw new NotFoundException('Participante não encontrado');
+
+    return this.prisma.trainingParticipant.update({
+      where: { id: participantId },
+      data: { participationType: dto.participationType },
+      include: { participant: true },
+    });
+  }
+
+  async removeParticipant(participantId: string) {
+    const record = await this.prisma.trainingParticipant.findUnique({
+      where: { id: participantId },
+    });
+    if (!record) throw new NotFoundException('Participante não encontrado');
+    if(record.status === 'EM_AVALIACAO') {
+      throw new BadRequestException('Não é possível remover participante em avaliação');
+    }
+
+    return this.prisma.trainingParticipant.delete({
+      where: { id: participantId },
     });
   }
 }
