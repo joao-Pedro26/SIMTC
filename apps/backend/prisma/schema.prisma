@@ -140,10 +140,7 @@ model DemandPipeline {
 enum DemandStatus {
   QUALIFICACAO
   ANALISE
-  PROPOSTA
   AGENDAMENTO
-  CONCLUIDO
-  PERDIDO
 }
 
 // ─── TREINAMENTOS ────────────────────────────────────────────────────────────
