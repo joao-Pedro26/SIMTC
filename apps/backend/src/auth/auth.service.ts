@@ -41,7 +41,7 @@ export class AuthService {
       role: user.role,
       consultantId: user.consultantId ?? undefined,
       companyId: user.contact?.companyId ?? undefined,
-    });
+    } as JwtPayload);
   }
 
   async refresh(refreshToken: string): Promise<AuthTokensDto> {
@@ -49,13 +49,27 @@ export class AuthService {
       const payload = this.jwt.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       }) as JwtPayload;
+
+      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      if (!user?.refreshTokenHash) throw new UnauthorizedException('Refresh token inválido');
+
+      const valid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+      if (!valid) throw new UnauthorizedException('Refresh token inválido');
+
       return this.generateTokens(payload);
     } catch {
       throw new UnauthorizedException('Refresh token inválido ou expirado');
     }
   }
 
-  private generateTokens(payload: JwtPayload): AuthTokensDto {
+  async logout(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshTokenHash: null },
+    });
+  }
+
+  private async generateTokens(payload: JwtPayload): Promise<AuthTokensDto> {
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
       expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
@@ -64,6 +78,13 @@ export class AuthService {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
     });
+
+    const hash = await bcrypt.hash(refreshToken, 10);
+    await this.prisma.user.update({
+      where: { id: payload.sub },
+      data: { refreshTokenHash: hash },
+    });
+
     return { accessToken, refreshToken };
   }
 
@@ -117,6 +138,6 @@ export class AuthService {
       email: user.email,
       role: user.role,
       companyId: user.contact?.companyId ?? undefined,
-    })
+    } as JwtPayload);
   }
 }

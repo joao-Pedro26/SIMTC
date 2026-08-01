@@ -279,6 +279,7 @@ model User {
   lastLogin    DateTime?
   otpCode      String?
   otpExpiresAt DateTime?
+  refreshTokenHash  String?
 
   consultantId String?         @unique
   contactId    String?         @unique
