@@ -5,8 +5,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AssessmentCategoriesService } from './assessment-categories.service';
-import { CreateAssessmentCategoryDto } from './dto/create-assessment-category.dto';
+import { CreateAssessmentCategoryDto, CreateInfractionDto } from './dto/create-assessment-category.dto';
 import { UpdateAssessmentCategoryDto } from './dto/update-assessment-category.dto';
+import { UpdateInfractionDto } from './dto/update-infraction.dto';
 
 @ApiTags('assessment-categories')
 @ApiBearerAuth()
@@ -52,4 +53,29 @@ export class AssessmentCategoriesController {
   deleteAssessmentCotegory(@Param('id') id: string){
     return this.service.deleteAssessmentCotegory(id)
   }
+
+  @Post(':id/infractions')
+@Roles(UserRole.ADMIN)
+addInfraction(@Param('id') id: string, @Body() dto: CreateInfractionDto) {
+  return this.service.addInfraction(id, dto);
+}
+
+@Patch(':id/infractions/:infractionId')
+@Roles(UserRole.ADMIN)
+updateInfraction(
+  @Param('id') id: string,
+  @Param('infractionId') infractionId: string,
+  @Body() dto: UpdateInfractionDto,
+) {
+  return this.service.updateInfraction(id, infractionId, dto);
+}
+
+@Delete(':id/infractions/:infractionId')
+@Roles(UserRole.ADMIN)
+removeInfraction(
+  @Param('id') id: string,
+  @Param('infractionId') infractionId: string,
+) {
+  return this.service.removeInfraction(id, infractionId);
+}
 }

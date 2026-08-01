@@ -2,6 +2,8 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssessmentCategoryDto } from './dto/create-assessment-category.dto';
 import { UpdateAssessmentCategoryDto } from './dto/update-assessment-category.dto';
+import { CreateInfractionDto } from './dto/create-assessment-category.dto';
+import { UpdateInfractionDto } from './dto/update-infraction.dto';
 
 @Injectable()
 export class AssessmentCategoriesService {
@@ -112,4 +114,53 @@ export class AssessmentCategoriesService {
       include: { notes: true },
     });
   }
+
+  async addInfraction(categoryId: string, dto: CreateInfractionDto) {
+  await this.findAssementCaretegoryById(categoryId);
+
+  return this.prisma.$transaction(async (tx) => {
+    const infraction = await tx.infraction.create({
+      data: { categoryId, description: dto.description, order: dto.order ?? 0 },
+    });
+
+    await tx.infractionNote.createMany({
+      data: dto.notes.map((n) => ({
+        infractionId: infraction.id,
+        noteType: n.noteType,
+        comment: n.comment,
+        deduction: n.deduction,
+      })),
+    });
+
+    return tx.infraction.findUnique({
+      where: { id: infraction.id },
+      include: { notes: true },
+    });
+  });
+}
+
+async updateInfraction(categoryId: string, infractionId: string, dto: UpdateInfractionDto) {
+  const infraction = await this.prisma.infraction.findFirst({
+    where: { id: infractionId, categoryId },
+  });
+  if (!infraction) throw new NotFoundException('Infração não encontrada');
+
+  return this.prisma.infraction.update({
+    where: { id: infractionId },
+    data: { description: dto.description, order: dto.order },
+    include: { notes: true },
+  });
+}
+
+async removeInfraction(categoryId: string, infractionId: string) {
+  const infraction = await this.prisma.infraction.findFirst({
+    where: { id: infractionId, categoryId },
+  });
+  if (!infraction) throw new NotFoundException('Infração não encontrada');
+
+  return this.prisma.$transaction(async (tx) => {
+    await tx.infractionNote.deleteMany({ where: { infractionId } });
+    return tx.infraction.delete({ where: { id: infractionId } });
+  });
+}
 }

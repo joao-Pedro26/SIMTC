@@ -21,7 +21,7 @@ class CreateInfractionNoteDto {
     deduction!: number;
 }
 
-class CreateInfractionDto {
+export class CreateInfractionDto {
     
     @IsString()
     description!: string;
