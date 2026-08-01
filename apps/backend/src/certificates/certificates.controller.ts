@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -17,6 +17,12 @@ export class CertificatesController {
   @ApiOperation({ summary: 'Gera PDFs em lote para todos os aprovados da sessão' })
   generateBatch(@Param('id') trainingSessionId: string) {
     return this.service.generateBatch(trainingSessionId);
+  }
+
+  @Get('certificates/:id')
+  @ApiOperation({ summary: 'Busca certificado por ID com URL do PDF' })
+  findById(@Param('id') id: string) {
+    return this.service.findById(id);
   }
 
   @Post('certificates/:id/send')

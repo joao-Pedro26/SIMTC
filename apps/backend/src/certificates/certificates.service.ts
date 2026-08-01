@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfGeneratorService } from './pdf-generator.service';
 import { StorageService } from '../storage/storage.service';
@@ -67,6 +67,19 @@ export class CertificatesService {
       create: { trainingParticipantId: trainingParticipant.id, pdfUrl: url },
       update: { pdfUrl: url, generatedAt: new Date() },
     });
+  }
+
+  async findById(id: string) {
+    const cert = await this.prisma.certificate.findUnique({
+      where: { id },
+      include: {
+        trainingParticipant: {
+          include: { participant: true, training: { include: { company: true, course: true } } },
+        },
+      },
+    });
+    if (!cert) throw new NotFoundException('Certificado não encontrado');
+    return cert;
   }
 
   async sendByEmail(certificateId: string, to: 'participant' | 'company' | 'both') {
