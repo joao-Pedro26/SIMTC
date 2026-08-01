@@ -68,6 +68,12 @@ export class TrainingSessionsController {
     return this.service.deleteSession(id);
   }
 
+  @Patch(':id/cancel')
+  @Roles('ADMIN' as any)
+  cancelTrainingSession(@Param('id') id: string) {
+    return this.service.cancelSession(id);
+  }
+
   @Patch(':id')
   @Roles('ADMIN' as any)
   updateTrainingSession(@Param('id') id: string, @Body() dto: UpdateTrainingSessionDto) {

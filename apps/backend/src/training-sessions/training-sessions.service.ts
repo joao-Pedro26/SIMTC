@@ -134,11 +134,25 @@ export class TrainingSessionsService {
   });
 }
 
+  async cancelSession(id: string) {
+    const session = await this.findTrainingSessionById(id);
+    if (session.status === 'CONCLUIDO') {
+      throw new ForbiddenException('Não é possível cancelar um treinamento já concluído');
+    }
+    if (session.status === 'CANCELADO') {
+      throw new ForbiddenException('Treinamento já está cancelado');
+    }
+    return this.prisma.trainingSession.update({
+      where: { id },
+      data: { status: 'CANCELADO' },
+    });
+  }
+
   async updateSession (id: string, dto: UpdateTrainingSessionDto) {
     const session = await this.findTrainingSessionById(id);
 
-    if(session.status === 'CONCLUIDO') {
-      throw new ForbiddenException('Não é possível editar um treinamento concluído');
+    if (session.status === 'CONCLUIDO' || session.status === 'CANCELADO') {
+      throw new ForbiddenException('Não é possível editar um treinamento concluído ou cancelado');
     }
 
     return this.prisma.$transaction(async (tx) => {
