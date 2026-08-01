@@ -10,6 +10,7 @@
     h2 { font-size: 18px; font-weight: normal; color: #444; }
     .body { margin: 40px 0; font-size: 16px; line-height: 1.8; }
     .highlight { font-size: 22px; font-weight: bold; }
+    .result { font-size: 16px; margin-top: 8px; color: #1A56DB; font-weight: bold; }
     .signatures { display: flex; justify-content: space-around; margin-top: 60px; }
     .sig { text-align: center; }
     .sig img { height: 60px; display: block; margin: 0 auto 8px; }
@@ -28,14 +29,16 @@
     <p>Certificamos que</p>
     <p class="highlight">{{participant.name}}</p>
     <p>participou do treinamento de segurança no trânsito <strong>{{course.name}}</strong>,
-    realizado em <strong>{{session.city}}/{{session.state}}</strong>,
+    realizado em <strong>{{session.city}}/{{session.state}}</strong>
+    {{#if session.date}}em <strong>{{session.date}}</strong>{{/if}},
     com carga horária de <strong>{{course.theoryHours}}h teóricas</strong> e <strong>{{course.practiceHours}}h práticas</strong>.</p>
-    <p>{{course.description}}</p>
+    {{#if course.description}}<p>{{course.description}}</p>{{/if}}
+    {{#if result}}<p class="result">Resultado: {{result}}</p>{{/if}}
   </div>
 
   <div class="signatures">
     <div class="sig">
-      <img src="{{consultant.signatureUrl}}" alt="Assinatura">
+      {{#if consultant.signatureUrl}}<img src="{{consultant.signatureUrl}}" alt="Assinatura">{{/if}}
       <div class="sig-line"></div>
       <p>{{consultant.name}}<br>Instrutor Responsável</p>
     </div>
@@ -47,6 +50,7 @@
 
   <div class="footer">
     SIM Treinamentos · simtc.com.br · CNPJ: 00.000.000/0001-00
+    {{#if certificateId}}<br>Certificado Nº {{certificateId}}{{/if}}
   </div>
 </body>
 </html>

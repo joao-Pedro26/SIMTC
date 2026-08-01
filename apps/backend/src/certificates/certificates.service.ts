@@ -51,22 +51,44 @@ export class CertificatesService {
   }
 
   private async generateOne(trainingParticipant: any, session: any) {
+    const cert = await this.prisma.certificate.upsert({
+      where: { trainingParticipantId: trainingParticipant.id },
+      create: { trainingParticipantId: trainingParticipant.id, pdfUrl: '' },
+      update: { generatedAt: new Date() },
+    });
+
+    const result = this.resolveResult(trainingParticipant);
+    const sessionDate = session.date
+      ? new Date(session.date).toLocaleDateString('pt-BR')
+      : null;
+
     const pdf = await this.pdfGenerator.renderCertificate({
       participant: trainingParticipant.participant,
-      session,
+      session: { ...session, date: sessionDate },
       company: session.company,
       course: session.course,
       consultant: session.responsibleConsultant,
+      result,
+      certificateId: cert.id,
     });
 
     const fileName = `${session.id}/${trainingParticipant.participantId}.pdf`;
     const url = await this.storage.upload('certificates', fileName, pdf, 'application/pdf');
 
-    return this.prisma.certificate.upsert({
-      where: { trainingParticipantId: trainingParticipant.id },
-      create: { trainingParticipantId: trainingParticipant.id, pdfUrl: url },
-      update: { pdfUrl: url, generatedAt: new Date() },
+    return this.prisma.certificate.update({
+      where: { id: cert.id },
+      data: { pdfUrl: url },
     });
+  }
+
+  private resolveResult(trainingParticipant: any): string | null {
+    if (trainingParticipant.participationType === 'SOMENTE_TEORICA') return null;
+    if (trainingParticipant.status === 'APROVADO') {
+      const score = trainingParticipant.assessment?.score;
+      if (score != null && score >= 85) return 'Aprovado com Excelência';
+      return 'Aprovado';
+    }
+    return null;
   }
 
   async findById(id: string) {
