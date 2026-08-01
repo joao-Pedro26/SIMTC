@@ -4,9 +4,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthTokensDto, JwtPayload } from '@simtc/shared-types';
 import { LoginDto } from './dto/login.dto';
-import { EmailService } from 'src/email/email.service';
+import { EmailService } from '../email/email.service';
 import { randomInt } from 'crypto';
-import { use } from 'passport';
 
 @Injectable()
 export class AuthService {
