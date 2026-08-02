@@ -16,6 +16,26 @@ export class ParticipantsService {
     });
   }
 
+  async findByToken(qrToken: string): Promise<{ companyName: string; courseName: string; status: string }> {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { qrCodeToken: qrToken },
+      include: {
+        company: { select: { name: true } },
+        course: { select: { name: true } },
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
+
+    return {
+      companyName: session.company.name,
+      courseName: session.course.name,
+      status: session.status,
+    };
+  }
+
   /** Rota pública — auto-cadastro via QR Code */
   async registerPublic(qrCodeToken: string, dto: RegisterParticipantPublicDto) {
     // 1. Encontra a sessão pelo token

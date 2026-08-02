@@ -2,7 +2,7 @@ import { Controller, Get, Post, Param, Body, UseGuards, Patch, Delete } from '@n
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ParticipantsService } from './participants.service';
-import { RegisterParticipantPublicDto, UserRole } from '@simtc/shared-types';
+import { UserRole } from '@simtc/shared-types';
 import { ValidateCpfPipe } from '../common/pipes/validate-cpf.pipe';
 import { AddParticipantDto } from './dto/add-participant.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -13,15 +13,6 @@ import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 @Controller()
 export class ParticipantsController {
   constructor(private readonly service: ParticipantsService) {}
-
-  @Post('public/register/:qrToken')
-  registerPublic(
-    @Param('qrToken') qrToken: string,
-    @Body('cpf', ValidateCpfPipe) _cpf: string,
-    @Body() dto: RegisterParticipantPublicDto,
-  ) {
-    return this.service.registerPublic(qrToken, dto);
-  }
 
   @Get('training-sessions/:id/participants')
   @ApiBearerAuth()
