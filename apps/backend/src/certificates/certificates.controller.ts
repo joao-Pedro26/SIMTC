@@ -31,8 +31,11 @@ export class CertificatesController {
   @Get('training-sessions/:id/certificates')
   @Roles('ADMIN' as any, 'CONSULTANT' as any, 'CLIENT' as any)
   @ApiOperation({ summary: 'Lista todos os certificados de uma sessão de treinamento' })
-  findByTrainingSession(@Param('id') trainingSessionId: string) {
-    return this.service.findByTrainingSession(trainingSessionId);
+  findByTrainingSession(
+    @Param('id') trainingSessionId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.findByTrainingSession(trainingSessionId, user);
   }
 
   @Get('training-sessions/:id/assessment-reports')
@@ -52,8 +55,8 @@ export class CertificatesController {
   @Get('certificates/:id/download-url')
   @Roles('ADMIN' as any, 'CONSULTANT' as any, 'CLIENT' as any)
   @ApiOperation({ summary: 'Retorna URL assinada de 5 minutos para download do PDF (bucket privado)' })
-  getDownloadUrl(@Param('id') id: string) {
-    return this.service.getDownloadUrl(id);
+  getDownloadUrl(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.getDownloadUrl(id, user);
   }
 
   @Get('assessment-reports/:id/download-url')

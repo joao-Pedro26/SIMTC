@@ -332,7 +332,16 @@ export class CertificatesService {
     return { url };
   }
 
-  async findByTrainingSession(trainingSessionId: string) {
+  async findByTrainingSession(trainingSessionId: string, user: JwtPayload) {
+    if (user.role === 'CLIENT') {
+      const session = await this.prisma.trainingSession.findUnique({
+        where: { id: trainingSessionId },
+        select: { companyId: true },
+      });
+      if (!session) throw new NotFoundException('Sessão não encontrada');
+      if (session.companyId !== user.companyId) throw new ForbiddenException('Acesso negado');
+    }
+
     const participants = await this.prisma.trainingParticipant.findMany({
       where: { trainingSessionId },
       include: {
@@ -345,6 +354,7 @@ export class CertificatesService {
     return participants.map((tp) => ({
       participantId: tp.participantId,
       participantName: tp.participant.name,
+      status: tp.status,
       certificate: tp.certificate
         ? {
             id: tp.certificate.id,
@@ -370,11 +380,25 @@ export class CertificatesService {
     return cert;
   }
 
-  async getDownloadUrl(id: string): Promise<{ url: string }> {
-    const cert = await this.prisma.certificate.findUnique({ where: { id } });
+  async getDownloadUrl(id: string, user: JwtPayload): Promise<{ url: string }> {
+    const cert = await this.prisma.certificate.findUnique({
+      where: { id },
+      include: {
+        trainingParticipant: {
+          include: { training: { select: { companyId: true } } },
+        },
+      },
+    });
     if (!cert || !cert.pdfUrl) throw new NotFoundException('Certificado não encontrado ou ainda não gerado');
+
+    if (user.role === 'CLIENT') {
+      if (cert.trainingParticipant.training.companyId !== user.companyId) {
+        throw new ForbiddenException('Acesso negado');
+      }
+    }
+
     const pdfPath = cert.pdfUrl.split('/certificates/')[1];
-    const url = await this.storage.getSignedUrl('certificates', pdfPath, 300); // 5 min
+    const url = await this.storage.getSignedUrl('certificates', pdfPath, 300);
     return { url };
   }
 
