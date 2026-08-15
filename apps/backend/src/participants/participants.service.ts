@@ -1,12 +1,16 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
 import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 
 @Injectable()
 export class ParticipantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   findBySession(trainingSessionId: string) {
     return this.prisma.trainingParticipant.findMany({
@@ -16,11 +20,16 @@ export class ParticipantsService {
     });
   }
 
-  async findByToken(qrToken: string): Promise<{ companyName: string; courseName: string; status: string }> {
+  async findByToken(qrToken: string): Promise<{
+    companyName: string;
+    companyLogoUrl: string | null;
+    courseName: string;
+    status: string;
+  }> {
     const session = await this.prisma.trainingSession.findUnique({
       where: { qrCodeToken: qrToken },
       include: {
-        company: { select: { name: true } },
+        company: { select: { name: true, logoUrl: true } },
         course: { select: { name: true } },
       },
     });
@@ -31,6 +40,7 @@ export class ParticipantsService {
 
     return {
       companyName: session.company.name,
+      companyLogoUrl: session.company.logoUrl ?? null,
       courseName: session.course.name,
       status: session.status,
     };
@@ -41,6 +51,10 @@ export class ParticipantsService {
     // 1. Encontra a sessão pelo token
     const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { qrCodeToken },
+      include: {
+        company: { select: { name: true } },
+        course: { select: { name: true } },
+      },
     });
 
     if (session.status === 'CANCELADO' || session.status === 'CONCLUIDO') {
@@ -78,9 +92,26 @@ export class ParticipantsService {
       throw new ConflictException('CPF já inscrito neste treinamento');
     }
 
-    return this.prisma.trainingParticipant.create({
-      data: { trainingSessionId: session.id, participantId: participant.id },
+    const trainingParticipant = await this.prisma.trainingParticipant.create({
+      data: {
+        trainingSessionId: session.id,
+        participantId: participant.id,
+        participationType: dto.participationType,
+      },
     });
+
+    if (participant.email) {
+      await this.email
+        .sendRegistrationConfirmation(
+          participant.email,
+          participant.name,
+          session.course.name,
+          session.company.name,
+        )
+        .catch((err) => console.error('Falha ao enviar e-mail de confirmação de inscrição:', err));
+    }
+
+    return trainingParticipant;
   }
 
   async addParticipant(trainingSessionId: string, dto: AddParticipantDto) {
