@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #111;
+    }
+
+    /* ── Page base ─────────────────────────────────────────────────── */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      position: relative;
+      background: #ffffff;
+      padding: 20mm 20mm 18mm 20mm;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #00AEEF;
+      padding-bottom: 10px;
+    }
+
+    .sim-logo {
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .doc-title {
+      text-align: right;
+    }
+
+    .doc-title h1 {
+      font-size: 15px;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin: 0 0 2px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .doc-title p {
+      font-size: 11px;
+      color: #555;
+      margin: 0;
+    }
+
+    /* ── Identification block ────────────────────────────────────────── */
+    .id-block {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+
+    .id-block-title {
+      background: #1a3a6a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 4px 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .id-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .id-row {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+      min-height: 26px;
+    }
+
+    .id-row:last-child {
+      border-bottom: none;
+    }
+
+    .id-row.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .id-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #555;
+      min-width: 110px;
+      padding: 4px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .id-value {
+      font-size: 11.5px;
+      color: #111;
+      padding: 4px 8px 4px 0;
+      flex: 1;
+    }
+
+    .id-sep {
+      width: 1px;
+      background: #eee;
+      align-self: stretch;
+    }
+
+    /* ── Assessment sections ─────────────────────────────────────────── */
+    .sections-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #1a3a6a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #00AEEF;
+    }
+
+    .section-item {
+      margin-bottom: 12px;
+    }
+
+    .section-header {
+      font-size: 12px;
+      font-weight: bold;
+      font-style: italic;
+      color: #1a3a6a;
+      margin-bottom: 3px;
+    }
+
+    .section-code {
+      font-size: 10.5px;
+      color: #00AEEF;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+
+    .section-note {
+      font-size: 11px;
+      color: #333;
+      line-height: 1.5;
+    }
+
+    .note-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .note-B   { background: #d4edda; color: #155724; }
+    .note-PM  { background: #fff3cd; color: #856404; }
+    .note-M   { background: #f8d7da; color: #721c24; }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+      font-size: 9.5px;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       PAGE 2 — CONCLUSÃO E ASSINATURA
+    ═══════════════════════════════════════════════════════════════════ */
+    .page-2 {
+      break-before: page;
+    }
+
+    .conclusion-body {
+      font-size: 12px;
+      line-height: 1.8;
+      color: #222;
+      flex: 1;
+      margin-top: 18px;
+      margin-bottom: 30px;
+    }
+
+    .conclusion-body p {
+      margin: 0 0 14px 0;
+    }
+
+    .signature-block {
+      text-align: right;
+      margin-top: auto;
+      padding-top: 20px;
+    }
+
+    .signature-location {
+      font-size: 12px;
+      color: #333;
+      margin-bottom: 24px;
+    }
+
+    .sig-img {
+      height: 56px;
+      display: block;
+      margin: 0 0 2px auto;
+      object-fit: contain;
+    }
+
+    .sig-line {
+      border-top: 1px solid #333;
+      width: 260px;
+      margin: 0 0 6px auto;
+    }
+
+    .sig-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: #111;
+      margin: 0;
+    }
+
+    .sig-credential {
+      font-size: 11px;
+      color: #555;
+      margin: 3px 0 0 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════ PAGE 1: IDENTIFICAÇÃO + AVALIAÇÃO ══ -->
+  <div class="page">
+
+    <div class="header">
+      {{#if simLogoDataUrl}}
+        <img class="sim-logo" src="{{{simLogoDataUrl}}}" alt="SIM Treinamentos">
+      {{else}}
+        <div style="font-size:13px;font-weight:bold;color:#1a3a6a;">SIM Treinamentos</div>
+      {{/if}}
+      <div class="doc-title">
+        <h1>Avaliação Técnica de Direção Veicular</h1>
+        <p>Relatório de avaliação prática individual</p>
+      </div>
+    </div>
+
+    <div class="id-block">
+      <div class="id-block-title">Dados do Avaliado</div>
+      <div class="id-grid">
+
+        <div class="id-row full-width">
+          <span class="id-label">Nome</span>
+          <span class="id-value">{{participantName}}</span>
+        </div>
+
+        <div class="id-row">
+          <span class="id-label">Categoria CNH</span>
+          <span class="id-value">{{cnhCategory}}</span>
+        </div>
+        <div style="width:1px;background:#eee;"></div>
+        <div class="id-row">
+          <span class="id-label">Validade CNH</span>
+          <span class="id-value">{{cnhExpiration}}</span>
+        </div>
+
+        <div class="id-row">
+          <span class="id-label">Local</span>
+          <span class="id-value">{{location}}</span>
+        </div>
+        <div style="width:1px;background:#eee;"></div>
+        <div class="id-row">
+          <span class="id-label">Data</span>
+          <span class="id-value">{{assessmentDate}}</span>
+        </div>
+
+        <div class="id-row">
+          <span class="id-label">Hora início</span>
+          <span class="id-value">{{startTime}}</span>
+        </div>
+        <div style="width:1px;background:#eee;"></div>
+        <div class="id-row">
+          <span class="id-label">Hora término</span>
+          <span class="id-value">{{endTime}}</span>
+        </div>
+
+      </div>
+    </div>
+
+    {{#if sections.length}}
+    <div class="sections-title">Pontos Observados na Avaliação</div>
+
+    {{#each sections}}
+    <div class="section-item">
+      <div class="section-header">
+        {{#if this.code}}<span class="section-code">{{this.code}}</span>{{/if}}{{this.name}}
+      </div>
+      {{#each this.items}}
+      <div class="section-note">
+        <span class="note-badge note-{{this.noteType}}">{{this.noteType}}</span>
+        {{this.description}}{{#if this.comment}} — <em>{{this.comment}}</em>{{/if}}
+      </div>
+      {{/each}}
+    </div>
+    {{/each}}
+    {{else}}
+    <div class="section-note" style="color:#888;font-style:italic;">Nenhuma infração registrada nesta avaliação.</div>
+    {{/if}}
+
+    <div class="page-footer">
+      <span>{{footerMonth}}</span>
+      <span>www.simtc.com.br</span>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════ PAGE 2: CONCLUSÃO E ASSINATURA ══ -->
+  <div class="page page-2">
+
+    <div class="header">
+      {{#if simLogoDataUrl}}
+        <img class="sim-logo" src="{{{simLogoDataUrl}}}" alt="SIM Treinamentos">
+      {{else}}
+        <div style="font-size:13px;font-weight:bold;color:#1a3a6a;">SIM Treinamentos</div>
+      {{/if}}
+      <div class="doc-title">
+        <h1>Avaliação Técnica de Direção Veicular</h1>
+        <p>Relatório de avaliação prática individual</p>
+      </div>
+    </div>
+
+    <div class="conclusion-body">
+      <p>
+        Prezado(a) <strong>{{firstName}}</strong>,
+      </p>
+      <p>
+        Esta avaliação técnica de direção veicular tem como objetivo contribuir para o seu
+        desenvolvimento como condutor(a), identificando oportunidades de melhoria que,
+        quando trabalhadas, elevam significativamente a sua segurança e a de todos ao redor.
+      </p>
+      <p>
+        Os pontos anotados durante a condução acompanhada refletem situações observadas
+        em campo e servem como base para reflexão e aprimoramento das suas práticas no
+        trânsito. Cada observação é uma oportunidade de crescimento.
+      </p>
+      <p>
+        Parabéns pela participação e pelo compromisso com a direção segura. Continuidade
+        e atenção aos pontos levantados farão toda a diferença no seu desempenho futuro.
+      </p>
+    </div>
+
+    <div class="signature-block">
+      <p class="signature-location">{{consultantCity}}, {{signatureDate}}</p>
+
+      {{#if consultantSignatureUrl}}
+        <img class="sig-img" src="{{{consultantSignatureUrl}}}" alt="Assinatura">
+      {{/if}}
+      <div class="sig-line"></div>
+      <p class="sig-name">{{consultantName}}</p>
+      {{#if credentialDetran}}<p class="sig-credential">{{credentialDetran}}</p>{{/if}}
+    </div>
+
+    <div class="page-footer">
+      <span>{{footerMonth}}</span>
+      <span>www.simtc.com.br</span>
+    </div>
+
+  </div>
+
+</body>
+</html>

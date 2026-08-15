@@ -42,12 +42,14 @@ model CompanyContact {
 // ─── CONSULTORES ─────────────────────────────────────────────────────────────
 
 model Consultant {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  signatureUrl String?
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  phone            String?
+  signatureUrl     String?
+  credentialDetran String?
+  regMte           String?
+  createdAt        DateTime @default(now())
 
   user               User?
   sessionConsultants SessionConsultant[]
@@ -66,6 +68,7 @@ model Course {
   theoryHours   Float
   practiceHours Float       @default(0)
   description   String
+  contentItems  Json?       // Array de { left: string, right?: string, leftBold?: boolean, rightBold?: boolean }
   createdAt     DateTime    @default(now())
 
   trainings TrainingSession[]
@@ -239,6 +242,8 @@ model PracticalAssessment {
   endTime               DateTime?
   synced                Boolean   @default(false)
   score                 Float?
+  reportPdfUrl          String?
+  reportGeneratedAt     DateTime?
   createdAt             DateTime  @default(now())
 
   trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
@@ -277,9 +282,11 @@ model User {
   role         UserRole
   createdAt    DateTime  @default(now())
   lastLogin    DateTime?
-  otpCode      String?
-  otpExpiresAt DateTime?
-  refreshTokenHash  String?
+  otpCode             String?
+  otpExpiresAt        DateTime?
+  refreshTokenHash    String?
+  resetTokenHash      String?
+  resetTokenExpiresAt DateTime?
 
   consultantId String?         @unique
   contactId    String?         @unique

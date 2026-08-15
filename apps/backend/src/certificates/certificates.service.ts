@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfGeneratorService } from './pdf-generator.service';
 import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../email/email.service';
+import { JwtPayload } from '@simtc/shared-types';
 
 @Injectable()
 export class CertificatesService {
@@ -64,18 +65,41 @@ export class CertificatesService {
       session.course.practiceHours,
     );
 
+    // Bucket 'signatures' é privado — resolve o path para uma signed URL
+    // temporária (5 min é suficiente para o Puppeteer renderizar o PDF)
+    const consultant = session.responsibleConsultant;
+    let signatureUrl: string | null = null;
+    if (consultant?.signatureUrl) {
+      const sigPath = consultant.signatureUrl.startsWith('http')
+        ? consultant.signatureUrl.replace(/.*\/signatures\//, '')
+        : consultant.signatureUrl;
+      signatureUrl = await this.storage.getSignedUrl('signatures', sigPath, 300).catch(() => null);
+    }
+
+    // Garante que contentItems é um array (campo Json? pode vir como null)
+    const contentItems = Array.isArray(session.course.contentItems)
+      ? session.course.contentItems
+      : null;
+
     const pdf = await this.pdfGenerator.renderCertificate({
       participant: trainingParticipant.participant,
       session: { ...session, date: sessionDate },
       company: session.company,
-      course: session.course,
-      consultant: session.responsibleConsultant,
+      course: { ...session.course, contentItems },
+      consultant: { ...consultant, signatureUrl },
       result,
       certificateId: cert.id,
       cargaHoraria,
     });
 
-    const fileName = `${session.id}/${trainingParticipant.participantId}.pdf`;
+    // Deleta o arquivo anterior para evitar arquivos órfãos no bucket
+    if (cert.pdfUrl) {
+      const oldPath = cert.pdfUrl.split('/certificates/')[1];
+      if (oldPath) await this.storage.delete('certificates', oldPath).catch(() => null);
+    }
+
+    // Timestamp no path para bustar o cache do CDN do Supabase
+    const fileName = `${session.id}/${trainingParticipant.participantId}-${Date.now()}.pdf`;
     const url = await this.storage.upload('certificates', fileName, pdf, 'application/pdf');
 
     return this.prisma.certificate.update({
@@ -113,6 +137,226 @@ export class CertificatesService {
     return null;
   }
 
+  async generateAssessmentReports(trainingSessionId: string) {
+    const session = await this.prisma.trainingSession.findUniqueOrThrow({
+      where: { id: trainingSessionId },
+      include: {
+        company: true,
+        course: true,
+        responsibleConsultant: true,
+        consultants: { include: { consultant: true } },
+        participants: {
+          include: {
+            participant: true,
+            assessment: {
+              include: {
+                items: {
+                  include: {
+                    infractionNote: {
+                      include: { infraction: { include: { category: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const withAssessment = session.participants.filter((tp) => tp.assessment !== null);
+
+    const results = await Promise.allSettled(
+      withAssessment.map((tp) => this.generateOneAssessmentReport(tp, session)),
+    );
+
+    return results.map((r, i) => ({
+      participantId: withAssessment[i].participantId,
+      status: r.status,
+      error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
+    }));
+  }
+
+  private async generateOneAssessmentReport(trainingParticipant: any, session: any) {
+    const assessment = trainingParticipant.assessment;
+    const participant = trainingParticipant.participant;
+    const consultant = session.responsibleConsultant;
+
+    let consultantSignatureUrl: string | null = null;
+    if (consultant?.signatureUrl) {
+      const sigPath = consultant.signatureUrl.startsWith('http')
+        ? consultant.signatureUrl.replace(/.*\/signatures\//, '')
+        : consultant.signatureUrl;
+      consultantSignatureUrl = await this.storage.getSignedUrl('signatures', sigPath, 300).catch(() => null);
+    }
+
+    const sections = this.buildAssessmentSections(assessment.items);
+
+    const assessmentDate = assessment.date
+      ? new Date(assessment.date).toLocaleDateString('pt-BR')
+      : null;
+    const startTime = assessment.startTime
+      ? new Date(assessment.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + 'h'
+      : null;
+    const endTime = assessment.endTime
+      ? new Date(assessment.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + 'h'
+      : null;
+    const footerMonth = assessment.date
+      ? new Date(assessment.date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      : null;
+    const signatureDate = assessment.date
+      ? this.formatDate(new Date(assessment.date))
+      : null;
+    const cnhExpiration = participant.cnhExpiration
+      ? new Date(participant.cnhExpiration).toLocaleDateString('pt-BR')
+      : null;
+
+    const pdf = await this.pdfGenerator.renderAssessmentReport({
+      participantName: participant.name,
+      firstName: participant.name.split(' ')[0],
+      cnhCategory: participant.cnhCategory ?? '—',
+      cnhExpiration: cnhExpiration ?? '—',
+      location: `${session.city}/${session.state}`,
+      assessmentDate,
+      startTime,
+      endTime,
+      footerMonth,
+      signatureDate,
+      sections,
+      consultantName: consultant?.name ?? '',
+      consultantCity: session.city,
+      credentialDetran: consultant?.credentialDetran ?? null,
+      consultantSignatureUrl,
+    });
+
+    // Deleta arquivo anterior do bucket para evitar órfãos
+    if (assessment.reportPdfUrl) {
+      const oldPath = assessment.reportPdfUrl.split('/reports/')[1];
+      if (oldPath) await this.storage.delete('reports', oldPath).catch(() => null);
+    }
+
+    const fileName = `${session.id}/${trainingParticipant.participantId}-relatorio-${Date.now()}.pdf`;
+    const url = await this.storage.upload('reports', fileName, pdf, 'application/pdf');
+
+    return this.prisma.practicalAssessment.update({
+      where: { id: assessment.id },
+      data: { reportPdfUrl: url, reportGeneratedAt: new Date() },
+    });
+  }
+
+  private buildAssessmentSections(items: any[]): any[] {
+    const categoryMap = new Map<string, { code: string; name: string; items: any[] }>();
+
+    for (const item of items) {
+      const note = item.infractionNote;
+      const infraction = note?.infraction;
+      const category = infraction?.category;
+      if (!category) continue;
+
+      if (!categoryMap.has(category.id)) {
+        categoryMap.set(category.id, { code: category.code, name: category.name, items: [] });
+      }
+      categoryMap.get(category.id)!.items.push({
+        noteType: note.noteType,
+        description: infraction.description,
+        comment: note.comment ?? null,
+      });
+    }
+
+    return Array.from(categoryMap.values());
+  }
+
+  async findAssessmentReportsByTrainingSession(trainingSessionId: string) {
+    const participants = await this.prisma.trainingParticipant.findMany({
+      where: { trainingSessionId },
+      include: {
+        participant: { select: { id: true, name: true } },
+        assessment: {
+          select: { id: true, reportPdfUrl: true, reportGeneratedAt: true },
+        },
+      },
+      orderBy: { participant: { name: 'asc' } },
+    });
+
+    return participants.map((tp) => ({
+      participantId: tp.participantId,
+      participantName: tp.participant.name,
+      status: tp.status,
+      assessmentReport: tp.assessment?.reportPdfUrl
+        ? {
+            id: tp.assessment.id,
+            pdfUrl: tp.assessment.reportPdfUrl,
+            generatedAt: tp.assessment.reportGeneratedAt,
+          }
+        : null,
+    }));
+  }
+
+  async getAssessmentReportDownloadUrl(assessmentId: string, user: JwtPayload): Promise<{ url: string }> {
+    const assessment = await this.prisma.practicalAssessment.findUnique({
+      where: { id: assessmentId },
+      include: {
+        trainingParticipant: {
+          include: {
+            training: {
+              include: {
+                consultants: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!assessment || !assessment.reportPdfUrl) {
+      throw new NotFoundException('Relatório não encontrado ou ainda não gerado');
+    }
+
+    const session = assessment.trainingParticipant.training;
+
+    if (user.role === 'CLIENT') {
+      if (session.companyId !== user.companyId) {
+        throw new ForbiddenException('Acesso negado');
+      }
+    } else if (user.role === 'CONSULTANT') {
+      const isAssigned =
+        session.responsibleConsultantId === user.consultantId ||
+        session.consultants.some((c: any) => c.consultantId === user.consultantId);
+      if (!isAssigned) {
+        throw new ForbiddenException('Você não tem acesso a este relatório');
+      }
+    }
+
+    const pdfPath = assessment.reportPdfUrl.split('/reports/')[1];
+    const url = await this.storage.getSignedUrl('reports', pdfPath, 300);
+    return { url };
+  }
+
+  async findByTrainingSession(trainingSessionId: string) {
+    const participants = await this.prisma.trainingParticipant.findMany({
+      where: { trainingSessionId },
+      include: {
+        participant: { select: { id: true, name: true } },
+        certificate: true,
+      },
+      orderBy: { participant: { name: 'asc' } },
+    });
+
+    return participants.map((tp) => ({
+      participantId: tp.participantId,
+      participantName: tp.participant.name,
+      certificate: tp.certificate
+        ? {
+            id: tp.certificate.id,
+            pdfUrl: tp.certificate.pdfUrl,
+            generatedAt: tp.certificate.generatedAt,
+            sentToParticipant: tp.certificate.sentToParticipant,
+            sentToCompany: tp.certificate.sentToCompany,
+          }
+        : null,
+    }));
+  }
+
   async findById(id: string) {
     const cert = await this.prisma.certificate.findUnique({
       where: { id },
@@ -124,6 +368,14 @@ export class CertificatesService {
     });
     if (!cert) throw new NotFoundException('Certificado não encontrado');
     return cert;
+  }
+
+  async getDownloadUrl(id: string): Promise<{ url: string }> {
+    const cert = await this.prisma.certificate.findUnique({ where: { id } });
+    if (!cert || !cert.pdfUrl) throw new NotFoundException('Certificado não encontrado ou ainda não gerado');
+    const pdfPath = cert.pdfUrl.split('/certificates/')[1];
+    const url = await this.storage.getSignedUrl('certificates', pdfPath, 300); // 5 min
+    return { url };
   }
 
   async sendByEmail(certificateId: string, to: 'participant' | 'company' | 'both') {
