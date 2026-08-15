@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { JwtPayload } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
@@ -7,14 +8,21 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class TrainingSessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   /** ADMIN vê todas as sessões; CONSULTANT vê apenas as suas */
   async findAll(user: JwtPayload, pagination: PaginationDto) {
-    const where =
+    const where: Record<string, unknown> =
       user.role === 'CONSULTANT'
         ? { consultants: { some: { consultantId: user.consultantId } } }
         : {};
+
+    if (pagination.companyId) {
+      where.companyId = pagination.companyId;
+    }
 
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
@@ -38,7 +46,7 @@ export class TrainingSessionsService {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findTrainingSessionById(id: string) {
+  async findTrainingSessionById(id: string, user?: JwtPayload) {
     const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { id },
       include: {
@@ -46,20 +54,56 @@ export class TrainingSessionsService {
         course: true,
         responsibleConsultant: true,
         consultants: { include: { consultant: true } },
-        participants: { include: { participant: true, assessment: true } },
+        participants: {
+          include: {
+            participant: true,
+            assessment: true,
+            certificate: true,
+            assignedConsultant: { select: { id: true, name: true } },
+          },
+        },
       },
     });
+
+    // CONSULTANT só pode ver o detalhe de uma sessão à qual está atribuído.
+    // (chamadas internas — cancelSession/updateSession/deleteSession — não passam
+    // `user`, então continuam sem essa checagem, pois já são restritas a ADMIN.)
+    if (user?.role === 'CONSULTANT') {
+      const isAssigned = session.consultants.some(
+        (c) => c.consultantId === user.consultantId,
+      );
+      if (!isAssigned) {
+        throw new ForbiddenException('Você não tem acesso a este treinamento');
+      }
+    }
+
     return session;
   }
 
-  async start(id: string) {
+  /** Só ADMIN ou o consultor responsável pela sessão podem iniciar/concluir (regras de negócio). */
+  private async assertCanManageLifecycle(id: string, user?: JwtPayload) {
+    if (!user || user.role === 'ADMIN') return;
+    const session = await this.prisma.trainingSession.findUniqueOrThrow({
+      where: { id },
+      select: { responsibleConsultantId: true },
+    });
+    if (session.responsibleConsultantId !== user.consultantId) {
+      throw new ForbiddenException(
+        'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
+      );
+    }
+  }
+
+  async start(id: string, user?: JwtPayload) {
+    await this.assertCanManageLifecycle(id, user);
     return this.prisma.trainingSession.update({
       where: { id },
       data: { status: 'EM_ANDAMENTO' },
     });
   }
 
-  async complete(id: string) {
+  async complete(id: string, user?: JwtPayload) {
+    await this.assertCanManageLifecycle(id, user);
     return this.prisma.trainingSession.update({
       where: { id },
       data: { status: 'CONCLUIDO' },
@@ -83,7 +127,7 @@ export class TrainingSessionsService {
       ...(dto.additionalConsultantsIds ?? []),
     ].filter((id, index, self) => self.indexOf(id) === index);
 
-    return this.prisma.$transaction(async (tx) => {
+    const session = await this.prisma.$transaction(async (tx) => {
       const trainingSession = await tx.trainingSession.create({
         data: {
           companyId: dto.companyId,
@@ -107,13 +151,33 @@ export class TrainingSessionsService {
       return tx.trainingSession.findUnique({
         where: { id: trainingSession.id },
         include: {
-          company: { select: { id: true, name: true } },
+          company: { select: { id: true, name: true, contacts: { select: { name: true, email: true } } } },
           course: { select: { id: true, name: true } },
           responsibleConsultant: { select: { id: true, name: true } },
           consultants: { include: { consultant: { select: { id: true, name: true } } } },
-        }        
-      })
+        },
+      });
     });
+
+    if (session) {
+      const company = session.company as { id: string; name: string; contacts: { name: string; email: string }[] };
+      const promises = company.contacts.map((contact) =>
+        this.email
+          .sendTrainingScheduled(
+            contact.email,
+            contact.name,
+            session.course!.name,
+            company.name,
+            session.city,
+            session.state,
+            session.date,
+          )
+          .catch((err) => console.error(`Falha ao notificar contato ${contact.email} sobre treinamento agendado:`, err)),
+      );
+      await Promise.allSettled(promises);
+    }
+
+    return session;
   }
 
  async deleteSession(id: string) {
@@ -170,7 +234,7 @@ export class TrainingSessionsService {
         const allConsultantIds = [
           dto.responsibleConsultantId ?? session.responsibleConsultantId,
           ...dto.additionalConsultantsIds,
-        ].filter((cid, index, self) => self.indexOf (cid) === index);
+        ].filter((cid, index, self): cid is string => Boolean(cid) && self.indexOf(cid) === index);
 
         await tx.sessionConsultant.createMany({
           data: allConsultantIds.map((consultantId) => ({
