@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, FileTypeValidator, Get, MaxFileSizeValidator, Param, ParseFilePipe, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, MaxFileSizeValidator, NotFoundException, Param, ParseFilePipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UserRole } from '@simtc/shared-types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -23,8 +23,9 @@ export class ConsultantsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.CONSULTANT)
-  findAllConsultants() {
-    return this.service.findAllConsultants();
+  @ApiOperation({ summary: 'Lista consultores. Use ?active=true para trazer só os ativos (ex: dropdowns de atribuição de novo trabalho).' })
+  findAllConsultants(@Query('active') active?: string) {
+    return this.service.findAllConsultants(active === 'true');
   }
 
   @Get(':id')
@@ -45,19 +46,34 @@ export class ConsultantsController {
     return this.service.updateConsultant(id, dto);
   }
 
+  @Post(':id/reset-password')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Gera uma nova senha aleatória para o consultor e reenvia por e-mail' })
+  resetPassword(@Param('id') id: string) {
+    return this.service.resetConsultantPassword(id);
+  }
+
+  @Get(':id/signature-url')
+  @Roles(UserRole.ADMIN)
+  async getSignatureUrl(@Param('id') id: string) {
+    const result = await this.service.getSignatureSignedUrl(id);
+    if (!result) throw new NotFoundException('Sem assinatura cadastrada');
+    return result;
+  }
+
   @Patch(':id/signature')
   @Roles(UserRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
-  uploadSignature(@Param('id') id: string,
+  uploadSignature(
+    @Param('id') id: string,
     @UploadedFile(new ParseFilePipe({
-      validators: [
-        new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 }), // 5MB
-        new FileTypeValidator({ fileType: /image\/(png|jpeg)/ }),
-      ],
-    }),
-  )
-  file: Express.Multer.File,
-)  {
+      validators: [new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 })],
+    }))
+    file: Express.Multer.File,
+  ) {
+    if (!/^image\/(png|jpeg|svg\+xml)$/.test(file.mimetype)) {
+      throw new BadRequestException('Tipo de arquivo inválido. Aceito: PNG, JPEG, SVG.');
+    }
     return this.service.uploadSignature(id, file.buffer, file.mimetype);
   }
 }

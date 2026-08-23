@@ -3,6 +3,14 @@ export interface LoginDto {
   password: string;
 }
 
+export interface CheckEmailDto {
+  email: string;
+}
+
+export interface CheckEmailResponseDto {
+  authMethod: 'password' | 'otp' | 'not_found';
+}
+
 export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
@@ -14,4 +22,11 @@ export interface JwtPayload {
   role: string;
   consultantId?: string;
   companyId?: string;
+}
+
+export interface MeResponseDto {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }

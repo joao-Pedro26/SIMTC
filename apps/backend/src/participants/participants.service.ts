@@ -52,7 +52,7 @@ export class ParticipantsService {
     const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { qrCodeToken },
       include: {
-        company: { select: { name: true } },
+        company: { select: { name: true, logoUrl: true } },
         course: { select: { name: true } },
       },
     });
@@ -107,6 +107,7 @@ export class ParticipantsService {
           participant.name,
           session.course.name,
           session.company.name,
+          session.company.logoUrl,
         )
         .catch((err) => console.error('Falha ao enviar e-mail de confirmação de inscrição:', err));
     }

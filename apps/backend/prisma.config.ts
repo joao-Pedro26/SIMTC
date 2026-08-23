@@ -6,6 +6,9 @@ import { config } from 'dotenv';
 config({ path: '.env.development' });
 
 export default defineConfig({
+  migrations: {
+    seed: 'ts-node ./prisma/seed.ts',
+  },
   datasource: {
     // DIRECT_URL: conexão direta ao banco, necessária para migrations.
     // DATABASE_URL (pooler) não funciona para migrations pois o PgBouncer

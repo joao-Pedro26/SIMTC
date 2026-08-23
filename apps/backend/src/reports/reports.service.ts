@@ -10,7 +10,9 @@ export class ReportsService {
     const where =
       user.role === 'CONSULTANT'
         ? { consultants: { some: { consultantId: user.consultantId } } }
-        : {};
+        : user.role === 'CLIENT'
+          ? { companyId: user.companyId }
+          : {};
 
     return this.prisma.trainingSession.findMany({
       where,
@@ -26,8 +28,8 @@ export class ReportsService {
     });
   }
 
-  async getSessionReport(id: string) {
-    return this.prisma.trainingSession.findUniqueOrThrow({
+  async getSessionReport(id: string, user: JwtPayload) {
+    const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { id },
       include: {
         company: true,
@@ -53,6 +55,21 @@ export class ReportsService {
         },
       },
     });
+
+    if (user.role === 'CLIENT') {
+      if (session.companyId !== user.companyId) {
+        throw new ForbiddenException('Acesso negado');
+      }
+    } else if (user.role === 'CONSULTANT') {
+      const isAssigned = session.consultants.some(
+        (c) => c.consultantId === user.consultantId,
+      );
+      if (!isAssigned) {
+        throw new ForbiddenException('Você não tem acesso a este treinamento');
+      }
+    }
+
+    return session;
   }
 
   async getCompanyHistory(companyId: string, user: JwtPayload) {

@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 
 enum VehicleType {
   LEVE = 'LEVE',
@@ -27,4 +27,8 @@ export class CreateCourseDto {
     @MinLength(2)
     @MaxLength(1000)
     description!: string;
+
+    @IsOptional()
+    @IsArray()
+    contentItems?: any[];
 }

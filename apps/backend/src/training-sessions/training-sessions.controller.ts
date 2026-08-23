@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TrainingSessionsService } from './training-sessions.service';
 import { QrCodeService } from './qr-code.service';
@@ -23,26 +24,31 @@ export class TrainingSessionsController {
   ) {}
 
   @Get()
+  @Roles('ADMIN' as any, 'CONSULTANT' as any)
   @ApiOperation({ summary: 'Lista sessões — ADMIN vê tudo, CONSULTANT vê só as suas' })
   findAll(@CurrentUser() user: JwtPayload, @Query() pagination: PaginationDto) {
     return this.service.findAll(user, pagination);
   }
 
   @Get(':id')
-  findTrainingSessionById(@Param('id') id: string) {
-    return this.service.findTrainingSessionById(id);
+  @Roles('ADMIN' as any, 'CONSULTANT' as any)
+  @ApiOperation({ summary: 'Detalhe da sessão — CONSULTANT só acessa se estiver atribuído a ela' })
+  findTrainingSessionById(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.findTrainingSessionById(id, user);
   }
 
   @Post(':id/start')
-  @Roles('ADMIN' as any)
-  start(@Param('id') id: string) {
-    return this.service.start(id);
+  @Roles('ADMIN' as any, 'CONSULTANT' as any)
+  @ApiOperation({ summary: 'Inicia a sessão — ADMIN ou o consultor responsável por ela' })
+  start(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.start(id, user);
   }
 
   @Post(':id/complete')
-  @Roles('ADMIN' as any)
-  complete(@Param('id') id: string) {
-    return this.service.complete(id);
+  @Roles('ADMIN' as any, 'CONSULTANT' as any)
+  @ApiOperation({ summary: 'Conclui a sessão — ADMIN ou o consultor responsável por ela' })
+  complete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.complete(id, user);
   }
 
   @Post()
@@ -53,7 +59,8 @@ export class TrainingSessionsController {
   }
 
   @Get(':id/qr-code')
-  @ApiOperation({ summary: 'Retorna imagem PNG do QR Code da sessão' })
+  @Public()
+  @ApiOperation({ summary: 'Retorna imagem PNG do QR Code da sessão — público (usado como <img src>)' })
   async getQrCode(@Param('id') id: string, @Res() res: Response) {
     const session = await this.service.findTrainingSessionById(id);
     const png = await this.qrCode.generatePng(
@@ -65,6 +72,7 @@ export class TrainingSessionsController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN' as any)
   deleteTrainingSession(@Param('id') id:string){
     return this.service.deleteSession(id);
   }

@@ -7,7 +7,6 @@ import { ValidateCpfPipe } from '../common/pipes/validate-cpf.pipe';
 import { AddParticipantDto } from './dto/add-participant.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 
 @ApiTags('participants')
 @Controller()
@@ -31,17 +30,6 @@ export class ParticipantsController {
     @Body() dto: AddParticipantDto,
   ) {
     return this.service.addParticipant(trainingSessionId, dto);
-  }
-
-  @Patch('participants/:participantId/type') 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  updateParticipationType(
-    @Param('participantId') participantId: string,
-    @Body() dto: UpdateParticipantTypeDto,
-  ) {
-    return this.service.updateParticipationType(participantId, dto);
   }
 
   @Delete('participants/:participantId')

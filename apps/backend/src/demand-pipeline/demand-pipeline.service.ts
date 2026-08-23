@@ -6,7 +6,7 @@ import { UpdateDemandStatusDto } from './dto/update-demand-status.dto';
 
 
 const INCLUDE = {
-  company: { select: { id: true, name: true } },
+  company: { select: { id: true, name: true, logoUrl: true } },
   consultant: { select: { id: true, name: true } },
   course: { select: { id: true, name: true } }, 
 };

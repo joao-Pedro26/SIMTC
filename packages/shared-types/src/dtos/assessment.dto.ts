@@ -20,9 +20,9 @@ export interface CreateInfractionDto {
 
 export interface SyncPracticalAssessmentDto {
   trainingParticipantId: string;
-  consultantId: string;
-  date: string;        // ISO date
-  startTime: string;   // ISO datetime
+  consultantId?: string;   // opcional — no web vem do JWT; no mobile pode ser enviado
+  date: string;            // ISO date
+  startTime: string;       // ISO datetime
   endTime?: string;
   items: {
     infractionNoteId: string;

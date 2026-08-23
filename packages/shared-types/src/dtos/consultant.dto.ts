@@ -2,7 +2,8 @@ export interface CreateConsultantDto {
   name: string;
   email: string;
   phone?: string;
-  password: string; // criado pelo admin — hash no backend
+  // Senha não é mais definida pelo admin: é gerada automaticamente no backend
+  // e enviada por e-mail ao consultor (ver EmailService.sendConsultantCredentials).
 }
 
 export interface UpdateConsultantDto {

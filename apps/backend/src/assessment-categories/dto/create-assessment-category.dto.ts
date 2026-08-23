@@ -1,5 +1,6 @@
 import { Type } from "class-transformer";
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+// ArrayMinSize mantido pois ainda é usado em CreateInfractionDto (notes)
 
 enum NoteType {
     B = 'B',
@@ -56,7 +57,6 @@ export class CreateAssessmentCategoryDto {
 
     @IsArray()
     @ValidateNested({each: true})
-    @ArrayMinSize(1)
     @Type(() => CreateInfractionDto)
     infractions!: CreateInfractionDto[]
 }

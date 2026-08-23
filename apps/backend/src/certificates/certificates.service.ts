@@ -409,7 +409,8 @@ export class CertificatesService {
         trainingParticipant: {
           include: {
             participant: true,
-            training: { include: { company: { include: { contacts: true } } } },
+            assessment: { select: { reportPdfUrl: true } },
+            training: { include: { company: { include: { contacts: true } }, course: true } },
           },
         },
       },
@@ -418,9 +419,28 @@ export class CertificatesService {
     const pdfPath = cert.pdfUrl!.split('/certificates/')[1];
     const pdfBuffer = await this.storage.download('certificates', pdfPath);
     const tp = cert.trainingParticipant;
+    const companyLogoUrl = tp.training.company.logoUrl;
+    const courseName = tp.training.course.name;
+
+    // Se o participante já tem relatório de avaliação técnica gerado, anexa
+    // junto no mesmo e-mail do certificado.
+    let reportPdfBuffer: Buffer | null = null;
+    if (tp.assessment?.reportPdfUrl) {
+      const reportPath = tp.assessment.reportPdfUrl.split('/reports/')[1];
+      if (reportPath) {
+        reportPdfBuffer = await this.storage.download('reports', reportPath).catch(() => null);
+      }
+    }
 
     if ((to === 'participant' || to === 'both') && tp.participant.email) {
-      await this.email.sendCertificate(tp.participant.email, tp.participant.name, pdfBuffer);
+      await this.email.sendCertificateAndReport(
+        tp.participant.email,
+        tp.participant.name,
+        courseName,
+        pdfBuffer,
+        companyLogoUrl,
+        reportPdfBuffer,
+      );
       await this.prisma.certificate.update({
         where: { id: certificateId },
         data: { sentToParticipant: true },
@@ -430,7 +450,14 @@ export class CertificatesService {
     if (to === 'company' || to === 'both') {
       const primary = tp.training.company.contacts.find((c: any) => c.isPrimary);
       if (primary) {
-        await this.email.sendCertificate(primary.email, tp.participant.name, pdfBuffer);
+        await this.email.sendCertificateAndReport(
+          primary.email,
+          tp.participant.name,
+          courseName,
+          pdfBuffer,
+          companyLogoUrl,
+          reportPdfBuffer,
+        );
         await this.prisma.certificate.update({
           where: { id: certificateId },
           data: { sentToCompany: true },

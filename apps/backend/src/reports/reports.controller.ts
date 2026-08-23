@@ -18,8 +18,8 @@ export class ReportsController {
   }
 
   @Get('training-sessions/:id')
-  getSession(@Param('id') id: string) {
-    return this.service.getSessionReport(id);
+  getSession(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.getSessionReport(id, user);
   }
 
   @Get('companies/:id/history')

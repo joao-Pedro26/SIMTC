@@ -13,8 +13,21 @@ export class UsersService {
     if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = await this.prisma.user.create({
-      data: { email: dto.email, passwordHash, role: 'ADMIN' },
+
+    // Cria Consultant + User em transação — todo admin tem perfil de consultor vinculado
+    const user = await this.prisma.$transaction(async (tx) => {
+      const consultant = await tx.consultant.create({
+        data: { name: dto.name, email: dto.email },
+      });
+
+      return tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          role: 'ADMIN',
+          consultantId: consultant.id,
+        },
+      });
     });
 
     const { passwordHash: _, ...result } = user;

@@ -49,6 +49,7 @@ model Consultant {
   signatureUrl     String?
   credentialDetran String?
   regMte           String?
+  active           Boolean  @default(true)
   createdAt        DateTime @default(now())
 
   user               User?
@@ -127,7 +128,7 @@ enum NoteType {
 model DemandPipeline {
   id               String       @id @default(cuid())
   companyId        String
-  consultantId     String
+  consultantId     String?
   courseId         String
   status           DemandStatus @default(QUALIFICACAO)
   participantCount Int?
@@ -135,9 +136,9 @@ model DemandPipeline {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  company    Company    @relation(fields: [companyId], references: [id])
-  consultant Consultant @relation(fields: [consultantId], references: [id])
-  course     Course     @relation(fields: [courseId], references: [id])
+  company    Company     @relation(fields: [companyId], references: [id])
+  consultant Consultant? @relation(fields: [consultantId], references: [id])
+  course     Course      @relation(fields: [courseId], references: [id])
 }
 
 enum DemandStatus {
@@ -152,7 +153,7 @@ model TrainingSession {
   id                      String         @id @default(cuid())
   companyId               String
   courseId                String
-  responsibleConsultantId String
+  responsibleConsultantId String?
   city                    String
   state                   String
   date                    DateTime?
@@ -165,7 +166,7 @@ model TrainingSession {
 
   company               Company               @relation(fields: [companyId], references: [id])
   course                Course                @relation(fields: [courseId], references: [id])
-  responsibleConsultant Consultant            @relation(fields: [responsibleConsultantId], references: [id])
+  responsibleConsultant Consultant?           @relation(fields: [responsibleConsultantId], references: [id])
   consultants           SessionConsultant[]
   participants          TrainingParticipant[]
 }
@@ -236,7 +237,7 @@ enum ParticipantStatus {
 model PracticalAssessment {
   id                    String    @id @default(cuid())
   trainingParticipantId String    @unique
-  consultantId          String
+  consultantId          String?
   date                  DateTime
   startTime             DateTime
   endTime               DateTime?
@@ -247,7 +248,7 @@ model PracticalAssessment {
   createdAt             DateTime  @default(now())
 
   trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
-  consultant          Consultant          @relation(fields: [consultantId], references: [id])
+  consultant          Consultant?         @relation(fields: [consultantId], references: [id])
   items               AssessmentItem[]
 }
 

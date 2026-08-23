@@ -4,6 +4,7 @@ import { StorageService } from '../storage/storage.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateContactUserDto } from './dto/create-contact-user.dto';
+import { UpdateContactDto } from './dto/update-contact.dto';
 
 @Injectable()
 export class CompaniesService {
@@ -18,6 +19,13 @@ export class CompaniesService {
     });
     if (existingCompany) {
       throw new ConflictException('Empresa com este CNPJ já existe.');
+    }
+
+    for (const c of dto.contacts) {
+      const existingUser = await this.prisma.user.findUnique({ where: { email: c.email } });
+      if (existingUser) {
+        throw new ConflictException(`O e-mail "${c.email}" já está cadastrado no sistema.`);
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -59,7 +67,16 @@ export class CompaniesService {
 
   async findAllCompanies() {
     return this.prisma.company.findMany({
-      include: { contacts: true },
+      include: {
+        contacts: true,
+        // Traz apenas o treinamento concluído mais recente para exibir "Último Treinamento"
+        trainings: {
+          where: { status: 'CONCLUIDO' },
+          orderBy: { date: 'desc' },
+          take: 1,
+          select: { date: true },
+        },
+      },
       orderBy: { name: 'asc' },
     });
   }
@@ -75,12 +92,71 @@ export class CompaniesService {
 
   async deleteCompany(id: string) {
     await this.findCompanyById(id);
+
+    // Bloqueia apenas sessões ativas — canceladas podem ser limpas junto com a empresa
+    const activeSessionCount = await this.prisma.trainingSession.count({
+      where: { companyId: id, status: { in: ['PLANEJADO', 'EM_ANDAMENTO'] } },
+    });
+
+    if (activeSessionCount > 0) {
+      throw new ConflictException(
+        `Não é possível excluir esta empresa pois ela possui ${activeSessionCount} sessão(ões) ativa(s). Cancele ou conclua os treinamentos antes de excluir.`,
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
+      // Busca todas as sessões da empresa (canceladas/concluídas)
+      const sessions = await tx.trainingSession.findMany({
+        where: { companyId: id },
+        select: { id: true },
+      });
+      const sessionIds = sessions.map((s) => s.id);
+
+      if (sessionIds.length > 0) {
+        // Busca participantes dessas sessões
+        const participants = await tx.trainingParticipant.findMany({
+          where: { trainingSessionId: { in: sessionIds } },
+          select: { id: true },
+        });
+        const participantIds = participants.map((p) => p.id);
+
+        if (participantIds.length > 0) {
+          // Deleta em cascata: itens de avaliação → avaliações → certificados → participantes
+          const assessments = await tx.practicalAssessment.findMany({
+            where: { trainingParticipantId: { in: participantIds } },
+            select: { id: true },
+          });
+          await tx.assessmentItem.deleteMany({
+            where: { assessmentId: { in: assessments.map((a) => a.id) } },
+          });
+          await tx.practicalAssessment.deleteMany({
+            where: { trainingParticipantId: { in: participantIds } },
+          });
+          await tx.certificate.deleteMany({
+            where: { trainingParticipantId: { in: participantIds } },
+          });
+          await tx.trainingParticipant.deleteMany({
+            where: { trainingSessionId: { in: sessionIds } },
+          });
+        }
+
+        // Deleta consultores vinculados às sessões e as sessões em si
+        await tx.sessionConsultant.deleteMany({
+          where: { trainingSessionId: { in: sessionIds } },
+        });
+        await tx.trainingSession.deleteMany({ where: { companyId: id } });
+      }
+
+      // Deleta demandas
+      await tx.demandPipeline.deleteMany({ where: { companyId: id } });
+
+      // Deleta contatos e usuários vinculados
       const contacts = await tx.companyContact.findMany({ where: { companyId: id } });
       for (const contact of contacts) {
         await tx.user.deleteMany({ where: { contactId: contact.id } });
       }
       await tx.companyContact.deleteMany({ where: { companyId: id } });
+
       return tx.company.delete({ where: { id } });
     });
   }
@@ -101,6 +177,41 @@ export class CompaniesService {
         data: { email: dto.email, role: 'CLIENT', contactId: contact.id },
       });
       return contact;
+    });
+  }
+
+  async updateContact(companyId: string, contactId: string, dto: UpdateContactDto) {
+    const contact = await this.prisma.companyContact.findFirst({
+      where: { id: contactId, companyId },
+    });
+    if (!contact) throw new NotFoundException('Contato não encontrado');
+
+    // Se o e-mail está sendo alterado, verifica se já existe outro usuário com esse e-mail
+    if (dto.email && dto.email !== contact.email) {
+      const conflict = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (conflict) throw new ConflictException('Este e-mail já está em uso por outro usuário.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Atualiza o contato
+      const updated = await tx.companyContact.update({
+        where: { id: contactId },
+        data: {
+          ...(dto.name  !== undefined && { name: dto.name }),
+          ...(dto.email !== undefined && { email: dto.email }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+        },
+      });
+
+      // Se o e-mail mudou, atualiza também o User vinculado (login)
+      if (dto.email && dto.email !== contact.email) {
+        await tx.user.updateMany({
+          where: { contactId },
+          data: { email: dto.email },
+        });
+      }
+
+      return updated;
     });
   }
 
@@ -132,8 +243,20 @@ export class CompaniesService {
   }
 
   async uploadCompanyLogo(id: string, buffer: Buffer, contentType: string) {
-    await this.findCompanyById(id);
-    const url = await this.storage.upload('logos', id, buffer, contentType);
+    const company = await this.findCompanyById(id);
+
+    // Apaga o arquivo anterior para não acumular arquivos órfãos no bucket
+    if (company.logoUrl) {
+      const oldPath = new URL(company.logoUrl).pathname
+        .replace(/^\/storage\/v1\/object\/public\/logos\//, '');
+      await this.storage.delete('logos', oldPath).catch(() => null);
+    }
+
+    // Usa timestamp no caminho para garantir URL única e bustar o CDN automaticamente
+    const ext = contentType === 'image/png' ? 'png' : contentType === 'image/svg+xml' ? 'svg' : 'jpg';
+    const path = `${id}/${Date.now()}.${ext}`;
+    const url = await this.storage.upload('logos', path, buffer, contentType);
+
     return this.prisma.company.update({
       where: { id },
       data: { logoUrl: url },

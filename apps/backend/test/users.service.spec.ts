@@ -4,6 +4,11 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from 'src/users/users.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+const mockTx = {
+  consultant: { create: jest.fn() },
+  user: { create: jest.fn() },
+};
+
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
@@ -11,6 +16,8 @@ const mockPrisma = {
     findMany: jest.fn(),
     update: jest.fn(),
   },
+  // $transaction executa o callback passando mockTx como "tx"
+  $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
 };
 
 describe('UsersService', () => {
@@ -26,6 +33,9 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     jest.clearAllMocks();
+    // Reseta também os mocks do tx
+    mockTx.consultant.create.mockReset();
+    mockTx.user.create.mockReset();
   });
 
   // ─── createAdmin ─────────────────────────────────────────────────────────
@@ -33,21 +43,25 @@ describe('UsersService', () => {
   describe('createAdmin', () => {
     it('lança 409 se e-mail já existe', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: '1' });
-      await expect(service.createAdmin({ email: 'a@a.com', password: '12345678' }))
+      await expect(service.createAdmin({ name: 'Admin', email: 'a@a.com', password: '12345678' }))
         .rejects.toThrow(ConflictException);
     });
 
-    it('cria admin sem retornar o passwordHash', async () => {
+    it('cria admin sem retornar o passwordHash e com consultantId vinculado', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      mockPrisma.user.create.mockResolvedValue({
-        id: '1', email: 'a@a.com', role: 'ADMIN', passwordHash: 'hash', createdAt: new Date(),
+      mockTx.consultant.create.mockResolvedValue({ id: 'c1', name: 'Admin', email: 'a@a.com' });
+      mockTx.user.create.mockResolvedValue({
+        id: '1', email: 'a@a.com', role: 'ADMIN', consultantId: 'c1', passwordHash: 'hash', createdAt: new Date(),
       });
 
-      const result = await service.createAdmin({ email: 'a@a.com', password: '12345678' });
+      const result = await service.createAdmin({ name: 'Admin', email: 'a@a.com', password: '12345678' });
 
       expect(result).not.toHaveProperty('passwordHash');
-      expect(mockPrisma.user.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ role: 'ADMIN' }) }),
+      expect(mockTx.consultant.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ name: 'Admin', email: 'a@a.com' }) }),
+      );
+      expect(mockTx.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ role: 'ADMIN', consultantId: 'c1' }) }),
       );
     });
   });

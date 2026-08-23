@@ -1,76 +1,157 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   private readonly resend = new Resend(process.env.RESEND_API_KEY);
-  // Configurável via EMAIL_FROM — útil para testar com o remetente sandbox do
-  // Resend (onboarding@resend.dev) antes do domínio simtc.com.br ser verificado.
   private readonly from = process.env.EMAIL_FROM ?? 'SIM Treinamentos <noreply@simtc.com.br>';
+  private readonly simLogoUrl =
+    process.env.SIM_LOGO_URL ?? `${process.env.SUPABASE_URL}/storage/v1/object/public/logos/logo-sim-treinamentos.png`;
+  
+  private readonly brandBarUrl =
+    process.env.EMAIL_BRAND_BAR_URL ??
+    `${process.env.SUPABASE_URL}/storage/v1/object/public/logos/email-brand-bar.png`; 
 
-  async sendCertificate(to: string, participantName: string, pdfBuffer: Buffer) {
-    await this.resend.emails.send({
+  /**
+   * Envia o certificado de participação e, se fornecido, o relatório de avaliação
+   * técnica em anexo no mesmo e-mail. Usa o template "certificado-relatorio" criado
+   * no dashboard do Resend (ver assets/email-templates/certificado-relatorio.html) —
+   * as variáveis {{{simLogoUrl}}}, {{{companyLogoUrl}}}, {{{brandBarUrl}}},
+   * {{{participantName}}} e {{{anoAtual}}} são resolvidas pelo próprio Resend a
+   * partir de `template.variables` (chaves triplas — é a sintaxe de interpolação
+   * do Resend, chaves duplas não renderizam).
+   */
+  async sendCertificateAndReport(
+    to: string,
+    participantName: string,
+    courseName: string,
+    certificatePdfBuffer: Buffer,
+    companyLogoUrl?: string | null,
+    reportPdfBuffer?: Buffer | null,
+  ) {
+    const fileSlug = participantName.toLowerCase().replace(/ /g, '-');
+
+    const attachments = [
+      {
+        filename: `certificado-${fileSlug}.pdf`,
+        content: certificatePdfBuffer.toString('base64'),
+      },
+    ];
+
+    if (reportPdfBuffer) {
+      attachments.push({
+        filename: `relatorio-${fileSlug}.pdf`,
+        content: reportPdfBuffer.toString('base64'),
+      });
+    }
+
+    const { data, error } = await this.resend.emails.send({
       from: this.from,
       to,
-      subject: `Seu certificado — SIM Treinamentos`,
-      html: `<p>Olá, ${participantName}!</p>
-             <p>Segue em anexo seu certificado de participação no treinamento de segurança no trânsito.</p>
-             <p>Em caso de dúvidas, entre em contato: <a href="mailto:contato@simtc.com.br">contato@simtc.com.br</a></p>`,
-      attachments: [
-        {
-          filename: `certificado-${participantName.toLowerCase().replace(/ /g, '-')}.pdf`,
-          content: pdfBuffer.toString('base64'),
+      subject: reportPdfBuffer
+        ? 'Seu certificado e relatório — SIM Treinamentos'
+        : 'Seu certificado — SIM Treinamentos',
+      template: {
+        id: 'certificado-relatorio',
+        variables: {
+          simLogoUrl: this.simLogoUrl,
+          companyLogoUrl: companyLogoUrl ?? this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          participantName,
+          courseName,
+          anoAtual: String(new Date().getFullYear()),
         },
-      ],
-    });
+      },
+      attachments,
+    } as any);
+
+    if (error) {
+      this.logger.error(`Falha ao enviar certificado/relatório para ${to}: ${JSON.stringify(error)}`);
+      throw new Error(`Falha ao enviar e-mail via Resend: ${error.message ?? JSON.stringify(error)}`);
+    }
+
+    return data;
   }
 
-  async sendOtpCode(to: string, code: string) {
-    await this.resend.emails.send({
+  async sendOtpCode(
+    to: string, 
+    code: string,
+    participantName: string,
+  ) {
+    const { data, error } = await this.resend.emails.send({
       from: this.from,
       to,
       subject: 'Seu código de acesso — SIM Treinamentos',
-      html: `<p>Seu código de acesso ao Portal do Cliente é:</p>
-             <h2 style="letter-spacing: 4px">${code}</h2>
-             <p>Válido por 10 minutos. Não compartilhe este código.</p>`,
-    });
+      template: {
+        id: 'otp-code',
+        variables : {
+          simLogoUrl: this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          participantName,
+          code,
+          anoAtual: String(new Date().getFullYear()),
+        },
+      },
+    } as any);
+
+    if (error) {
+      this.logger.error(`Falha ao enviar p código otp para ${to}: ${JSON.stringify(error)}`);
+      throw new Error(`Falha ao enviar código otp via Resend: ${error.message ?? JSON.stringify(error)}`);
+    }
+
+    return data;
   }
 
-  async sendClientPortalAccess(to: string, name: string, tempPassword: string) {
-    await this.resend.emails.send({
-      from: this.from,
-      to,
-      subject: 'Acesso ao Portal do Cliente — SIM Treinamentos',
-      html: `<p>Olá, ${name}!</p>
-             <p>Seu acesso ao Portal do Cliente foi criado.</p>
-             <p><strong>E-mail:</strong> ${to}<br>
-             <strong>Senha temporária:</strong> ${tempPassword}</p>
-             <p>Acesse em: <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL}</a></p>`,
-    });
-  }
-
-  async sendPasswordReset(to: string, resetLink: string) {
-    await this.resend.emails.send({
+  async sendPasswordReset(to: string, resetLink: string, participantName: string) {
+    const { data, error } = await this.resend.emails.send({
       from: this.from,
       to,
       subject: 'Redefinição de senha — SIM Treinamentos',
-      html: `<p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
-             <p>Clique no link abaixo para criar uma nova senha. O link é válido por 1 hora.</p>
-             <p><a href="${resetLink}">Redefinir minha senha</a></p>
-             <p style="color:#6b7280; font-size: 0.9em;">Se você não solicitou isso, ignore este e-mail — sua senha permanece a mesma.</p>
-             <p>Em caso de dúvidas: <a href="mailto:contato@simtc.com.br">contato@simtc.com.br</a></p>`,
-    });
+      template: {
+        id: 'password-reset',
+        variables: {
+          simLogoUrl: this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          participantName,
+          resetLink,
+          anoAtual: String(new Date().getFullYear()),
+        },
+      },
+    } as any);
+
+    if (error) {
+      this.logger.error(`Falha ao enviar e-mail de redefinição de senha para ${to}: ${JSON.stringify(error)}`);
+      throw new Error(`Falha ao enviar e-mail via Resend: ${error.message ?? JSON.stringify(error)}`);
+    }
+
+    return data;
   }
 
-  async sendRegistrationConfirmation(to: string, participantName: string, courseName: string, companyName: string) {
+  async sendRegistrationConfirmation(
+     to: string,
+     participantName: string,
+     courseName: string,
+     companyName: string, 
+     companyLogoUrl: string | null
+    ) {
     await this.resend.emails.send({
       from: this.from,
       to,
       subject: `Inscrição confirmada — ${courseName}`,
-      html: `<p>Olá, ${participantName}!</p>
-             <p>Sua inscrição no treinamento <strong>${courseName}</strong> promovido pela empresa <strong>${companyName}</strong> foi confirmada com sucesso.</p>
-             <p>Em caso de dúvidas, entre em contato: <a href="mailto:contato@simtc.com.br">contato@simtc.com.br</a></p>`,
-    });
+      template: {
+        id: 'registration-confirmation',
+        variables: {
+          simLogoUrl: this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          companyLogoUrl: companyLogoUrl,
+          companyName,
+          courseName,
+          participantName,
+          anoAtual: String(new Date().getFullYear()),
+        },
+      },
+    } as any);
   }
 
   async sendTrainingScheduled(
@@ -106,36 +187,33 @@ export class EmailService {
     password: string,
     mode: 'created' | 'reset',
   ) {
-    const accessUrl = process.env.FRONTEND_URL ?? 'https://app.simtc.com.br';
-
     const subject =
       mode === 'created'
         ? 'Seu acesso ao Sistema SIM Treinamentos foi criado'
         : 'Sua senha de acesso foi redefinida — SIM Treinamentos';
-
-    const intro =
-      mode === 'created'
-        ? `<p>Olá, ${name}!</p>
-           <p>Seu acesso ao Sistema de Automação de Treinamentos da SIM Treinamentos foi criado. Use os dados abaixo para fazer o primeiro acesso:</p>`
-        : `<p>Olá, ${name}!</p>
-           <p>Um administrador redefiniu sua senha de acesso ao Sistema de Automação de Treinamentos. Use os dados abaixo para entrar novamente:</p>`;
-
-    const securityNote =
-      mode === 'reset'
-        ? `<p style="color:#b91c1c; font-size: 0.9em;">Se você não esperava essa redefinição, entre em contato imediatamente com um administrador.</p>`
-        : '';
-
-    await this.resend.emails.send({
+    const { data, error } = await this.resend.emails.send({
       from: this.from,
       to,
       subject,
-      html: `${intro}
-             <p><strong>E-mail:</strong> ${to}<br>
-             <strong>Senha temporária:</strong> ${password}</p>
-             <p>Recomendamos alterar essa senha em "Meu Perfil" assim que possível.</p>
-             <p>Acesse em: <a href="${accessUrl}">${accessUrl}</a></p>
-             ${securityNote}
-             <p>Em caso de dúvidas, entre em contato: <a href="mailto:contato@simtc.com.br">contato@simtc.com.br</a></p>`,
-    });
+      template: {
+        id: mode === 'created' ? 'consultant-credentials-created' : 'consultant-credentials-reset',
+        variables: {
+          simLogoUrl: this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          consultantName: name,
+          email: to,
+          password,
+          accessUrl: process.env.FRONTEND_URL ?? 'https://app.simtc.com.br',
+          anoAtual: String(new Date().getFullYear()),
+        },
+      },
+    } as any);
+
+    if (error) {
+      this.logger.error(`Falha ao enviar credenciais para ${to}: ${JSON.stringify(error)}`);
+      throw new Error(`Falha ao enviar e-mail via Resend: ${error.message ?? JSON.stringify(error)}`);
+    }
+
+    return data;
   }
 }
