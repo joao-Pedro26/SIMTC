@@ -18,6 +18,9 @@ RUN npm ci
 COPY packages/shared-types ./packages/shared-types
 COPY apps/backend ./apps/backend
 
+# Gera o Prisma Client antes do build TypeScript (necessário para os tipos)
+RUN cd apps/backend && npx prisma generate
+
 # Build: turbo compila shared-types primeiro, depois o backend
 RUN npx turbo run build --filter=@simtc/backend...
 
