@@ -1,0 +1,45 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Chromium para puppeteer (geração de PDFs)
+RUN apk add --no-cache chromium
+
+# Arquivos de configuração do workspace
+COPY package.json package-lock.json turbo.json ./
+
+# package.json de cada workspace necessário
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY apps/backend/package.json ./apps/backend/
+
+# Instala todas as dependências
+RUN npm ci
+
+# Copia o código fonte
+COPY packages/shared-types ./packages/shared-types
+COPY apps/backend ./apps/backend
+
+# Build: turbo compila shared-types primeiro, depois o backend
+RUN npx turbo run build --filter=@simtc/backend...
+
+# ---- Imagem de produção ----
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+RUN apk add --no-cache chromium
+
+# Copia artefatos do build
+COPY --from=builder /app/apps/backend/dist ./dist
+COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder /app/apps/backend/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+
+# Gera o Prisma Client para este ambiente
+RUN npx prisma generate
+
+EXPOSE 3000
+CMD ["node", "dist/src/main"]
