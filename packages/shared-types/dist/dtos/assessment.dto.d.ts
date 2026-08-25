@@ -17,7 +17,7 @@ export interface CreateInfractionDto {
 }
 export interface SyncPracticalAssessmentDto {
     trainingParticipantId: string;
-    consultantId: string;
+    consultantId?: string;
     date: string;
     startTime: string;
     endTime?: string;

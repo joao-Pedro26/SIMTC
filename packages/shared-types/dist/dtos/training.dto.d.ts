@@ -19,6 +19,7 @@ export interface RegisterParticipantPublicDto {
     email?: string;
     cnhCategory?: string;
     cnhExpiration?: string;
+    participationType?: ParticipationType;
 }
 export interface UpdateParticipantTypeDto {
     participationType: ParticipationType;

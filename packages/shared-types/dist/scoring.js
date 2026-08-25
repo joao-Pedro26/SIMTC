@@ -8,7 +8,7 @@ exports.calculateOverallScore = calculateOverallScore;
 exports.getApprovalStatus = getApprovalStatus;
 exports.getApprovalLabel = getApprovalLabel;
 exports.NOTE_DEDUCTIONS = {
-    B: 0, // Bom — sem dedução
+    B: 1, // Bom — desconta 1 ponto
     PM: 3, // Pode Melhorar — desconta 3 pontos
     M: 5, // Melhorar — desconta 5 pontos
 };
