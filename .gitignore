@@ -54,3 +54,24 @@ prints-telas-powerapp/
 
 reuniao-simtc-2026-07-21.md
 CLAUDE.md
+
+# Ferramentas de IA (Claude, agentes, MCP)
+.claude/
+.agents/
+.playwright-mcp/
+**/.claude/
+**/.agents/
+
+# Arquivos de debug e screenshots
+*.png
+apps/backend/documents-tab.png
+
+# Arquivos de design e brainstorm
+simtc-design.docx
+simtc-design.zip
+simtc-design-extracted/
+simtc-enrollment-brainstorm.html
+brainstorm-implementacao-web.md
+
+# Assets brutos na raiz (são referenciados via apps/)
+assets/
