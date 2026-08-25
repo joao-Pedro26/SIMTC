@@ -156,7 +156,7 @@ export class EmailService {
 
   async sendTrainingScheduled(
     to: string,
-    contactName: string,
+    contactName: string,           
     courseName: string,
     companyName: string,
     city: string | null,
@@ -167,7 +167,6 @@ export class EmailService {
     const dateFormatted = date
       ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : 'a definir';
-
     await this.resend.emails.send({
       from: this.from,
       to,
