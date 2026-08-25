@@ -1,0 +1,345 @@
+diff --git a/src/app/(admin)/training-sessions/[id]/qr-code/layout.tsx b/src/app/(admin)/training-sessions/[id]/qr-code/layout.tsx
+new file mode 100644
+index 0000000..62bf281
+--- /dev/null
++++ b/src/app/(admin)/training-sessions/[id]/qr-code/layout.tsx
+@@ -0,0 +1,3 @@
++export default function QRCodeLayout({ children }: { children: React.ReactNode }) {
++  return <>{children}</>
++}
+diff --git a/src/app/(admin)/training-sessions/[id]/qr-code/page.module.css b/src/app/(admin)/training-sessions/[id]/qr-code/page.module.css
+new file mode 100644
+index 0000000..3515cae
+--- /dev/null
++++ b/src/app/(admin)/training-sessions/[id]/qr-code/page.module.css
+@@ -0,0 +1,97 @@
++.page {
++  min-height: 100vh;
++  background-color: white;
++  display: flex;
++  flex-direction: column;
++}
++
++.topBar {
++  display: flex;
++  align-items: center;
++  gap: 1rem;
++  padding: 1rem 1.5rem;
++  border-bottom: 1px solid #E2E8F0;
++}
++
++.backBtn {
++  display: flex;
++  align-items: center;
++  gap: 0.375rem;
++  font-size: 0.875rem;
++  color: #475569;
++  text-decoration: none;
++  font-weight: 500;
++  transition: color 0.15s;
++}
++
++.backBtn:hover { color: #0F172A; }
++
++.sessionInfo {
++  display: flex;
++  align-items: center;
++  gap: 0.5rem;
++}
++
++.companyName {
++  font-size: 0.9375rem;
++  font-weight: 700;
++  color: #0F172A;
++}
++
++.separator { color: #94A3B8; }
++
++.courseName {
++  font-size: 0.9375rem;
++  color: #475569;
++}
++
++.center {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 1.5rem;
++  padding: 2rem;
++}
++
++.qrBox {
++  padding: 2rem;
++  border: 2px solid #E2E8F0;
++  border-radius: 8px;
++  background-color: white;
++}
++
++.qrIcon { color: #1E2A34; }
++
++.url {
++  font-size: 1rem;
++  color: #2AA8B4;
++  font-weight: 500;
++  text-align: center;
++}
++
++.instruction {
++  font-size: 1rem;
++  color: #94A3B8;
++  text-align: center;
++  max-width: 28rem;
++  line-height: 1.6;
++}
++
++.notFound {
++  min-height: 100vh;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 1rem;
++  font-size: 0.875rem;
++  color: #94A3B8;
++}
++
++.backLink {
++  color: #2AA8B4;
++  text-decoration: none;
++  font-weight: 500;
++}
+diff --git a/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx b/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx
+index 9912bfb..1bf0b01 100644
+--- a/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx
++++ b/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx
+@@ -1,10 +1,52 @@
+-// TODO: implementar na Fase correspondente — ver arquitetura-simtc.md
++import { QrCode, ArrowLeft } from 'lucide-react'
++import Link from 'next/link'
++import { mockTrainingSessions } from '@/features/training-sessions/mock-data'
++import styles from './page.module.css'
++
++interface QRCodePageProps {
++  params: { id: string }
++}
++
++export default function QRCodeProjectionPage({ params }: QRCodePageProps) {
++  const session = mockTrainingSessions.find((s) => s.id === Number(params.id))
++
++  if (!session) {
++    return (
++      <div className={styles.notFound}>
++        <p>Treinamento não encontrado.</p>
++        <Link href="/training-sessions" className={styles.backLink}>
++          ← Voltar para treinamentos
++        </Link>
++      </div>
++    )
++  }
++
++  const publicUrl = `simtc.com.br/register/${session.qrCodeToken}`
+ 
+-export default function QRCodePage() {
+   return (
+-    <div>
+-      <h1>QR Code</h1>
+-      <p>QR Code da turma para projetar na sala</p>
++    <div className={styles.page}>
++
++      <div className={styles.topBar}>
++        <Link href="/training-sessions" className={styles.backBtn}>
++          <ArrowLeft size={16} /> Voltar
++        </Link>
++        <div className={styles.sessionInfo}>
++          <span className={styles.companyName}>{session.company.name}</span>
++          <span className={styles.separator}>·</span>
++          <span className={styles.courseName}>{session.course.name}</span>
++        </div>
++      </div>
++
++      <div className={styles.center}>
++        <div className={styles.qrBox}>
++          <QrCode size={280} strokeWidth={0.75} className={styles.qrIcon} />
++        </div>
++        <p className={styles.url}>{publicUrl}</p>
++        <p className={styles.instruction}>
++          Aponte a câmera do celular para o QR Code acima para se cadastrar no treinamento.
++        </p>
++      </div>
++
+     </div>
+-  );
++  )
+ }
+diff --git a/src/app/(admin)/training-sessions/page.module.css b/src/app/(admin)/training-sessions/page.module.css
+new file mode 100644
+index 0000000..fa12718
+--- /dev/null
++++ b/src/app/(admin)/training-sessions/page.module.css
+@@ -0,0 +1,36 @@
++.page {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++}
++
++.header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 1.25rem 1.5rem 1rem;
++}
++
++.title {
++  font-size: 1.25rem;
++  font-weight: 700;
++  color: var(--text);
++}
++
++.filters {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++  padding: 0 1.5rem 1.25rem;
++}
++
++.tableWrapper {
++  padding: 0 1.5rem 1.5rem;
++  overflow-x: auto;
++}
++
++@media (max-width: 40rem) {
++  .header   { padding: 1rem; }
++  .filters  { flex-wrap: wrap; padding: 0 1rem 1rem; }
++  .tableWrapper { padding: 0 1rem 1rem; }
++}
+diff --git a/src/app/(admin)/training-sessions/page.tsx b/src/app/(admin)/training-sessions/page.tsx
+index 64bc124..178478e 100644
+--- a/src/app/(admin)/training-sessions/page.tsx
++++ b/src/app/(admin)/training-sessions/page.tsx
+@@ -1,10 +1,118 @@
+-// TODO: implementar na Fase correspondente — ver arquitetura-simtc.md
++'use client'
++
++import { useState } from 'react'
++import { Plus } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import { InputSearch } from '@/components/ui/input-search/input-search'
++import { Select } from '@/components/ui/select/select'
++import { Drawer } from '@/components/ui/drawer/drawer'
++import { TrainingSessionTable } from '@/features/training-sessions/training-session-table'
++import { TrainingSessionAddForm, type TrainingSessionFormData } from '@/features/training-sessions/training-session-add-form'
++import { TrainingSessionDetailTabs } from '@/features/training-sessions/training-session-detail-tabs'
++import { mockTrainingSessions } from '@/features/training-sessions/mock-data'
++import type { TrainingSession } from '@/features/training-sessions/types'
++import styles from './page.module.css'
++
++type DrawerMode = 'add' | 'detail' | null
++
++const statusOptions = [
++  { label: 'Planejado', value: 'PLANEJADO' },
++  { label: 'Em Andamento', value: 'EM_ANDAMENTO' },
++  { label: 'Concluído', value: 'CONCLUIDO' },
++  { label: 'Arquivado', value: 'ARQUIVADO' },
++  { label: 'Cancelado', value: 'CANCELADO' },
++]
+ 
+ export default function TreinamentosPage() {
++  const [sessions, setSessions] = useState<TrainingSession[]>(mockTrainingSessions)
++  const [query, setQuery] = useState('')
++  const [statusFilter, setStatusFilter] = useState('')
++  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null)
++  const [selected, setSelected] = useState<TrainingSession | null>(null)
++
++  const filtered = sessions.filter((s) => {
++    const matchQuery =
++      s.company.name.toLowerCase().includes(query.toLowerCase()) ||
++      s.city.toLowerCase().includes(query.toLowerCase())
++    const matchStatus = statusFilter === '' || s.status === statusFilter
++    return matchQuery && matchStatus
++  })
++
++  function openAdd() {
++    setSelected(null)
++    setDrawerMode('add')
++  }
++
++  function openDetail(session: TrainingSession) {
++    setSelected(session)
++    setDrawerMode('detail')
++  }
++
++  function closeDrawer() {
++    setDrawerMode(null)
++    setSelected(null)
++  }
++
++  function handleAdd(data: TrainingSessionFormData) {
++    console.log('Novo treinamento:', data)
++    closeDrawer()
++  }
++
++  function handleUpdateSession(updated: TrainingSession) {
++    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
++    setSelected(updated)
++  }
++
++  const drawerTitle =
++    drawerMode === 'add'
++      ? 'Adicionar Treinamento'
++      : selected
++      ? `${selected.company.name} — ${selected.course.name}`
++      : ''
++
+   return (
+-    <div>
+-      <h1>Treinamentos</h1>
+-      <p>Lista de todos os treinamentos</p>
++    <div className={styles.page}>
++
++      <div className={styles.header}>
++        <h1 className={styles.title}>Treinamentos</h1>
++        <Button size="md" variant="primary" onClick={openAdd}>
++          <Plus size={16} /> Adicionar
++        </Button>
++      </div>
++
++      <div className={styles.filters}>
++        <InputSearch value={query} onChange={setQuery} placeholder="Buscar por empresa ou cidade" />
++        <Select
++          value={statusFilter}
++          onChange={setStatusFilter}
++          options={statusOptions}
++          placeholder="Status"
++        />
++      </div>
++
++      <div className={styles.tableWrapper}>
++        <TrainingSessionTable sessions={filtered} onSelect={openDetail} />
++      </div>
++
++      <Drawer
++        open={drawerMode !== null}
++        title={drawerTitle}
++        onClose={closeDrawer}
++      >
++        {drawerMode === 'add' && (
++          <TrainingSessionAddForm
++            onSave={handleAdd}
++            onCancel={closeDrawer}
++          />
++        )}
++        {drawerMode === 'detail' && selected && (
++          <TrainingSessionDetailTabs
++            session={selected}
++            onUpdateSession={handleUpdateSession}
++          />
++        )}
++      </Drawer>
++
+     </div>
+-  );
++  )
+ }

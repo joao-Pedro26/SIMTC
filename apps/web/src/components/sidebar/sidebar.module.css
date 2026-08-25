@@ -1,0 +1,243 @@
+/* ── Container ───────────────────────────────────────────── */
+
+.sidebar {
+  width: 76px;
+  flex-shrink: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #0a6e80 0%, #1d9aa4 50%, #0a6e80 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.25s ease;
+  box-shadow:
+    4px 0 16px rgba(0, 0, 0, 0.18),
+    inset -1px 0 0 rgba(255, 255, 255, 0.12);
+}
+
+.sidebar:hover {
+  width: 240px;
+}
+
+/* ── Área da logo (fundo branco) ─────────────────────────── */
+
+.logoArea {
+  height: 4.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0 0.875rem;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+  min-width: 240px;
+}
+
+.logoImg {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.logoInfo {
+  min-width: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar:hover .logoInfo {
+  opacity: 1;
+}
+
+.logoName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.logoSub {
+  font-size: 0.688rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Navegação ───────────────────────────────────────────── */
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  white-space: nowrap;
+  min-width: 240px;
+}
+
+.nav::-webkit-scrollbar {
+  width: 4px;
+}
+.nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 99px;
+}
+
+/* ── Seções de navegação ─────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.sectionLabel {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0 0.75rem;
+  margin-bottom: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar:hover .sectionLabel {
+  opacity: 1;
+}
+
+/* ── Links de navegação ──────────────────────────────────── */
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 8px 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.navLink:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.navLink.active {
+  color: var(--orange);
+  background-color: rgba(255, 165, 0, 0.15);
+  border-left-color: var(--orange);
+}
+
+/* ── Ícones dos links ────────────────────────────────────── */
+
+.navIcon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.15s;
+}
+
+.navLink:hover .navIcon {
+  color: #ffffff;
+}
+
+.navLink.active .navIcon {
+  color: var(--orange);
+}
+
+.navLinkText {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar:hover .navLinkText {
+  opacity: 1;
+}
+
+/* ── Área do usuário ─────────────────────────────────────── */
+
+.userArea {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.75rem;
+  white-space: nowrap;
+  min-width: 240px;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 8px;
+}
+
+.avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+  min-width: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar:hover .userInfo {
+  opacity: 1;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userRole {
+  font-size: 0.688rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.logoutBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: color 0.15s, opacity 0.15s ease;
+}
+
+.sidebar:hover .logoutBtn {
+  opacity: 1;
+}
+
+.logoutBtn:hover {
+  color: #ffffff;
+}

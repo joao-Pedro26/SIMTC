@@ -1,0 +1,259 @@
+diff --git a/src/features/training-sessions/training-session-status-badge.module.css b/src/features/training-sessions/training-session-status-badge.module.css
+new file mode 100644
+index 0000000..f325f54
+--- /dev/null
++++ b/src/features/training-sessions/training-session-status-badge.module.css
+@@ -0,0 +1,35 @@
++.badge {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  padding: 0.25rem 0.75rem;
++  border-radius: 4px;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  white-space: nowrap;
++}
++
++.PLANEJADO {
++  background-color: var(--teal-soft);
++  color: var(--text-muted);
++}
++
++.EM_ANDAMENTO {
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++}
++
++.CONCLUIDO {
++  background-color: #DCFCE7;
++  color: #16A34A;
++}
++
++.ARQUIVADO {
++  background-color: var(--charcoal-2);
++  color: rgba(255, 255, 255, 0.85);
++}
++
++.CANCELADO {
++  background-color: #FEE2E2;
++  color: #DC2626;
++}
+diff --git a/src/features/training-sessions/training-session-status-badge.tsx b/src/features/training-sessions/training-session-status-badge.tsx
+new file mode 100644
+index 0000000..4347939
+--- /dev/null
++++ b/src/features/training-sessions/training-session-status-badge.tsx
+@@ -0,0 +1,22 @@
++import type { TrainingStatus } from './types'
++import styles from './training-session-status-badge.module.css'
++
++interface TrainingSessionStatusBadgeProps {
++  status: TrainingStatus
++}
++
++const labels: Record<TrainingStatus, string> = {
++  PLANEJADO: 'Planejado',
++  EM_ANDAMENTO: 'Em Andamento',
++  CONCLUIDO: 'Concluído',
++  ARQUIVADO: 'Arquivado',
++  CANCELADO: 'Cancelado',
++}
++
++export function TrainingSessionStatusBadge({ status }: TrainingSessionStatusBadgeProps) {
++  return (
++    <span className={`${styles.badge} ${styles[status]}`}>
++      {labels[status]}
++    </span>
++  )
++}
+diff --git a/src/features/training-sessions/training-session-table.module.css b/src/features/training-sessions/training-session-table.module.css
+new file mode 100644
+index 0000000..2faa4a5
+--- /dev/null
++++ b/src/features/training-sessions/training-session-table.module.css
+@@ -0,0 +1,97 @@
++.wrapper {
++  overflow-x: auto;
++  border-radius: 8px;
++  border: 1px solid var(--border);
++}
++
++.table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.875rem;
++}
++
++.headRow {
++  background-color: var(--charcoal);
++}
++
++.th {
++  padding: 0.875rem 1rem;
++  text-align: left;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  color: rgba(255, 255, 255, 0.85);
++  white-space: nowrap;
++}
++
++.th:first-child { border-radius: 8px 0 0 0; }
++.th:last-child  { border-radius: 0 8px 0 0; }
++
++.row {
++  border-bottom: 1px solid var(--border);
++  cursor: pointer;
++  transition: background-color 0.1s;
++}
++
++.row:last-child { border-bottom: none; }
++
++.row:hover { background-color: var(--bg); }
++
++.td {
++  padding: 0.875rem 1rem;
++  color: var(--text);
++  max-width: 14rem;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.center { text-align: center; }
++
++.companyCell {
++  display: flex;
++  align-items: center;
++  gap: 0.625rem;
++  min-width: 0;
++}
++
++.logo {
++  width: 2rem;
++  height: 2rem;
++  border-radius: 50%;
++  object-fit: cover;
++  flex-shrink: 0;
++  border: 1px solid var(--border);
++}
++
++.logoFallback {
++  width: 2rem;
++  height: 2rem;
++  border-radius: 50%;
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++  font-size: 0.6875rem;
++  font-weight: 700;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  flex-shrink: 0;
++  border: 1px solid var(--border);
++}
++
++.companyName {
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.extra {
++  color: var(--text-muted);
++  font-size: 0.8125rem;
++}
++
++.empty {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++  text-align: center;
++  padding: 3rem 0;
++}
+diff --git a/src/features/training-sessions/training-session-table.tsx b/src/features/training-sessions/training-session-table.tsx
+new file mode 100644
+index 0000000..f9acfb8
+--- /dev/null
++++ b/src/features/training-sessions/training-session-table.tsx
+@@ -0,0 +1,81 @@
++import type { TrainingSession } from './types'
++import { TrainingSessionStatusBadge } from './training-session-status-badge'
++import styles from './training-session-table.module.css'
++
++interface TrainingSessionTableProps {
++  sessions: TrainingSession[]
++  onSelect: (session: TrainingSession) => void
++}
++
++function CompanyLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
++  if (logoUrl) {
++    return <img src={logoUrl} alt={name} className={styles.logo} />
++  }
++  const initials = name
++    .split(' ')
++    .slice(0, 2)
++    .map((w) => w[0])
++    .join('')
++    .toUpperCase()
++  return <span className={styles.logoFallback}>{initials}</span>
++}
++
++function formatDate(dateStr: string): string {
++  const [year, month, day] = dateStr.split('-')
++  return `${day}/${month}/${year}`
++}
++
++export function TrainingSessionTable({ sessions, onSelect }: TrainingSessionTableProps) {
++  if (sessions.length === 0) {
++    return <p className={styles.empty}>Nenhum treinamento encontrado.</p>
++  }
++
++  return (
++    <div className={styles.wrapper}>
++      <table className={styles.table}>
++        <thead>
++          <tr className={styles.headRow}>
++            <th className={styles.th}>Empresa</th>
++            <th className={styles.th}>Curso</th>
++            <th className={styles.th}>Data</th>
++            <th className={styles.th}>Cidade / UF</th>
++            <th className={styles.th}>Consultor Responsável</th>
++            <th className={`${styles.th} ${styles.center}`}>Participantes</th>
++            <th className={`${styles.th} ${styles.center}`}>Status</th>
++          </tr>
++        </thead>
++        <tbody>
++          {sessions.map((s) => (
++            <tr
++              key={s.id}
++              className={styles.row}
++              onClick={() => onSelect(s)}
++            >
++              <td className={styles.td}>
++                <div className={styles.companyCell}>
++                  <CompanyLogo name={s.company.name} logoUrl={s.company.logoUrl} />
++                  <span className={styles.companyName}>{s.company.name}</span>
++                </div>
++              </td>
++              <td className={styles.td}>{s.course.name}</td>
++              <td className={styles.td}>{formatDate(s.date)}</td>
++              <td className={styles.td}>{s.city} / {s.state}</td>
++              <td className={styles.td}>
++                {s.responsibleConsultant.name}
++                {s.additionalConsultants.length > 0 && (
++                  <span className={styles.extra}>
++                    {' '}+ {s.additionalConsultants.length}
++                  </span>
++                )}
++              </td>
++              <td className={`${styles.td} ${styles.center}`}>{s.participantCount}</td>
++              <td className={`${styles.td} ${styles.center}`}>
++                <TrainingSessionStatusBadge status={s.status} />
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
++  )
++}

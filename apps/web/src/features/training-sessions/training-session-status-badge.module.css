@@ -1,0 +1,35 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.PLANEJADO {
+  background-color: var(--teal-soft);
+  color: var(--text-muted);
+}
+
+.EM_ANDAMENTO {
+  background-color: var(--teal-soft);
+  color: var(--teal-dark);
+}
+
+.CONCLUIDO {
+  background-color: #DCFCE7;
+  color: #16A34A;
+}
+
+.ARQUIVADO {
+  background-color: var(--charcoal-2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.CANCELADO {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}

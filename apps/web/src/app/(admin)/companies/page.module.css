@@ -1,0 +1,62 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1rem;
+  padding: 0 1.75rem 1.75rem;
+}
+
+/* ── Container da busca ──────────────────────────────────── */
+
+.searchPanel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ── Container dos cards ─────────────────────────────────── */
+
+.gridPanel {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── Grid de cards ───────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.125rem;
+  padding: 1.25rem;
+}
+
+.empty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 5rem 0;
+}
+
+/* ── Responsivo ──────────────────────────────────────────── */
+
+@media (max-width: 64rem) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 30rem) {
+  .page   { padding: 0 1rem 1rem; }
+  .header { padding-top: 1rem; }
+}

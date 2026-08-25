@@ -1,0 +1,33 @@
+.wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select {
+  height: 2.25rem;
+  padding: 0 2.25rem 0 0.75rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-width: 9rem;
+}
+
+.select:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 0.1875rem rgba(56, 190, 200, 0.15);
+}
+
+.icon {
+  position: absolute;
+  right: 0.625rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}

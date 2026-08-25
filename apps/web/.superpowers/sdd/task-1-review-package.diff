@@ -1,0 +1,186 @@
+diff --git a/src/features/training-sessions/mock-data.ts b/src/features/training-sessions/mock-data.ts
+new file mode 100644
+index 0000000..7dee736
+--- /dev/null
++++ b/src/features/training-sessions/mock-data.ts
+@@ -0,0 +1,111 @@
++// src/features/training-sessions/mock-data.ts
++
++import type { TrainingSession, TrainingCompany, TrainingCourse, TrainingConsultant } from './types'
++
++export const mockTrainingSessions: TrainingSession[] = [
++  {
++    id: 1,
++    company: { id: 1, name: 'Louis Dreyfus Company Brasil S.A', logoUrl: null },
++    course: { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++    responsibleConsultant: { id: 1, name: 'Sebastião Souza' },
++    additionalConsultants: [
++      { id: 2, name: 'Francisco Camargo Filho' },
++      { id: 3, name: 'Rene Dias' },
++    ],
++    city: 'Guarulhos',
++    state: 'SP',
++    date: '2026-07-22',
++    participantCount: 20,
++    notes: 'Treinamento começa às 8h',
++    status: 'EM_ANDAMENTO',
++    qrCodeToken: 'token-abc-123',
++    participants: [
++      {
++        id: 1, name: 'João da Silva', cpf: '123.456.789-00', email: 'joao@email.com',
++        cnhCategory: 'B', cnhExpiration: '2028-03-10',
++        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 88, certificateGenerated: true,
++      },
++      {
++        id: 2, name: 'Maria Souza', cpf: '987.654.321-00', email: 'maria@email.com',
++        cnhCategory: 'AB', cnhExpiration: '2027-06-15',
++        type: 'SOMENTE_TEORICA', status: 'PENDENTE', score: null, certificateGenerated: false,
++      },
++      {
++        id: 3, name: 'Carlos Pereira', cpf: '111.222.333-44', email: 'carlos@email.com',
++        cnhCategory: 'B', cnhExpiration: '2026-11-20',
++        type: 'TEORICA_E_PRATICA', status: 'NECESSITA_REAVALIACAO', score: 62, certificateGenerated: false,
++      },
++    ],
++  },
++  {
++    id: 2,
++    company: { id: 2, name: 'BRACELL SP CELULOSE LTDA', logoUrl: null },
++    course: { id: 2, name: 'Direção Preventiva Veículos Pesados 8h', theoryHours: 8, practiceHours: 4 },
++    responsibleConsultant: { id: 2, name: 'Francisco Camargo Filho' },
++    additionalConsultants: [],
++    city: 'Lençóis Paulista',
++    state: 'SP',
++    date: '2026-07-10',
++    participantCount: 15,
++    notes: null,
++    status: 'CONCLUIDO',
++    qrCodeToken: 'token-def-456',
++    participants: [
++      {
++        id: 4, name: 'Ana Lima', cpf: '555.666.777-88', email: 'ana@email.com',
++        cnhCategory: 'C', cnhExpiration: '2029-01-05',
++        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 91, certificateGenerated: true,
++      },
++    ],
++  },
++  {
++    id: 3,
++    company: { id: 3, name: 'Jalles Machado', logoUrl: null },
++    course: { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++    responsibleConsultant: { id: 3, name: 'Rene Dias' },
++    additionalConsultants: [],
++    city: 'Goianésia',
++    state: 'GO',
++    date: '2026-08-15',
++    participantCount: 30,
++    notes: 'Treinamento solicitado pelo RH',
++    status: 'PLANEJADO',
++    qrCodeToken: 'token-ghi-789',
++    participants: [],
++  },
++  {
++    id: 4,
++    company: { id: 4, name: 'Agrex do Brasil', logoUrl: null },
++    course: { id: 3, name: 'Palestra Segurança no Trânsito 1h', theoryHours: 1, practiceHours: 0 },
++    responsibleConsultant: { id: 1, name: 'Sebastião Souza' },
++    additionalConsultants: [],
++    city: 'Goiânia',
++    state: 'GO',
++    date: '2025-11-20',
++    participantCount: 80,
++    notes: null,
++    status: 'ARQUIVADO',
++    qrCodeToken: 'token-jkl-012',
++    participants: [],
++  },
++]
++
++export const mockConsultants: TrainingConsultant[] = [
++  { id: 1, name: 'Sebastião Souza' },
++  { id: 2, name: 'Francisco Camargo Filho' },
++  { id: 3, name: 'Rene Dias' },
++  { id: 4, name: 'Mauricio Gomes de Oliveira' },
++]
++
++export const mockCompanies: TrainingCompany[] = [
++  { id: 1, name: 'Louis Dreyfus Company Brasil S.A', logoUrl: null },
++  { id: 2, name: 'BRACELL SP CELULOSE LTDA', logoUrl: null },
++  { id: 3, name: 'Jalles Machado', logoUrl: null },
++  { id: 4, name: 'Agrex do Brasil', logoUrl: null },
++]
++
++export const mockCourses: TrainingCourse[] = [
++  { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++  { id: 2, name: 'Direção Preventiva Veículos Pesados 8h', theoryHours: 8, practiceHours: 4 },
++  { id: 3, name: 'Palestra Segurança no Trânsito 1h', theoryHours: 1, practiceHours: 0 },
++]
+diff --git a/src/features/training-sessions/types.ts b/src/features/training-sessions/types.ts
+new file mode 100644
+index 0000000..6ce636a
+--- /dev/null
++++ b/src/features/training-sessions/types.ts
+@@ -0,0 +1,63 @@
++// src/features/training-sessions/types.ts
++
++export type TrainingStatus =
++  | 'PLANEJADO'
++  | 'EM_ANDAMENTO'
++  | 'CONCLUIDO'
++  | 'ARQUIVADO'
++  | 'CANCELADO'
++
++export type ParticipationType = 'SOMENTE_TEORICA' | 'TEORICA_E_PRATICA'
++
++export type ParticipantStatus =
++  | 'PENDENTE'
++  | 'EM_AVALIACAO'
++  | 'APROVADO'
++  | 'NECESSITA_REAVALIACAO'
++
++export interface TrainingCompany {
++  id: number
++  name: string
++  logoUrl: string | null
++}
++
++export interface TrainingCourse {
++  id: number
++  name: string
++  theoryHours: number
++  practiceHours: number
++}
++
++export interface TrainingConsultant {
++  id: number
++  name: string
++}
++
++export interface TrainingParticipant {
++  id: number
++  name: string
++  cpf: string
++  email: string
++  cnhCategory: string
++  cnhExpiration: string
++  type: ParticipationType
++  status: ParticipantStatus
++  score: number | null
++  certificateGenerated: boolean
++}
++
++export interface TrainingSession {
++  id: number
++  company: TrainingCompany
++  course: TrainingCourse
++  responsibleConsultant: TrainingConsultant
++  additionalConsultants: TrainingConsultant[]
++  city: string
++  state: string
++  date: string
++  participantCount: number
++  notes: string | null
++  status: TrainingStatus
++  qrCodeToken: string
++  participants: TrainingParticipant[]
++}

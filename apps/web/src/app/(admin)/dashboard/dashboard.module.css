@@ -1,0 +1,221 @@
+/* ── Página ──────────────────────────────────────────────── */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 72rem;
+  padding: 1.5rem 1.75rem 1.75rem;
+}
+
+/* ── Saudação ────────────────────────────────────────────── */
+
+.greeting h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.greeting p {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 0.125rem;
+  text-transform: capitalize;
+}
+
+/* ── Grade de estatísticas ───────────────────────────────── */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Card de estatística ─────────────────────────────────── */
+
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.statCard:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.09);
+}
+
+.statTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.statIconWrap {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Variantes de cor para o ícone */
+.bgTeal   { background-color: var(--teal-soft); }
+.bgOrange { background-color: var(--orange-soft); }
+.bgMauve  { background-color: var(--mauve-soft); }
+
+.iconTeal   { color: var(--teal); }
+.iconOrange { color: var(--orange); }
+.iconMauve  { color: var(--mauve); }
+
+.statDelta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  color: var(--text-muted);
+}
+
+.statDeltaUp {
+  color: #16a34a;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  margin-top: 0.125rem;
+}
+
+.statLabel {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* ── Card da tabela ──────────────────────────────────────── */
+
+.tableCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tableHeader h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.viewAll {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #1d9aa4;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  transition: color 0.15s;
+}
+
+.viewAll:hover {
+  color: #0a6e80;
+}
+
+/* ── Tabela ──────────────────────────────────────────────── */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  background-color: #1d9aa4;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s;
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background-color: var(--bg);
+}
+
+.table tbody td {
+  padding: 0.875rem 1rem;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.tdBold {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.tdCenter {
+  text-align: center;
+}
+
+/* ── Badges de status ────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badgePlanejado {
+  background-color: #EFF6FF;
+  color: #3B82F6;
+}
+
+.badgeEmAndamento {
+  background-color: #ECFDF5;
+  color: #10B981;
+}
+
+.badgeConcluido {
+  background-color: var(--teal-soft);
+  color: var(--teal-dark);
+}
+
+.badgeCancelado {
+  background-color: #FEF2F2;
+  color: #EF4444;
+}

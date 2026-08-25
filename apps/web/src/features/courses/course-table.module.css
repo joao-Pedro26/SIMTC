@@ -1,0 +1,123 @@
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+/* ── Cabeçalho ───────────────────────────────────────────── */
+
+.headRow {
+  background-color: #1d9aa4;
+}
+
+.th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
+.th:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.th:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+/* ── Linhas ──────────────────────────────────────────────── */
+
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background-color: var(--bg);
+}
+
+.td {
+  padding: 0.875rem 1rem;
+  color: var(--text);
+  vertical-align: top;
+}
+
+.nameCell {
+  max-width: 16rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.descClamp {
+  color: var(--text-2);
+  max-width: 22rem;
+  line-height: 1.5;
+  height: 4.5rem;
+  overflow-y: auto;
+}
+
+/* ── Alinhamento central ─────────────────────────────────── */
+
+.center {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Ações ───────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: transparent;
+  color: var(--teal);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.actionBtn:hover {
+  background-color: var(--teal-soft);
+}
+
+.deleteBtn {
+  color: #EF4444;
+}
+
+.deleteBtn:hover {
+  background-color: #FEF2F2;
+}
+
+/* ── Vazio ───────────────────────────────────────────────── */
+
+.empty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 3rem 0;
+}

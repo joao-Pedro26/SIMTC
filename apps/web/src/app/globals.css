@@ -1,0 +1,70 @@
+/* ============================================================
+   SIMTC — Design Tokens
+   Variáveis CSS extraídas da logo SIM Treinamentos.
+   Use estas variáveis em qualquer .module.css do projeto.
+   ============================================================ */
+
+:root {
+  /* Cores da marca */
+  --teal:         #38BEC8; /* figura central da logo — cor primária   */
+  --teal-dark:    #2AA8B4; /* hover / estado ativo                    */
+  --teal-soft:    #EEF9FA; /* fundo suave (badges, ícones)            */
+  --orange:       #F5A520; /* figura direita — CTA / botões de ação   */
+  --orange-dark:  #E09510; /* hover do botão laranja                  */
+  --orange-soft:  #FEF8EE; /* fundo suave laranja                     */
+  --mauve:        #9B80A8; /* figura esquerda — status secundários    */
+  --mauve-soft:   #F5F0F8; /* fundo suave mauve                       */
+  --charcoal:     #1E2A34; /* sidebar — cor escura                    */
+  --charcoal-2:   #2A3A46; /* hover/items ativos na sidebar           */
+
+  /* Neutros */
+  --bg:           #F8FAFC;
+  --surface:      #FFFFFF;
+  --border:       #E2E8F0;
+  --text:         #0F172A;
+  --text-2:       #475569;
+  --text-muted:   #94A3B8;
+
+  /* Tipografia */
+  --font: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+/* ── Reset básico ─────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font);
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* ── Animações globais ────────────────────────────────────── */
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

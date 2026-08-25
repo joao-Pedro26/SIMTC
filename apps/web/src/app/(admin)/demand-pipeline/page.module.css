@@ -1,0 +1,55 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  gap: 1rem;
+  padding: 0 1.75rem 1.75rem;
+}
+
+/* ── Container da busca ──────────────────────────────────── */
+
+.searchPanel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ── Container do board ──────────────────────────────────── */
+
+.boardPanel {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: auto;
+  min-height: 0;
+}
+
+.board {
+  padding: 1.25rem;
+  min-height: 100%;
+}
+
+.columns {
+  display: flex;
+  gap: 1rem;
+  min-height: 100%;
+  align-items: flex-start;
+}
+
+/* ── Responsivo ──────────────────────────────────────────── */
+
+@media (max-width: 48rem) {
+  .page   { padding: 0 1rem 1rem; }
+  .header { padding-top: 1rem; }
+  .columns { flex-direction: column; align-items: stretch; }
+}

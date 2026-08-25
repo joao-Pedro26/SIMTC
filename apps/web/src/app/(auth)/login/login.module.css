@@ -1,0 +1,272 @@
+/* ── Layout de dois painéis ─────────────────────────────── */
+
+.page {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Painel esquerdo (logo) ─────────────────────────────── */
+
+.leftPanel {
+  display: none;
+  width: 50%;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+}
+
+@media (min-width: 1024px) {
+  .leftPanel {
+    display: flex;
+  }
+}
+
+.brandArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  user-select: none;
+}
+
+.logo {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+}
+
+.tagline {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  text-align: center;
+  max-width: 20rem;
+}
+
+/* ── Painel direito (formulário) ─────────────────────────── */
+
+.rightPanel {
+  width: 100%;
+  background-color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 4rem;
+}
+
+@media (min-width: 1024px) {
+  .rightPanel {
+    width: 50%;
+  }
+}
+
+/* ── Contêiner do formulário ─────────────────────────────── */
+
+.formContainer {
+  width: 100%;
+  max-width: 36rem;
+  animation: fadeInDown 0.4s ease-out forwards;
+}
+
+/* ── Logo mobile ─────────────────────────────────────────── */
+
+.mobileBrand {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 2.5rem;
+}
+
+.mobileLogo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .mobileBrand {
+    display: none;
+  }
+}
+
+/* ── Cabeçalho ───────────────────────────────────────────── */
+
+.heading {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.heading p {
+  font-size: 0.9375rem;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+/* ── Formulário ──────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 0.9375rem;
+  font-family: var(--font);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(56, 190, 200, 0.12);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+/* ── Campo de senha ──────────────────────────────────────── */
+
+.passwordWrapper {
+  position: relative;
+}
+
+.passwordWrapper .input {
+  padding-right: 3rem;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.eyeBtn:hover {
+  color: var(--text-2);
+}
+
+/* ── Linha: esqueci senha + entrar ───────────────────────── */
+
+.formRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.forgotBtn {
+  font-size: 0.9375rem;
+  color: var(--teal);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  text-decoration-offset: 2px;
+  transition: color 0.15s;
+  padding: 0;
+}
+
+.forgotBtn:hover {
+  color: var(--teal-dark);
+  text-decoration: underline;
+}
+
+.submitBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.875rem 2.5rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: var(--font);
+  background-color: var(--teal);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  letter-spacing: 0.01em;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: var(--teal-dark);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Mensagem de erro ────────────────────────────────────── */
+
+.errorMsg {
+  font-size: 0.875rem;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+}
+
+/* ── Rodapé ──────────────────────────────────────────────── */
+
+.footer {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Spinner ─────────────────────────────────────────────── */
+
+.spinner {
+  animation: spin 1s linear infinite;
+}

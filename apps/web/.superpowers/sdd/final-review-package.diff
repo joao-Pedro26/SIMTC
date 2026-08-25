@@ -1,0 +1,2200 @@
+diff --git a/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx b/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx
+deleted file mode 100644
+index 9912bfb..0000000
+--- a/src/app/(admin)/training-sessions/[id]/qr-code/page.tsx
++++ /dev/null
+@@ -1,10 +0,0 @@
+-// TODO: implementar na Fase correspondente — ver arquitetura-simtc.md
+-
+-export default function QRCodePage() {
+-  return (
+-    <div>
+-      <h1>QR Code</h1>
+-      <p>QR Code da turma para projetar na sala</p>
+-    </div>
+-  );
+-}
+diff --git a/src/app/(admin)/training-sessions/page.module.css b/src/app/(admin)/training-sessions/page.module.css
+new file mode 100644
+index 0000000..fa12718
+--- /dev/null
++++ b/src/app/(admin)/training-sessions/page.module.css
+@@ -0,0 +1,36 @@
++.page {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++}
++
++.header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding: 1.25rem 1.5rem 1rem;
++}
++
++.title {
++  font-size: 1.25rem;
++  font-weight: 700;
++  color: var(--text);
++}
++
++.filters {
++  display: flex;
++  align-items: center;
++  gap: 0.75rem;
++  padding: 0 1.5rem 1.25rem;
++}
++
++.tableWrapper {
++  padding: 0 1.5rem 1.5rem;
++  overflow-x: auto;
++}
++
++@media (max-width: 40rem) {
++  .header   { padding: 1rem; }
++  .filters  { flex-wrap: wrap; padding: 0 1rem 1rem; }
++  .tableWrapper { padding: 0 1rem 1rem; }
++}
+diff --git a/src/app/(admin)/training-sessions/page.tsx b/src/app/(admin)/training-sessions/page.tsx
+index 64bc124..178478e 100644
+--- a/src/app/(admin)/training-sessions/page.tsx
++++ b/src/app/(admin)/training-sessions/page.tsx
+@@ -1,10 +1,118 @@
+-// TODO: implementar na Fase correspondente — ver arquitetura-simtc.md
++'use client'
++
++import { useState } from 'react'
++import { Plus } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import { InputSearch } from '@/components/ui/input-search/input-search'
++import { Select } from '@/components/ui/select/select'
++import { Drawer } from '@/components/ui/drawer/drawer'
++import { TrainingSessionTable } from '@/features/training-sessions/training-session-table'
++import { TrainingSessionAddForm, type TrainingSessionFormData } from '@/features/training-sessions/training-session-add-form'
++import { TrainingSessionDetailTabs } from '@/features/training-sessions/training-session-detail-tabs'
++import { mockTrainingSessions } from '@/features/training-sessions/mock-data'
++import type { TrainingSession } from '@/features/training-sessions/types'
++import styles from './page.module.css'
++
++type DrawerMode = 'add' | 'detail' | null
++
++const statusOptions = [
++  { label: 'Planejado', value: 'PLANEJADO' },
++  { label: 'Em Andamento', value: 'EM_ANDAMENTO' },
++  { label: 'Concluído', value: 'CONCLUIDO' },
++  { label: 'Arquivado', value: 'ARQUIVADO' },
++  { label: 'Cancelado', value: 'CANCELADO' },
++]
+ 
+ export default function TreinamentosPage() {
++  const [sessions, setSessions] = useState<TrainingSession[]>(mockTrainingSessions)
++  const [query, setQuery] = useState('')
++  const [statusFilter, setStatusFilter] = useState('')
++  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null)
++  const [selected, setSelected] = useState<TrainingSession | null>(null)
++
++  const filtered = sessions.filter((s) => {
++    const matchQuery =
++      s.company.name.toLowerCase().includes(query.toLowerCase()) ||
++      s.city.toLowerCase().includes(query.toLowerCase())
++    const matchStatus = statusFilter === '' || s.status === statusFilter
++    return matchQuery && matchStatus
++  })
++
++  function openAdd() {
++    setSelected(null)
++    setDrawerMode('add')
++  }
++
++  function openDetail(session: TrainingSession) {
++    setSelected(session)
++    setDrawerMode('detail')
++  }
++
++  function closeDrawer() {
++    setDrawerMode(null)
++    setSelected(null)
++  }
++
++  function handleAdd(data: TrainingSessionFormData) {
++    console.log('Novo treinamento:', data)
++    closeDrawer()
++  }
++
++  function handleUpdateSession(updated: TrainingSession) {
++    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
++    setSelected(updated)
++  }
++
++  const drawerTitle =
++    drawerMode === 'add'
++      ? 'Adicionar Treinamento'
++      : selected
++      ? `${selected.company.name} — ${selected.course.name}`
++      : ''
++
+   return (
+-    <div>
+-      <h1>Treinamentos</h1>
+-      <p>Lista de todos os treinamentos</p>
++    <div className={styles.page}>
++
++      <div className={styles.header}>
++        <h1 className={styles.title}>Treinamentos</h1>
++        <Button size="md" variant="primary" onClick={openAdd}>
++          <Plus size={16} /> Adicionar
++        </Button>
++      </div>
++
++      <div className={styles.filters}>
++        <InputSearch value={query} onChange={setQuery} placeholder="Buscar por empresa ou cidade" />
++        <Select
++          value={statusFilter}
++          onChange={setStatusFilter}
++          options={statusOptions}
++          placeholder="Status"
++        />
++      </div>
++
++      <div className={styles.tableWrapper}>
++        <TrainingSessionTable sessions={filtered} onSelect={openDetail} />
++      </div>
++
++      <Drawer
++        open={drawerMode !== null}
++        title={drawerTitle}
++        onClose={closeDrawer}
++      >
++        {drawerMode === 'add' && (
++          <TrainingSessionAddForm
++            onSave={handleAdd}
++            onCancel={closeDrawer}
++          />
++        )}
++        {drawerMode === 'detail' && selected && (
++          <TrainingSessionDetailTabs
++            session={selected}
++            onUpdateSession={handleUpdateSession}
++          />
++        )}
++      </Drawer>
++
+     </div>
+-  );
++  )
+ }
+diff --git a/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.module.css b/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.module.css
+new file mode 100644
+index 0000000..3515cae
+--- /dev/null
++++ b/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.module.css
+@@ -0,0 +1,97 @@
++.page {
++  min-height: 100vh;
++  background-color: white;
++  display: flex;
++  flex-direction: column;
++}
++
++.topBar {
++  display: flex;
++  align-items: center;
++  gap: 1rem;
++  padding: 1rem 1.5rem;
++  border-bottom: 1px solid #E2E8F0;
++}
++
++.backBtn {
++  display: flex;
++  align-items: center;
++  gap: 0.375rem;
++  font-size: 0.875rem;
++  color: #475569;
++  text-decoration: none;
++  font-weight: 500;
++  transition: color 0.15s;
++}
++
++.backBtn:hover { color: #0F172A; }
++
++.sessionInfo {
++  display: flex;
++  align-items: center;
++  gap: 0.5rem;
++}
++
++.companyName {
++  font-size: 0.9375rem;
++  font-weight: 700;
++  color: #0F172A;
++}
++
++.separator { color: #94A3B8; }
++
++.courseName {
++  font-size: 0.9375rem;
++  color: #475569;
++}
++
++.center {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 1.5rem;
++  padding: 2rem;
++}
++
++.qrBox {
++  padding: 2rem;
++  border: 2px solid #E2E8F0;
++  border-radius: 8px;
++  background-color: white;
++}
++
++.qrIcon { color: #1E2A34; }
++
++.url {
++  font-size: 1rem;
++  color: #2AA8B4;
++  font-weight: 500;
++  text-align: center;
++}
++
++.instruction {
++  font-size: 1rem;
++  color: #94A3B8;
++  text-align: center;
++  max-width: 28rem;
++  line-height: 1.6;
++}
++
++.notFound {
++  min-height: 100vh;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 1rem;
++  font-size: 0.875rem;
++  color: #94A3B8;
++}
++
++.backLink {
++  color: #2AA8B4;
++  text-decoration: none;
++  font-weight: 500;
++}
+diff --git a/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.tsx b/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.tsx
+new file mode 100644
+index 0000000..1bf0b01
+--- /dev/null
++++ b/src/app/(fullscreen)/training-sessions/[id]/qr-code/page.tsx
+@@ -0,0 +1,52 @@
++import { QrCode, ArrowLeft } from 'lucide-react'
++import Link from 'next/link'
++import { mockTrainingSessions } from '@/features/training-sessions/mock-data'
++import styles from './page.module.css'
++
++interface QRCodePageProps {
++  params: { id: string }
++}
++
++export default function QRCodeProjectionPage({ params }: QRCodePageProps) {
++  const session = mockTrainingSessions.find((s) => s.id === Number(params.id))
++
++  if (!session) {
++    return (
++      <div className={styles.notFound}>
++        <p>Treinamento não encontrado.</p>
++        <Link href="/training-sessions" className={styles.backLink}>
++          ← Voltar para treinamentos
++        </Link>
++      </div>
++    )
++  }
++
++  const publicUrl = `simtc.com.br/register/${session.qrCodeToken}`
++
++  return (
++    <div className={styles.page}>
++
++      <div className={styles.topBar}>
++        <Link href="/training-sessions" className={styles.backBtn}>
++          <ArrowLeft size={16} /> Voltar
++        </Link>
++        <div className={styles.sessionInfo}>
++          <span className={styles.companyName}>{session.company.name}</span>
++          <span className={styles.separator}>·</span>
++          <span className={styles.courseName}>{session.course.name}</span>
++        </div>
++      </div>
++
++      <div className={styles.center}>
++        <div className={styles.qrBox}>
++          <QrCode size={280} strokeWidth={0.75} className={styles.qrIcon} />
++        </div>
++        <p className={styles.url}>{publicUrl}</p>
++        <p className={styles.instruction}>
++          Aponte a câmera do celular para o QR Code acima para se cadastrar no treinamento.
++        </p>
++      </div>
++
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/documents-tab.module.css b/src/features/training-sessions/documents-tab.module.css
+new file mode 100644
+index 0000000..90eda9d
+--- /dev/null
++++ b/src/features/training-sessions/documents-tab.module.css
+@@ -0,0 +1,120 @@
++.locked {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  justify-content: center;
++  gap: 0.75rem;
++  padding: 3rem 1rem;
++  text-align: center;
++  flex: 1;
++}
++
++.lockedIcon { color: var(--text-muted); }
++
++.lockedTitle {
++  font-size: 1rem;
++  font-weight: 600;
++  color: var(--text);
++}
++
++.lockedDesc {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++  max-width: 24rem;
++  line-height: 1.6;
++}
++
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++  gap: 1rem;
++}
++
++.toolbar {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.75rem;
++}
++
++.summary {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++}
++
++.tableWrapper {
++  flex: 1;
++  overflow-y: auto;
++  border: 1px solid var(--border);
++  border-radius: 8px;
++}
++
++.table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.875rem;
++}
++
++.headRow {
++  background-color: var(--charcoal);
++  position: sticky;
++  top: 0;
++}
++
++.th {
++  padding: 0.625rem 0.875rem;
++  text-align: left;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  color: rgba(255, 255, 255, 0.85);
++  white-space: nowrap;
++}
++
++.th:first-child { border-radius: 8px 0 0 0; }
++.th:last-child  { border-radius: 0 8px 0 0; }
++
++.row {
++  border-bottom: 1px solid var(--border);
++  transition: background-color 0.1s;
++}
++
++.row:last-child { border-bottom: none; }
++.row:hover { background-color: var(--bg); }
++
++.td {
++  padding: 0.625rem 0.875rem;
++  color: var(--text);
++  white-space: nowrap;
++}
++
++.center { text-align: center; }
++
++.scoreOk   { color: #16A34A; font-weight: 600; }
++.scoreFail { color: #DC2626; font-weight: 600; }
++.scoreDash { color: var(--text-muted); }
++
++.certGenerated { color: #16A34A; font-weight: 600; font-size: 0.8125rem; }
++.certPending   { color: var(--text-muted); font-size: 0.8125rem; }
++
++.rowActions {
++  display: flex;
++  justify-content: flex-end;
++  gap: 0.375rem;
++}
++
++.actionBtn {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: 1.75rem;
++  height: 1.75rem;
++  border: none;
++  border-radius: 4px;
++  cursor: pointer;
++  background-color: transparent;
++  color: var(--teal);
++  transition: background-color 0.15s;
++}
++
++.actionBtn:hover { background-color: var(--teal-soft); }
+diff --git a/src/features/training-sessions/documents-tab.tsx b/src/features/training-sessions/documents-tab.tsx
+new file mode 100644
+index 0000000..1aab650
+--- /dev/null
++++ b/src/features/training-sessions/documents-tab.tsx
+@@ -0,0 +1,95 @@
++'use client'
++
++import { FileText, Send } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import type { TrainingSession } from './types'
++import styles from './documents-tab.module.css'
++
++interface DocumentsTabProps {
++  session: TrainingSession
++}
++
++export function DocumentsTab({ session }: DocumentsTabProps) {
++  if (session.status !== 'CONCLUIDO') {
++    return (
++      <div className={styles.locked}>
++        <FileText size={48} strokeWidth={1} className={styles.lockedIcon} />
++        <p className={styles.lockedTitle}>Documentação indisponível</p>
++        <p className={styles.lockedDesc}>
++          Conclua o treinamento na aba &quot;Participantes&quot; para habilitar a geração de certificados e laudos.
++        </p>
++      </div>
++    )
++  }
++
++  const allGenerated = session.participants.every((p) => p.certificateGenerated)
++
++  return (
++    <div className={styles.wrapper}>
++      <div className={styles.toolbar}>
++        <p className={styles.summary}>
++          {session.participants.filter((p) => p.certificateGenerated).length} / {session.participants.length} certificados gerados
++        </p>
++        {!allGenerated && (
++          <Button variant="primary" size="sm" onClick={() => console.log('Gerar todos')}>
++            <FileText size={14} /> Gerar todos
++          </Button>
++        )}
++      </div>
++
++      <div className={styles.tableWrapper}>
++        <table className={styles.table}>
++          <thead>
++            <tr className={styles.headRow}>
++              <th className={styles.th}>Nome</th>
++              <th className={`${styles.th} ${styles.center}`}>Tipo</th>
++              <th className={`${styles.th} ${styles.center}`}>Score</th>
++              <th className={`${styles.th} ${styles.center}`}>Certificado</th>
++              <th className={styles.th} />
++            </tr>
++          </thead>
++          <tbody>
++            {session.participants.map((p) => (
++              <tr key={p.id} className={styles.row}>
++                <td className={styles.td}>{p.name}</td>
++                <td className={`${styles.td} ${styles.center}`}>
++                  {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
++                </td>
++                <td className={`${styles.td} ${styles.center}`}>
++                  {p.score !== null ? (
++                    <span className={p.score >= 70 ? styles.scoreOk : styles.scoreFail}>
++                      {p.score}%
++                    </span>
++                  ) : (
++                    <span className={styles.scoreDash}>—</span>
++                  )}
++                </td>
++                <td className={`${styles.td} ${styles.center}`}>
++                  {p.certificateGenerated ? (
++                    <span className={styles.certGenerated}>Gerado</span>
++                  ) : (
++                    <span className={styles.certPending}>Pendente</span>
++                  )}
++                </td>
++                <td className={styles.td}>
++                  <div className={styles.rowActions}>
++                    {!p.certificateGenerated && (
++                      <button className={styles.actionBtn} onClick={() => console.log('Gerar:', p.id)} title="Gerar certificado">
++                        <FileText size={14} />
++                      </button>
++                    )}
++                    {p.certificateGenerated && (
++                      <button className={styles.actionBtn} onClick={() => console.log('Enviar:', p.id)} title="Enviar por e-mail">
++                        <Send size={14} />
++                      </button>
++                    )}
++                  </div>
++                </td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/info-tab.module.css b/src/features/training-sessions/info-tab.module.css
+new file mode 100644
+index 0000000..5e83fb5
+--- /dev/null
++++ b/src/features/training-sessions/info-tab.module.css
+@@ -0,0 +1,96 @@
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++  gap: 1.5rem;
++}
++
++.content {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  gap: 1.5rem;
++}
++
++.companyHeader {
++  display: flex;
++  align-items: center;
++  gap: 1rem;
++  padding: 1rem;
++  background-color: var(--bg);
++  border-radius: 8px;
++  border: 1px solid var(--border);
++}
++
++.logoFallback {
++  width: 3rem;
++  height: 3rem;
++  border-radius: 50%;
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++  font-size: 0.875rem;
++  font-weight: 700;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  flex-shrink: 0;
++  border: 1px solid var(--border);
++}
++
++.companyName {
++  font-size: 0.9375rem;
++  font-weight: 600;
++  color: var(--text);
++}
++
++.courseName {
++  font-size: 0.875rem;
++  color: var(--text-2);
++  margin-top: 0.125rem;
++}
++
++.infoGrid {
++  display: flex;
++  flex-direction: column;
++  gap: 0;
++  border: 1px solid var(--border);
++  border-radius: 8px;
++  overflow: hidden;
++}
++
++.row {
++  display: flex;
++  align-items: flex-start;
++  padding: 0.75rem 1rem;
++  border-bottom: 1px solid var(--border);
++  gap: 1rem;
++}
++
++.row:last-child {
++  border-bottom: none;
++}
++
++.rowLabel {
++  font-size: 0.8125rem;
++  font-weight: 500;
++  color: var(--text-muted);
++  min-width: 11rem;
++  flex-shrink: 0;
++}
++
++.rowValue {
++  font-size: 0.875rem;
++  color: var(--text);
++  flex: 1;
++}
++
++.actions {
++  padding-top: 1rem;
++  border-top: 1px solid var(--border);
++  flex-shrink: 0;
++}
++
++.actionsLeft {
++  display: flex;
++  gap: 0.5rem;
++}
+diff --git a/src/features/training-sessions/info-tab.tsx b/src/features/training-sessions/info-tab.tsx
+new file mode 100644
+index 0000000..87822bf
+--- /dev/null
++++ b/src/features/training-sessions/info-tab.tsx
+@@ -0,0 +1,85 @@
++import { Archive, XCircle } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import { TrainingSessionStatusBadge } from './training-session-status-badge'
++import type { TrainingSession } from './types'
++import styles from './info-tab.module.css'
++
++interface InfoTabProps {
++  session: TrainingSession
++  onArchive: () => void
++  onCancel: () => void
++}
++
++function formatDate(dateStr: string): string {
++  const [year, month, day] = dateStr.split('-')
++  return `${day}/${month}/${year}`
++}
++
++function Row({ label, children }: { label: string; children: React.ReactNode }) {
++  return (
++    <div className={styles.row}>
++      <span className={styles.rowLabel}>{label}</span>
++      <span className={styles.rowValue}>{children}</span>
++    </div>
++  )
++}
++
++export function InfoTab({ session, onArchive, onCancel }: InfoTabProps) {
++  const canArchive = session.status !== 'ARQUIVADO' && session.status !== 'CANCELADO'
++  const canCancel = session.status === 'PLANEJADO' || session.status === 'EM_ANDAMENTO'
++
++  return (
++    <div className={styles.wrapper}>
++      <div className={styles.content}>
++
++        <div className={styles.companyHeader}>
++          <div className={styles.logoFallback}>
++            {session.company.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
++          </div>
++          <div>
++            <p className={styles.companyName}>{session.company.name}</p>
++            <p className={styles.courseName}>{session.course.name}</p>
++          </div>
++        </div>
++
++        <div className={styles.infoGrid}>
++          <Row label="Status"><TrainingSessionStatusBadge status={session.status} /></Row>
++          <Row label="Data">{formatDate(session.date)}</Row>
++          <Row label="Local">{session.city} / {session.state}</Row>
++          <Row label="Carga horária">
++            {session.course.theoryHours}h teórica
++            {session.course.practiceHours > 0 && ` + ${session.course.practiceHours}h prática`}
++          </Row>
++          <Row label="Nº estimado">{session.participantCount} participantes</Row>
++          <Row label="Consultor responsável">{session.responsibleConsultant.name}</Row>
++          {session.additionalConsultants.length > 0 && (
++            <Row label="Consultores adicionais">
++              {session.additionalConsultants.map((c) => c.name).join(', ')}
++            </Row>
++          )}
++          {session.notes && (
++            <Row label="Observações">{session.notes}</Row>
++          )}
++        </div>
++
++      </div>
++
++      {(canArchive || canCancel) && (
++        <div className={styles.actions}>
++          <div className={styles.actionsLeft}>
++            {canArchive && (
++              <Button variant="ghost" size="sm" onClick={onArchive}>
++                <Archive size={14} /> Arquivar
++              </Button>
++            )}
++            {canCancel && (
++              <Button variant="danger" size="sm" onClick={onCancel}>
++                <XCircle size={14} /> Cancelar Treinamento
++              </Button>
++            )}
++          </div>
++        </div>
++      )}
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/mock-data.ts b/src/features/training-sessions/mock-data.ts
+new file mode 100644
+index 0000000..7dee736
+--- /dev/null
++++ b/src/features/training-sessions/mock-data.ts
+@@ -0,0 +1,111 @@
++// src/features/training-sessions/mock-data.ts
++
++import type { TrainingSession, TrainingCompany, TrainingCourse, TrainingConsultant } from './types'
++
++export const mockTrainingSessions: TrainingSession[] = [
++  {
++    id: 1,
++    company: { id: 1, name: 'Louis Dreyfus Company Brasil S.A', logoUrl: null },
++    course: { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++    responsibleConsultant: { id: 1, name: 'Sebastião Souza' },
++    additionalConsultants: [
++      { id: 2, name: 'Francisco Camargo Filho' },
++      { id: 3, name: 'Rene Dias' },
++    ],
++    city: 'Guarulhos',
++    state: 'SP',
++    date: '2026-07-22',
++    participantCount: 20,
++    notes: 'Treinamento começa às 8h',
++    status: 'EM_ANDAMENTO',
++    qrCodeToken: 'token-abc-123',
++    participants: [
++      {
++        id: 1, name: 'João da Silva', cpf: '123.456.789-00', email: 'joao@email.com',
++        cnhCategory: 'B', cnhExpiration: '2028-03-10',
++        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 88, certificateGenerated: true,
++      },
++      {
++        id: 2, name: 'Maria Souza', cpf: '987.654.321-00', email: 'maria@email.com',
++        cnhCategory: 'AB', cnhExpiration: '2027-06-15',
++        type: 'SOMENTE_TEORICA', status: 'PENDENTE', score: null, certificateGenerated: false,
++      },
++      {
++        id: 3, name: 'Carlos Pereira', cpf: '111.222.333-44', email: 'carlos@email.com',
++        cnhCategory: 'B', cnhExpiration: '2026-11-20',
++        type: 'TEORICA_E_PRATICA', status: 'NECESSITA_REAVALIACAO', score: 62, certificateGenerated: false,
++      },
++    ],
++  },
++  {
++    id: 2,
++    company: { id: 2, name: 'BRACELL SP CELULOSE LTDA', logoUrl: null },
++    course: { id: 2, name: 'Direção Preventiva Veículos Pesados 8h', theoryHours: 8, practiceHours: 4 },
++    responsibleConsultant: { id: 2, name: 'Francisco Camargo Filho' },
++    additionalConsultants: [],
++    city: 'Lençóis Paulista',
++    state: 'SP',
++    date: '2026-07-10',
++    participantCount: 15,
++    notes: null,
++    status: 'CONCLUIDO',
++    qrCodeToken: 'token-def-456',
++    participants: [
++      {
++        id: 4, name: 'Ana Lima', cpf: '555.666.777-88', email: 'ana@email.com',
++        cnhCategory: 'C', cnhExpiration: '2029-01-05',
++        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 91, certificateGenerated: true,
++      },
++    ],
++  },
++  {
++    id: 3,
++    company: { id: 3, name: 'Jalles Machado', logoUrl: null },
++    course: { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++    responsibleConsultant: { id: 3, name: 'Rene Dias' },
++    additionalConsultants: [],
++    city: 'Goianésia',
++    state: 'GO',
++    date: '2026-08-15',
++    participantCount: 30,
++    notes: 'Treinamento solicitado pelo RH',
++    status: 'PLANEJADO',
++    qrCodeToken: 'token-ghi-789',
++    participants: [],
++  },
++  {
++    id: 4,
++    company: { id: 4, name: 'Agrex do Brasil', logoUrl: null },
++    course: { id: 3, name: 'Palestra Segurança no Trânsito 1h', theoryHours: 1, practiceHours: 0 },
++    responsibleConsultant: { id: 1, name: 'Sebastião Souza' },
++    additionalConsultants: [],
++    city: 'Goiânia',
++    state: 'GO',
++    date: '2025-11-20',
++    participantCount: 80,
++    notes: null,
++    status: 'ARQUIVADO',
++    qrCodeToken: 'token-jkl-012',
++    participants: [],
++  },
++]
++
++export const mockConsultants: TrainingConsultant[] = [
++  { id: 1, name: 'Sebastião Souza' },
++  { id: 2, name: 'Francisco Camargo Filho' },
++  { id: 3, name: 'Rene Dias' },
++  { id: 4, name: 'Mauricio Gomes de Oliveira' },
++]
++
++export const mockCompanies: TrainingCompany[] = [
++  { id: 1, name: 'Louis Dreyfus Company Brasil S.A', logoUrl: null },
++  { id: 2, name: 'BRACELL SP CELULOSE LTDA', logoUrl: null },
++  { id: 3, name: 'Jalles Machado', logoUrl: null },
++  { id: 4, name: 'Agrex do Brasil', logoUrl: null },
++]
++
++export const mockCourses: TrainingCourse[] = [
++  { id: 1, name: 'Direção Preventiva 4h', theoryHours: 4, practiceHours: 2 },
++  { id: 2, name: 'Direção Preventiva Veículos Pesados 8h', theoryHours: 8, practiceHours: 4 },
++  { id: 3, name: 'Palestra Segurança no Trânsito 1h', theoryHours: 1, practiceHours: 0 },
++]
+diff --git a/src/features/training-sessions/participants-tab.module.css b/src/features/training-sessions/participants-tab.module.css
+new file mode 100644
+index 0000000..db61e16
+--- /dev/null
++++ b/src/features/training-sessions/participants-tab.module.css
+@@ -0,0 +1,186 @@
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++  gap: 1rem;
++}
++
++.toolbar {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.75rem;
++}
++
++.count {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++}
++
++.toolbarActions {
++  display: flex;
++  gap: 0.5rem;
++}
++
++.addForm {
++  border: 1px solid var(--border);
++  border-radius: 8px;
++  padding: 1rem;
++  background-color: var(--bg);
++  display: flex;
++  flex-direction: column;
++  gap: 0.75rem;
++}
++
++.addFormTitle {
++  font-size: 0.875rem;
++  font-weight: 600;
++  color: var(--text);
++}
++
++.addFormGrid {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 0.75rem;
++}
++
++.field {
++  display: flex;
++  flex-direction: column;
++  gap: 0.25rem;
++}
++
++.label {
++  font-size: 0.8125rem;
++  font-weight: 500;
++  color: var(--text);
++}
++
++.input {
++  height: 2rem;
++  padding: 0 0.625rem;
++  border: 1px solid var(--border);
++  border-radius: 4px;
++  font-size: 0.8125rem;
++  color: var(--text);
++  background-color: var(--surface);
++  outline: none;
++  width: 100%;
++}
++
++.input:focus {
++  border-color: var(--teal);
++  box-shadow: 0 0 0 0.125rem rgba(56, 190, 200, 0.15);
++}
++
++.addFormActions {
++  display: flex;
++  justify-content: flex-end;
++  gap: 0.5rem;
++}
++
++.tableWrapper {
++  flex: 1;
++  overflow-y: auto;
++  border: 1px solid var(--border);
++  border-radius: 8px;
++}
++
++.table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.875rem;
++}
++
++.headRow {
++  background-color: var(--charcoal);
++  position: sticky;
++  top: 0;
++}
++
++.th {
++  padding: 0.625rem 0.875rem;
++  text-align: left;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  color: rgba(255, 255, 255, 0.85);
++  white-space: nowrap;
++}
++
++.th:first-child { border-radius: 8px 0 0 0; }
++.th:last-child  { border-radius: 0 8px 0 0; }
++
++.row {
++  border-bottom: 1px solid var(--border);
++  transition: background-color 0.1s;
++}
++
++.row:last-child { border-bottom: none; }
++.row:hover { background-color: var(--bg); }
++
++.td {
++  padding: 0.625rem 0.875rem;
++  color: var(--text);
++  max-width: 12rem;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.center { text-align: center; }
++
++.typeBtn {
++  display: inline-flex;
++  align-items: center;
++  padding: 0.2rem 0.625rem;
++  border-radius: 4px;
++  font-size: 0.75rem;
++  font-weight: 600;
++  border: none;
++  cursor: pointer;
++  transition: opacity 0.15s;
++}
++
++.typeBtn:hover { opacity: 0.8; }
++
++.typeSoloTeoria {
++  background-color: var(--mauve-soft);
++  color: var(--mauve);
++}
++
++.typePratica {
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++}
++
++.statusBadge {
++  display: inline-flex;
++  align-items: center;
++  padding: 0.2rem 0.625rem;
++  border-radius: 4px;
++  font-size: 0.75rem;
++  font-weight: 600;
++  white-space: nowrap;
++}
++
++.statusPendente        { background-color: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
++.statusEmAvaliacao     { background-color: var(--teal-soft); color: var(--teal-dark); }
++.statusAprovado        { background-color: #DCFCE7; color: #16A34A; }
++.statusNecessita       { background-color: #FEE2E2; color: #DC2626; }
++
++.empty {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++  text-align: center;
++  padding: 2rem 0;
++  flex: 1;
++}
++
++.footer {
++  display: flex;
++  justify-content: flex-end;
++  gap: 0.5rem;
++  padding-top: 1rem;
++  border-top: 1px solid var(--border);
++  flex-shrink: 0;
++}
+diff --git a/src/features/training-sessions/participants-tab.tsx b/src/features/training-sessions/participants-tab.tsx
+new file mode 100644
+index 0000000..81e6e9b
+--- /dev/null
++++ b/src/features/training-sessions/participants-tab.tsx
+@@ -0,0 +1,202 @@
++'use client'
++
++import { useState } from 'react'
++import { UserPlus, Upload, Check } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import type { TrainingSession, TrainingParticipant, ParticipationType, ParticipantStatus } from './types'
++import styles from './participants-tab.module.css'
++
++interface ParticipantsTabProps {
++  session: TrainingSession
++  onUpdateSession: (updated: TrainingSession) => void
++}
++
++const statusLabels: Record<ParticipantStatus, string> = {
++  PENDENTE: 'Pendente',
++  EM_AVALIACAO: 'Em Avaliação',
++  APROVADO: 'Aprovado',
++  NECESSITA_REAVALIACAO: 'Necessita Reavaliação',
++}
++
++const statusColors: Record<ParticipantStatus, string> = {
++  PENDENTE: styles.statusPendente,
++  EM_AVALIACAO: styles.statusEmAvaliacao,
++  APROVADO: styles.statusAprovado,
++  NECESSITA_REAVALIACAO: styles.statusNecessita,
++}
++
++interface AddParticipantForm {
++  name: string
++  cpf: string
++  email: string
++  cnhCategory: string
++  cnhExpiration: string
++}
++
++const emptyForm: AddParticipantForm = {
++  name: '', cpf: '', email: '', cnhCategory: '', cnhExpiration: '',
++}
++
++export function ParticipantsTab({ session, onUpdateSession }: ParticipantsTabProps) {
++  const [showAddForm, setShowAddForm] = useState(false)
++  const [form, setForm] = useState<AddParticipantForm>(emptyForm)
++
++  function setField(field: keyof AddParticipantForm, value: string) {
++    setForm((prev) => ({ ...prev, [field]: value }))
++  }
++
++  function toggleType(participantId: number) {
++    const updated: TrainingSession = {
++      ...session,
++      participants: session.participants.map((p) =>
++        p.id === participantId
++          ? { ...p, type: (p.type === 'SOMENTE_TEORICA' ? 'TEORICA_E_PRATICA' : 'SOMENTE_TEORICA') as ParticipationType }
++          : p
++      ),
++    }
++    onUpdateSession(updated)
++  }
++
++  function addParticipant() {
++    if (!form.name.trim() || !form.cpf.trim()) return
++    const newP: TrainingParticipant = {
++      id: Date.now(),
++      name: form.name,
++      cpf: form.cpf,
++      email: form.email,
++      cnhCategory: form.cnhCategory,
++      cnhExpiration: form.cnhExpiration,
++      type: 'TEORICA_E_PRATICA',
++      status: 'PENDENTE',
++      score: null,
++      certificateGenerated: false,
++    }
++    onUpdateSession({
++      ...session,
++      participants: [...session.participants, newP],
++      participantCount: session.participantCount + 1,
++    })
++    setForm(emptyForm)
++    setShowAddForm(false)
++  }
++
++  function handleStart() {
++    onUpdateSession({ ...session, status: 'EM_ANDAMENTO' })
++  }
++
++  function handleComplete() {
++    onUpdateSession({ ...session, status: 'CONCLUIDO' })
++  }
++
++  const canStart = session.status === 'PLANEJADO'
++  const canComplete =
++    session.status === 'EM_ANDAMENTO' &&
++    session.participants.length > 0 &&
++    session.participants.every(
++      (p) => p.type === 'SOMENTE_TEORICA' || p.status === 'APROVADO' || p.status === 'NECESSITA_REAVALIACAO'
++    )
++
++  return (
++    <div className={styles.wrapper}>
++
++      <div className={styles.toolbar}>
++        <p className={styles.count}>{session.participants.length} participante(s)</p>
++        <div className={styles.toolbarActions}>
++          <Button variant="ghost" size="sm" onClick={() => console.log('Import XLSX')}>
++            <Upload size={14} /> Importar planilha
++          </Button>
++          <Button variant="secondary" size="sm" onClick={() => setShowAddForm((v) => !v)}>
++            <UserPlus size={14} /> Adicionar manualmente
++          </Button>
++        </div>
++      </div>
++
++      {showAddForm && (
++        <div className={styles.addForm}>
++          <p className={styles.addFormTitle}>Novo Participante</p>
++          <div className={styles.addFormGrid}>
++            <div className={styles.field}>
++              <label className={styles.label}>Nome *</label>
++              <input className={styles.input} value={form.name} onChange={(e) => setField('name', e.target.value)} />
++            </div>
++            <div className={styles.field}>
++              <label className={styles.label}>CPF *</label>
++              <input className={styles.input} value={form.cpf} onChange={(e) => setField('cpf', e.target.value)} placeholder="000.000.000-00" />
++            </div>
++            <div className={styles.field}>
++              <label className={styles.label}>E-mail</label>
++              <input className={styles.input} type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
++            </div>
++            <div className={styles.field}>
++              <label className={styles.label}>Cat. CNH</label>
++              <input className={styles.input} value={form.cnhCategory} onChange={(e) => setField('cnhCategory', e.target.value)} placeholder="B" />
++            </div>
++            <div className={styles.field}>
++              <label className={styles.label}>Vencimento CNH</label>
++              <input className={styles.input} type="date" value={form.cnhExpiration} onChange={(e) => setField('cnhExpiration', e.target.value)} />
++            </div>
++          </div>
++          <div className={styles.addFormActions}>
++            <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(false); setForm(emptyForm) }}>Cancelar</Button>
++            <Button variant="primary" size="sm" disabled={!form.name.trim() || !form.cpf.trim()} onClick={addParticipant}>
++              <Check size={14} /> Confirmar
++            </Button>
++          </div>
++        </div>
++      )}
++
++      {session.participants.length === 0 ? (
++        <p className={styles.empty}>Nenhum participante inscrito ainda.</p>
++      ) : (
++        <div className={styles.tableWrapper}>
++          <table className={styles.table}>
++            <thead>
++              <tr className={styles.headRow}>
++                <th className={styles.th}>Nome</th>
++                <th className={styles.th}>CPF</th>
++                <th className={`${styles.th} ${styles.center}`}>Tipo</th>
++                <th className={`${styles.th} ${styles.center}`}>Avaliação</th>
++              </tr>
++            </thead>
++            <tbody>
++              {session.participants.map((p) => (
++                <tr key={p.id} className={styles.row}>
++                  <td className={styles.td}>{p.name}</td>
++                  <td className={styles.td}>{p.cpf}</td>
++                  <td className={`${styles.td} ${styles.center}`}>
++                    <button
++                      className={`${styles.typeBtn} ${p.type === 'SOMENTE_TEORICA' ? styles.typeSoloTeoria : styles.typePratica}`}
++                      onClick={() => toggleType(p.id)}
++                      title="Clique para alternar"
++                    >
++                      {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
++                    </button>
++                  </td>
++                  <td className={`${styles.td} ${styles.center}`}>
++                    <span className={`${styles.statusBadge} ${statusColors[p.status]}`}>
++                      {statusLabels[p.status]}
++                    </span>
++                  </td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </div>
++      )}
++
++      <div className={styles.footer}>
++        {canStart && (
++          <Button variant="primary" size="sm" onClick={handleStart}>
++            Iniciar Treinamento
++          </Button>
++        )}
++        {canComplete && (
++          <Button variant="primary" size="sm" onClick={handleComplete}>
++            Concluir Treinamento
++          </Button>
++        )}
++      </div>
++
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/qr-code-tab.module.css b/src/features/training-sessions/qr-code-tab.module.css
+new file mode 100644
+index 0000000..342dbf4
+--- /dev/null
++++ b/src/features/training-sessions/qr-code-tab.module.css
+@@ -0,0 +1,58 @@
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  gap: 1.5rem;
++  padding-top: 1rem;
++}
++
++.qrPlaceholder {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  gap: 0.75rem;
++  padding: 2rem;
++  border: 2px dashed var(--border);
++  border-radius: 8px;
++  background-color: var(--bg);
++  width: 100%;
++}
++
++.qrIcon { color: var(--charcoal); }
++
++.qrLabel {
++  font-size: 0.8125rem;
++  color: var(--text-muted);
++  text-align: center;
++}
++
++.linkBox {
++  width: 100%;
++  background-color: var(--bg);
++  border: 1px solid var(--border);
++  border-radius: 8px;
++  padding: 0.875rem 1rem;
++}
++
++.linkLabel {
++  font-size: 0.75rem;
++  color: var(--text-muted);
++  margin-bottom: 0.25rem;
++}
++
++.linkUrl {
++  font-size: 0.875rem;
++  color: var(--teal-dark);
++  font-weight: 500;
++  word-break: break-all;
++}
++
++.actions { display: flex; gap: 0.75rem; }
++
++.hint {
++  font-size: 0.8125rem;
++  color: var(--text-muted);
++  text-align: center;
++  line-height: 1.6;
++  max-width: 28rem;
++}
+diff --git a/src/features/training-sessions/qr-code-tab.tsx b/src/features/training-sessions/qr-code-tab.tsx
+new file mode 100644
+index 0000000..8ce98ae
+--- /dev/null
++++ b/src/features/training-sessions/qr-code-tab.tsx
+@@ -0,0 +1,46 @@
++'use client'
++
++import { ExternalLink, Copy, QrCode } from 'lucide-react'
++import { Button } from '@/components/ui/button/button'
++import type { TrainingSession } from './types'
++import styles from './qr-code-tab.module.css'
++
++interface QrCodeTabProps {
++  session: TrainingSession
++}
++
++export function QrCodeTab({ session }: QrCodeTabProps) {
++  const publicUrl = `simtc.com.br/register/${session.qrCodeToken}`
++
++  function copyLink() {
++    navigator.clipboard.writeText(`https://${publicUrl}`)
++  }
++
++  return (
++    <div className={styles.wrapper}>
++      <div className={styles.qrPlaceholder}>
++        <QrCode size={180} strokeWidth={1} className={styles.qrIcon} />
++        <p className={styles.qrLabel}>QR Code — {session.company.name}</p>
++      </div>
++      <div className={styles.linkBox}>
++        <p className={styles.linkLabel}>Link do formulário público:</p>
++        <p className={styles.linkUrl}>{publicUrl}</p>
++      </div>
++      <div className={styles.actions}>
++        <Button variant="secondary" size="sm" onClick={copyLink}>
++          <Copy size={14} /> Copiar link
++        </Button>
++        <Button
++          variant="primary"
++          size="sm"
++          onClick={() => window.open(`/training-sessions/${session.id}/qr-code`, '_blank')}
++        >
++          <ExternalLink size={14} /> Abrir em tela cheia
++        </Button>
++      </div>
++      <p className={styles.hint}>
++        Projete o QR Code na sala para que os participantes façam o auto-cadastro pelo celular, sem precisar digitar nenhum código de turma.
++      </p>
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/training-session-add-form.module.css b/src/features/training-sessions/training-session-add-form.module.css
+new file mode 100644
+index 0000000..770e7f5
+--- /dev/null
++++ b/src/features/training-sessions/training-session-add-form.module.css
+@@ -0,0 +1,137 @@
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  gap: 1.5rem;
++  height: 100%;
++}
++
++.form {
++  display: flex;
++  flex-direction: column;
++  gap: 1rem;
++  flex: 1;
++}
++
++.row2 {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 1rem;
++}
++
++.field {
++  display: flex;
++  flex-direction: column;
++  gap: 0.375rem;
++}
++
++.label {
++  font-size: 0.875rem;
++  font-weight: 500;
++  color: var(--text);
++}
++
++.required {
++  color: #DC2626;
++}
++
++.input {
++  height: 2.25rem;
++  padding: 0 0.75rem;
++  border: 1px solid var(--border);
++  border-radius: 4px;
++  font-size: 0.875rem;
++  color: var(--text);
++  background-color: var(--surface);
++  outline: none;
++  transition: border-color 0.15s, box-shadow 0.15s;
++  width: 100%;
++}
++
++.input:focus {
++  border-color: var(--teal);
++  box-shadow: 0 0 0 0.1875rem rgba(56, 190, 200, 0.15);
++}
++
++.textarea {
++  padding: 0.5rem 0.75rem;
++  border: 1px solid var(--border);
++  border-radius: 4px;
++  font-size: 0.875rem;
++  color: var(--text);
++  background-color: var(--surface);
++  outline: none;
++  resize: vertical;
++  font-family: inherit;
++  transition: border-color 0.15s, box-shadow 0.15s;
++  width: 100%;
++}
++
++.textarea:focus {
++  border-color: var(--teal);
++  box-shadow: 0 0 0 0.1875rem rgba(56, 190, 200, 0.15);
++}
++
++.multiSelect {
++  display: flex;
++  flex-direction: column;
++  gap: 0.375rem;
++  border: 1px solid var(--border);
++  border-radius: 4px;
++  padding: 0.5rem;
++  background-color: var(--surface);
++  max-height: 9rem;
++  overflow-y: auto;
++}
++
++.checkItem {
++  display: flex;
++  align-items: center;
++  gap: 0.5rem;
++  padding: 0.375rem 0.5rem;
++  border-radius: 4px;
++  font-size: 0.875rem;
++  color: var(--text);
++  cursor: pointer;
++  transition: background-color 0.1s;
++}
++
++.checkItem:hover {
++  background-color: var(--bg);
++}
++
++.checkItemSelected {
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++}
++
++.checkbox {
++  accent-color: var(--teal);
++  width: 1rem;
++  height: 1rem;
++  flex-shrink: 0;
++}
++
++.noConsultants {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++  text-align: center;
++  padding: 0.5rem 0;
++}
++
++.actions {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  padding-top: 1rem;
++  border-top: 1px solid var(--border);
++  flex-shrink: 0;
++}
++
++.actionsRight {
++  display: flex;
++  gap: 0.5rem;
++}
++
++@media (max-width: 30rem) {
++  .row2 { grid-template-columns: 1fr; }
++}
+diff --git a/src/features/training-sessions/training-session-add-form.tsx b/src/features/training-sessions/training-session-add-form.tsx
+new file mode 100644
+index 0000000..feed441
+--- /dev/null
++++ b/src/features/training-sessions/training-session-add-form.tsx
+@@ -0,0 +1,203 @@
++'use client'
++
++import { useState } from 'react'
++import { Button } from '@/components/ui/button/button'
++import { Select } from '@/components/ui/select/select'
++import { mockCompanies, mockCourses, mockConsultants } from './mock-data'
++import styles from './training-session-add-form.module.css'
++
++export interface TrainingSessionFormData {
++  companyId: number
++  courseId: number
++  responsibleConsultantId: number
++  additionalConsultantIds: number[]
++  city: string
++  state: string
++  date: string
++  participantCount: string
++  notes: string
++}
++
++const BR_STATES = [
++  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA',
++  'PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
++]
++
++interface TrainingSessionAddFormProps {
++  onSave: (data: TrainingSessionFormData) => void
++  onCancel: () => void
++}
++
++const empty: TrainingSessionFormData = {
++  companyId: 0,
++  courseId: 0,
++  responsibleConsultantId: 0,
++  additionalConsultantIds: [],
++  city: '',
++  state: '',
++  date: '',
++  participantCount: '',
++  notes: '',
++}
++
++export function TrainingSessionAddForm({ onSave, onCancel }: TrainingSessionAddFormProps) {
++  const [form, setForm] = useState<TrainingSessionFormData>(empty)
++
++  function set<K extends keyof TrainingSessionFormData>(field: K, value: TrainingSessionFormData[K]) {
++    setForm((prev) => ({ ...prev, [field]: value }))
++  }
++
++  function toggleAdditional(id: number) {
++    setForm((prev) => {
++      const already = prev.additionalConsultantIds.includes(id)
++      return {
++        ...prev,
++        additionalConsultantIds: already
++          ? prev.additionalConsultantIds.filter((x) => x !== id)
++          : [...prev.additionalConsultantIds, id],
++      }
++    })
++  }
++
++  const availableAdditional = mockConsultants.filter(
++    (c) => c.id !== form.responsibleConsultantId,
++  )
++
++  const isValid =
++    form.companyId > 0 &&
++    form.courseId > 0 &&
++    form.responsibleConsultantId > 0 &&
++    form.city.trim() !== '' &&
++    form.state !== '' &&
++    form.date !== ''
++
++  return (
++    <div className={styles.wrapper}>
++      <div className={styles.form}>
++
++        <div className={styles.field}>
++          <label className={styles.label}>Empresa <span className={styles.required}>*</span></label>
++          <Select
++            value={form.companyId === 0 ? '' : String(form.companyId)}
++            onChange={(v) => set('companyId', Number(v))}
++            options={mockCompanies.map((c) => ({ label: c.name, value: String(c.id) }))}
++            placeholder="Selecionar empresa"
++          />
++        </div>
++
++        <div className={styles.field}>
++          <label className={styles.label}>Curso <span className={styles.required}>*</span></label>
++          <Select
++            value={form.courseId === 0 ? '' : String(form.courseId)}
++            onChange={(v) => set('courseId', Number(v))}
++            options={mockCourses.map((c) => ({ label: c.name, value: String(c.id) }))}
++            placeholder="Selecionar curso"
++          />
++        </div>
++
++        <div className={styles.field}>
++          <label className={styles.label}>Consultor Responsável <span className={styles.required}>*</span></label>
++          <Select
++            value={form.responsibleConsultantId === 0 ? '' : String(form.responsibleConsultantId)}
++            onChange={(v) => {
++              const newId = Number(v)
++              set('responsibleConsultantId', newId)
++              set('additionalConsultantIds', form.additionalConsultantIds.filter((id) => id !== newId))
++            }}
++            options={mockConsultants.map((c) => ({ label: c.name, value: String(c.id) }))}
++            placeholder="Selecionar consultor"
++          />
++        </div>
++
++        <div className={styles.row2}>
++          <div className={styles.field}>
++            <label className={styles.label}>Cidade <span className={styles.required}>*</span></label>
++            <input
++              className={styles.input}
++              value={form.city}
++              onChange={(e) => set('city', e.target.value)}
++              placeholder="Ex: Guarulhos"
++            />
++          </div>
++          <div className={styles.field}>
++            <label className={styles.label}>UF <span className={styles.required}>*</span></label>
++            <Select
++              value={form.state}
++              onChange={(v) => set('state', v)}
++              options={BR_STATES.map((s) => ({ label: s, value: s }))}
++              placeholder="UF"
++            />
++          </div>
++        </div>
++
++        <div className={styles.row2}>
++          <div className={styles.field}>
++            <label className={styles.label}>Data <span className={styles.required}>*</span></label>
++            <input
++              className={styles.input}
++              type="date"
++              value={form.date}
++              onChange={(e) => set('date', e.target.value)}
++            />
++          </div>
++          <div className={styles.field}>
++            <label className={styles.label}>Nº estimado de participantes</label>
++            <input
++              className={styles.input}
++              type="number"
++              min="0"
++              value={form.participantCount}
++              onChange={(e) => set('participantCount', e.target.value)}
++              placeholder="0"
++            />
++          </div>
++        </div>
++
++        <div className={styles.field}>
++          <label className={styles.label}>Consultores Adicionais</label>
++          <div className={styles.multiSelect}>
++            {availableAdditional.length === 0 && (
++              <p className={styles.noConsultants}>Nenhum consultor disponível</p>
++            )}
++            {availableAdditional.map((c) => {
++              const checked = form.additionalConsultantIds.includes(c.id)
++              return (
++                <label key={c.id} className={`${styles.checkItem} ${checked ? styles.checkItemSelected : ''}`}>
++                  <input
++                    type="checkbox"
++                    className={styles.checkbox}
++                    checked={checked}
++                    onChange={() => toggleAdditional(c.id)}
++                  />
++                  {c.name}
++                </label>
++              )
++            })}
++          </div>
++        </div>
++
++        <div className={styles.field}>
++          <label className={styles.label}>Observações</label>
++          <textarea
++            className={styles.textarea}
++            value={form.notes}
++            onChange={(e) => set('notes', e.target.value)}
++            placeholder="Ex: Treinamento começa às 8h"
++            rows={3}
++          />
++        </div>
++
++      </div>
++
++      <div className={styles.actions}>
++        <div />
++        <div className={styles.actionsRight}>
++          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
++          <Button variant="primary" size="sm" disabled={!isValid} onClick={() => onSave(form)}>
++            Salvar
++          </Button>
++        </div>
++      </div>
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/training-session-detail-tabs.module.css b/src/features/training-sessions/training-session-detail-tabs.module.css
+new file mode 100644
+index 0000000..0443b86
+--- /dev/null
++++ b/src/features/training-sessions/training-session-detail-tabs.module.css
+@@ -0,0 +1,41 @@
++.wrapper {
++  display: flex;
++  flex-direction: column;
++  height: 100%;
++}
++
++.tabList {
++  display: flex;
++  border-bottom: 2px solid var(--border);
++  flex-shrink: 0;
++  margin-bottom: 1.25rem;
++}
++
++.tab {
++  padding: 0.625rem 1rem;
++  font-size: 0.875rem;
++  font-weight: 500;
++  color: var(--text-muted);
++  background: none;
++  border: none;
++  cursor: pointer;
++  border-bottom: 2px solid transparent;
++  margin-bottom: -2px;
++  transition: color 0.15s, border-color 0.15s;
++  white-space: nowrap;
++}
++
++.tab:hover { color: var(--text); }
++
++.tabActive {
++  color: var(--teal-dark);
++  border-bottom-color: var(--teal);
++  font-weight: 600;
++}
++
++.panel {
++  flex: 1;
++  overflow-y: auto;
++  display: flex;
++  flex-direction: column;
++}
+diff --git a/src/features/training-sessions/training-session-detail-tabs.tsx b/src/features/training-sessions/training-session-detail-tabs.tsx
+new file mode 100644
+index 0000000..190d020
+--- /dev/null
++++ b/src/features/training-sessions/training-session-detail-tabs.tsx
+@@ -0,0 +1,67 @@
++'use client'
++
++import { useState } from 'react'
++import { InfoTab } from './info-tab'
++import { ParticipantsTab } from './participants-tab'
++import { QrCodeTab } from './qr-code-tab'
++import { DocumentsTab } from './documents-tab'
++import type { TrainingSession } from './types'
++import styles from './training-session-detail-tabs.module.css'
++
++type Tab = 'info' | 'participants' | 'qrcode' | 'documents'
++
++interface TrainingSessionDetailTabsProps {
++  session: TrainingSession
++  onUpdateSession: (updated: TrainingSession) => void
++}
++
++const tabs: { id: Tab; label: string }[] = [
++  { id: 'info', label: 'Informações' },
++  { id: 'participants', label: 'Participantes' },
++  { id: 'qrcode', label: 'QR Code' },
++  { id: 'documents', label: 'Documentos' },
++]
++
++export function TrainingSessionDetailTabs({ session, onUpdateSession }: TrainingSessionDetailTabsProps) {
++  const [activeTab, setActiveTab] = useState<Tab>('info')
++
++  function handleArchive() {
++    onUpdateSession({ ...session, status: 'ARQUIVADO' })
++  }
++
++  function handleCancel() {
++    onUpdateSession({ ...session, status: 'CANCELADO' })
++  }
++
++  return (
++    <div className={styles.wrapper}>
++      <div className={styles.tabList} role="tablist">
++        {tabs.map((tab) => (
++          <button
++            key={tab.id}
++            role="tab"
++            aria-selected={activeTab === tab.id}
++            className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
++            onClick={() => setActiveTab(tab.id)}
++          >
++            {tab.label}
++          </button>
++        ))}
++      </div>
++      <div className={styles.panel}>
++        {activeTab === 'info' && (
++          <InfoTab session={session} onArchive={handleArchive} onCancel={handleCancel} />
++        )}
++        {activeTab === 'participants' && (
++          <ParticipantsTab session={session} onUpdateSession={onUpdateSession} />
++        )}
++        {activeTab === 'qrcode' && (
++          <QrCodeTab session={session} />
++        )}
++        {activeTab === 'documents' && (
++          <DocumentsTab session={session} />
++        )}
++      </div>
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/training-session-status-badge.module.css b/src/features/training-sessions/training-session-status-badge.module.css
+new file mode 100644
+index 0000000..f325f54
+--- /dev/null
++++ b/src/features/training-sessions/training-session-status-badge.module.css
+@@ -0,0 +1,35 @@
++.badge {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  padding: 0.25rem 0.75rem;
++  border-radius: 4px;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  white-space: nowrap;
++}
++
++.PLANEJADO {
++  background-color: var(--teal-soft);
++  color: var(--text-muted);
++}
++
++.EM_ANDAMENTO {
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++}
++
++.CONCLUIDO {
++  background-color: #DCFCE7;
++  color: #16A34A;
++}
++
++.ARQUIVADO {
++  background-color: var(--charcoal-2);
++  color: rgba(255, 255, 255, 0.85);
++}
++
++.CANCELADO {
++  background-color: #FEE2E2;
++  color: #DC2626;
++}
+diff --git a/src/features/training-sessions/training-session-status-badge.tsx b/src/features/training-sessions/training-session-status-badge.tsx
+new file mode 100644
+index 0000000..4347939
+--- /dev/null
++++ b/src/features/training-sessions/training-session-status-badge.tsx
+@@ -0,0 +1,22 @@
++import type { TrainingStatus } from './types'
++import styles from './training-session-status-badge.module.css'
++
++interface TrainingSessionStatusBadgeProps {
++  status: TrainingStatus
++}
++
++const labels: Record<TrainingStatus, string> = {
++  PLANEJADO: 'Planejado',
++  EM_ANDAMENTO: 'Em Andamento',
++  CONCLUIDO: 'Concluído',
++  ARQUIVADO: 'Arquivado',
++  CANCELADO: 'Cancelado',
++}
++
++export function TrainingSessionStatusBadge({ status }: TrainingSessionStatusBadgeProps) {
++  return (
++    <span className={`${styles.badge} ${styles[status]}`}>
++      {labels[status]}
++    </span>
++  )
++}
+diff --git a/src/features/training-sessions/training-session-table.module.css b/src/features/training-sessions/training-session-table.module.css
+new file mode 100644
+index 0000000..2faa4a5
+--- /dev/null
++++ b/src/features/training-sessions/training-session-table.module.css
+@@ -0,0 +1,97 @@
++.wrapper {
++  overflow-x: auto;
++  border-radius: 8px;
++  border: 1px solid var(--border);
++}
++
++.table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 0.875rem;
++}
++
++.headRow {
++  background-color: var(--charcoal);
++}
++
++.th {
++  padding: 0.875rem 1rem;
++  text-align: left;
++  font-size: 0.8125rem;
++  font-weight: 600;
++  color: rgba(255, 255, 255, 0.85);
++  white-space: nowrap;
++}
++
++.th:first-child { border-radius: 8px 0 0 0; }
++.th:last-child  { border-radius: 0 8px 0 0; }
++
++.row {
++  border-bottom: 1px solid var(--border);
++  cursor: pointer;
++  transition: background-color 0.1s;
++}
++
++.row:last-child { border-bottom: none; }
++
++.row:hover { background-color: var(--bg); }
++
++.td {
++  padding: 0.875rem 1rem;
++  color: var(--text);
++  max-width: 14rem;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.center { text-align: center; }
++
++.companyCell {
++  display: flex;
++  align-items: center;
++  gap: 0.625rem;
++  min-width: 0;
++}
++
++.logo {
++  width: 2rem;
++  height: 2rem;
++  border-radius: 50%;
++  object-fit: cover;
++  flex-shrink: 0;
++  border: 1px solid var(--border);
++}
++
++.logoFallback {
++  width: 2rem;
++  height: 2rem;
++  border-radius: 50%;
++  background-color: var(--teal-soft);
++  color: var(--teal-dark);
++  font-size: 0.6875rem;
++  font-weight: 700;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  flex-shrink: 0;
++  border: 1px solid var(--border);
++}
++
++.companyName {
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.extra {
++  color: var(--text-muted);
++  font-size: 0.8125rem;
++}
++
++.empty {
++  font-size: 0.875rem;
++  color: var(--text-muted);
++  text-align: center;
++  padding: 3rem 0;
++}
+diff --git a/src/features/training-sessions/training-session-table.tsx b/src/features/training-sessions/training-session-table.tsx
+new file mode 100644
+index 0000000..f9acfb8
+--- /dev/null
++++ b/src/features/training-sessions/training-session-table.tsx
+@@ -0,0 +1,81 @@
++import type { TrainingSession } from './types'
++import { TrainingSessionStatusBadge } from './training-session-status-badge'
++import styles from './training-session-table.module.css'
++
++interface TrainingSessionTableProps {
++  sessions: TrainingSession[]
++  onSelect: (session: TrainingSession) => void
++}
++
++function CompanyLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
++  if (logoUrl) {
++    return <img src={logoUrl} alt={name} className={styles.logo} />
++  }
++  const initials = name
++    .split(' ')
++    .slice(0, 2)
++    .map((w) => w[0])
++    .join('')
++    .toUpperCase()
++  return <span className={styles.logoFallback}>{initials}</span>
++}
++
++function formatDate(dateStr: string): string {
++  const [year, month, day] = dateStr.split('-')
++  return `${day}/${month}/${year}`
++}
++
++export function TrainingSessionTable({ sessions, onSelect }: TrainingSessionTableProps) {
++  if (sessions.length === 0) {
++    return <p className={styles.empty}>Nenhum treinamento encontrado.</p>
++  }
++
++  return (
++    <div className={styles.wrapper}>
++      <table className={styles.table}>
++        <thead>
++          <tr className={styles.headRow}>
++            <th className={styles.th}>Empresa</th>
++            <th className={styles.th}>Curso</th>
++            <th className={styles.th}>Data</th>
++            <th className={styles.th}>Cidade / UF</th>
++            <th className={styles.th}>Consultor Responsável</th>
++            <th className={`${styles.th} ${styles.center}`}>Participantes</th>
++            <th className={`${styles.th} ${styles.center}`}>Status</th>
++          </tr>
++        </thead>
++        <tbody>
++          {sessions.map((s) => (
++            <tr
++              key={s.id}
++              className={styles.row}
++              onClick={() => onSelect(s)}
++            >
++              <td className={styles.td}>
++                <div className={styles.companyCell}>
++                  <CompanyLogo name={s.company.name} logoUrl={s.company.logoUrl} />
++                  <span className={styles.companyName}>{s.company.name}</span>
++                </div>
++              </td>
++              <td className={styles.td}>{s.course.name}</td>
++              <td className={styles.td}>{formatDate(s.date)}</td>
++              <td className={styles.td}>{s.city} / {s.state}</td>
++              <td className={styles.td}>
++                {s.responsibleConsultant.name}
++                {s.additionalConsultants.length > 0 && (
++                  <span className={styles.extra}>
++                    {' '}+ {s.additionalConsultants.length}
++                  </span>
++                )}
++              </td>
++              <td className={`${styles.td} ${styles.center}`}>{s.participantCount}</td>
++              <td className={`${styles.td} ${styles.center}`}>
++                <TrainingSessionStatusBadge status={s.status} />
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
++  )
++}
+diff --git a/src/features/training-sessions/types.ts b/src/features/training-sessions/types.ts
+new file mode 100644
+index 0000000..6ce636a
+--- /dev/null
++++ b/src/features/training-sessions/types.ts
+@@ -0,0 +1,63 @@
++// src/features/training-sessions/types.ts
++
++export type TrainingStatus =
++  | 'PLANEJADO'
++  | 'EM_ANDAMENTO'
++  | 'CONCLUIDO'
++  | 'ARQUIVADO'
++  | 'CANCELADO'
++
++export type ParticipationType = 'SOMENTE_TEORICA' | 'TEORICA_E_PRATICA'
++
++export type ParticipantStatus =
++  | 'PENDENTE'
++  | 'EM_AVALIACAO'
++  | 'APROVADO'
++  | 'NECESSITA_REAVALIACAO'
++
++export interface TrainingCompany {
++  id: number
++  name: string
++  logoUrl: string | null
++}
++
++export interface TrainingCourse {
++  id: number
++  name: string
++  theoryHours: number
++  practiceHours: number
++}
++
++export interface TrainingConsultant {
++  id: number
++  name: string
++}
++
++export interface TrainingParticipant {
++  id: number
++  name: string
++  cpf: string
++  email: string
++  cnhCategory: string
++  cnhExpiration: string
++  type: ParticipationType
++  status: ParticipantStatus
++  score: number | null
++  certificateGenerated: boolean
++}
++
++export interface TrainingSession {
++  id: number
++  company: TrainingCompany
++  course: TrainingCourse
++  responsibleConsultant: TrainingConsultant
++  additionalConsultants: TrainingConsultant[]
++  city: string
++  state: string
++  date: string
++  participantCount: number
++  notes: string | null
++  status: TrainingStatus
++  qrCodeToken: string
++  participants: TrainingParticipant[]
++}

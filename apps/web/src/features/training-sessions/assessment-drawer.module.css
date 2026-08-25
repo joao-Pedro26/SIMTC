@@ -1,0 +1,522 @@
+/* ── Overlay e Modal ─────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(1.5rem) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal {
+  position: relative;
+  background-color: var(--surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 1320px;
+  height: 90vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.18s ease;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background-color: #1d9aa4;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────────── */
+
+.modalBody {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Loading / Error ─────────────────────────────────────────────────────────── */
+
+.loadingState,
+.errorState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--text-muted, #718096);
+  flex: 1;
+}
+
+.errorState p {
+  color: #e53e3e;
+  font-size: 0.875rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+  opacity: 0.5;
+}
+
+/* ── Layout de duas colunas ──────────────────────────────────────────────────── */
+
+.twoPanel {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
+
+.sidebar {
+  width: 12rem;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border, #e2e8f0);
+  background-color: var(--surface-muted, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.5rem 0;
+  overflow-y: auto;
+}
+
+.catBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.75rem 0.875rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border-left: 3px solid transparent;
+  transition: background-color 0.12s, border-color 0.12s;
+  gap: 0.125rem;
+}
+
+.catBtn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.catBtnActive {
+  border-left-color: #1d9aa4;
+  background-color: rgba(29, 154, 164, 0.08);
+}
+
+.catCode {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #1d9aa4;
+  letter-spacing: 0.04em;
+}
+
+.catBtnActive .catCode {
+  color: #0a6e80;
+}
+
+.catName {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #718096);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.catScore {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.catScoreHigh { background-color: #c6f6d5; color: #276749; }
+.catScoreMid  { background-color: #fefcbf; color: #744210; }
+.catScoreLow  { background-color: #fed7d7; color: #822727; }
+
+/* ── Main panel ──────────────────────────────────────────────────────────────── */
+
+.mainPanel {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.categoryCode {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  background-color: #1d9aa4;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.categoryTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text, #1a202c);
+}
+
+.categoryDescription {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #718096);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+  border-left: 3px solid #1d9aa4;
+  padding-left: 0.75rem;
+}
+
+.infractionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.infractionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.infractionItem:last-child {
+  border-bottom: none;
+}
+
+.infractionRow {
+  display: flex;
+  gap: 0.375rem;
+  align-items: flex-start;
+}
+
+.infractionIndex {
+  font-size: 0.75rem;
+  color: var(--text-muted, #718096);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  width: 1.25rem;
+}
+
+.infractionDesc {
+  font-size: 0.875rem;
+  color: var(--text, #1a202c);
+  line-height: 1.45;
+}
+
+/* ── Note buttons ────────────────────────────────────────────────────────────── */
+
+.noteButtons {
+  display: flex;
+  gap: 0.375rem;
+  padding-left: 1.625rem;
+}
+
+.noteBtn {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  border: 1.5px solid;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+  letter-spacing: 0.02em;
+}
+
+.noteBtnB {
+  border-color: #68d391;
+  color: #276749;
+  background-color: transparent;
+}
+.noteBtnB:hover { background-color: #c6f6d5; }
+.noteBtnB.noteBtnSelected {
+  background-color: #48bb78;
+  border-color: #48bb78;
+  color: white;
+}
+
+.noteBtnPM {
+  border-color: #f6e05e;
+  color: #744210;
+  background-color: transparent;
+}
+.noteBtnPM:hover { background-color: #fefcbf; }
+.noteBtnPM.noteBtnSelected {
+  background-color: #ecc94b;
+  border-color: #ecc94b;
+  color: #744210;
+}
+
+.noteBtnM {
+  border-color: #fc8181;
+  color: #822727;
+  background-color: transparent;
+}
+.noteBtnM:hover { background-color: #fed7d7; }
+.noteBtnM.noteBtnSelected {
+  background-color: #fc8181;
+  border-color: #fc8181;
+  color: white;
+}
+
+.emptyState {
+  color: var(--text-muted, #718096);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+  background-color: var(--surface, #fff);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.footerScores {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.footerScoreItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.footerCode {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #1d9aa4;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.footerValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text, #1a202c);
+}
+
+.footerDash {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #718096);
+}
+
+.footerOverall {
+  font-size: 0.875rem;
+  color: var(--text, #1a202c);
+  margin-left: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 1.5px solid var(--border, #e2e8f0);
+}
+
+.footerError {
+  font-size: 0.75rem;
+  color: #e53e3e;
+  flex-basis: 100%;
+}
+
+.footerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.cancelBtn {
+  padding: 0.5rem 1.125rem;
+  background-color: transparent;
+  color: var(--text-muted, #718096);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background-color: #fff5f5;
+  border-color: #fc8181;
+  color: #c53030;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saveBtn {
+  padding: 0.5rem 1.25rem;
+  background-color: #1d9aa4;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background-color: #0a6e80;
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Confirm dialog de cancelamento ─────────────────────────────────────────── */
+
+.cancelOverlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 12px;
+  animation: fadeIn 0.12s ease;
+}
+
+.cancelDialog {
+  background-color: var(--surface, #fff);
+  border-radius: 10px;
+  padding: 1.75rem;
+  max-width: 22rem;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.15s ease;
+}
+
+.cancelDialogTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #1a202c);
+  margin: 0 0 0.5rem;
+}
+
+.cancelDialogBody {
+  font-size: 0.875rem;
+  color: var(--text-muted, #718096);
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.cancelDialogActions {
+  display: flex;
+  gap: 0.625rem;
+  justify-content: flex-end;
+}
+
+.cancelDialogKeep {
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text, #1a202c);
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.cancelDialogKeep:hover {
+  background-color: var(--bg, #f7fafc);
+}
+
+.cancelDialogConfirm {
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 7px;
+  background-color: #e53e3e;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.cancelDialogConfirm:hover {
+  background-color: #c53030;
+}

@@ -1,0 +1,53 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1rem;
+  padding: 0 1.75rem 1.75rem;
+}
+
+/* ── Layout lado a lado ──────────────────────────────────── */
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  margin-top: 1.5rem;
+}
+
+/* ── Cada painel (tópicos / infrações) ───────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tableWrapper {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Responsivo ──────────────────────────────────────────── */
+
+@media (max-width: 56rem) {
+  .columns { grid-template-columns: 1fr; }
+  .page    { padding: 0 1rem 1rem; }
+}

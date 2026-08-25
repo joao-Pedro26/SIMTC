@@ -1,0 +1,275 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.count {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.toolbarActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.addForm {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.addFormTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.addFormGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.input {
+  height: 2rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background-color: var(--surface);
+  outline: none;
+  width: 100%;
+}
+
+.input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 0.125rem rgba(56, 190, 200, 0.15);
+}
+
+.addFormActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.tableWrapper {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.headRow {
+  background-color: #1d9aa4;
+  position: sticky;
+  top: 0;
+}
+
+.th {
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
+.th:first-child { border-radius: 8px 0 0 0; }
+.th:last-child  { border-radius: 0 8px 0 0; }
+
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s;
+}
+
+.row:last-child { border-bottom: none; }
+.row:hover { background-color: var(--bg); }
+
+.td {
+  padding: 0.625rem 0.875rem;
+  color: var(--text);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.center { text-align: center; }
+
+.typeBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.typeBtn:hover { opacity: 0.8; }
+
+.typeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.typeSoloTeoria {
+  background-color: var(--mauve-soft);
+  color: var(--mauve);
+}
+
+.typePratica {
+  background-color: var(--teal-soft);
+  color: var(--teal-dark);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusPendente        { background-color: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+.statusEmAvaliacao     { background-color: var(--teal-soft); color: var(--teal-dark); }
+.statusAprovado        { background-color: #DCFCE7; color: #16A34A; }
+.statusNecessita       { background-color: #FEE2E2; color: #DC2626; }
+
+.empty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem 0;
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.deleteBtn:hover:not(:disabled) { color: #e53e3e; }
+.deleteBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Botões de ação de avaliação ─────────────────────────────────────────── */
+
+.actionBtn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1.5px solid;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionBtnPrimary {
+  border-color: #1d9aa4;
+  color: #0a6e80;
+  background-color: #e6f6f7;
+}
+.actionBtnPrimary:hover:not(:disabled) {
+  background-color: #1d9aa4;
+  color: white;
+}
+
+.actionBtnContinue {
+  border-color: #68d391;
+  color: #276749;
+  background-color: #f0fff4;
+}
+.actionBtnContinue:hover:not(:disabled) {
+  background-color: #48bb78;
+  border-color: #48bb78;
+  color: white;
+}
+
+.actionBtnReavaliar {
+  border-color: #f6ad55;
+  color: #744210;
+  background-color: #fffaf0;
+}
+.actionBtnReavaliar:hover:not(:disabled) {
+  background-color: #ed8936;
+  border-color: #ed8936;
+  color: white;
+}
+
+.blockedLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted, #718096);
+  font-style: italic;
+  max-width: 8rem;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.scoreHint {
+  font-size: 0.75rem;
+  color: #276749;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}

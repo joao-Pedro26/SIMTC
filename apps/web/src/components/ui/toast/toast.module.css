@@ -1,0 +1,117 @@
+/* ── Container (fixed, top-right) ───────────────────────────────────────── */
+
+.container {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+/* ── Toast card ──────────────────────────────────────────────────────────── */
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8125rem 0.875rem 0.8125rem 1rem;
+  border-radius: 10px;
+  min-width: 288px;
+  max-width: 380px;
+  background: #ffffff;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.10),
+    0 1px 4px rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-left: 3.5px solid transparent;
+  pointer-events: all;
+  animation: slideIn 0.28s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.toast.exiting {
+  animation: slideOut 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(calc(100% + 1.25rem));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 1.25rem));
+    opacity: 0;
+  }
+}
+
+/* ── Variants ─────────────────────────────────────────────────────────────── */
+
+.success { border-left-color: #22c55e; }
+.error   { border-left-color: #ef4444; }
+.warning { border-left-color: #f97316; }
+.info    { border-left-color: var(--teal, #2db6a3); }
+
+/* ── Icon ────────────────────────────────────────────────────────────────── */
+
+.icon {
+  flex-shrink: 0;
+}
+
+.iconSuccess { color: #22c55e; }
+.iconError   { color: #ef4444; }
+.iconWarning { color: #f97316; }
+.iconInfo    { color: var(--teal, #2db6a3); }
+
+/* ── Message ─────────────────────────────────────────────────────────────── */
+
+.message {
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text, #1a2433);
+  font-weight: 450;
+}
+
+/* ── Close button ────────────────────────────────────────────────────────── */
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #8c9ab0);
+  padding: 0.1875rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background-color 0.15s;
+  margin-left: 0.125rem;
+}
+
+.closeBtn:hover {
+  color: var(--text, #1a2433);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.exiting {
+    animation: none;
+  }
+}
