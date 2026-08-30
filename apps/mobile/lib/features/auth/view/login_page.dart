@@ -28,9 +28,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('SIMTC', style: SimtcTypography.headingLg.copyWith(color: SimtcColors.primary)),
-              const SizedBox(height: SimtcSpacing.xs),
-              Text('SIM Treinamentos', style: SimtcTypography.body.copyWith(color: SimtcColors.textSecondary)),
+              Image.asset('assets/images/logo-simtc.png', height: 120),
               const SizedBox(height: SimtcSpacing.xxl),
               TextField(controller: _emailCtrl,    decoration: const InputDecoration(labelText: 'E-mail'), keyboardType: TextInputType.emailAddress),
               const SizedBox(height: SimtcSpacing.md),
