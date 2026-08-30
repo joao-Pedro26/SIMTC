@@ -15,8 +15,11 @@ RUN npm ci
 COPY packages/shared-types ./packages/shared-types
 COPY apps/web ./apps/web
 
-# NEXT_PUBLIC_API_URL é injetada em build time pelo Next.js
+# NEXT_PUBLIC_API_URL e NEXT_PUBLIC_APP_URL são injetadas em build time pelo Next.js
+# (variáveis NEXT_PUBLIC_* são "queimadas" no bundle no build — configurá-las só
+# no ambiente de runtime do container não tem efeito nenhum)
 ENV NEXT_PUBLIC_API_URL=https://api.simtc.com.br/api
+ENV NEXT_PUBLIC_APP_URL=https://portal.simtc.com.br
 
 # GIT_SHA invalida o cache do Docker a cada novo commit
 ARG GIT_SHA=unknown
