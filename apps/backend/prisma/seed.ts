@@ -249,16 +249,22 @@ async function main() {
 
   // ── Categorias de avaliação ────────────────────────────────────────────────
   const categories = [
-    { code: 'CV', name: 'Controle do Veículo',  order: 1 },
-    { code: 'RR', name: 'Respeito às Regras',   order: 2 },
-    { code: 'CS', name: 'Comportamento Seguro', order: 3 },
-    { code: 'TP', name: 'Técnica de Pista',     order: 4 },
+    { code: 'CV', name: 'Controle do Veículo',  order: 1, description: null },
+    {
+      code: 'RR', name: 'Respeito às Regras',   order: 2,
+      description: 'O trânsito é um “jogo” e as apostas são altíssimas: ou ganha-se muito, ou perde-se muito! No trânsito, há regras que devem ser seguidas. Na parte prática o objetivo foi verificar sua aptidão de perceber e obedecer às regras e sinalizações (disciplina). A indisciplina, por distração ou descuido, nos expõe a dois riscos indesejados: às multas e aos sinistros de trânsito. Portanto, tenha atenção e cuidado!',
+    },
+    {
+      code: 'CS', name: 'Comportamento Seguro', order: 3,
+      description: 'Posicionar-se com segurança na via é, sem dúvidas, uma das principais vantagens de um condutor prudente. Lembre-se: um correto posicionamento nos faz evitar diversos riscos indesejados, pois teremos mais espaços para executar as decisões tomadas, teremos mais visibilidade e melhor controle da situação.',
+    },
+    { code: 'TP', name: 'Técnica de Pista',     order: 4, description: null },
   ];
 
   for (const cat of categories) {
     const saved = await prisma.assessmentCategory.upsert({
       where: { code: cat.code },
-      update: {},
+      update: { name: cat.name, order: cat.order, description: cat.description },
       create: cat,
     });
     console.log(`  ✓ Categoria: ${cat.code} — ${cat.name}`);
@@ -297,6 +303,56 @@ async function main() {
 
       console.log(`    ↳ [${i + 1}] ${inf.description}`);
     }
+  }
+
+  // ── Textos de fechamento do relatório (por faixa de percentual geral) ──────
+  // ATENÇÃO: apenas a faixa 76–100 abaixo é texto REAL, extraído do PDF de
+  // referência (assets/relatorios/20240708 - Erica dos Santos Gomes.pdf).
+  // As faixas 0–50 e 51–75 são RASCUNHO/PLACEHOLDER escrito para preencher o
+  // mecanismo enquanto Sebastião não fecha a redação final — não enviar ao
+  // aluno sem revisão dele. Cortes das faixas (0–50/51–75/76–100) também são
+  // ilustrativos, dados por ele em 26/08/2026, não confirmados como finais.
+  const conclusionTexts = [
+    {
+      minPercent: 0,
+      maxPercent: 50,
+      text: [
+        'O objetivo da observação, era verificar sua técnica, a forma como você se posiciona na via e, também, ver como você gerencia os riscos ao seu redor enquanto dirige. Durante o percurso avaliado, identificamos diversos pontos que precisam de atenção imediata, descritos acima, e recomendamos fortemente que sejam revistos antes de uma nova avaliação.',
+        'Durante um percurso com um veículo, é possível dirigir com economia, conforto e segurança. Neste momento, a prioridade deve ser corrigir os procedimentos indicados nesta avaliação, de forma a reduzir os riscos identificados e aumentar sua segurança e a de terceiros no trânsito.',
+        'Recomendamos a reavaliação após a revisão dos pontos apontados, para que possamos confirmar sua evolução e segurança na condução.',
+        'Agradecemos sua participação e ficamos à disposição para auxiliar no que for necessário!',
+      ].join('\n\n'),
+    },
+    {
+      minPercent: 51,
+      maxPercent: 75,
+      text: [
+        'O objetivo da observação, era verificar sua técnica, a forma como você se posiciona na via e, também, ver como você gerencia os riscos ao seu redor enquanto dirige. Durante o percurso avaliado, identificamos alguns pontos de atenção, descritos acima, que merecem ser revistos para elevar o seu nível de segurança na condução.',
+        'Durante um percurso com um veículo, é possível dirigir com economia, conforto e segurança. Recomendamos que você dedique atenção especial aos pontos observados nesta avaliação, buscando corrigir os procedimentos indicados para tornar sua condução mais segura no dia a dia.',
+        'Desejamos que esta avaliação atenda às suas expectativas e que os resultados dela possam contribuir para aprimorar sua performance no trânsito.',
+        'Agradecemos sua participação e até uma próxima oportunidade!',
+      ].join('\n\n'),
+    },
+    {
+      // Texto real, verbatim do PDF de referência (score 80%, "Aprovado").
+      minPercent: 76,
+      maxPercent: 100,
+      text: [
+        'O objetivo da observação, era verificar sua técnica, a forma como você se posiciona na via e, também, ver como você gerencia os riscos ao seu redor enquanto dirige. Após observação durante o trajeto percorrido na prática veicular, propomos que você reveja os procedimentos comentados acima, essas recomendações, irão aumentar sua segurança!',
+        'Durante um percurso com um veículo, é possível dirigir com economia, conforto e segurança. Propomos que segurança seja a opção predominante. A segurança é a opção que irá proporcionar as maiores chances de preservar a sua integridade física e também do veículo. As técnicas indicadas, tornarão suas viagens mais seguras.',
+        'Desejamos que esta avaliação atenda às suas expectativas e que os resultados dela possam contribuir para aprimorar sua performance no trânsito.',
+        'Agradecemos sua participação e até uma próxima oportunidade!',
+      ].join('\n\n'),
+    },
+  ];
+
+  for (const ct of conclusionTexts) {
+    await prisma.reportConclusionText.upsert({
+      where: { minPercent_maxPercent: { minPercent: ct.minPercent, maxPercent: ct.maxPercent } },
+      update: { text: ct.text },
+      create: ct,
+    });
+    console.log(`  ✓ Texto de fechamento: ${ct.minPercent}–${ct.maxPercent}%`);
   }
 
   console.log('✅ Seed concluído!');

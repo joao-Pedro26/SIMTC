@@ -261,6 +261,18 @@ model AssessmentItem {
   infractionNote InfractionNote      @relation(fields: [infractionNoteId], references: [id])
 }
 
+// Texto de fechamento (carta) do relatório de avaliação — varia conforme a
+// faixa de percentual geral atingida (overallScorePercent), não por tópico.
+// minPercent/maxPercent são inclusivos e não devem deixar lacunas entre si.
+model ReportConclusionText {
+  id         String @id @default(cuid())
+  minPercent Int
+  maxPercent Int
+  text       String
+
+  @@unique([minPercent, maxPercent])
+}
+
 // ─── CERTIFICADOS ────────────────────────────────────────────────────────────
 
 model Certificate {
