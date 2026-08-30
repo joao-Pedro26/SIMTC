@@ -1,7 +1,20 @@
 .page {
-  padding: 1.5rem 2rem;
-  max-width: 1100px;
+  padding: 1.5rem clamp(1.25rem, 4vw, 2rem);
+  max-width: 72rem;
+  margin: 0 auto;
 }
+
+/* ── Breadcrumb ─────────────────────────────────────── */
+.breadcrumb {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 1rem;
+  transition: color 0.15s;
+}
+.breadcrumb:hover { color: var(--teal-dark); }
 
 /* ── Header ─────────────────────────────────────────── */
 .header {
@@ -127,6 +140,14 @@
 .badgeOk      { background: #f0fff4; color: #276749; }
 .badgePending { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
 
+/* ── Documents tab: badge + botão combinados por coluna ─ */
+.docCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 /* ── Download button ──────────────────────────────────── */
 .downloadBtn {
   display: inline-block;
@@ -187,6 +208,15 @@
   margin-left: 0.25rem;
 }
 
+/* ── Bulk actions toolbar ─────────────────────────────── */
+.bulkToolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 2.25rem;
+  margin-bottom: 0.75rem;
+}
+
 /* ── Stub tab ──────────────────────────────────────────── */
 .stubCard {
   border: 1px dashed var(--border);
@@ -195,4 +225,33 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 0.875rem;
+}
+
+/* ── Drawer de detalhes do participante ───────────────── */
+.detailList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detailRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+.detailRow:last-child { border-bottom: none; padding-bottom: 0; }
+
+.detailLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.detailValue {
+  font-size: 0.9375rem;
+  color: var(--text);
 }

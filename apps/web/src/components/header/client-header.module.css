@@ -1,0 +1,125 @@
+/* ── Container ───────────────────────────────────────────── */
+
+.header {
+  height: 4.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.07),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Marca (logo + nome) ─────────────────────────────────── */
+
+.brandArea {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+.logoImg {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.brandText {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* ── Título da página ────────────────────────────────────── */
+
+.pageTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.divider {
+  font-size: 1rem;
+  color: var(--border);
+  font-weight: 300;
+  flex-shrink: 0;
+}
+
+.pageName {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Espaçador ────────────────────────────────────────────── */
+
+.spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+/* ── Usuário + logout ────────────────────────────────────── */
+
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.logoutBtn:hover {
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+/* ── Mobile: economiza espaço horizontal ─────────────────── */
+
+@media (max-width: 48rem) {
+  .header {
+    padding: 0 1rem;
+    gap: 0.625rem;
+  }
+
+  .userName {
+    display: none;
+  }
+}
+
+@media (max-width: 30rem) {
+  .brandText {
+    display: none;
+  }
+
+  .pageTitle {
+    display: none;
+  }
+}

@@ -1,0 +1,16 @@
+/* ── Shell: sem sidebar — header no topo, conteúdo full-width ── */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg);
+}
+
+/* ── Área de conteúdo das páginas ────────────────────────── */
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+}

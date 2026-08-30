@@ -5,8 +5,18 @@ export type ParticipantStatus =
   | 'NECESSITA_REAVALIACAO'
 
 export interface SessionParticipant {
+  /** PK da linha TrainingParticipant (join table) — usar este para ações em lote (bulk-download etc). */
+  id: string
+  /** FK para Participant.id — apenas para referência/exibição, NÃO usar em ações que operam sobre a matrícula. */
   participantId: string
-  participant: { id: string; name: string }
+  participant: {
+    id: string
+    name: string
+    cpf: string
+    email: string | null
+    cnhCategory: string | null
+    cnhExpiration: string | null
+  }
   status: ParticipantStatus
   assessment: { score: number | null } | null
 }

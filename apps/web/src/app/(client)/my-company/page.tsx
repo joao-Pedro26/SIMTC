@@ -1,11 +1,9 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { MapPin, CreditCard } from 'lucide-react'
 import { api } from '@/lib/api'
-import { TrainingSessionStatusBadge } from '@/features/training-sessions/training-session-status-badge'
-import type { TrainingStatus } from '@/features/training-sessions/types'
 import { PageTitle } from '@/components/header/page-title'
+import { HistoryTable, type TrainingHistoryItem } from './history-table'
 import styles from './page.module.css'
 
 interface Company {
@@ -18,16 +16,6 @@ interface Company {
   logoUrl?: string | null
 }
 
-interface TrainingHistoryItem {
-  id: string
-  date?: string | null
-  city: string
-  state: string
-  status: TrainingStatus
-  course: { name: string }
-  _count: { participants: number }
-}
-
 function applyCnpjMask(value: string): string {
   const d = value.replace(/\D/g, '').slice(0, 14)
   if (d.length <= 2) return d
@@ -35,11 +23,6 @@ function applyCnpjMask(value: string): string {
   if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
   if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-}
-
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('pt-BR')
 }
 
 export default async function MinhaEmpresaPage() {
@@ -108,38 +91,7 @@ export default async function MinhaEmpresaPage() {
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Histórico de Treinamentos</h2>
 
-        {history.length === 0 ? (
-          <p className={styles.empty}>Nenhum treinamento registrado.</p>
-        ) : (
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Curso</th>
-                  <th>Data</th>
-                  <th>Local</th>
-                  <th>Status</th>
-                  <th>Participantes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <Link href={`/my-company/trainings/${item.id}`} className={styles.rowLink}>
-                        {item.course.name}
-                      </Link>
-                    </td>
-                    <td>{formatDate(item.date)}</td>
-                    <td>{item.city && item.state ? `${item.city}/${item.state}` : item.city || '—'}</td>
-                    <td><TrainingSessionStatusBadge status={item.status} /></td>
-                    <td>{item._count.participants}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <HistoryTable history={history} />
       </div>
     </div>
   )

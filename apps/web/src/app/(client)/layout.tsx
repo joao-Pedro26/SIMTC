@@ -1,19 +1,15 @@
-import { Sidebar } from '@/components/sidebar/sidebar'
-import { Header } from '@/components/header/header'
+import { ClientHeader } from '@/components/header/client-header'
 import { Providers } from '@/components/providers'
-import styles from '../(admin)/layout.module.css'
+import styles from './client-layout.module.css'
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
       <div className={styles.shell}>
-        <Sidebar />
-        <div className={styles.rightCol}>
-          <Header />
-          <main className={styles.content}>
-            {children}
-          </main>
-        </div>
+        <ClientHeader />
+        <main className={styles.content}>
+          {children}
+        </main>
       </div>
     </Providers>
   )
