@@ -65,6 +65,10 @@ CLAUDE.md
 # Arquivos de debug e screenshots
 *.png
 apps/backend/documents-tab.png
+# Exceção: PNGs reais usados em runtime pelos templates de certificado/relatório
+!apps/backend/src/certificates/templates/*.png
+# Exceção: assets reais do app mobile (bundlados pelo Flutter via pubspec.yaml)
+!apps/mobile/assets/**
 
 # Arquivos de design e brainstorm
 simtc-design.docx
@@ -72,6 +76,13 @@ simtc-design.zip
 simtc-design-extracted/
 simtc-enrollment-brainstorm.html
 brainstorm-implementacao-web.md
+brainstorm-acoes-lote-participantes.md
+brainstorm-melhorias-portal-cliente.md
 
-# Assets brutos na raiz (são referenciados via apps/)
-assets/
+# Atas de reunião (documentação interna, não faz parte do app)
+reuniao-simtc-2026-08-22.md
+
+# Assets brutos NA RAIZ (são referenciados via apps/) — não usar "assets/" sem
+# a barra inicial aqui, senão a regra também esconde pastas de assets legítimas
+# dentro dos apps (ex.: apps/mobile/assets/, usada de verdade pelo Flutter)
+/assets/
