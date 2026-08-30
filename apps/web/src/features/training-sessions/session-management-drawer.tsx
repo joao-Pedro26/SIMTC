@@ -40,8 +40,10 @@ interface BackendSession {
 /**
  * Ações possíveis por participante:
  * - atribuir   → PENDENTE: apenas atribui ao consultor logado (sem abrir drawer)
- * - avaliar    → EM_AVALIACAO próprio: abre o checklist de avaliação
- * - reavaliar  → NECESSITA_REAVALIACAO: atribui + abre checklist
+ * - avaliar    → EM_AVALIACAO próprio, primeira avaliação (sem assessment anterior): abre o checklist
+ * - reavaliar  → NECESSITA_REAVALIACAO, ou EM_AVALIACAO próprio já com assessment anterior
+ *                (reavaliação em andamento — status técnico volta a EM_AVALIACAO ao atribuir,
+ *                mas a existência do assessment anterior mantém a ação como "reavaliar")
  * - blocked    → EM_AVALIACAO de outro consultor
  * - none       → aprovado, somente teoria, fora de EM_ANDAMENTO
  */
@@ -61,11 +63,24 @@ function getAction(
     case 'PENDENTE': return 'atribuir'
     case 'EM_AVALIACAO':
       if (!consultantId) return 'none'
-      return p.assignedConsultantId === consultantId ? 'avaliar' : 'blocked'
+      if (p.assignedConsultantId !== consultantId) return 'blocked'
+      // Já existe uma avaliação anterior (reprovada) → isto é uma reavaliação em andamento,
+      // mesmo com o status técnico voltando para EM_AVALIACAO ao ser atribuído novamente.
+      return p.assessment != null ? 'reavaliar' : 'avaliar'
     case 'APROVADO': return 'none'
     case 'NECESSITA_REAVALIACAO': return 'reavaliar'
     default: return 'none'
   }
+}
+
+/**
+ * Status "visual" do participante: quando está EM_AVALIACAO mas já existe um assessment
+ * anterior, trata-se de uma reavaliação em andamento — mantém o badge como
+ * "Necessita Reavaliação" em vez de mostrar "Em Avaliação".
+ */
+function getDisplayStatus(p: BackendParticipant): string {
+  if (p.status === 'EM_AVALIACAO' && p.assessment != null) return 'NECESSITA_REAVALIACAO'
+  return p.status
 }
 
 const statusLabels: Record<string, string> = {
@@ -134,6 +149,9 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   // Assessment drawer
   const [assessmentParticipant, setAssessmentParticipant] = useState<BackendParticipant | null>(null)
   const [assessmentOpen, setAssessmentOpen] = useState(false)
+
+  // Confirmação ao concluir treinamento com participante(s) não aprovado(s)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
 
   // ── Carregamento ─────────────────────────────────────────────────────────────
 
@@ -317,6 +335,16 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
     }
   }
 
+  /** Clique em "Concluir Treinamento": sempre confirma antes (mensagem varia conforme haja ou não pendências) */
+  function handleCompleteClick() {
+    setShowCompleteConfirm(true)
+  }
+
+  function handleCompleteConfirmed() {
+    setShowCompleteConfirm(false)
+    handleLifecycle('complete')
+  }
+
   // ── Helpers de UI ─────────────────────────────────────────────────────────────
 
   const participants = session?.participants ?? []
@@ -334,8 +362,18 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
 
   const canEdit = isAdmin && (session?.status === 'PLANEJADO' || session?.status === 'EM_ANDAMENTO')
   const canStart = canManageLifecycle && session?.status === 'PLANEJADO'
+  // Usa o status "visual" (getDisplayStatus): um participante em reavaliação-em-andamento
+  // (EM_AVALIACAO com assessment anterior) conta como NECESSITA_REAVALIACAO para não bloquear
+  // nem esconder o botão de concluir o treinamento — só uma avaliação de fato inédita (sem
+  // assessment anterior) mantém a sessão como "ainda não pode concluir".
   const canComplete = canManageLifecycle && session?.status === 'EM_ANDAMENTO' && participants.length > 0 &&
-    participants.every((p) => p.participationType === 'SOMENTE_TEORICA' || p.status === 'APROVADO' || p.status === 'NECESSITA_REAVALIACAO')
+    participants.every((p) => {
+      const ds = getDisplayStatus(p)
+      return p.participationType === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NECESSITA_REAVALIACAO'
+    })
+  const hasUnapprovedParticipants = participants.some(
+    (p) => p.participationType !== 'SOMENTE_TEORICA' && getDisplayStatus(p) === 'NECESSITA_REAVALIACAO',
+  )
 
   function courseTypeLabel(): string {
     if (!session) return '—'
@@ -361,7 +399,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           </button>
         )}
         {canComplete && (
-          <button className={`${styles.footerBtn} ${styles.footerBtnSuccess}`} onClick={() => handleLifecycle('complete')} disabled={busy}>
+          <button className={`${styles.footerBtn} ${styles.footerBtnSuccess}`} onClick={handleCompleteClick} disabled={busy}>
             Concluir Treinamento
           </button>
         )}
@@ -479,7 +517,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
               {/* Colaboradores */}
               <div className={styles.section}>
                 <div className={styles.sectionHeader}>
-                  <span className={styles.sectionTitle}>Colaboradores</span>
+                  <span className={styles.sectionTitle}>Consultores</span>
                 </div>
 
                 {/* Lista de colaboradores atuais */}
@@ -594,6 +632,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                 <div className={styles.participantList}>
                   {participants.map((p) => {
                     const action = getAction(p, consultantId, session.status, isAdmin)
+                    const displayStatus = getDisplayStatus(p)
                     return (
                       <div key={p.id} className={styles.participantRow}>
                         <div className={styles.participantInfo}>
@@ -601,11 +640,11 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                           <span className={styles.participantCpf}>{formatCpf(p.participant.cpf)}</span>
                         </div>
                         <div className={styles.participantRight}>
-                          <span className={`${styles.statusBadge} ${statusCssMap[p.status] ?? ''}`}>
-                            {statusLabels[p.status] ?? p.status}
+                          <span className={`${styles.statusBadge} ${statusCssMap[displayStatus] ?? ''}`}>
+                            {statusLabels[displayStatus] ?? displayStatus}
                           </span>
                           {p.status === 'APROVADO' && p.assessment?.score != null && (
-                            <span className={styles.scoreHint}>{Math.round(p.assessment.score)} pts</span>
+                            <span className={styles.scoreHint}>{Math.round(p.assessment.score)}%</span>
                           )}
                           {/* Atribuir: reserva o participante para o consultor logado */}
                           {action === 'atribuir' && (
@@ -663,6 +702,39 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           onClose={() => { setAssessmentOpen(false); setAssessmentParticipant(null) }}
           onSaved={handleAssessmentSaved}
         />
+      )}
+
+      {/* Confirmação: concluir treinamento (mensagem varia conforme haja ou não participante não aprovado) */}
+      {showCompleteConfirm && (
+        <div className={styles.completeOverlay} role="dialog" aria-modal="true" aria-labelledby="complete-confirm-title">
+          <div className={styles.completeDialog}>
+            <p id="complete-confirm-title" className={styles.completeDialogTitle}>
+              Concluir treinamento?
+            </p>
+            <p className={styles.completeDialogBody}>
+              {hasUnapprovedParticipants
+                ? 'Há participante(s) com status "Necessita Reavaliação" nesta sessão. Deseja concluir o treinamento mesmo assim?'
+                : 'Todos os participantes já foram avaliados. Deseja concluir este treinamento? Essa ação encerra a sessão.'}
+            </p>
+            <div className={styles.completeDialogActions}>
+              <button
+                className={styles.completeDialogKeep}
+                onClick={() => setShowCompleteConfirm(false)}
+                disabled={busy}
+              >
+                Cancelar
+              </button>
+              <button
+                className={hasUnapprovedParticipants ? styles.completeDialogConfirm : styles.completeDialogConfirmOk}
+                onClick={handleCompleteConfirmed}
+                disabled={busy}
+              >
+                {busy ? <Loader2 size={14} className={styles.spin} /> : null}
+                {hasUnapprovedParticipants ? 'Concluir mesmo assim' : 'Concluir'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )
