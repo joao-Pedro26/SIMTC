@@ -63,7 +63,6 @@ class AssessmentPage extends ConsumerWidget {
   }
 
   String _label(double score) {
-    if (score >= 85) return '✅ Excelência';
     if (score >= 70) return '✅ Aprovado';
     return '⚠️ Necessita Reavaliação';
   }

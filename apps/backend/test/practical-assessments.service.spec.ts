@@ -32,16 +32,26 @@ describe('PracticalAssessmentsService', () => {
   // ─── Funções de scoring (lógica pura) ────────────────────────────────────
 
   describe('calculateCategoryScore', () => {
-    it('retorna 100 se não há deduções', () => {
-      expect(calculateCategoryScore([])).toBe(100);
+    it('retorna 100 se não há infrações cadastradas na categoria', () => {
+      expect(calculateCategoryScore([], 0)).toBe(100);
     });
 
-    it('desconta deduções corretamente', () => {
-      expect(calculateCategoryScore([3, 5])).toBe(92);
+    it('retorna 100 se há infrações cadastradas mas nenhuma foi marcada', () => {
+      expect(calculateCategoryScore([], 5)).toBe(100);
+    });
+
+    it('desconta proporcionalmente ao número de infrações da categoria', () => {
+      // 5 infrações no tópico → cada uma vale 20%. Uma nota M (peso máximo) desconta os 20% inteiros.
+      expect(calculateCategoryScore([5], 5)).toBe(80);
+    });
+
+    it('nota B desconta apenas 1/5 do peso máximo dentro da fatia da infração', () => {
+      // 5 infrações no tópico → fatia de 20%. Nota B (peso 1 de 5) desconta 1/5 de 20% = 4%.
+      expect(calculateCategoryScore([1], 5)).toBe(96);
     });
 
     it('não vai abaixo de 0', () => {
-      expect(calculateCategoryScore([50, 50, 50])).toBe(0);
+      expect(calculateCategoryScore([5, 5, 5], 3)).toBe(0);
     });
   });
 

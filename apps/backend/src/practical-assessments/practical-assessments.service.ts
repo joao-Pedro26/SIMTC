@@ -132,8 +132,13 @@ export class PracticalAssessmentsService {
       byCategory.get(categoryId)!.push(item.infractionNote.deduction);
     }
 
-    const categoryScores = Array.from(byCategory.values()).map((deductions) =>
-      calculateCategoryScore(deductions),
+    // Busca TODAS as categorias (mesmo as não avaliadas nesta sessão, que contam 100%)
+    const allCategories = await this.prisma.assessmentCategory.findMany({
+      select: { id: true, _count: { select: { infractions: true } } },
+    });
+
+    const categoryScores = allCategories.map((cat) =>
+      calculateCategoryScore(byCategory.get(cat.id) ?? [], cat._count.infractions),
     );
     const overallScore = calculateOverallScore(categoryScores);
     const status = getApprovalStatus(overallScore);

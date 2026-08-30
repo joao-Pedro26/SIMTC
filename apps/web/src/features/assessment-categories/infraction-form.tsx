@@ -29,7 +29,6 @@ interface InfractionEditFormProps {
   onSave: (data: InfractionFormData) => void
   onDelete: () => void
   onCancel: () => void
-  /** Modo somente-leitura (ex.: CONSULTANT) — trava campos e some com salvar/excluir */
   readOnly?: boolean
 }
 
@@ -56,9 +55,6 @@ function NoteSection({
     <div className={styles.noteSection}>
       <div className={styles.noteHeader}>
         <span className={`${styles.noteChip} ${colorClass}`}>{label}</span>
-        <span className={styles.deduction}>
-          {`-${deduction} pt${deduction !== 1 ? 's' : ''}`}
-        </span>
       </div>
       <textarea
         className={styles.textarea}
@@ -98,7 +94,7 @@ function InfractionFormBody({
       </div>
 
       <div className={styles.field}>
-        <label className={styles.label}>Descrição da infração:</label>
+        <label className={styles.label}>Título da infração:</label>
         <input
           className={styles.input}
           value={form.name}

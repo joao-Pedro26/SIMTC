@@ -29,7 +29,6 @@ function formatDate(d: Date): string {
 }
 
 function getResultClass(score: number): string {
-  if (score >= 85) return styles.resultExcelencia
   if (score >= 70) return styles.resultAprovado
   return styles.resultReprovado
 }
@@ -81,11 +80,11 @@ export function AssessmentConfirmDialog({
                     className={styles.catBarFill}
                     style={{
                       width: `${cs.score}%`,
-                      backgroundColor: cs.score >= 85 ? '#48bb78' : cs.score >= 70 ? '#ecc94b' : '#fc8181',
+                      backgroundColor: cs.score > 75 ? '#48bb78' : cs.score > 50 ? '#ecc94b' : '#fc8181',
                     }}
                   />
                 </div>
-                <span className={styles.catPercent}>{Math.round(cs.score)} pts</span>
+                <span className={styles.catPercent}>{Math.round(cs.score)}%</span>
               </div>
             ))}
           </div>
@@ -99,7 +98,7 @@ export function AssessmentConfirmDialog({
         <div className={styles.overallRow}>
           <span className={styles.overallLabel}>Resultado Final</span>
           <div className={styles.overallRight}>
-            <span className={styles.overallScore}>{Math.round(overallScore)} pts</span>
+            <span className={styles.overallScore}>{Math.round(overallScore)}%</span>
             <span className={`${styles.resultBadge} ${getResultClass(overallScore)}`}>
               {approvalLabel}
             </span>

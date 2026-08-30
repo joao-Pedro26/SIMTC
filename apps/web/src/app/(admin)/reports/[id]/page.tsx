@@ -6,24 +6,14 @@ import { ChevronLeft, Loader2 } from 'lucide-react'
 import { clientApi } from '@/lib/client-api'
 import { PageTitle } from '@/components/header/page-title'
 import { TrainingSessionStatusBadge } from '@/features/training-sessions/training-session-status-badge'
-import { calculateCategoryScore, calculateOverallScore, getApprovalLabel } from '@simtc/shared-types'
+import { getApprovalLabel } from '@simtc/shared-types'
 import type { TrainingStatus } from '@/features/training-sessions/types'
 import styles from './page.module.css'
 
 // ─── Tipos que batem com o include do backend ─────────────────
 
-interface AssessmentItem {
-  infractionNote: {
-    deduction: number
-    infraction: {
-      category: { id: string; name: string }
-    }
-  }
-}
-
 interface Assessment {
   score?: number | null
-  items: AssessmentItem[]
 }
 
 interface Certificate {
@@ -62,16 +52,8 @@ function formatDate(dateStr?: string | null): string {
 }
 
 function computeScore(assessment: Assessment | null | undefined): number | null {
-  if (!assessment || assessment.items.length === 0) return null
-  // Group deductions by category
-  const byCategory: Record<string, number[]> = {}
-  for (const item of assessment.items) {
-    const catId = item.infractionNote.infraction.category.id
-    if (!byCategory[catId]) byCategory[catId] = []
-    byCategory[catId].push(item.infractionNote.deduction)
-  }
-  const categoryScores = Object.values(byCategory).map(calculateCategoryScore)
-  return Math.round(calculateOverallScore(categoryScores))
+  if (!assessment || assessment.score == null) return null
+  return Math.round(assessment.score)
 }
 
 const participantStatusLabels: Record<string, string> = {
@@ -83,13 +65,13 @@ const participantStatusLabels: Record<string, string> = {
 
 function ScoreBadge({ score, participationType }: { score: number | null; participationType: string }) {
   if (participationType === 'SOMENTE_TEORICA') {
-    return <span className={`${styles.badge} ${styles.badgePending}`}>Só Teoria</span>
+    return <span className={`${styles.badge} ${styles.badgePending}`}>Teoria</span>
   }
   if (score === null) {
     return <span className={`${styles.badge} ${styles.badgePending}`}>—</span>
   }
   const label = getApprovalLabel(score)
-  const cls = score >= 85 ? styles.badgeExcellence : score >= 70 ? styles.badgeApproved : styles.badgeFailed
+  const cls = score >= 70 ? styles.badgeApproved : styles.badgeFailed
   return <span className={`${styles.badge} ${cls}`}>{label} ({score}%)</span>
 }
 

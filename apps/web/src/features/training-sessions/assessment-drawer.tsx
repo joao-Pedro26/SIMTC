@@ -145,10 +145,10 @@ export function AssessmentDrawer({
       if (!byCategory.has(sel.categoryId)) byCategory.set(sel.categoryId, [])
       byCategory.get(sel.categoryId)!.push(sel.deduction)
     }
-    // Todas as categorias começam em 100 — desconta apenas o que foi marcado
+    // Todas as categorias começam em 100% — desconta apenas o que foi marcado
     const catScores = categories.map((cat) => ({
       categoryId: cat.id,
-      score: calculateCategoryScore(byCategory.get(cat.id) ?? []),
+      score: calculateCategoryScore(byCategory.get(cat.id) ?? [], cat.infractions.length),
     }))
     const overall = calculateOverallScore(catScores.map((cs) => cs.score))
     return { catScores, overall }
@@ -257,7 +257,7 @@ export function AssessmentDrawer({
                         <span className={styles.catName}>{cat.name}</span>
                         {score !== undefined && (
                           <span className={`${styles.catScore} ${score < 70 ? styles.catScoreLow : score >= 85 ? styles.catScoreHigh : styles.catScoreMid}`}>
-                            {Math.round(score)} pts
+                            {Math.round(score)}%
                           </span>
                         )}
                       </button>
@@ -324,13 +324,13 @@ export function AssessmentDrawer({
                   <span key={cat.id} className={styles.footerScoreItem}>
                     <span className={styles.footerCode}>{cat.code}</span>
                     <span className={score !== undefined ? styles.footerValue : styles.footerDash}>
-                      {score !== undefined ? `${Math.round(score)} pts` : '—'}
+                      {score !== undefined ? `${Math.round(score)}%` : '—'}
                     </span>
                   </span>
                 )
               })}
               <span className={styles.footerOverall}>
-                Geral: <strong>{catScores.length > 0 ? `${Math.round(overall)} pts` : '—'}</strong>
+                Geral: <strong>{catScores.length > 0 ? `${Math.round(overall)}%` : '—'}</strong>
               </span>
             </div>
             {saveError && <span className={styles.footerError}>{saveError}</span>}
