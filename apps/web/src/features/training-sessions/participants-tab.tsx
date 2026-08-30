@@ -7,6 +7,8 @@ import { ColumnFilter } from '@/components/ui/column-filter/column-filter'
 import { clientApi } from '@/lib/client-api'
 import { formatCpf } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
+import { useBulkSelection } from '@/lib/use-bulk-selection'
+import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
 import type { TrainingSession, TrainingParticipant, ParticipantStatus } from './types'
 import styles from './participants-tab.module.css'
 
@@ -32,6 +34,16 @@ const statusColors: Record<ParticipantStatus, string> = {
   NECESSITA_REAVALIACAO: styles.statusNecessita,
 }
 
+/**
+ * Status "visual": quando está EM_AVALIACAO mas já existe uma nota anterior (score),
+ * trata-se de uma reavaliação em andamento — mantém o badge como "Necessita Reavaliação"
+ * em vez de mostrar "Em Avaliação".
+ */
+function getDisplayStatus(p: TrainingParticipant): ParticipantStatus {
+  if (p.status === 'EM_AVALIACAO' && p.score != null) return 'NECESSITA_REAVALIACAO'
+  return p.status
+}
+
 interface AddParticipantForm {
   name: string
   cpf: string
@@ -55,7 +67,7 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
   const canEdit = !readOnly && (session.status === 'PLANEJADO' || session.status === 'EM_ANDAMENTO')
 
   const tipoOptions = [
-    { label: 'Só Teoria',        value: 'SOMENTE_TEORICA'  },
+    { label: 'Teoria',        value: 'SOMENTE_TEORICA'  },
     { label: 'Teoria + Prática', value: 'TEORICA_E_PRATICA' },
   ]
   const avaliacaoOptions = [
@@ -69,9 +81,19 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     const matchName   = p.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
       p.cpf.includes(nameFilter)
     const matchTipo   = tipoFilter === '' || p.type === tipoFilter
-    const matchStatus = statusFilter === '' || p.status === statusFilter
+    const matchStatus = statusFilter === '' || getDisplayStatus(p) === statusFilter
     return matchName && matchTipo && matchStatus
   })
+
+  // Participantes com avaliação em andamento não podem ser excluídos (mesma
+  // regra do botão de excluir individual) — por isso ficam de fora da lista
+  // "selecionável" para a exclusão em lote.
+  const selectableIds = filteredParticipants
+    .filter((p) => p.status !== 'EM_AVALIACAO')
+    .map((p) => p.id)
+  const bulkSelection = useBulkSelection(selectableIds)
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null)
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false)
 
   function setField(field: keyof AddParticipantForm, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -116,22 +138,59 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     await run(() => clientApi.delete(`/participants/${id}`))
   }
 
+  async function handleBulkDelete() {
+    const ok = await confirm({
+      title: 'Excluir participantes selecionados',
+      message: `Deseja excluir ${bulkSelection.selectedCount} participante(s) selecionado(s)? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
+
+    setBulkDeleteBusy(true)
+    setActionError('')
+    try {
+      const { jobId } = await clientApi.post<{ jobId: string }>(
+        `/training-sessions/${sessionId}/participants/bulk-delete`,
+        { participantIds: bulkSelection.selectedIds },
+      )
+      setBulkJobId(jobId)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Erro ao iniciar exclusão em lote')
+    } finally {
+      setBulkDeleteBusy(false)
+    }
+  }
+
   const canStart = !readOnly && session.status === 'PLANEJADO'
+  // Usa o status "visual" (getDisplayStatus): reavaliação-em-andamento conta como
+  // NECESSITA_REAVALIACAO para não esconder o botão de concluir o treinamento.
   const canComplete =
     !readOnly &&
     session.status === 'EM_ANDAMENTO' &&
     session.participants.length > 0 &&
-    session.participants.every(
-      (p) => p.type === 'SOMENTE_TEORICA' || p.status === 'APROVADO' || p.status === 'NECESSITA_REAVALIACAO'
-    )
+    session.participants.every((p) => {
+      const ds = getDisplayStatus(p)
+      return p.type === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NECESSITA_REAVALIACAO'
+    })
 
-  const totalCols = 4 + (canEdit ? 1 : 0)
+  const totalCols = 4 + (canEdit ? 2 : 0)
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.toolbar}>
         <p className={styles.count}>{session.participants.length} participante(s)</p>
         <div className={styles.toolbarActions}>
+          {canEdit && bulkSelection.selectedCount > 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={busy || bulkDeleteBusy}
+            >
+              <Trash2 size={14} /> Excluir selecionados ({bulkSelection.selectedCount})
+            </Button>
+          )}
           <Button variant="ghost" size="sm" disabled>
             <Upload size={14} /> Importar planilha
           </Button>
@@ -198,6 +257,17 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
           <table className={styles.table}>
             <thead>
               <tr className={styles.headRow}>
+                {canEdit && (
+                  <th className={styles.th} style={{ width: '2rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={bulkSelection.allSelected}
+                      ref={(el) => { if (el) el.indeterminate = bulkSelection.someSelected }}
+                      onChange={bulkSelection.toggleAll}
+                      aria-label="Selecionar todos os participantes"
+                    />
+                  </th>
+                )}
                 <ColumnFilter
                   type="text"
                   label="Nome / CPF"
@@ -230,21 +300,33 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
                 <tr><td colSpan={totalCols} className={styles.empty}>Nenhum participante encontrado.</td></tr>
               ) : (
                 filteredParticipants.map((p) => {
+                  const displayStatus = getDisplayStatus(p)
                   return (
                     <tr key={p.id} className={styles.row}>
+                      {canEdit && (
+                        <td className={styles.td}>
+                          <input
+                            type="checkbox"
+                            checked={bulkSelection.isSelected(p.id)}
+                            disabled={p.status === 'EM_AVALIACAO'}
+                            onChange={() => bulkSelection.toggle(p.id)}
+                            aria-label={`Selecionar ${p.name}`}
+                          />
+                        </td>
+                      )}
                       <td className={styles.td}>{p.name}</td>
                       <td className={styles.td}>{formatCpf(p.cpf)}</td>
                       <td className={`${styles.td} ${styles.center}`}>
                         <span className={`${styles.typeBtn} ${p.type === 'SOMENTE_TEORICA' ? styles.typeSoloTeoria : styles.typePratica}`}>
-                          {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                          {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                         </span>
                       </td>
                       <td className={`${styles.td} ${styles.center}`}>
-                        <span className={`${styles.statusBadge} ${statusColors[p.status]}`}>
-                          {statusLabels[p.status]}
+                        <span className={`${styles.statusBadge} ${statusColors[displayStatus]}`}>
+                          {statusLabels[displayStatus]}
                         </span>
                         {p.status === 'APROVADO' && p.score !== null && (
-                          <span className={styles.scoreHint}> {Math.round(p.score)} pts</span>
+                          <span className={styles.scoreHint}> {Math.round(p.score)}%</span>
                         )}
                       </td>
                       {canEdit && (
@@ -282,6 +364,18 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
           </Button>
         )}
       </div>
+
+      {bulkJobId && (
+        <BulkJobProgressModal
+          jobId={bulkJobId}
+          title="Excluindo participantes selecionados"
+          onFinished={() => {
+            bulkSelection.clear()
+            onRefresh()
+          }}
+          onClose={() => setBulkJobId(null)}
+        />
+      )}
 
     </div>
   )

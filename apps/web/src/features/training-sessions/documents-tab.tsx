@@ -5,6 +5,8 @@ import { FileText, Send, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
 import { useToast } from '@/components/ui/toast/toast-provider'
+import { useBulkSelection } from '@/lib/use-bulk-selection'
+import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
 import type { TrainingSession } from './types'
 import styles from './documents-tab.module.css'
 
@@ -22,6 +24,12 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sentIds, setSentIds] = useState<Set<string>>(new Set())
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const allParticipantIds = session.participants.map((p) => p.id)
+  const bulkSelection = useBulkSelection(allParticipantIds)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null)
+  const [bulkJobTitle, setBulkJobTitle] = useState('')
 
   if (session.status !== 'CONCLUIDO') {
     return (
@@ -77,20 +85,68 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     }
   }
 
+  async function handleBulkSend() {
+    setBulkBusy(true)
+    setGenerateError('')
+    try {
+      const { jobId } = await clientApi.post<{ jobId: string }>(
+        `/training-sessions/${sessionId}/participants/bulk-send-certificates`,
+        { participantIds: bulkSelection.selectedIds },
+      )
+      setBulkJobTitle('Enviando certificados e relatórios por e-mail')
+      setBulkJobId(jobId)
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Erro ao iniciar envio em lote')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkZip() {
+    setBulkBusy(true)
+    setGenerateError('')
+    try {
+      const { jobId } = await clientApi.post<{ jobId: string }>(
+        `/training-sessions/${sessionId}/participants/bulk-download`,
+        { participantIds: bulkSelection.selectedIds },
+      )
+      setBulkJobTitle('Gerando arquivo ZIP')
+      setBulkJobId(jobId)
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Erro ao iniciar geração do ZIP')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.toolbar}>
         <p className={styles.summary}>
           {session.participants.filter((p) => p.certificateGenerated).length} / {session.participants.length} certificados gerados
         </p>
-        {!readOnly && (
-          <Button variant="primary" size="sm" onClick={handleGenerateAll} disabled={generating}>
-            {generating
-              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando...</>
-              : <><FileText size={14} /> Gerar Documentos</>
-            }
-          </Button>
-        )}
+        <div className={styles.toolbarActions}>
+          {bulkSelection.selectedCount > 0 && (
+            <>
+              {!readOnly && (
+                <Button variant="secondary" size="sm" onClick={handleBulkSend} disabled={bulkBusy}>
+                  <Send size={14} /> Enviar selecionados ({bulkSelection.selectedCount})
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={handleBulkZip} disabled={bulkBusy}>
+                <Download size={14} /> Baixar ZIP ({bulkSelection.selectedCount})
+              </Button>
+            </>
+          )}
+          {!readOnly && (
+            <Button variant="primary" size="sm" onClick={handleGenerateAll} disabled={generating}>
+              {generating
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando...</>
+                : <><FileText size={14} /> Gerar Documentos</>
+              }
+            </Button>
+          )}
+        </div>
       </div>
 
       {generateError && (
@@ -103,6 +159,15 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
         <table className={styles.table}>
           <thead>
             <tr className={styles.headRow}>
+              <th className={styles.th} style={{ width: '2rem' }}>
+                <input
+                  type="checkbox"
+                  checked={bulkSelection.allSelected}
+                  ref={(el) => { if (el) el.indeterminate = bulkSelection.someSelected }}
+                  onChange={bulkSelection.toggleAll}
+                  aria-label="Selecionar todos os participantes"
+                />
+              </th>
               <th className={styles.th}>Nome</th>
               <th className={`${styles.th} ${styles.center}`}>Tipo</th>
               <th className={`${styles.th} ${styles.center}`}>Score</th>
@@ -113,13 +178,25 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
           <tbody>
             {session.participants.map((p) => (
               <tr key={p.id} className={styles.row}>
+                <td className={styles.td}>
+                  <input
+                    type="checkbox"
+                    checked={bulkSelection.isSelected(p.id)}
+                    onChange={() => bulkSelection.toggle(p.id)}
+                    aria-label={`Selecionar ${p.name}`}
+                  />
+                </td>
                 <td className={styles.td}>{p.name}</td>
                 <td className={`${styles.td} ${styles.center}`}>
-                  {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                  {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>
                   {p.score !== null
-                    ? <span className={p.score >= 70 ? styles.scoreOk : styles.scoreFail}>{p.score} pts</span>
+                    ? (
+                      <span className={p.score >= 70 ? styles.scoreOk : styles.scoreFail}>
+                        {p.score.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                      </span>
+                    )
                     : <span className={styles.scoreDash}>—</span>
                   }
                 </td>
@@ -168,6 +245,18 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
           </tbody>
         </table>
       </div>
+
+      {bulkJobId && (
+        <BulkJobProgressModal
+          jobId={bulkJobId}
+          title={bulkJobTitle}
+          onFinished={() => {
+            bulkSelection.clear()
+            onRefresh()
+          }}
+          onClose={() => setBulkJobId(null)}
+        />
+      )}
     </div>
   )
 }

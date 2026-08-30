@@ -1,6 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
+/**
+ * Erro específico para rate limit do Resend (`error.name === 'rate_limit_exceeded'`).
+ * Usado pelo job de envio em lote (`BulkActionsService`) para decidir quando
+ * vale a pena esperar um pouco e tentar de novo, em vez de desistir do
+ * participante na primeira falha. O SDK do Resend não expõe o header
+ * `retry-after` de forma simples (a chamada de alto nível só devolve
+ * `{ data, error }`), então usamos um backoff fixo em vez de ler o header.
+ */
+export class EmailRateLimitError extends Error {}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -68,6 +78,9 @@ export class EmailService {
 
     if (error) {
       this.logger.error(`Falha ao enviar certificado/relatório para ${to}: ${JSON.stringify(error)}`);
+      if ((error as any).name === 'rate_limit_exceeded') {
+        throw new EmailRateLimitError(error.message ?? 'Rate limit excedido no Resend');
+      }
       throw new Error(`Falha ao enviar e-mail via Resend: ${error.message ?? JSON.stringify(error)}`);
     }
 

@@ -1241,7 +1241,7 @@ export function ParticipantsTab({ session, sessionId, onRefresh }: ParticipantsT
                       disabled={!canEdit || busy}
                       title="Clique para alternar"
                     >
-                      {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                      {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                     </button>
                   </td>
                   <td className={`${styles.td} ${styles.center}`}>
@@ -1435,7 +1435,7 @@ export function DocumentsTab({ session, sessionId, onRefresh }: DocumentsTabProp
               <tr key={p.id} className={styles.row}>
                 <td className={styles.td}>{p.name}</td>
                 <td className={`${styles.td} ${styles.center}`}>
-                  {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                  {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>
                   {p.score !== null
@@ -2250,7 +2250,7 @@ export default async function ParticipantsPage({ params }: Props) {
                   <td className={styles.td}>{tp.participant.name}</td>
                   <td className={styles.td}>{maskCpf(tp.participant.cpf)}</td>
                   <td className={`${styles.td} ${styles.center}`}>
-                    {tp.participationType === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                    {tp.participationType === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                   </td>
                   <td className={`${styles.td} ${styles.center}`}>
                     {statusLabels[tp.status] ?? tp.status}
@@ -2408,7 +2408,7 @@ export default async function ResultsPage({ params }: Props) {
 
   const results = participants.map((tp) => {
     if (tp.participationType === 'SOMENTE_TEORICA' || !tp.assessment) {
-      return { name: tp.participant.name, type: tp.participationType, score: null, label: 'Só Teoria' }
+      return { name: tp.participant.name, type: tp.participationType, score: null, label: 'Teoria' }
     }
 
     // Agrupar deduções por categoria
@@ -2448,7 +2448,7 @@ export default async function ResultsPage({ params }: Props) {
               <tr key={r.name} className={styles.row}>
                 <td className={styles.td}>{r.name}</td>
                 <td className={`${styles.td} ${styles.center}`}>
-                  {r.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
+                  {r.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>
                   {r.score !== null ? `${r.score}%` : '—'}
@@ -2476,7 +2476,7 @@ export default async function ResultsPage({ params }: Props) {
 
   1. `/my-sessions/[id]/participants` → tabela com CPFs mascarados, read-only
   2. `/my-sessions/[id]/qr-code` → QR Code com URL `http://localhost:3000/register/...`
-  3. `/my-sessions/[id]/results` → scores calculados; "—" e "Só Teoria" para `SOMENTE_TEORICA`
+  3. `/my-sessions/[id]/results` → scores calculados; "—" e "Teoria" para `SOMENTE_TEORICA`
 
 - [ ] **Step 8: Commit**
 

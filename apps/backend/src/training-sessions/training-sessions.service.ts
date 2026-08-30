@@ -1,16 +1,20 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { StorageService } from '../storage/storage.service';
 import { JwtPayload } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
 
 @Injectable()
 export class TrainingSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly storage: StorageService,
   ) {}
 
   /** ADMIN vê todas as sessões; CONSULTANT vê apenas as suas */
@@ -47,7 +51,7 @@ export class TrainingSessionsService {
   }
 
   async findTrainingSessionById(id: string, user?: JwtPayload) {
-    const session = await this.prisma.trainingSession.findUniqueOrThrow({
+    const session = await this.prisma.trainingSession.findUnique({
       where: { id },
       include: {
         company: true,
@@ -64,6 +68,10 @@ export class TrainingSessionsService {
         },
       },
     });
+
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
 
     // CONSULTANT só pode ver o detalhe de uma sessão à qual está atribuído.
     // (chamadas internas — cancelSession/updateSession/deleteSession — não passam
@@ -83,10 +91,13 @@ export class TrainingSessionsService {
   /** Só ADMIN ou o consultor responsável pela sessão podem iniciar/concluir (regras de negócio). */
   private async assertCanManageLifecycle(id: string, user?: JwtPayload) {
     if (!user || user.role === 'ADMIN') return;
-    const session = await this.prisma.trainingSession.findUniqueOrThrow({
+    const session = await this.prisma.trainingSession.findUnique({
       where: { id },
       select: { responsibleConsultantId: true },
     });
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
     if (session.responsibleConsultantId !== user.consultantId) {
       throw new ForbiddenException(
         'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
@@ -110,8 +121,8 @@ export class TrainingSessionsService {
     });
   }
 
-  findByQrToken(qrCodeToken: string) {
-    return this.prisma.trainingSession.findUniqueOrThrow({
+  async findByQrToken(qrCodeToken: string) {
+    const session = await this.prisma.trainingSession.findUnique({
       where: { qrCodeToken },
       include: {
         course: { select: { name: true } },
@@ -119,6 +130,12 @@ export class TrainingSessionsService {
         responsibleConsultant: { select: { name: true } },
       },
     });
+
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
+
+    return session;
   }
 
   async createTrainingSession(dto: CreateTrainingSessionDto) {
@@ -180,14 +197,46 @@ export class TrainingSessionsService {
     return session;
   }
 
+ /**
+  * Apaga o treinamento e tudo o que pertence só a ele (participantes,
+  * avaliações, certificados). As linhas do banco já eram limpas
+  * corretamente aqui antes desta mudança; o que faltava era apagar os
+  * arquivos PDF de fato (buckets `reports`/`certificates` no Supabase
+  * Storage) referenciados por `reportPdfUrl`/`pdfUrl` — sem isso, o
+  * arquivo ficava órfão no storage para sempre mesmo com a linha do banco
+  * já apagada. A exclusão do storage roda depois da transação do banco
+  * ter sucesso, best-effort (`.catch(() => null)`, mesmo padrão de
+  * certificates.service.ts): falha ao apagar um PDF não desfaz nem impede
+  * a exclusão do treinamento.
+  *
+  * `BulkOperationJob` (feature de ações em lote) também tem FK para
+  * `trainingSessionId` sem cascade — apagar a sessão sem limpar essas
+  * linhas antes quebrava com violação de FK sempre que o treinamento já
+  * tinha algum job em lote (excluir/enviar e-mail/baixar ZIP) registrado.
+  * Um job de `DOWNLOAD_ZIP` concluído também pode ter deixado um arquivo
+  * temporário (`resultFilePath`, fora do Supabase Storage, em
+  * `os.tmpdir()`) ainda não baixado/apagado — removido best-effort junto
+  * com o resto, mesmo padrão dos PDFs.
+  *
+  * O cadastro de `Participant` (CPF, compartilhado entre treinamentos) só é
+  * apagado junto se a pessoa não estiver mais inscrita em NENHUM outro
+  * treinamento — decisão do cliente 30/08/2026, ver
+  * `deleteOrphanedParticipants` em `participant-cleanup.util.ts`.
+  */
  async deleteSession(id: string) {
   await this.findTrainingSessionById(id);
-  return this.prisma.$transaction(async (tx) => {
-    const participants = await tx.trainingParticipant.findMany({
-      where: { trainingSessionId: id },
-      include: { assessment: true },
-    });
 
+  const participants = await this.prisma.trainingParticipant.findMany({
+    where: { trainingSessionId: id },
+    include: { assessment: true, certificate: true },
+  });
+
+  const bulkJobs = await this.prisma.bulkOperationJob.findMany({
+    where: { trainingSessionId: id },
+    select: { resultFilePath: true },
+  });
+
+  await this.prisma.$transaction(async (tx) => {
     const assessmentIds = participants
       .filter((p) => p.assessment)
       .map((p) => p.assessment!.id);
@@ -201,9 +250,33 @@ export class TrainingSessionsService {
     await tx.certificate.deleteMany({ where: { trainingParticipantId: { in: participantIds } } });
     await tx.trainingParticipant.deleteMany({ where: { trainingSessionId: id } });
     await tx.sessionConsultant.deleteMany({ where: { trainingSessionId: id } });
+    await tx.bulkOperationJob.deleteMany({ where: { trainingSessionId: id } });
 
-    return tx.trainingSession.delete({ where: { id } });
+    const result = await tx.trainingSession.delete({ where: { id } });
+    await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
+    return result;
   });
+
+  const reportPaths = participants
+    .map((p) => p.assessment?.reportPdfUrl)
+    .filter((url): url is string => !!url)
+    .map((url) => url.split('/reports/')[1])
+    .filter((path): path is string => !!path);
+
+  const certificatePaths = participants
+    .map((p) => p.certificate?.pdfUrl)
+    .filter((url): url is string => !!url)
+    .map((url) => url.split('/certificates/')[1])
+    .filter((path): path is string => !!path);
+
+  await Promise.allSettled(reportPaths.map((path) => this.storage.delete('reports', path)));
+  await Promise.allSettled(certificatePaths.map((path) => this.storage.delete('certificates', path)));
+
+  for (const job of bulkJobs) {
+    if (job.resultFilePath) {
+      fs.unlink(job.resultFilePath, () => {});
+    }
+  }
 }
 
   async cancelSession(id: string) {

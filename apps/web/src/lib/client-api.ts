@@ -69,6 +69,44 @@ async function clientFetch<T>(
   return res.json() as Promise<T>
 }
 
+// Baixa um arquivo binário (ex.: ZIP de um job em lote) autenticado com o
+// mesmo Bearer token dos outros métodos, dispara o download no navegador via
+// um <a> temporário e libera a object URL em seguida. Não usa clientFetch
+// porque a resposta não é JSON.
+async function downloadFile(path: string, fallbackName: string, isRetry = false): Promise<void> {
+  const token = getToken('simtc-token')
+
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  })
+
+  if (res.status === 401 && !isRetry) {
+    const newToken = await doRefresh()
+    if (newToken) return downloadFile(path, fallbackName, true)
+    if (typeof window !== 'undefined') window.location.href = '/login'
+    throw new Error('Sessão expirada. Faça login novamente.')
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }))
+    throw new Error(error.message ?? `Erro ${res.status}`)
+  }
+
+  const blob = await res.blob()
+  const disposition = res.headers.get('content-disposition')
+  const match = disposition?.match(/filename="?([^"]+)"?/)
+  const filename = match?.[1] ?? fallbackName
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export const clientApi = {
   get:    <T>(path: string)                => clientFetch<T>(path),
   post:   <T>(path: string, body: unknown) => clientFetch<T>(path, { method: 'POST',   body: JSON.stringify(body) }),
@@ -76,4 +114,5 @@ export const clientApi = {
   patch:  <T>(path: string, body: unknown) => clientFetch<T>(path, { method: 'PATCH',  body: JSON.stringify(body) }),
   delete: <T>(path: string)                => clientFetch<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, fd: FormData)  => clientFetch<T>(path, { method: 'PATCH',  body: fd }),
+  downloadFile,
 }

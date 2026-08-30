@@ -183,7 +183,7 @@ index 0000000..b9c5f55
 +              <tr key={p.id} className={styles.row}>
 +                <td className={styles.td}>{p.name}</td>
 +                <td className={`${styles.td} ${styles.center}`}>
-+                  {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
++                  {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
 +                </td>
 +                <td className={`${styles.td} ${styles.center}`}>
 +                  {p.score !== null ? (
@@ -785,7 +785,7 @@ index 0000000..81e6e9b
 +                      onClick={() => toggleType(p.id)}
 +                      title="Clique para alternar"
 +                    >
-+                      {p.type === 'SOMENTE_TEORICA' ? 'Só Teoria' : 'Teoria + Prática'}
++                      {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
 +                    </button>
 +                  </td>
 +                  <td className={`${styles.td} ${styles.center}`}>

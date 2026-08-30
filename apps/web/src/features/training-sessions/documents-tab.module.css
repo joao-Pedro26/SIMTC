@@ -43,6 +43,12 @@
   color: var(--text-muted);
 }
 
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .tableWrapper {
   flex: 1;
   overflow-y: auto;

@@ -169,6 +169,7 @@ model TrainingSession {
   responsibleConsultant Consultant?           @relation(fields: [responsibleConsultantId], references: [id])
   consultants           SessionConsultant[]
   participants          TrainingParticipant[]
+  bulkJobs              BulkOperationJob[]
 }
 
 enum TrainingStatus {
@@ -305,10 +306,49 @@ model User {
   contactId    String?         @unique
   consultant   Consultant?     @relation(fields: [consultantId], references: [id])
   contact      CompanyContact? @relation(fields: [contactId], references: [id])
+
+  bulkJobs     BulkOperationJob[]
 }
 
 enum UserRole {
   ADMIN
   CONSULTANT
   CLIENT
+}
+
+// ─── AÇÕES EM LOTE (JOBS EM BACKGROUND) ──────────────────────────────────────
+
+model BulkOperationJob {
+  id                String        @id @default(cuid())
+  type              BulkJobType
+  status            BulkJobStatus @default(PENDING)
+  requestedById     String
+  requestedByRole   UserRole
+  trainingSessionId String
+  totalItems        Int
+  processedItems    Int           @default(0)
+  succeededItems    Int           @default(0)
+  skippedItems      Int           @default(0)
+  failedItems       Int           @default(0)
+  resultDetails     Json?
+  resultFilePath    String?
+  errorMessage      String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  requestedBy       User            @relation(fields: [requestedById], references: [id])
+  trainingSession   TrainingSession @relation(fields: [trainingSessionId], references: [id])
+}
+
+enum BulkJobType {
+  DELETE_PARTICIPANTS
+  SEND_CERTIFICATES
+  DOWNLOAD_ZIP
+}
+
+enum BulkJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }

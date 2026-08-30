@@ -5,6 +5,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateContactUserDto } from './dto/create-contact-user.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
+import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
 
 @Injectable()
 export class CompaniesService {
@@ -113,10 +114,19 @@ export class CompaniesService {
       const sessionIds = sessions.map((s) => s.id);
 
       if (sessionIds.length > 0) {
-        // Busca participantes dessas sessões
+        // Jobs de ações em lote (excluir/enviar e-mail/baixar ZIP participantes)
+        // têm FK obrigatória para a sessão — precisa limpar antes de apagar as
+        // sessões, senão quebra com violação de FK (mesmo problema corrigido em
+        // TrainingSessionsService.deleteSession, ver [[simtc-participant-training-delete]]).
+        await tx.bulkOperationJob.deleteMany({
+          where: { trainingSessionId: { in: sessionIds } },
+        });
+
+        // Busca participantes dessas sessões (participantId incluso para o
+        // cleanup de cadastros órfãos logo abaixo, ver [[simtc-participant-training-delete]])
         const participants = await tx.trainingParticipant.findMany({
           where: { trainingSessionId: { in: sessionIds } },
-          select: { id: true },
+          select: { id: true, participantId: true },
         });
         const participantIds = participants.map((p) => p.id);
 
@@ -138,6 +148,9 @@ export class CompaniesService {
           await tx.trainingParticipant.deleteMany({
             where: { trainingSessionId: { in: sessionIds } },
           });
+          // Cadastro de Participant (CPF, compartilhado entre treinamentos)
+          // só é apagado se não sobrar nenhuma outra inscrição dele
+          await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
         }
 
         // Deleta consultores vinculados às sessões e as sessões em si
@@ -222,6 +235,15 @@ export class CompaniesService {
     if (!contact) throw new NotFoundException('Contato não encontrado');
 
     return this.prisma.$transaction(async (tx) => {
+      // Mesmo motivo do bulkOperationJob.deleteMany em deleteCompany logo
+      // acima: `requestedById` é FK obrigatória para User, então apagar o
+      // usuário do contato sem limpar antes os jobs em lote que ele disparou
+      // (bulk-download é liberado para CLIENT) quebra com violação de FK.
+      const contactUsers = await tx.user.findMany({ where: { contactId }, select: { id: true } });
+      await tx.bulkOperationJob.deleteMany({
+        where: { requestedById: { in: contactUsers.map((u) => u.id) } },
+      });
+
       await tx.user.deleteMany({ where: { contactId } });
       return tx.companyContact.delete({ where: { id: contactId } });
     });

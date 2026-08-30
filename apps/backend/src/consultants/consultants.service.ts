@@ -129,6 +129,20 @@ export class ConsultantsService {
         data: { assignedConsultantId: null },
       });
 
+      // Jobs de ações em lote registram quem os disparou (`requestedById`,
+      // FK obrigatória para User) — se este consultor já baixou um ZIP em
+      // lote (bulk-download libera CONSULTANT), apagar o usuário sem antes
+      // limpar esses jobs quebra com violação de FK (mesmo problema
+      // corrigido em TrainingSessionsService.deleteSession, ver
+      // [[simtc-participant-training-delete]]). Diferente das outras FKs
+      // acima, aqui não dá pra deixar em branco — `requestedById` é
+      // obrigatório, então a linha do job é removida (mesmo raciocínio já
+      // usado para `SessionConsultant`).
+      const consultantUsers = await tx.user.findMany({ where: { consultantId: id }, select: { id: true } });
+      await tx.bulkOperationJob.deleteMany({
+        where: { requestedById: { in: consultantUsers.map((u) => u.id) } },
+      });
+
       await tx.user.deleteMany({ where: { consultantId: id } });
       await tx.consultant.delete({ where: { id } });
     });
