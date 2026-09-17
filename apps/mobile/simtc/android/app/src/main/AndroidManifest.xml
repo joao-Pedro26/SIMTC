@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necessária no manifest principal: o APK release (sideload) não herda a
+         permissão declarada nos manifests de debug/profile. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="simtc"
+        android:label="SIMTC"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

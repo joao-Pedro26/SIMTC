@@ -1,7 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The INTERNET permission is required for development. Specifically,
-         the Flutter tool needs it to communicate with the running application
-         to allow setting breakpoints, to provide hot reload, etc.
-    -->
+    <!-- A INTERNET permission é exigida pelo próprio tooling do Flutter em debug
+         (hot reload, VM service). O release usa a declarada no manifest principal. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Em desenvolvimento o app fala com o backend do PC em http://localhost:3001
+         (via `adb reverse tcp:3001`). Android 9+ bloqueia cleartext por padrão;
+         esta permissão vale só para builds de debug. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
