@@ -1,31 +1,41 @@
 # Referência visual do app mobile
 
-`SIMTC-Mobile.dc.html` é o export do projeto "Paleta e componentes do app móvel"
+`SIMTC-Mobile.dc.html` é o canvas do projeto "Paleta e componentes do app móvel"
 do Claude Design (`claude.ai/design/p/e2d444d2-44d5-4519-a4d1-fb3e7bb8e588`),
-importado em 17/09/2026. É a referência de layout das telas; quando um token de
-cor ou espaçamento divergir, vale o que está escrito em
-`prompt-claude-design-mobile.md` (são os valores reais de produção).
+extraído em 17/09/2026 do export completo. São 3765 linhas e 42 quadros.
 
 ## Como o arquivo está organizado
 
 | Linhas | Bloco | Conteúdo |
 |---|---|---|
-| 13–248 | Variante ADMIN | 1.11 Adicionar participante, 1.12 Dados do treinamento, 1.13 Consultores da sessão |
-| 249–969 | Celular (compact) | 1.1 Abertura, 1.2 Entrar, 1.3 Minhas sessões, 1.4 Detalhe (consultor e ADMIN), Checklist, 1.6 Conferir e finalizar, 1.7 Assinatura, 1.8 Resultado, 1.9 Sincronizar, 1.10 Perfil |
-| 970–2878 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais o quadro "Spec para dev" |
+| 460–695 | Variante ADMIN | 1.11 Adicionar participante, 1.12 Dados do treinamento, 1.13 Consultores da sessão |
+| 696–1416 | Celular (compact) | 1.1 Abertura (702), 1.2 Entrar (719), 1.3 Minhas sessões (767), 1.4 Detalhe consultor (855) e ADMIN (944), Checklist (1043), 1.6 Conferir e finalizar (1118), 1.7 Assinatura (1169), 1.8 Resultado (1217), 1.9 Sincronizar (1297), 1.10 Perfil (1365) |
+| 1417–3383 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais dois quadros "Spec para dev" (3323 e 3354) |
+| 3384–3765 | Fundações e sistema de design | Contexto de uso, mapeamento para Material 3, escala tipográfica, paleta semântica e as decisões do designer |
 
 Cada quadro é um `div.dv-opt` com o rótulo da tela; as telas são HTML com estilo
 inline, então dá para ler medidas, cores e pesos de fonte direto do markup.
+Alguns quadros usam dados de um `<script type="text/x-dc">` no fim do arquivo
+(listas `statusChips`, `severity`, `typeScale`, `brand`, `CV`).
 
-## Limitação conhecida: o arquivo está truncado
+## Qual parte manda
 
-A ferramenta de importação lê no máximo 256 KiB, e o export é maior que isso.
-O arquivo termina no meio do último quadro do bloco de tablet — **"Spec para
-dev · linha de checklist e chip de severidade"** —, que é justamente a
-especificação da linha de infração usada na Fase 4.
+**As telas.** O bloco "Fundações e sistema de design" registra o raciocínio do
+designer, mas boa parte dele não foi seguida ao desenhar as telas — informação
+do próprio autor do projeto em 17/09/2026. Quando os dois divergirem, vale o
+quadro da tela. Exemplos de divergência já identificados:
 
-Tudo o que vem antes está completo, inclusive o bloco do celular inteiro.
+- fundações descrevem a navbar como charcoal opaca; as telas usam pastilha clara `#F8FAFC`;
+- fundações colocam `EM_AVALIACAO` em teal; o brief escrito pede amarelo;
+- fundações propõem uma rampa própria de severidade; o brief escrito manda usar as cores do painel web.
 
-Para substituir pela versão completa: baixe o arquivo pelo próprio Claude Design
-e salve por cima deste, mantendo o nome. Vale fazer isso antes de planejar a
-Fase 4 (checklist) e a Fase 7 (tablet).
+Para tokens que não estejam no canvas, vale `prompt-claude-design-mobile.md`
+(valores reais de produção).
+
+## De onde veio este arquivo
+
+O export do Claude Design é um HTML "bundle" auto-extraível (~1,4 MB, com fontes
+e imagens embutidas em base64). O que está versionado aqui é só o template do
+canvas, extraído do bloco `<script type="__bundler/template">` do bundle — é o
+mesmo HTML, sem os binários. Para atualizar: baixe o export novo e extraia esse
+bloco por cima deste arquivo.

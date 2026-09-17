@@ -1,13 +1,460 @@
 <!DOCTYPE html>
-<html>
-<head>
+<html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="./support.js"></script>
+<script src="d647d324-9381-4774-a955-2bd62f24b97e"></script>
+
 </head>
 <body>
 <x-dc>
-<helmet data-dc-atomics=""><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&amp;display=swap" rel="stylesheet"><style>body{margin:0;background:#EEF1F5;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#0A6E80}a:hover{color:#07545F}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(15,23,42,.1);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px "JetBrains Mono",ui-monospace,monospace;padding:3px 7px;background:#1E2A34;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 Inter,sans-serif;color:#1E2A34}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px "JetBrains Mono",ui-monospace,monospace;padding:3px 7px;background:rgba(15,23,42,.08);color:#1E2A34;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 Inter,sans-serif;color:rgba(15,23,42,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(15,23,42,.1);border-radius:10px;box-shadow:0 1px 3px rgba(15,23,42,.07);overflow:hidden}.dv-opt:target .dv-oid{background:#0A6E80;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 Inter,sans-serif;color:rgba(15,23,42,.5)}</style></helmet>
+<helmet data-dc-atomics=""><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><style>/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("3bca0470-e835-4bbe-b30b-f2e6f30ec9b9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("a6f96b18-2f38-4e48-ad95-ad1c61c21193") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("230dc72e-eb2d-4269-a0c9-88f785acd51f") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("5012d696-1a67-4875-b2d1-18f7752c6f5b") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("d076dfe2-519a-45f3-8bf9-77c2cc6fd21d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("aa5d4732-4e3e-4a25-a4cc-7301a261cd93") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("daf3d4e8-e598-46b9-9566-ae683dcd0971") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("3bca0470-e835-4bbe-b30b-f2e6f30ec9b9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("a6f96b18-2f38-4e48-ad95-ad1c61c21193") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("230dc72e-eb2d-4269-a0c9-88f785acd51f") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("5012d696-1a67-4875-b2d1-18f7752c6f5b") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("d076dfe2-519a-45f3-8bf9-77c2cc6fd21d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("aa5d4732-4e3e-4a25-a4cc-7301a261cd93") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("daf3d4e8-e598-46b9-9566-ae683dcd0971") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("3bca0470-e835-4bbe-b30b-f2e6f30ec9b9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("a6f96b18-2f38-4e48-ad95-ad1c61c21193") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("230dc72e-eb2d-4269-a0c9-88f785acd51f") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("5012d696-1a67-4875-b2d1-18f7752c6f5b") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("d076dfe2-519a-45f3-8bf9-77c2cc6fd21d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("aa5d4732-4e3e-4a25-a4cc-7301a261cd93") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("daf3d4e8-e598-46b9-9566-ae683dcd0971") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("3bca0470-e835-4bbe-b30b-f2e6f30ec9b9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("a6f96b18-2f38-4e48-ad95-ad1c61c21193") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("230dc72e-eb2d-4269-a0c9-88f785acd51f") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("5012d696-1a67-4875-b2d1-18f7752c6f5b") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("d076dfe2-519a-45f3-8bf9-77c2cc6fd21d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("aa5d4732-4e3e-4a25-a4cc-7301a261cd93") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("daf3d4e8-e598-46b9-9566-ae683dcd0971") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("3bca0470-e835-4bbe-b30b-f2e6f30ec9b9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("a6f96b18-2f38-4e48-ad95-ad1c61c21193") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("230dc72e-eb2d-4269-a0c9-88f785acd51f") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("5012d696-1a67-4875-b2d1-18f7752c6f5b") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("d076dfe2-519a-45f3-8bf9-77c2cc6fd21d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("aa5d4732-4e3e-4a25-a4cc-7301a261cd93") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("daf3d4e8-e598-46b9-9566-ae683dcd0971") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("71ce2c79-b97c-4a7d-8203-616ed8274145") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("7478d57a-d84e-44b2-88fe-0d7f66d795ff") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("da9e146d-a59d-421d-82db-d10698e55ff6") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fafbd661-9ef2-4840-b4bd-f7482d726ae0") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("4833c46d-a29b-46ec-a2ea-1b660191cce9") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("7946b719-5e39-4e92-8d67-fafe7b5a7bc8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("71ce2c79-b97c-4a7d-8203-616ed8274145") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("7478d57a-d84e-44b2-88fe-0d7f66d795ff") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("da9e146d-a59d-421d-82db-d10698e55ff6") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fafbd661-9ef2-4840-b4bd-f7482d726ae0") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("4833c46d-a29b-46ec-a2ea-1b660191cce9") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("7946b719-5e39-4e92-8d67-fafe7b5a7bc8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* fallback */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("0a57278d-07ca-4dfe-b1e8-19e5e1f2b88e") format('woff2');
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+</style><style>body{margin:0;background:#EEF1F5;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#0A6E80}a:hover{color:#07545F}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(15,23,42,.1);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px "JetBrains Mono",ui-monospace,monospace;padding:3px 7px;background:#1E2A34;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 Inter,sans-serif;color:#1E2A34}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px "JetBrains Mono",ui-monospace,monospace;padding:3px 7px;background:rgba(15,23,42,.08);color:#1E2A34;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 Inter,sans-serif;color:rgba(15,23,42,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(15,23,42,.1);border-radius:10px;box-shadow:0 1px 3px rgba(15,23,42,.07);overflow:hidden}.dv-opt:target .dv-oid{background:#0A6E80;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 Inter,sans-serif;color:rgba(15,23,42,.5)}</style></helmet>
 
 <section class="dv-turn" id="t3">
 <div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Variante ADMIN — formulários de participante, treinamento e equipe de consultores</span></div>
@@ -25,7 +472,7 @@
 </div>
 <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;background:#fff">
 <div style="padding:12px 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px">
-<div style="flex:none;width:40px;height:40px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:40px;height:40px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
 <span style="font:600 14px/1.25 Inter,sans-serif;color:#0F172A">Bracell</span>
 <span style="font:400 12.5px/1.3 Inter,sans-serif;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Direção Defensiva — Veículo Pesado · 12 set</span>
@@ -105,7 +552,7 @@
 <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;background:#fff">
 <div style="padding: 14px 20px; border-bottom: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 10px; background-color: #FFFFFF">
 <div style="display:flex;align-items:center;gap:12px">
-<div style="flex:none;width:44px;height:44px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:44px;height:44px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
 <span style="font:600 15px/1.25 Inter,sans-serif;color:#0F172A">Bracell</span>
 <span style="font:400 12.5px/1.3 Inter,sans-serif;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Direção Defensiva — Veículo Pesado</span>
@@ -179,7 +626,7 @@
 </div>
 <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;background:#fff">
 <div style="padding:12px 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px">
-<div style="flex:none;width:40px;height:40px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:40px;height:40px;border-radius:8px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:5px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
 <span style="font:600 14px/1.25 Inter,sans-serif;color:#0F172A">Bracell · 12 set</span>
 <span style="font:400 12.5px/1.3 Inter,sans-serif;color:#475569">5 participantes · 3 consultores</span>
@@ -258,7 +705,7 @@
 
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 0 32px; background-color: #FFFFFF">
 
-<img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height: 130px; width: 99px; display: block"><div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height: 130px; width: 99px; display: block"><div style="display:flex;flex-direction:column;align-items:center;gap:6px">
 
 
 </div>
@@ -272,7 +719,7 @@
 <div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>1.2 Entrar</div>
 <div class="dv-card" style="width:412px;height:915px;display:flex;flex-direction:column;background:#fff;border-radius:14px">
 <div style="height:28px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex:none"><span style="font:600 11px/1 Inter,sans-serif;color:#0F172A">08:42</span><span style="font-family:'Material Symbols Outlined';font-size:14px;line-height:1;color:#0F172A">signal_cellular_alt</span></div><div style="flex:1;overflow-y:auto;padding:48px 24px 24px;display:flex;flex-direction:column;gap:28px">
-<img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height: 150px; display: block; margin-top: auto; margin-right: auto; margin-bottom: 0px; margin-left: auto"><div style="display:flex;flex-direction:column;gap:16px">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height: 150px; display: block; margin-top: auto; margin-right: auto; margin-bottom: 0px; margin-left: auto"><div style="display:flex;flex-direction:column;gap:16px">
 
 <div style="display:flex;flex-direction:column;gap:4px">
 
@@ -322,7 +769,7 @@
 <div style="height:28px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex:none"><span style="font:600 11px/1 Inter,sans-serif;color:#0F172A">08:42</span><span style="font-family:'Material Symbols Outlined';font-size:14px;line-height:1;color:#0F172A">signal_cellular_alt</span></div>
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;flex:none;padding:10px 12px 10px 16px;display:flex;flex-direction:column;gap:10px">
 <div style="display:flex;align-items:center;gap:4px">
-<img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height: 60px; width: auto; display: block">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height: 60px; width: auto; display: block">
 <div style="flex:1"></div>
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#475569">search</span></div>
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;position:relative"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#8A4100">cloud_off</span><div style="position:absolute;top:6px;right:5px;min-width:16px;height:16px;border-radius:999px;background:#C2670A;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0 3px"><span style="font:700 9px/1 Inter,sans-serif;color:#fff">3</span></div></div>
@@ -416,7 +863,7 @@
 <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:none">
 <div style="display:flex;gap:12px;align-items:flex-start">
-<div style="flex:none;width:52px;height:52px;border-radius:10px;background:#FFFFFF;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:52px;height:52px;border-radius:10px;background:#FFFFFF;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
 <div style="font:600 18px/1.25 Inter,sans-serif;color:#0F172A;text-wrap:pretty">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Direção Defensiva — Veículo Pesado</div>
@@ -510,7 +957,7 @@
 <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:none">
 <div style="display:flex;gap:12px;align-items:flex-start">
-<div style="flex:none;width:52px;height:52px;border-radius:10px;background:#FFFFFF;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:52px;height:52px;border-radius:10px;background:#FFFFFF;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
 <div style="font:600 18px/1.25 Inter,sans-serif;color:#0F172A;text-wrap:pretty">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Direção Defensiva — Veículo Pesado</div>
@@ -812,7 +1259,7 @@
 </div>
 <sc-for list="{{ resultRows }}" as="r" hint-placeholder-count="5">
 <sc-if value="{{ r.head }}" hint-placeholder-val="{{ false }}">
-<div onClick="{{ r.toggle }}" style="padding: 14px 20px; display: flex; align-items: center; gap: 10px; background: {{ r.headBg }}; border-top: 1px solid #D6EDF0; border-bottom: 1px solid #D6EDF0; min-height: 22px; cursor: pointer; padding-top: 20px; padding-right: 20px; padding-bottom: 20px; padding-left: 20px; height: 22px">
+<div sc-camel-on-click="{{ r.toggle }}" style="padding: 14px 20px; display: flex; align-items: center; gap: 10px; background: {{ r.headBg }}; border-top: 1px solid #D6EDF0; border-bottom: 1px solid #D6EDF0; min-height: 22px; cursor: pointer; padding-top: 20px; padding-right: 20px; padding-bottom: 20px; padding-left: 20px; height: 22px">
 <div style="padding: 3px 7px; border-radius: 6px; background: {{ r.chipBg }}; display: flex; flex: none"><span style="font:700 11px/1.2 'JetBrains Mono',monospace;color:{{ r.chipInk }};letter-spacing:.04em">{{ r.code }}</span></div>
 <div style="flex:1;min-width:0;font:600 15px/1.25 Inter,sans-serif;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
 <span style="font: 500 12px/1.2 Inter,sans-serif; color: #94A3B8; flex: none">{{ r.sum }}</span>
@@ -976,7 +1423,7 @@
 <div class="dv-card" style="width:1280px;height:800px;display:flex;flex-direction:column;background:#1E2A34;border-radius:14px">
 <div style="height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex: none; background-color: #FFFFFF; border-width: 0px; border-style: solid; border-color: #000000"><span style="font:600 12px/1 Inter,sans-serif;color:#fff">08:42</span><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#fff">wifi_off</span><span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#fff">battery_5_bar</span></div></div>
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 0 80px; background-color: #FFFFFF; border-width: 0px; border-style: solid; border-color: #000000">
-<div style="background:#fff;border-radius:20px;padding:30px 38px;display:flex;align-items:center;justify-content:center"><img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height: 200px; display: block"></div>
+<div style="background:#fff;border-radius:20px;padding:30px 38px;display:flex;align-items:center;justify-content:center"><img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height: 200px; display: block"></div>
 
 <div style="width: 220px; height: 4px; border-radius: 999px; overflow: hidden; background-color: #00000024"><div style="width: 45%; height: 100%; border-radius: 999px; background-color: #1D9AA4"></div></div>
 </div>
@@ -990,7 +1437,7 @@
 <div class="dv-card" style="width:800px;height:1280px;display:flex;flex-direction:column;background:#1E2A34;border-radius:14px">
 <div style="height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex:none;background-color:#FFFFFF"><span style="font:600 12px/1 Inter,sans-serif;color:#fff">08:42</span><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#fff">wifi_off</span><span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#fff">battery_5_bar</span></div></div>
 <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;padding:0 80px;background-color:#FFFFFF">
-<div style="background:#fff;border-radius:20px;padding:30px 38px;display:flex;align-items:center;justify-content:center"><img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height:200px;display:block"></div>
+<div style="background:#fff;border-radius:20px;padding:30px 38px;display:flex;align-items:center;justify-content:center"><img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height:200px;display:block"></div>
 <div style="width:220px;height:4px;border-radius:999px;overflow:hidden;background-color:#00000024"><div style="width:45%;height:100%;border-radius:999px;background-color:#1D9AA4"></div></div>
 </div>
 </div>
@@ -1006,7 +1453,7 @@
 <div style="display:flex;flex-direction:column;gap:10px">
 
 
-</div><img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height: 230px; display: block; margin-top: auto; margin-right: auto; margin-bottom: auto; margin-left: auto">
+</div><img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height: 230px; display: block; margin-top: auto; margin-right: auto; margin-bottom: auto; margin-left: auto">
 
 </div>
 <div style="flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 0 64px; background: #fff">
@@ -1092,7 +1539,7 @@
 <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1.2;color:#475569;flex:none">wifi_off</span>
 <div style="flex:1;min-width:0;font:400 13.5px/1.45 Inter,sans-serif;color:#334155;text-wrap:pretty">Sem sinal, o app aceita o último login válido neste aparelho por 7 dias e abre direto nas sessões baixadas.</div>
 </div>
-</div><div style="flex:none;display:flex;align-items:center;justify-content:center;padding:56px 56px 32px;background-color:#FFFFFF"><img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height:230px;display:block"></div>
+</div><div style="flex:none;display:flex;align-items:center;justify-content:center;padding:56px 56px 32px;background-color:#FFFFFF"><img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height:230px;display:block"></div>
 </div>
 </div>
 </div>
@@ -1107,7 +1554,7 @@
 <div style="flex:none;width:392px;min-width:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;background:#fff">
 <div style="border-bottom:1px solid #E2E8F0;flex:none;padding:12px 12px 12px 20px;display:flex;flex-direction:column;gap:10px">
 <div style="display:flex;align-items:center;gap:4px">
-<img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height:44px;width:auto;display:block">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height:44px;width:auto;display:block">
 <div style="flex:1"></div>
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#475569">search</span></div>
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;position:relative"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#8A4100">cloud_off</span><div style="position:absolute;top:6px;right:5px;min-width:16px;height:16px;border-radius:999px;background:#C2670A;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0 3px"><span style="font:700 9px/1 Inter,sans-serif;color:#fff">3</span></div></div>
@@ -1171,7 +1618,7 @@
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px 18px;display:flex;flex-direction:column;gap:14px;flex:none">
 <div style="display:flex;gap:14px;align-items:flex-start">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A;text-wrap:pretty">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Direção Defensiva — Veículo Pesado</div>
@@ -1265,7 +1712,7 @@
 <div style="flex:none;width:392px;min-width:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;background:#fff">
 <div style="border-bottom:1px solid #E2E8F0;flex:none;padding:12px 12px 12px 20px;display:flex;flex-direction:column;gap:10px">
 <div style="display:flex;align-items:center;gap:4px">
-<img src="apps/mobile/assets/images/logo-simtc.png" alt="SIM Treinamentos" style="height:44px;width:auto;display:block">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height:44px;width:auto;display:block">
 <div style="flex:1"></div>
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#475569">search</span></div><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;position:relative"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#8A4100">cloud_off</span><div style="position:absolute;top:6px;right:5px;min-width:16px;height:16px;border-radius:999px;background:#C2670A;border:2px solid #fff;display:flex;align-items:center;justify-content:center;padding:0 3px"><span style="font:700 9px/1 Inter,sans-serif;color:#fff">3</span></div></div>
 
@@ -1306,7 +1753,7 @@
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px 18px;display:flex;flex-direction:column;gap:14px;flex:none">
 <div style="display:flex;gap:14px;align-items:flex-start">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Direção Defensiva — Veículo Pesado</div>
@@ -1402,7 +1849,7 @@
 <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#fff">
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px 18px;display:flex;flex-direction:column;gap:14px;flex:none">
 <div style="display:flex;gap:14px;align-items:flex-start">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Direção Defensiva — Veículo Pesado</div>
@@ -1835,7 +2282,7 @@
 </div>
 <sc-for list="{{ resultRows }}" as="r" hint-placeholder-count="5">
 <sc-if value="{{ r.head }}" hint-placeholder-val="{{ false }}">
-<div onClick="{{ r.toggle }}" style="padding:16px 24px;display:flex;align-items:center;gap:12px;background:{{ r.headBg }};border-top:1px solid #D6EDF0;border-bottom:1px solid #D6EDF0;min-height:56px;cursor:pointer;flex:none">
+<div sc-camel-on-click="{{ r.toggle }}" style="padding:16px 24px;display:flex;align-items:center;gap:12px;background:{{ r.headBg }};border-top:1px solid #D6EDF0;border-bottom:1px solid #D6EDF0;min-height:56px;cursor:pointer;flex:none">
 <div style="padding:3px 7px;border-radius:6px;background:{{ r.chipBg }};display:flex;flex:none"><span style="font:700 11px/1.2 'JetBrains Mono',monospace;color:{{ r.chipInk }};letter-spacing:.04em">{{ r.code }}</span></div>
 <div style="flex:1;min-width:0;font:600 15.5px/1.25 Inter,sans-serif;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
 <span style="font:500 12.5px/1.2 Inter,sans-serif;color:#94A3B8;flex:none">{{ r.sum }}</span>
@@ -1906,7 +2353,7 @@
 </div>
 <sc-for list="{{ resultRows }}" as="r" hint-placeholder-count="5">
 <sc-if value="{{ r.head }}" hint-placeholder-val="{{ false }}">
-<div onClick="{{ r.toggle }}" style="padding:16px 24px;display:flex;align-items:center;gap:12px;background:{{ r.headBg }};border-top:1px solid #D6EDF0;border-bottom:1px solid #D6EDF0;min-height:56px;cursor:pointer;flex:none">
+<div sc-camel-on-click="{{ r.toggle }}" style="padding:16px 24px;display:flex;align-items:center;gap:12px;background:{{ r.headBg }};border-top:1px solid #D6EDF0;border-bottom:1px solid #D6EDF0;min-height:56px;cursor:pointer;flex:none">
 <div style="padding:3px 7px;border-radius:6px;background:{{ r.chipBg }};display:flex;flex:none"><span style="font:700 11px/1.2 'JetBrains Mono',monospace;color:{{ r.chipInk }};letter-spacing:.04em">{{ r.code }}</span></div>
 <div style="flex:1;min-width:0;font:600 15.5px/1.25 Inter,sans-serif;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
 <span style="font:500 12.5px/1.2 Inter,sans-serif;color:#94A3B8;flex:none">{{ r.sum }}</span>
@@ -2182,7 +2629,7 @@
 </div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
 <div style="border-bottom:1px solid #E2E8F0;padding:16px 24px;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Itabira/MG · 12 set 2026 · 5 participantes</div>
@@ -2311,7 +2758,7 @@
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#0A6E80">group</span></div>
 </div>
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px;flex:none;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Itabira/MG · 12 set 2026 · 5 participantes</div>
@@ -2428,7 +2875,7 @@
 </div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
 <div style="border-bottom:1px solid #E2E8F0;padding:16px 24px;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Itabira/MG · 12 set 2026 · 07:30</div>
@@ -2549,7 +2996,7 @@
 <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#0A6E80">group</span></div>
 </div>
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px;flex:none;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Itabira/MG · 12 set 2026 · 5 participantes</div>
@@ -2665,7 +3112,7 @@
 </div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
 <div style="border-bottom:1px solid #E2E8F0;padding:16px 24px;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">5 participantes · 3 consultores</div>
@@ -2782,7 +3229,7 @@
 <div style="width:48px;height:48px;border-radius:999px;background:#E6F6F7;border:1.5px solid #1D9AA4;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#0A6E80">group</span></div>
 </div>
 <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:16px 24px;flex:none;display:flex;align-items:center;gap:14px">
-<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="apps/mobile/assets/images/logo-bracell.png" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+<div style="flex:none;width:56px;height:56px;border-radius:10px;background:#fff;border:1px solid #D6EDF0;display:flex;align-items:center;justify-content:center;padding:6px"><img src="c9d1a163-1e44-40bd-9e79-f15180d69f60" alt="Bracell" style="width:100%;height:100%;object-fit:contain;display:block"></div>
 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
 <div style="font:600 20px/1.25 Inter,sans-serif;color:#0F172A">Bracell</div>
 <div style="font:400 14px/1.35 Inter,sans-serif;color:#475569">Itabira/MG · 12 set 2026 · 5 participantes</div>
@@ -2876,4 +3323,443 @@
 <div class="dv-olabel"><a class="dv-oid" href="#4z">4z</a>Spec para dev · linha de checklist e chip de severidade</div>
 <div class="dv-card" style="width:900px;padding:28px 32px;display:flex;flex-direction:column;gap:24px;background:#fff">
 <div style="font:700 15px/1.2 Inter,sans-serif;color:#0F172A">Linha de infração (checklist)</div>
-<div style="position:relative;border:1px dashed #94A3B8;padding:14px 16px;border-bottom:1px solid #F1F5F
+<div style="position:relative;border:1px dashed #94A3B8;padding:14px 16px;border-bottom:1px solid #F1F5F9;display:flex;align-items:flex-start;gap:8px">
+<span style="font:600 12px/1.55 'JetBrains Mono',monospace;color:#94A3B8;flex:none;width:14px">1</span>
+<div style="flex:1;min-width:0;font:400 16px/1.4 Inter,sans-serif;color:#0F172A">Não ajustou o banco, cinto ou espelhos antes de partir</div>
+<div style="position:absolute;top:-11px;left:16px;background:#fff;padding:0 4px;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">padding 14/16dp</div>
+</div>
+<div style="display:flex;gap:6px">
+<div style="position:relative;flex:1;min-height:56px;border-radius:8px;border:1.5px solid #8FCDA6;background:#E7F5EC;display:flex;align-items:center;justify-content:center">
+<span style="font:700 15px/1.1 Inter,sans-serif;color:#1B7940">B</span>
+<div style="position:absolute;bottom:-22px;left:0;right:0;text-align:center;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">r=8 · #E7F5EC / #8FCDA6</div>
+</div>
+<div style="position:relative;flex:1;min-height:56px;border-radius:8px;border:1.5px solid #E0A500;background:#E0A500;display:flex;align-items:center;justify-content:center">
+<span style="font:700 15px/1.1 Inter,sans-serif;color:#3D2E00">PM</span>
+<div style="position:absolute;bottom:-22px;left:0;right:0;text-align:center;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">fill #E0A500 · ink #3D2E00</div>
+</div>
+<div style="position:relative;flex:1;min-height:56px;border-radius:8px;border:1.5px solid #E2857A;background:#FDE2E1;display:flex;align-items:center;justify-content:center">
+<span style="font:700 15px/1.1 Inter,sans-serif;color:#9B2C22">M</span>
+<div style="position:absolute;bottom:-22px;left:0;right:0;text-align:center;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">min-h 56dp · gap 6dp</div>
+</div>
+</div>
+<div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Tokens — não selecionado</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">B #E7F5EC / #8FCDA6 / ink #1B7940<br>PM #FFF6D9 / #E3C24D / ink #7A5900<br>M #FDE2E1 / #E2857A / ink #9B2C22</div></div>
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Tokens — selecionado</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">B fill #22A55A · ink #0B2D18<br>PM fill #E0A500 · ink #3D2E00<br>M fill #E63946 · ink #3C0805</div></div>
+</div>
+<div style="font:400 12px/1.5 Inter,sans-serif;color:#475569">Nota: os três botões dividem a largura em partes iguais (<span style="font-family:'JetBrains Mono',monospace;font-size:11px">flex:1</span> cada), alvo de toque 56dp de altura ≥ mínimo de 48dp. Raio 8dp em toda a família B/PM/M — nunca pílula, para não colidir visualmente com os chips de status (raio 999).</div>
+</div>
+</div>
+
+<div class="dv-opt" id="5a" style="flex:none">
+<div class="dv-olabel"><a class="dv-oid" href="#5a">5a</a>Spec para dev · chip de status e pílula de severidade (resultado)</div>
+<div class="dv-card" style="width:900px;padding:28px 32px;display:flex;flex-direction:column;gap:24px;background:#fff">
+<div style="font:700 15px/1.2 Inter,sans-serif;color:#0F172A">Chip de status (participante / sessão)</div>
+<div style="position:relative;display:inline-flex;align-items:center;gap:5px;padding:5px 11px 5px 9px;border-radius:999px;background:#E6F6F7;border:1.5px solid #7FC9D1;align-self:flex-start">
+<span style="font-family:'Material Symbols Outlined';font-size:14px;line-height:1;color:#0A6E80">play_circle</span>
+<span style="font:600 12px/1.2 Inter,sans-serif;color:#0A6E80">Avaliando · você</span>
+<div style="position:absolute;bottom:-22px;left:0;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">padding 5/11/5/9dp · r=999 · borda 1.5dp</div>
+</div>
+<div style="margin-top:20px;font:700 15px/1.2 Inter,sans-serif;color:#0F172A">Linha de resultado por categoria</div>
+<div style="position:relative;display:flex;align-items:center;gap:10px;border:1px dashed #94A3B8;padding:14px 16px">
+<div style="padding:3px 7px;border-radius:6px;background:#1D9AA4;display:flex"><span style="font:700 11px/1.2 'JetBrains Mono',monospace;color:#fff;letter-spacing:.04em">CV</span></div>
+<div style="flex:1;min-width:0;font:600 15px/1.25 Inter,sans-serif;color:#0F172A">Controle do Veículo</div>
+<span style="font:400 11.5px/1.2 'JetBrains Mono',monospace;color:#94A3B8">14 de 18 pts</span>
+<div style="padding:2px 7px;border-radius:6px;background:#FFF6D9"><span style="font:700 11.5px/1.3 Inter,sans-serif;color:#7A5900">77,8%</span></div>
+<span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#475569">expand_more</span>
+<div style="position:absolute;top:-11px;left:16px;background:#fff;padding:0 4px;font:600 10px/1.2 'JetBrains Mono',monospace;color:#B91C1C">min-h 56dp · gap 10dp</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Badge de % — por faixa</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">≥85%: bg #DCFCE7 · ink #166534<br>70–84%: bg #FFF6D9 · ink #7A5900<br>&lt;70%: bg #FDE2E1 · ink #9B2C22</div></div>
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Chip do código de categoria</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">fechado: bg #EEF4F5 · ink #0A6E80<br>aberto (só a expandida): bg #1D9AA4 · ink #FFFFFF<br>padding 3/7dp · r=6</div></div>
+</div>
+<div style="font:400 12px/1.5 Inter,sans-serif;color:#475569">Regra de estado: no acordeão de <a class="dv-oid" href="#2g">2g</a>/<a class="dv-oid" href="#4i">4i</a>, o chip do código só fica <span style="font-family:'JetBrains Mono',monospace;font-size:11px">#1D9AA4</span> quando a categoria está expandida — nas demais, cinza-claro. Categorias sem infração (ex. TP) não têm chevron nem estado aberto.</div>
+</div>
+</div>
+
+<p class="dv-next">Tablet: fluxo <a class="dv-oid" href="#4a">4a</a> → <a class="dv-oid" href="#4b">4b</a> → <a class="dv-oid" href="#4c">4c</a> (split; <a class="dv-oid" href="#4d">4d</a> admin, <a class="dv-oid" href="#4e">4e</a> retrato) → <a class="dv-oid" href="#4f">4f</a> → <a class="dv-oid" href="#4g">4g</a> → <a class="dv-oid" href="#4h">4h</a> → <a class="dv-oid" href="#4i">4i</a>; <a class="dv-oid" href="#4j">4j</a> e <a class="dv-oid" href="#4k">4k</a> no rail; <a class="dv-oid" href="#4l">4l</a> · <a class="dv-oid" href="#4m">4m</a> · <a class="dv-oid" href="#4n">4n</a> como diálogos ancorados. Próximo passo: "adicionar as anotações de spec em dp/hex"</p>
+</section>
+</div>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Fundações e sistema de design</span></div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Contexto, premissas e sistema de design</div>
+<div class="dv-card" style="width:1240px;padding:0">
+
+<div style="background:#1E2A34;padding:24px 28px;display:flex;align-items:flex-start;gap:20px;justify-content:space-between">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="font:800 20px/1.2 Inter,sans-serif;color:#fff;letter-spacing:-.01em">SIMTC · Avaliação prática em campo</div>
+<div style="font:400 13px/1.5 Inter,sans-serif;color:#94A3B8;max-width:620px">Sistema de design do app Flutter (Android, compact + medium/expanded). Marca herdada de <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#38BEC8">apps/web/src/app/globals.css</span>, dados reais de <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#38BEC8">prisma/schema.prisma</span> e <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#38BEC8">prisma/seed.ts</span>.</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;background:#fff;border-radius:10px;padding:10px 14px">
+<img src="248a3ccd-9614-4a55-b0fb-a8a3e009c830" alt="SIM Treinamentos" style="height:46px;width:auto;display:block">
+<div style="font:600 10px/1.4 'JetBrains Mono',monospace;color:#475569">assets/images/<br>logo-simtc.png</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid #E2E8F0">
+<div style="padding:20px 24px;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 11px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.08em;text-transform:uppercase">Contexto de uso que orientou tudo</div>
+<div style="font:400 13px/1.55 Inter,sans-serif;color:#334155">Consultor <strong style="font-weight:600">sentado dentro do veículo</strong>, luz variável pela janela, vibração do carro, atenção dividida com o participante. Não é sol forte constante — o inimigo é <strong style="font-weight:600">imprecisão de toque e leitura de relance</strong>, não reflexo.</div>
+<div style="font:400 13px/1.55 Inter,sans-serif;color:#334155">Consequências diretas: alvos de <strong style="font-weight:600">56dp</strong> no checklist (acima do mínimo 48dp), corpo de texto em <strong style="font-weight:600">16sp</strong> (não 14sp como na web), estado marcado legível a 60cm sem foco, e zero gesto de precisão (nada de arrastar ou pinçar).</div>
+</div>
+<div style="padding:20px 24px;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 11px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.08em;text-transform:uppercase">Decisões que tomei sozinho</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">Navbar sólida, não glass.</strong> Luz variável dentro do carro faz o blur mudar de contraste conforme o conteúdo rola por baixo — contraste imprevisível é pior que tendência. Charcoal opaco (#1E2A34), o mesmo da sidebar web.</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">Cartões com borda, não sombra.</strong> 1px #E2E8F0 mantém a separação visível em qualquer luz; sombra desaparece sob reflexo.</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">EM_AVALIACAO em teal, não amarelo.</strong> O brief pedia amarelo, mas isso colidiria com a severidade B. A web em produção já usa teal-soft/teal-dark nesse status — mantive, e liberei a faixa âmbar inteira para severidade.</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">CPF mascarado</strong> (042.118.***-**) na lista: o aparelho passa pela mão do participante na assinatura.</div>
+</div>
+<div style="padding:20px 24px;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 11px/1 Inter,sans-serif;color:#A32218;letter-spacing:.08em;text-transform:uppercase">Pendências que não assumi</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">Assinatura não tem campo.</strong> <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">PracticalAssessment</span> não tem <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">signatureUrl</span> nem endpoint de upload. Desenhei 1.7 com a captura local e a fila marcada como "aguardando backend".</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">Divergência de dedução.</strong> <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">note_selector.dart</span> tem B = 0; <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">scoring.ts</span> e <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">score_calculator.dart</span> usam B = 1. Desenhei com <strong style="font-weight:600">B = −1</strong> (fonte de verdade compartilhada).</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155"><strong style="font-weight:600">Divergência de token.</strong> <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">--teal #38BEC8</span> é o token, mas a web usa #1D9AA4 nos botões. Você escolheu #1D9AA4 como primário; #38BEC8 virou acento sobre escuro (onde tem contraste sobrando).</div>
+<div style="font:400 12.5px/1.5 Inter,sans-serif;color:#334155">Sem campo de "cronômetro pausado" no schema — o cronômetro é derivado de <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">startTime</span>, só leitura.</div>
+</div>
+</div>
+
+<div style="padding:22px 24px 8px;display:flex;flex-direction:column;gap:4px">
+<div style="font:700 13px/1.3 Inter,sans-serif;color:#0F172A">Marca → color roles do Material Design 3</div>
+<div style="font:400 12px/1.5 Inter,sans-serif;color:#475569">Um mapeamento, não uma paleta nova. <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">primary</span> = #1D9AA4 (o teal que a web realmente usa) porque branco sobre #38BEC8 dá 2,2:1 e reprova AA em qualquer luz.</div>
+</div>
+<div style="padding:12px 24px 22px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+<sc-for list="{{ brand }}" as="c" hint-placeholder-count="10">
+<div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+<div style="height:52px;display:flex;align-items:flex-end;justify-content:flex-end;padding:6px 8px;background:{{ c.hex }}"><span style="font:600 9px/1 'JetBrains Mono',monospace;color:{{ c.onSwatch }}">{{ c.contrast }}</span></div>
+<div style="padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:#fff">
+<div style="font:600 11.5px/1.3 Inter,sans-serif;color:#0F172A">{{ c.role }}</div>
+<div style="font:600 10.5px/1.3 'JetBrains Mono',monospace;color:#475569">{{ c.hex }}</div>
+<div style="font:400 10.5px/1.35 Inter,sans-serif;color:#94A3B8">{{ c.use }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="padding:18px 24px 8px;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:4px">
+<div style="font:700 13px/1.3 Inter,sans-serif;color:#0F172A">Paleta semântica — dois sistemas que nunca se confundem</div>
+<div style="font:400 12px/1.5 Inter,sans-serif;color:#475569">A separação é <strong style="font-weight:600">formal, não só cromática</strong>: status é <strong style="font-weight:600">pílula (raio 999) com matiz própria</strong>; severidade é <strong style="font-weight:600">quadrado (raio 8) numa rampa ordinal quente</strong> com a sigla e a dedução sempre visíveis. Mesmo em preto e branco, ou para um daltônico, forma + sigla + posição fixa resolvem.</div>
+</div>
+<div style="padding:12px 24px 20px;display:grid;grid-template-columns:1.15fr 1fr;gap:24px">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:700 11px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.08em;text-transform:uppercase">Status do participante · pílulas</div>
+<sc-for list="{{ statusChips }}" as="s" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;gap:12px">
+<div style="min-width:190px;display:flex">
+<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px 6px 10px;border-radius:999px;background:{{ s.bg }};border:1.5px {{ s.borderStyle }} {{ s.border }}">
+<span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;color:{{ s.ink }}">{{ s.icon }}</span>
+<span style="font:600 12px/1.2 Inter,sans-serif;color:{{ s.ink }}">{{ s.label }}</span>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+<div style="font:600 11px/1.3 'JetBrains Mono',monospace;color:#334155">{{ s.enumName }}</div>
+<div style="font:400 11px/1.35 Inter,sans-serif;color:#94A3B8">{{ s.note }}</div>
+</div>
+</div>
+</sc-for>
+<div style="font:400 11.5px/1.5 Inter,sans-serif;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px">Ícone <span style="font-family:'JetBrains Mono',monospace;font-size:11px">Icons.lock</span> + borda tracejada marcam "de outro consultor": o bloqueio precisa ser óbvio sem ler o nome.</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:700 11px/1 Inter,sans-serif;color:#8A4100;letter-spacing:.08em;text-transform:uppercase">Severidade da nota · quadrados ordinais</div>
+<div style="display:flex;gap:8px;align-items:stretch">
+<sc-for list="{{ severity }}" as="v" hint-placeholder-count="4">
+<div style="flex:1;display:flex;flex-direction:column;gap:6px">
+<div style="border-radius:8px;border:1.5px solid {{ v.border }};background:{{ v.bg }};padding:9px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;justify-content:center">
+<span style="font:700 15px/1 Inter,sans-serif;color:{{ v.ink }}">{{ v.code }}</span>
+<span style="font:600 10px/1 'JetBrains Mono',monospace;color:{{ v.ink }};opacity:.8">{{ v.ded }}</span>
+</div>
+<div style="border-radius:8px;background:{{ v.fill }};padding:9px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;justify-content:center">
+<span style="font:700 15px/1 Inter,sans-serif;color:{{ v.selInk }}">{{ v.code }}</span>
+<span style="font:600 10px/1 'JetBrains Mono',monospace;color:{{ v.selInk }};opacity:.85">{{ v.ded }}</span>
+</div>
+<div style="font:400 10.5px/1.35 Inter,sans-serif;color:#475569;text-align:center">{{ v.name }}</div>
+</div>
+</sc-for>
+</div>
+<div style="font:400 11.5px/1.5 Inter,sans-serif;color:#475569;background:#FFFBF2;border:1px solid #F0DCB8;border-radius:8px;padding:10px 12px">Linha de cima = não selecionado, de baixo = selecionado. Preenchimentos com texto escuro, contraste AA confortável nos três. A rampa segue o padrão semáforo — <strong style="font-weight:600">verde → amarelo → vermelho</strong> — leitura mais rápida de relance que uma escala de um só matiz. Nunca se confunde com status: severidade é sempre quadrado (raio 8), status é pílula, e cada um mora numa tela diferente.</div>
+</div>
+</div>
+
+<div style="padding:18px 24px 22px;border-top:1px solid #E2E8F0;display:grid;grid-template-columns:1.1fr 1fr;gap:28px">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:700 13px/1.3 Inter,sans-serif;color:#0F172A">Tipografia — Inter, escala M3 ajustada para dentro do carro</div>
+<sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="8">
+<div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #F1F5F9;padding-bottom:7px">
+<div style="min-width:128px;font:600 10.5px/1.3 'JetBrains Mono',monospace;color:#0A6E80">{{ t.token }}</div>
+<div style="flex:1;min-width:0;color:#0F172A;font-family:{{ t.family }};font-size:{{ t.size }}px;font-weight:{{ t.weight }};line-height:1.3">{{ t.sample }}</div>
+<div style="font:400 10.5px/1.3 'JetBrains Mono',monospace;color:#94A3B8;white-space:nowrap">{{ t.spec }}</div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="font:700 13px/1.3 Inter,sans-serif;color:#0F172A">Navbar pill flutuante · sólida</div>
+<div style="background:#F1F5F9;border:1px dashed #CBD5E1;border-radius:12px;padding:20px 16px;display:flex;justify-content:center">
+<div style="width: 344px; height: 64px; border-radius: 999px; box-shadow: 0 8px 24px rgba(15,23,42,.28); display: flex; align-items: center; padding: 6px; gap: 2px; background-color: #F8FAFC">
+<div style="flex:1;height:52px;border-radius:999px;background:rgba(56,190,200,.16);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+<span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#38BEC8">event_note</span>
+<span style="font:600 10px/1 Inter,sans-serif;color:#38BEC8">Sessões</span>
+</div>
+<div style="flex:1;height:52px;border-radius:999px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative">
+<span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#94A3B8">cloud_sync</span>
+<span style="font:600 10px/1 Inter,sans-serif;color:#94A3B8">Sincronizar</span>
+<div style="position: absolute; top: 4px; left: 50%; margin-left: 6px; min-width: 18px; height: 18px; border-radius: 999px; background: #C2670A; border: 2px solid #1E2A34; display: flex; align-items: center; justify-content: center; padding: 0 4px; border-color: #F8FAFC"><span style="font:700 10px/1 Inter,sans-serif;color:#fff">3</span></div>
+</div>
+<div style="flex:1;height:52px;border-radius:999px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+<span style="font-family:'Material Symbols Outlined';font-size:22px;line-height:1;color:#94A3B8">person</span>
+<span style="font:600 10px/1 Inter,sans-serif;color:#94A3B8">Perfil</span>
+</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Espaçamento</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">4 · 8 · 12 · 16 · 24 · 32dp<br>gutter de tela: 16dp<br>lista: 12dp entre cards</div></div>
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px"><div style="font:700 10px/1 Inter,sans-serif;color:#0A6E80;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Raio / alvo</div><div style="font:400 11.5px/1.6 'JetBrains Mono',monospace;color:#334155">input/botão 8 · card 12<br>sheet 20 · pílula 999<br>alvo mín. 48dp · nota 56dp</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+</div><p class="dv-next">Fundações e sistema de design em <a class="dv-oid" href="#1a">1a</a>. Telas do fluxo do celular em <a class="dv-oid" href="#2a">2a</a>.</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1340,&quot;height&quot;:1200}}">
+const SEV = {
+  B:  { code: 'B',  sub: '−1', bg: '#E7F5EC', border: '#8FCDA6', ink: '#1B7940', fill: '#22A55A', selInk: '#0B2D18' },
+  PM: { code: 'PM', sub: '−3', bg: '#FFF6D9', border: '#E3C24D', ink: '#7A5900', fill: '#E0A500', selInk: '#3D2E00' },
+  M:  { code: 'M',  sub: '−5', bg: '#FDE2E1', border: '#E2857A', ink: '#9B2C22', fill: '#E63946', selInk: '#3C0805' },
+};
+
+const CV = [
+  { n: 1, desc: 'Não ajustou o banco, cinto ou espelhos antes de partir', mark: 'PM',
+    notes: { B: 'Ajuste parcial', PM: 'Ajuste feito somente após solicitação', M: 'Não realizou nenhum ajuste' } },
+  { n: 2, desc: 'Posição incorreta das mãos no volante', mark: null,
+    notes: { B: 'Leve desvio de posição', PM: 'Uma mão no volante com frequência', M: 'Condução com postura totalmente inadequada' } },
+  { n: 3, desc: 'Troca de marchas inadequada para a velocidade ou situação', mark: null,
+    notes: { B: 'Pequeno atraso ou adiantamento na troca', PM: 'Marcha errada em situação de risco', M: 'Condução prolongada em marcha errada' } },
+  { n: 4, desc: 'Uso excessivo ou tardio do freio', mark: 'B',
+    notes: { B: 'Frenagem um pouco brusca', PM: 'Frenagens frequentemente inadequadas', M: 'Frenagem de emergência por falta de antecipação' } },
+  { n: 5, desc: 'Aceleração brusca ou desnecessária', mark: null,
+    notes: { B: 'Aceleração um pouco acentuada', PM: 'Acelerações abruptas recorrentes', M: 'Arrancadas violentas ou perigosas' } },
+  { n: 6, desc: 'Direção com uma só mão sem necessidade operacional', mark: null,
+    notes: { B: 'Ocorrência pontual', PM: 'Hábito frequente', M: 'Condução predominantemente com uma mão' } },
+];
+
+class Component extends DCLogic {
+  segOpts(mark) {
+    return ['B', 'PM', 'M'].map(k => {
+      const s = SEV[k];
+      const on = mark === k;
+      return {
+        code: s.code,
+        flex: 1,
+        bg: on ? s.fill : s.bg,
+        border: on ? s.fill : s.border,
+        ink: on ? s.selInk : s.ink,
+      };
+    });
+  }
+
+  renderVals() {
+    const brand = [
+      { role: 'primary', hex: '#1D9AA4', use: 'app bar, botões, seleção', contrast: '3,3:1', onSwatch: '#0B2B2E' },
+      { role: 'primary (dark) / onPrimaryContainer', hex: '#0A6E80', use: 'texto e ícone sobre teal-soft, cabeçalho imersivo', contrast: '5,4:1 ✓', onSwatch: '#FFFFFF' },
+      { role: 'primaryContainer', hex: '#E6F6F7', use: 'fundo de chip EM_AVALIACAO, superfície ativa', contrast: '—', onSwatch: '#0A6E80' },
+      { role: 'brand accent (sobre escuro)', hex: '#38BEC8', use: 'só sobre charcoal: navbar ativa, links na splash', contrast: '5,8:1 ✓', onSwatch: '#0B2B2E' },
+      { role: 'tertiary / CTA', hex: '#F5A520', use: 'ação principal isolada (Finalizar, Atribuir a mim)', contrast: '—', onSwatch: '#3D2500' },
+      { role: 'secondary', hex: '#9B80A8', use: 'tipo de participação (somente teórica)', contrast: '—', onSwatch: '#2B1F30' },
+      { role: 'surfaceDark / scrim', hex: '#1E2A34', use: 'navbar pill, overlay, splash', contrast: '14,6:1 ✓', onSwatch: '#FFFFFF' },
+      { role: 'surface', hex: '#FFFFFF', use: 'cards, app bar, folhas', contrast: '—', onSwatch: '#475569' },
+      { role: 'surfaceContainer / background', hex: '#F8FAFC', use: 'fundo de tela', contrast: '—', onSwatch: '#475569' },
+      { role: 'outline', hex: '#E2E8F0', use: 'borda de card e divisor (1dp)', contrast: '—', onSwatch: '#475569' },
+      { role: 'outlineVariant (forte)', hex: '#CBD5E1', use: 'borda de alvo tocável, input em repouso', contrast: '—', onSwatch: '#334155' },
+      { role: 'onSurface', hex: '#0F172A', use: 'texto principal', contrast: '17,4:1 ✓', onSwatch: '#FFFFFF' },
+      { role: 'onSurfaceVariant', hex: '#475569', use: 'texto secundário, meta', contrast: '7,5:1 ✓', onSwatch: '#FFFFFF' },
+      { role: 'onSurface muted', hex: '#94A3B8', use: 'só ícone decorativo e placeholder — nunca texto essencial', contrast: '2,8:1', onSwatch: '#0F172A' },
+      { role: 'error', hex: '#B91C1C', use: 'erro de formulário, NECESSITA_REAVALIACAO', contrast: '6,4:1 ✓', onSwatch: '#FFFFFF' },
+    ];
+
+    const statusChips = [
+      { enumName: 'PENDENTE', label: 'Pendente', icon: 'radio_button_unchecked', bg: '#EEF2F7', border: '#CBD5E1', borderStyle: 'solid', ink: '#334155', note: 'ninguém atribuído → botão "Atribuir a mim"' },
+      { enumName: 'EM_AVALIACAO · você', label: 'Avaliando', icon: 'play_circle', bg: '#E6F6F7', border: '#7FC9D1', borderStyle: 'solid', ink: '#0A6E80', note: 'toque abre o checklist; mostra o cronômetro' },
+      { enumName: 'EM_AVALIACAO · outro', label: 'Rafael L.', icon: 'lock', bg: '#F1F5F9', border: '#CBD5E1', borderStyle: 'dashed', ink: '#475569', note: 'sem ação — tracejado + cadeado' },
+      { enumName: 'APROVADO', label: 'Aprovado · 86%', icon: 'check_circle', bg: '#DCFCE7', border: '#86D9A4', borderStyle: 'solid', ink: '#166534', note: 'toque abre o resultado (somente leitura)' },
+      { enumName: 'NECESSITA_REAVALIACAO', label: 'Reavaliar · 62%', icon: 'warning', bg: '#FEE2E2', border: '#E9A2A2', borderStyle: 'solid', ink: '#B91C1C', note: 'resultado + botão "Reavaliar"' },
+      { enumName: 'SOMENTE_TEORICA (tipo)', label: 'Somente teórica', icon: 'menu_book', bg: '#F5F0F8', border: '#CFBBD8', borderStyle: 'solid', ink: '#6B4A7A', note: 'não entra na avaliação prática — mauve da marca, fora da escala de status' },
+    ];
+
+    const severity = [
+      { code: 'B', ded: '−1', name: 'leve', bg: SEV.B.bg, border: SEV.B.border, ink: SEV.B.ink, fill: SEV.B.fill, selInk: SEV.B.selInk },
+      { code: 'PM', ded: '−3', name: 'média', bg: SEV.PM.bg, border: SEV.PM.border, ink: SEV.PM.ink, fill: SEV.PM.fill, selInk: SEV.PM.selInk },
+      { code: 'M', ded: '−5', name: 'grave', bg: SEV.M.bg, border: SEV.M.border, ink: SEV.M.ink, fill: SEV.M.fill, selInk: SEV.M.selInk },
+    ];
+
+    const I = 'Inter, sans-serif', J = "'JetBrains Mono', monospace";
+    const typeScale = [
+      { token: 'displaySmall', family: I, size: 32, weight: 800, sample: '86,7%', spec: '32sp · w800' },
+      { token: 'headlineSmall', family: I, size: 24, weight: 700, sample: 'Minhas Sessões', spec: '24sp · w700' },
+      { token: 'titleLarge', family: I, size: 20, weight: 600, sample: 'Bracell', spec: '20sp · w600' },
+      { token: 'titleMedium', family: I, size: 16, weight: 600, sample: 'Ana Paula Ribeiro', spec: '16sp · w600' },
+      { token: 'bodyLarge', family: I, size: 16, weight: 400, sample: 'Posição incorreta das mãos no volante', spec: '16sp · w400 — infrações' },
+      { token: 'bodyMedium', family: I, size: 14, weight: 400, sample: 'Itabira/MG · 12 set 2026', spec: '14sp · w400' },
+      { token: 'labelLarge', family: I, size: 14, weight: 700, sample: 'Finalizar avaliação', spec: '14sp · w700 · botões' },
+      { token: 'labelMedium', family: I, size: 12, weight: 600, sample: 'Pendente', spec: '12sp · w600 · chips' },
+      { token: 'code / mono', family: J, size: 12, weight: 600, sample: '042.118.***-**', spec: 'CPF, cronômetro, códigos' },
+    ];
+
+    const collapsedCats = [
+      { code: 'RR', name: 'Respeito às Regras', count: '6 itens' },
+      { code: 'CS', name: 'Comportamento Seguro', count: '6 itens' },
+      { code: 'TP', name: 'Técnica de Pista', count: '6 itens' },
+    ];
+
+    const cv = CV.slice(0, 3).map(i => ({
+      n: i.n, desc: i.desc, opts: this.segOpts(i.mark),
+      comment: i.mark ? i.notes[i.mark] : null,
+    }));
+
+
+    const filters = [
+      { label: 'Todos', count: '6', bg: '#1D9AA4', border: '#1D9AA4', ink: '#FFFFFF' },
+      { label: 'Pendentes', count: '1', bg: '#FFFFFF', border: '#CBD5E1', ink: '#334155' },
+      { label: 'Meus', count: '2', bg: '#FFFFFF', border: '#CBD5E1', ink: '#334155' },
+      { label: 'Concluídos', count: '2', bg: '#FFFFFF', border: '#CBD5E1', ink: '#334155' },
+    ];
+
+    const P = {
+      mine: { chipBg: '#E6F6F7', chipBorder: '#7FC9D1', chipBorderStyle: 'solid', chipInk: '#0A6E80', chipIcon: 'play_circle', chipLabel: 'Avaliando · você' },
+      pending: { chipBg: '#EEF2F7', chipBorder: '#CBD5E1', chipBorderStyle: 'solid', chipInk: '#334155', chipIcon: 'radio_button_unchecked', chipLabel: 'Pendente' },
+      other: { chipBg: '#F1F5F9', chipBorder: '#CBD5E1', chipBorderStyle: 'dashed', chipInk: '#475569', chipIcon: 'lock', chipLabel: 'Rafael Lima' },
+      ok: { chipBg: '#DCFCE7', chipBorder: '#86D9A4', chipBorderStyle: 'solid', chipInk: '#166534', chipIcon: 'check_circle', chipLabel: 'Aprovado · 86%' },
+      redo: { chipBg: '#FEE2E2', chipBorder: '#E9A2A2', chipBorderStyle: 'solid', chipInk: '#B91C1C', chipIcon: 'warning', chipLabel: 'Reavaliar · 62%' },
+      theory: { chipBg: '#F5F0F8', chipBorder: '#CFBBD8', chipBorderStyle: 'solid', chipInk: '#6B4A7A', chipIcon: 'menu_book', chipLabel: 'Somente teórica' },
+    };
+    const base = { cardBg: '#FFFFFF', cardBorder: '#E2E8F0', cardBorderStyle: 'solid', avatarBg: '#EEF2F7', avatarInk: '#334155', nameInk: '#0F172A', chevron: true, action: false, typeChip: false, blockedNote: false, meta: false };
+
+    const participants = [
+      { ...base, ...P.mine, initials: 'AR', name: 'Ana Paula Ribeiro', cpf: '042.118.***-**', meta: '00:12:41', cardBorder: '#7FC9D1', avatarBg: '#E6F6F7', avatarInk: '#0A6E80' },
+      { ...base, ...P.pending, initials: 'CN', name: 'Carlos Eduardo Nunes', cpf: '187.443.***-**', chevron: false, action: true },
+      { ...base, ...P.other, initials: 'MA', name: 'Marcos Vinícius Alves', cpf: '351.902.***-**', cardBg: '#FBFCFE', cardBorderStyle: 'dashed', cardBorder: '#CBD5E1', nameInk: '#334155', chevron: false, blockedNote: 'Em avaliação por outro consultor desde 08:29.' },
+      { ...base, ...P.ok, initials: 'JC', name: 'Juliana Freitas Costa', cpf: '209.774.***-**', meta: 'hoje 08:12' },
+      { ...base, ...P.redo, initials: 'RT', name: 'Rodrigo Tavares', cpf: '118.650.***-**', meta: 'hoje 07:55' },
+      { ...base, ...P.theory, initials: 'SB', name: 'Simone Barbosa', cpf: '447.301.***-**', chevron: false, cardBg: '#FDFCFE' },
+    ];
+
+    const adminParticipants = [
+      participants[0],
+      participants[1],
+      { ...base, ...P.ok, initials: 'JC', name: 'Juliana Freitas Costa', cpf: '209.774.***-**' },
+    ];
+
+    const sess = {
+      live: { chipBg: '#E6F6F7', chipBorder: '#7FC9D1', chipInk: '#0A6E80', chipIcon: 'play_circle', chipLabel: 'Em andamento', border: '#7FC9D1' },
+      soon: { chipBg: '#EEF2F7', chipBorder: '#CBD5E1', chipInk: '#334155', chipIcon: 'schedule', chipLabel: 'Agendada', border: '#E2E8F0' },
+      done: { chipBg: '#DCFCE7', chipBorder: '#86D9A4', chipInk: '#166534', chipIcon: 'check_circle', chipLabel: 'Concluída', border: '#E2E8F0' },
+    };
+    const sessionsToday = [
+      { ...sess.live, company: 'Bracell', course: 'Direção Defensiva — Veículo Pesado', meta: 'Itabira/MG · 07:30 · 5 participantes', prog: 40, progLabel: '2 de 5 avaliados', showProg: true },
+      { ...sess.soon, company: 'Transportes Vale Norte S/A', course: 'Operação de Empilhadeira', meta: 'Betim/MG · 13:00 · 8 participantes', prog: 0, progLabel: '', showProg: false },
+    ];
+    const sessionsWeek = [
+      { ...sess.soon, company: 'Construtora Pampulha', course: 'Direção Defensiva — Leve', meta: 'Contagem/MG · qua 16 set · 6 participantes', prog: 0, progLabel: '', showProg: false },
+      { ...sess.soon, company: 'Log Minas Distribuição', course: 'Veículo Pesado — Reciclagem', meta: 'Sete Lagoas/MG · qui 17 set · 11 participantes', prog: 0, progLabel: '', showProg: false },
+      { ...sess.done, company: 'Cimento Itaúna', course: 'Direção Defensiva — Leve', meta: 'Itaúna/MG · seg 7 set · 9 participantes', prog: 100, progLabel: '9 de 9 avaliados', showProg: false },
+    ];
+
+    const sheetOpts = [
+      { code: 'B', name: 'Leve', ded: '−1 ponto', bg: SEV.B.bg, border: SEV.B.border, ink: SEV.B.ink, weight: 400 },
+      { code: 'PM', name: 'Média', ded: '−3 pontos', bg: SEV.PM.fill, border: SEV.PM.fill, ink: '#FFFFFF', weight: 700 },
+      { code: 'M', name: 'Grave', ded: '−5 pontos', bg: SEV.M.bg, border: SEV.M.border, ink: SEV.M.ink, weight: 400 },
+    ];
+    const sheetNotes = [
+      { label: 'Ajuste feito somente após solicitação', bg: '#9A3412', border: '#9A3412', ink: '#FFFFFF', icon: 'check' },
+      { label: 'Ajustou apenas o espelho retrovisor', bg: '#FFFFFF', border: '#CBD5E1', ink: '#334155', icon: '' },
+      { label: 'Cinto colocado com o veículo em movimento', bg: '#FFFFFF', border: '#CBD5E1', ink: '#334155', icon: '' },
+    ];
+
+    const finalCats = [
+      { code: 'CV', name: 'Controle do Veículo', inf: '2 infrações', pts: '−4', ptsInk: '#8A4100' },
+      { code: 'RR', name: 'Respeito às Regras', inf: '1 infração', pts: '−1', ptsInk: '#7A5200' },
+      { code: 'CS', name: 'Comportamento Seguro', inf: 'sem infração', pts: '0', ptsInk: '#166534' },
+      { code: 'TP', name: 'Técnica de Pista', inf: '2 não avaliados', pts: '—', ptsInk: '#94A3B8' },
+    ];
+
+    const resultCatScores = [
+      { code: 'CV', name: 'Controle do Veículo', pct: '77,8%', pctW: '77.8%', ratio: '14 de 18 pts', barBg: '#1D9AA4', pctBg: '#FFF6D9', pctInk: '#7A5900' },
+      { code: 'RR', name: 'Respeito às Regras', pct: '91,7%', pctW: '91.7%', ratio: '11 de 12 pts', barBg: '#1D9AA4', pctBg: '#DCFCE7', pctInk: '#166534' },
+      { code: 'CS', name: 'Comportamento Seguro', pct: '88,9%', pctW: '88.9%', ratio: '8 de 9 pts', barBg: '#1D9AA4', pctBg: '#DCFCE7', pctInk: '#166534' },
+      { code: 'TP', name: 'Técnica de Pista', pct: '100%', pctW: '100%', ratio: '6 de 6 pts', barBg: '#1D9AA4', pctBg: '#DCFCE7', pctInk: '#166534' },
+    ];
+
+    const RESULT_CATS = [
+      { code: 'CV', name: 'Controle do Veículo', sum: '2 infrações · −4 pts', items: [
+        { item: '1', sev: 'PM', bg: SEV.PM.fill, desc: 'Não ajustou o banco, cinto ou espelhos antes de partir', note: 'Ajuste feito somente após solicitação' },
+        { item: '4', sev: 'B', bg: SEV.B.fill, desc: 'Uso excessivo ou tardio do freio', note: 'Frenagem um pouco brusca' },
+      ] },
+      { code: 'RR', name: 'Respeito às Regras', sum: '1 infração · −1 pt', items: [
+        { item: '3', sev: 'B', bg: SEV.B.fill, desc: 'Não sinalizou a mudança de faixa com antecedência', note: false },
+      ] },
+      { code: 'CS', name: 'Comportamento Seguro', sum: '1 infração · −1 pt', items: [
+        { item: '5', sev: 'B', bg: SEV.B.fill, desc: 'Não manteve distância de seguimento do veículo à frente', note: false },
+      ] },
+      { code: 'TP', name: 'Técnica de Pista', sum: 'sem infração', items: [] },
+    ];
+    const openCats = this.state.openCats || { CV: true };
+    const resultRows = [];
+    RESULT_CATS.forEach(c => {
+      const has = c.items.length > 0;
+      const open = has && !!openCats[c.code];
+      resultRows.push({
+        head: true, inf: false, code: c.code, name: c.name, sum: c.sum,
+        chipBg: open ? '#1D9AA4' : '#EEF4F5', chipInk: open ? '#FFFFFF' : '#0A6E80',
+        headBg: open ? '#F1FAFB' : '#FFFFFF',
+        chevron: has ? (open ? 'expand_less' : 'expand_more') : '',
+        toggle: has ? (() => this.setState(s => ({ openCats: { ...(s.openCats || { CV: true }), [c.code]: !(s.openCats || { CV: true })[c.code] } }))) : undefined,
+      });
+      if (open) c.items.forEach(i => resultRows.push({ head: false, inf: true, ...i }));
+    });
+
+    const syncItems = [
+      { name: 'Ana Paula Ribeiro', meta: 'Avaliação prática · 86,7% · 08:41', icon: 'schedule', ink: '#475569', bg: '#EEF2F7', label: 'Na fila', action: false },
+      { name: 'Juliana Freitas Costa', meta: 'Avaliação prática + assinatura · 08:12', icon: 'schedule', ink: '#475569', bg: '#EEF2F7', label: 'Na fila', action: false },
+      { name: 'Rodrigo Tavares', meta: 'Falhou às 07:58 · tempo esgotado', icon: 'error', ink: '#B91C1C', bg: '#FEE2E2', label: 'Erro', action: true },
+    ];
+
+    const profileRows = [
+      { icon: 'badge', label: 'Perfil de acesso', value: 'Consultor', ink: '#0F172A' },
+      { icon: 'business', label: 'Empresa', value: 'SIM Treinamentos', ink: '#0F172A' },
+      { icon: 'cloud_sync', label: 'Última sincronização', value: 'hoje 07:12', ink: '#0F172A' },
+      { icon: 'delete_sweep', label: 'Limpar cache local', value: '18,4 MB', ink: '#0F172A' },
+      { icon: 'info', label: 'Versão do app', value: '1.4.0 (248)', ink: '#475569' },
+    ];
+
+    const sessionConsultors = [
+      { initials: 'CM', name: 'Carla Mendes (você)', email: 'carla.mendes@simtreinamentos.com.br', meta: '2 participantes · 1 em andamento',
+        roleLabel: 'Responsável', roleBg: '#E6F6F7', roleBorder: '#7FC9D1', roleInk: '#0A6E80', avatarBg: '#E6F6F7', avatarInk: '#0A6E80', removable: false, note: false },
+      { initials: 'RL', name: 'Rafael Lima', email: 'rafael.lima@simtreinamentos.com.br', meta: '1 participante · 1 em andamento',
+        roleLabel: 'Consultor', roleBg: '#EEF2F7', roleBorder: '#CBD5E1', roleInk: '#334155', avatarBg: '#EEF2F7', avatarInk: '#334155', removable: true,
+        note: 'Tem 1 avaliação em andamento. Remover devolve Marcos Vinícius para Pendente.' },
+      { initials: 'TS', name: 'Tatiane Souza', email: 'tatiane.souza@simtreinamentos.com.br', meta: '2 participantes concluídos',
+        roleLabel: 'Consultor', roleBg: '#EEF2F7', roleBorder: '#CBD5E1', roleInk: '#334155', avatarBg: '#EEF2F7', avatarInk: '#334155', removable: true, note: false },
+    ];
+
+    const availableConsultors = [
+      { initials: 'DB', name: 'Diego Barbosa', email: 'diego.barbosa@simtreinamentos.com.br', meta: 'Sem sessão hoje', ink: '#0F172A', addInk: '#0A6E80' },
+      { initials: 'PV', name: 'Patrícia Vasconcelos', email: 'patricia.v@simtreinamentos.com.br', meta: 'Empilhadeira · Betim 13:00', ink: '#0F172A', addInk: '#0A6E80' },
+    ];
+
+    return { brand, statusChips, severity, typeScale, cv, collapsedCats, filters, participants, adminParticipants,
+      sessionsToday, sessionsWeek, sheetOpts, sheetNotes, finalCats, resultCatScores, resultRows, syncItems, profileRows,
+      sessionConsultors, availableConsultors, cvFull: CV.map(i => ({ n: i.n, desc: i.desc, opts: this.segOpts(i.mark), comment: i.mark ? i.notes[i.mark] : null })) };
+  }
+}
+</script>
+
+
+</body></html>

@@ -47,21 +47,24 @@
 
 ## Referência visual (export do Claude Design)
 
-O canvas está versionado em `apps/mobile/docs/design/SIMTC-Mobile.dc.html` (2878 linhas). Ele veio **truncado no limite de 256 KiB** da ferramenta de importação: falta o fim do último quadro do bloco de tablet ("Spec para dev · linha de checklist e chip de severidade"), que só é necessário na Fase 4. Tudo que esta fase usa está completo — ver `apps/mobile/docs/design/README.md`. Blocos:
+O canvas completo está versionado em `apps/mobile/docs/design/SIMTC-Mobile.dc.html` (3765 linhas, 42 quadros). Blocos:
 
 | Linhas | Bloco | Quadros |
 |---|---|---|
-| 13–248 | Variante ADMIN | 1.11 Adicionar participante, 1.12 Dados do treinamento, 1.13 Consultores da sessão |
-| 249–969 | **Celular compact** | 1.1 Abertura, 1.2 Entrar, 1.3 Minhas sessões, 1.4 Detalhe (consultor e ADMIN), Checklist, 1.6 Conferir e finalizar, 1.7 Assinatura, 1.8 Resultado, 1.9 Sincronizar, 1.10 Perfil |
-| 970–2878 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais "Spec para dev · linha de checklist e chip de severidade" (linha 2875) |
+| 460–695 | Variante ADMIN | 1.11 Adicionar participante, 1.12 Dados do treinamento, 1.13 Consultores da sessão |
+| 696–1416 | **Celular compact** | 1.1 Abertura (702), 1.2 Entrar (719), 1.3 Minhas sessões (767), 1.4 Detalhe consultor (855) e variante ADMIN (944), Checklist (1043), 1.6 Conferir e finalizar (1118), 1.7 Assinatura (1169), 1.8 Resultado (1217), 1.9 Sincronizar (1297), 1.10 Perfil (1365) |
+| 1417–3383 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais dois quadros "Spec para dev" (3323 e 3354) |
+| 3384–3765 | Fundações e sistema de design | Justificativa de design: contexto de uso, mapeamento M3, escala tipográfica e decisões |
 
-Esta fase usa os quadros `2a` (1.1 Abertura, linha 254) e `2b` (1.2 Entrar, linha 271), e tira dos quadros `2c` (1.3, linha 319) e `1e` (1.4, linha 407) as medidas dos componentes-base.
+**Autoridade:** valem **as telas**. O bloco de fundações é a memória de raciocínio do designer e, segundo o usuário (17/09/2026), boa parte dele não foi seguida na hora de desenhar as telas — onde os dois divergirem (ex.: navbar charcoal, `EM_AVALIACAO` em teal, rampa própria de severidade), o quadro da tela é que vale. Para tokens de cor e espaçamento fora do canvas, vale `prompt-claude-design-mobile.md`.
+
+Esta fase usa os quadros de 1.1 Abertura (linha 702) e 1.2 Entrar (linha 719), e tira das telas 1.3 (linha 767) e 1.4 (linha 855) as medidas dos componentes-base.
 
 **Tokens confirmados no canvas** (histograma do bloco do celular): `#1D9AA4`, `#0A6E80`, `#F5A520`, `#0F172A`, `#475569`, `#334155`, `#94A3B8`, `#E2E8F0`, `#CBD5E1`, `#F8FAFC`, `#F1F5F9`, `#1E2A34`, `#FFFFFF`. Semânticos: verde `#DCFCE7`/`#86D9A4`/`#166534`/`#15803D`; âmbar `#FFF7EC`/`#F0DCB8`/`#8A4100`/`#C2670A`/`#3D2500`; vermelho `#FEE2E2`/`#B91C1C`; mauve `#F5F0F8`/`#CFBBD8`; teal suave `#E6F6F7`/`#D6EDF0`.
 
 **Divergências decididas** (o canvas manda no layout; estes três pontos seguem a especificação escrita e a regra de contraste):
 
-1. A navbar do canvas pinta o item ativo com `#38BEC8` sobre `#F8FAFC` — 2,3:1, reprovado em WCAG AA para um rótulo de 10px. O item ativo usa **`#0A6E80`** (6,4:1) sobre a mesma pastilha de fundo `rgba(29,154,164,.16)`.
+1. A navbar do canvas pinta o item ativo com `#38BEC8` sobre `#F8FAFC` — 2,3:1, reprovado em WCAG AA para um rótulo de 10px. O item ativo usa **`#0A6E80`** (6,4:1) sobre a mesma pastilha de fundo `rgba(29,154,164,.16)`. O próprio bloco de fundações reforça a regra: `#38BEC8` só deve aparecer sobre fundo escuro.
 2. O canvas usa a família de ícones **Material Symbols Outlined**; o Flutter traz Material Icons. A fase usa `Icons.*` (variantes outlined) centralizados em `AppIcons`, para que trocar a família depois seja mudança de um arquivo só.
 3. O canvas mostra mockups de status bar (relógio 08:42 etc.) — são moldura do desenho, não UI do app.
 
