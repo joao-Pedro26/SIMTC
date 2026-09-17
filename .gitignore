@@ -17,13 +17,8 @@ apps/web/out/
 # NestJS build
 apps/backend/dist/
 
-# Flutter
-apps/mobile/.dart_tool/
-apps/mobile/.flutter-plugins
-apps/mobile/.flutter-plugins-dependencies
-apps/mobile/build/
-apps/mobile/.packages
-apps/mobile/pubspec.lock
+# Flutter — as regras do app ficam em apps/mobile/simtc/.gitignore
+# (apps/mobile/simtc/pubspec.lock é versionado: builds reproduzíveis do APK)
 
 # Turbo
 .turbo/
@@ -68,7 +63,9 @@ apps/backend/documents-tab.png
 # Exceção: PNGs reais usados em runtime pelos templates de certificado/relatório
 !apps/backend/src/certificates/templates/*.png
 # Exceção: assets reais do app mobile (bundlados pelo Flutter via pubspec.yaml)
-!apps/mobile/assets/**
+# e ícones do launcher Android (referenciados pelo AndroidManifest.xml)
+!apps/mobile/simtc/assets/**
+!apps/mobile/simtc/android/app/src/main/res/**
 
 # Arquivos de design e brainstorm
 simtc-design.docx
