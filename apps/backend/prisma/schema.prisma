@@ -246,6 +246,9 @@ model PracticalAssessment {
   score                 Float?
   reportPdfUrl          String?
   reportGeneratedAt     DateTime?
+  // Path (não a URL) da assinatura do participante no bucket privado
+  // `participant-signatures` — mesmo padrão de Consultant.signatureUrl.
+  participantSignatureUrl String?
   createdAt             DateTime  @default(now())
 
   trainingParticipant TrainingParticipant @relation(fields: [trainingParticipantId], references: [id])
