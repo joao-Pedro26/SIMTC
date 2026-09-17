@@ -50,7 +50,7 @@ O `pdfx` está no `pubspec.yaml`, mas nenhuma tela prevista o usa; avaliar a rem
 ### 1.3 Ajustes de plataforma e ambiente
 
 - **Plataformas:** `ios/`, `linux/`, `macos/`, `web/` e `windows/` foram removidas na Fase 0 (o app é só Android). Para recriar alguma: `flutter create --platforms=<plataforma> .`
-- **Permissão `INTERNET` no manifest principal:** `android/app/src/main/AndroidManifest.xml` não declara `android.permission.INTERNET`; só o manifest de debug declara. Um APK release não acessaria a API. Corrigir na Fase 1.
+- **Permissão `INTERNET` no manifest principal:** `android/app/src/main/AndroidManifest.xml` não declara `android.permission.INTERNET`; só os manifests de debug e de profile declaram. Como o release usa o manifest principal, um APK release não acessaria a API. Corrigir na Fase 1.
 - **Identidade do app:** `applicationId`/`namespace` são `com.example.simtc` e `android:label` é `"simtc"`. Definir o id definitivo antes de distribuir o primeiro APK, porque trocar depois instala um segundo app no aparelho.
 - **Assinatura do release:** `build.gradle.kts` assina o release com a chave de debug. Criar uma keystore própria antes da distribuição (Fase 8).
 - **Fonte offline:** o `google_fonts` baixa a Inter em tempo de execução. Para o app abrir com a fonte certa sem internet, embutir os arquivos da Inter como asset e desligar o download (`GoogleFonts.config.allowRuntimeFetching = false`). Fase 1.
