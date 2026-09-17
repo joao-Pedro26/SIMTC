@@ -171,25 +171,25 @@ describe('PracticalAssessmentsService', () => {
       expect(mockStorage.upload).not.toHaveBeenCalled();
     });
 
-    it('sobe no bucket participant-signatures, salva só o path e devolve signed URL', async () => {
+    it('sobe no bucket signatures, salva só o path e devolve signed URL', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ participantSignatureUrl: null });
 
       const result = await service.uploadParticipantSignature('assess-1', png, 'image/png');
 
       expect(mockStorage.delete).not.toHaveBeenCalled();
       expect(mockStorage.upload).toHaveBeenCalledWith(
-        'participant-signatures',
-        'assess-1/1700000000000.png',
+        'signatures',
+        'participants/assess-1/1700000000000.png',
         png,
         'image/png',
       );
       expect(mockPrisma.practicalAssessment.update).toHaveBeenCalledWith({
         where: { id: 'assess-1' },
-        data: { participantSignatureUrl: 'assess-1/1700000000000.png' },
+        data: { participantSignatureUrl: 'participants/assess-1/1700000000000.png' },
       });
       expect(mockStorage.getSignedUrl).toHaveBeenCalledWith(
-        'participant-signatures',
-        'assess-1/1700000000000.png',
+        'signatures',
+        'participants/assess-1/1700000000000.png',
         3600,
       );
       expect(result).toEqual({ signedUrl: 'https://signed.example/assinatura.png' });
@@ -197,14 +197,14 @@ describe('PracticalAssessmentsService', () => {
 
     it('apaga o arquivo anterior antes de subir o novo', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'assess-1/1600000000000.png',
+        participantSignatureUrl: 'participants/assess-1/1600000000000.png',
       });
 
       await service.uploadParticipantSignature('assess-1', png, 'image/png');
 
       expect(mockStorage.delete).toHaveBeenCalledWith(
-        'participant-signatures',
-        'assess-1/1600000000000.png',
+        'signatures',
+        'participants/assess-1/1600000000000.png',
       );
       expect(mockStorage.delete.mock.invocationCallOrder[0]).toBeLessThan(
         mockStorage.upload.mock.invocationCallOrder[0],
@@ -213,7 +213,7 @@ describe('PracticalAssessmentsService', () => {
 
     it('segue com o upload mesmo se apagar o arquivo anterior falhar', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'assess-1/1600000000000.png',
+        participantSignatureUrl: 'participants/assess-1/1600000000000.png',
       });
       mockStorage.delete.mockRejectedValueOnce(new Error('Object not found'));
 
@@ -229,8 +229,8 @@ describe('PracticalAssessmentsService', () => {
       await service.uploadParticipantSignature('assess-1', png, 'image/jpeg');
 
       expect(mockStorage.upload).toHaveBeenCalledWith(
-        'participant-signatures',
-        'assess-1/1700000000000.jpg',
+        'signatures',
+        'participants/assess-1/1700000000000.jpg',
         png,
         'image/jpeg',
       );
@@ -255,7 +255,7 @@ describe('PracticalAssessmentsService', () => {
 
     it('gera signed URL de 1h a partir do path salvo', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'assess-1/1700000000000.png',
+        participantSignatureUrl: 'participants/assess-1/1700000000000.png',
       });
       mockStorage.getSignedUrl.mockResolvedValue('https://signed.example/assinatura.png');
 
@@ -263,8 +263,8 @@ describe('PracticalAssessmentsService', () => {
         signedUrl: 'https://signed.example/assinatura.png',
       });
       expect(mockStorage.getSignedUrl).toHaveBeenCalledWith(
-        'participant-signatures',
-        'assess-1/1700000000000.png',
+        'signatures',
+        'participants/assess-1/1700000000000.png',
         3600,
       );
     });

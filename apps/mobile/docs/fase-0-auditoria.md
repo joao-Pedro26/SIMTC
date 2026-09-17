@@ -62,7 +62,7 @@ O `pdfx` está no `pubspec.yaml`, mas nenhuma tela prevista o usa; avaliar a rem
 
 ### 2.1 Resolvidos na Fase 0
 
-- `PracticalAssessment.participantSignatureUrl`, com o path do arquivo no bucket privado `participant-signatures`.
+- `PracticalAssessment.participantSignatureUrl`, com o path do arquivo no bucket privado `signatures`, sob o prefixo `participants/`.
 - `PATCH /api/practical-assessments/:id/participant-signature` (multipart, campo `file`, PNG/JPEG com menos de 2 MB) e `GET /api/practical-assessments/:id/participant-signature-url` → `{ signedUrl }`, válida por 1 h. Só ADMIN e CONSULTANT têm acesso.
 - `POST /api/practical-assessments/sync` passa a devolver `assessmentId` em cada item com `status: 'fulfilled'`.
 

@@ -5,8 +5,13 @@ import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 
-/** Bucket privado das assinaturas de participantes (separado de `signatures`, dos consultores) */
-const PARTICIPANT_SIGNATURES_BUCKET = 'participant-signatures';
+/**
+ * Bucket privado `signatures` — o mesmo das assinaturas de consultores. As do
+ * participante ficam sob o prefixo `participants/` para não se misturarem com as
+ * pastas por consultor.
+ */
+const SIGNATURES_BUCKET = 'signatures';
+const PARTICIPANT_SIGNATURE_PREFIX = 'participants';
 
 @Injectable()
 export class PracticalAssessmentsService {
@@ -197,30 +202,31 @@ export class PracticalAssessmentsService {
 
   /**
    * Salva a assinatura do participante (capturada no app mobile) no bucket privado
-   * `participant-signatures`, com o mesmo padrão de ConsultantsService.uploadSignature:
-   * apaga o arquivo anterior, sobe o novo com path único por envio (evita signed URL
-   * antiga em cache) e grava no banco só o path, nunca a URL.
+   * `signatures` (prefixo `participants/`), com o mesmo padrão de
+   * ConsultantsService.uploadSignature: apaga o arquivo anterior, sobe o novo com
+   * path único por envio (evita signed URL antiga em cache) e grava no banco só o
+   * path, nunca a URL.
    */
   async uploadParticipantSignature(id: string, buffer: Buffer, contentType: string) {
     const previousPath = await this.findParticipantSignaturePath(id);
     if (previousPath) {
       // Limpeza best-effort: se falhar, sobra só um arquivo órfão no bucket,
       // o que não deve impedir o novo envio (mesmo padrão dos outros uploads)
-      await this.storage.delete(PARTICIPANT_SIGNATURES_BUCKET, previousPath).catch(() => null);
+      await this.storage.delete(SIGNATURES_BUCKET, previousPath).catch(() => null);
     }
 
     const ext = contentType === 'image/png' ? 'png' : 'jpg';
-    const storagePath = `${id}/${Date.now()}.${ext}`;
+    const storagePath = `${PARTICIPANT_SIGNATURE_PREFIX}/${id}/${Date.now()}.${ext}`;
 
     // Bucket é privado: a URL pública devolvida pelo upload é ignorada
-    await this.storage.upload(PARTICIPANT_SIGNATURES_BUCKET, storagePath, buffer, contentType);
+    await this.storage.upload(SIGNATURES_BUCKET, storagePath, buffer, contentType);
 
     await this.prisma.practicalAssessment.update({
       where: { id },
       data: { participantSignatureUrl: storagePath },
     });
 
-    const signedUrl = await this.storage.getSignedUrl(PARTICIPANT_SIGNATURES_BUCKET, storagePath, 3600);
+    const signedUrl = await this.storage.getSignedUrl(SIGNATURES_BUCKET, storagePath, 3600);
     return { signedUrl };
   }
 
@@ -229,7 +235,7 @@ export class PracticalAssessmentsService {
     const storagePath = await this.findParticipantSignaturePath(id);
     if (!storagePath) return null;
 
-    const signedUrl = await this.storage.getSignedUrl(PARTICIPANT_SIGNATURES_BUCKET, storagePath, 3600);
+    const signedUrl = await this.storage.getSignedUrl(SIGNATURES_BUCKET, storagePath, 3600);
     return { signedUrl };
   }
 
