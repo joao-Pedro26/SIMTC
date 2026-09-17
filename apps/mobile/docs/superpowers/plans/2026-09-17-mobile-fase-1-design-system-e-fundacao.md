@@ -1509,7 +1509,7 @@ flutter analyze
 flutter test test/ui/core/widgets/form_widgets_test.dart
 ```
 
-Expected: `No issues found!` e `All tests passed!` (9 testes). Saída limpa, sem avisos de overflow.
+Expected: `No issues found!` e `All tests passed!` (8 testes). Saída limpa, sem avisos de overflow.
 
 - [ ] **Step 7: Commit**
 
@@ -2536,7 +2536,7 @@ flutter analyze
 flutter test test/ui/core/widgets
 ```
 
-Expected: `No issues found!` e `All tests passed!` (15 testes somando com os da Task 4). Nenhum aviso de `RenderFlex overflowed` na saída.
+Expected: `No issues found!` e `All tests passed!` (14 testes somando com os da Task 4). Nenhum aviso de `RenderFlex overflowed` na saída.
 
 - [ ] **Step 11: Commit**
 
@@ -5035,7 +5035,7 @@ flutter analyze
 flutter test
 ```
 
-Expected: `No issues found!` e `All tests passed!` — 40 testes somando todas as tasks da fase (2 de config, 3 de tema, 9 de formulário, 6 de listagem, 5 de banco, 8 de API, 9 de auth, 3 de conectividade, 6 de login e 1 de abertura). Saída limpa, sem avisos de overflow ou de fonte ausente.
+Expected: `No issues found!` e `All tests passed!` — 51 testes somando todas as tasks da fase (2 de config, 3 de tema, 8 de formulário, 6 de listagem, 5 de banco, 8 de API, 9 de auth, 3 de conectividade, 6 de login e 1 de abertura). Saída limpa, sem avisos de overflow ou de fonte ausente.
 
 - [ ] **Step 9: Testar no aparelho físico**
 
