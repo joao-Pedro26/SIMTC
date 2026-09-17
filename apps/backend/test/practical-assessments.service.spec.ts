@@ -12,6 +12,8 @@ import {
 const mockPrisma = {
   practicalAssessment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), findUniqueOrThrow: jest.fn() },
   trainingParticipant: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+  assessmentItem: { deleteMany: jest.fn() },
+  assessmentCategory: { findMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -265,6 +267,55 @@ describe('PracticalAssessmentsService', () => {
         'assess-1/1700000000000.png',
         3600,
       );
+    });
+  });
+
+  // ─── syncFromMobile ──────────────────────────────────────────────────────
+
+  describe('syncFromMobile', () => {
+    const dto = {
+      trainingParticipantId: 'tp-1',
+      date: '2026-09-17',
+      startTime: '2026-09-17T10:00:00.000Z',
+      endTime: '2026-09-17T10:30:00.000Z',
+      items: [],
+    };
+
+    beforeEach(() => {
+      mockPrisma.assessmentCategory.findMany.mockResolvedValue([]);
+      mockPrisma.$transaction.mockResolvedValue([]);
+    });
+
+    it('devolve o assessmentId de cada avaliação sincronizada', async () => {
+      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+      mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+      const result = await service.syncFromMobile([dto], 'consultant-1');
+
+      expect(result).toEqual([
+        { trainingParticipantId: 'tp-1', status: 'fulfilled', assessmentId: 'assess-1' },
+      ]);
+    });
+
+    it('devolve o assessmentId também na reavaliação (registro existente)', async () => {
+      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
+      mockPrisma.assessmentItem.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.practicalAssessment.update.mockResolvedValue({ id: 'assess-1', items: [] });
+
+      const result = await service.syncFromMobile([dto], 'consultant-1');
+
+      expect(result[0]).toMatchObject({ status: 'fulfilled', assessmentId: 'assess-1' });
+    });
+
+    it('não devolve assessmentId para item rejeitado', async () => {
+      mockPrisma.practicalAssessment.findUnique.mockRejectedValueOnce(new Error('falha no banco'));
+
+      const result = await service.syncFromMobile([dto], 'consultant-1');
+
+      expect(result).toEqual([
+        { trainingParticipantId: 'tp-1', status: 'rejected', error: 'falha no banco' },
+      ]);
+      expect(result[0].assessmentId).toBeUndefined();
     });
   });
 });

@@ -44,6 +44,8 @@ export class PracticalAssessmentsService {
     return results.map((r, i) => ({
       trainingParticipantId: dtos[i].trainingParticipantId,
       status: r.status,
+      // id da avaliação criada/atualizada — o app mobile usa para enviar a assinatura do participante
+      assessmentId: r.status === 'fulfilled' ? r.value.id : undefined,
       error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
     }));
   }
