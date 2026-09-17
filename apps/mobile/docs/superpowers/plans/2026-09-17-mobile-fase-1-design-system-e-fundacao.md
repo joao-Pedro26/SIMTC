@@ -56,17 +56,18 @@ O canvas completo está versionado em `apps/mobile/docs/design/SIMTC-Mobile.dc.h
 | 1417–3383 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais dois quadros "Spec para dev" (3323 e 3354) |
 | 3384–3765 | Fundações e sistema de design | Justificativa de design: contexto de uso, mapeamento M3, escala tipográfica e decisões |
 
-**Autoridade:** valem **as telas**. O bloco de fundações é a memória de raciocínio do designer e, segundo o usuário (17/09/2026), boa parte dele não foi seguida na hora de desenhar as telas — onde os dois divergirem (ex.: navbar charcoal, `EM_AVALIACAO` em teal, rampa própria de severidade), o quadro da tela é que vale. Para tokens de cor e espaçamento fora do canvas, vale `prompt-claude-design-mobile.md`.
+**Autoridade: as telas, fielmente.** Por decisão do usuário (17/09/2026), o bloco "Fundações e sistema de design" é **desconsiderado por completo** — ele registra um raciocínio que não foi seguido ao desenhar as telas (navbar charcoal, `EM_AVALIACAO` em teal, rampa própria de severidade, escala tipográfica M3 "limpa"). A implementação copia as medidas e as cores dos quadros das telas. Para o que não estiver no canvas, vale `prompt-claude-design-mobile.md`.
 
 Esta fase usa os quadros de 1.1 Abertura (linha 702) e 1.2 Entrar (linha 719), e tira das telas 1.3 (linha 767) e 1.4 (linha 855) as medidas dos componentes-base.
 
 **Tokens confirmados no canvas** (histograma do bloco do celular): `#1D9AA4`, `#0A6E80`, `#F5A520`, `#0F172A`, `#475569`, `#334155`, `#94A3B8`, `#E2E8F0`, `#CBD5E1`, `#F8FAFC`, `#F1F5F9`, `#1E2A34`, `#FFFFFF`. Semânticos: verde `#DCFCE7`/`#86D9A4`/`#166534`/`#15803D`; âmbar `#FFF7EC`/`#F0DCB8`/`#8A4100`/`#C2670A`/`#3D2500`; vermelho `#FEE2E2`/`#B91C1C`; mauve `#F5F0F8`/`#CFBBD8`; teal suave `#E6F6F7`/`#D6EDF0`.
 
-**Divergências decididas** (o canvas manda no layout; estes três pontos seguem a especificação escrita e a regra de contraste):
+**Dois pontos em que o código não copia o canvas ao pé da letra** (nenhum deles muda cor, medida ou layout):
 
-1. A navbar do canvas pinta o item ativo com `#38BEC8` sobre `#F8FAFC` — 2,3:1, reprovado em WCAG AA para um rótulo de 10px. O item ativo usa **`#0A6E80`** (6,4:1) sobre a mesma pastilha de fundo `rgba(29,154,164,.16)`. O próprio bloco de fundações reforça a regra: `#38BEC8` só deve aparecer sobre fundo escuro.
-2. O canvas usa a família de ícones **Material Symbols Outlined**; o Flutter traz Material Icons. A fase usa `Icons.*` (variantes outlined) centralizados em `AppIcons`, para que trocar a família depois seja mudança de um arquivo só.
-3. O canvas mostra mockups de status bar (relógio 08:42 etc.) — são moldura do desenho, não UI do app.
+1. O canvas usa a família de ícones **Material Symbols Outlined**; o Flutter traz Material Icons. A fase usa `Icons.*` (variantes outlined) centralizados em `AppIcons`, para que adotar um pacote de Material Symbols depois seja mudança de um arquivo só.
+2. O canvas mostra mockups de status bar (relógio 08:42, ícone de sinal) — são moldura do desenho, não UI do app.
+
+**Observação de acessibilidade, registrada sem alterar o desenho:** na navbar, o item ativo usa `#38BEC8` sobre a pastilha `#F8FAFC`, o que dá 2,3:1 num rótulo de 10 px (WCAG AA pede 4,5:1). A implementação segue o canvas; se o contraste incomodar no uso real dentro do veículo, a troca por `#0A6E80` é de uma linha em `pill_nav_bar.dart`. Fica como pendência para a revisão de acessibilidade da Fase 8.
 
 ## Mapa de Arquivos
 
@@ -470,6 +471,9 @@ abstract final class AppColors {
 
   /// Fundo de chips e tiles de ação sobre superfície branca
   static const Color primarySurface = Color(0xFFE6F6F7);
+
+  /// Acento de marca — usado no item ativo da navbar, como no canvas
+  static const Color accent = Color(0xFF38BEC8);
 
   static const Color cta = Color(0xFFF5A520);
   static const Color ctaHover = Color(0xFFE09510);
@@ -1541,7 +1545,7 @@ git commit -m "feat(mobile): adiciona campo, botões, checkbox e aviso do design
   - `PillNavBar({required int currentIndex, required ValueChanged<int> onSelect, required List<PillNavItem> items})` e `PillNavItem({required IconData icon, required String label, int badgeCount = 0})`
   - `SkeletonBox({double? width, double height, double radius})` e `SkeletonListItem()`
   - `ConnectivityBanner({required bool isOffline, String? message})`
-- Medidas do canvas (quadro `2c`, linhas 319-406): chip com raio pastilha, padding 5/11/5/9, ícone 14 e rótulo 12; card com borda superior e inferior de 1,5 px na cor do status e padding 15/20; barra de progresso de 6 px; navbar flutuante com 64 de altura, 16 de margem lateral, 12 do rodapé, raio pastilha, fundo `#F8FAFC` opaco e sombra `0 8 24 rgba(15,23,42,.28)`; item ativo em `#0A6E80` sobre pastilha `rgba(29,154,164,.16)` (ver "Divergências decididas").
+- Medidas do canvas (quadro `2c`, linhas 319-406): chip com raio pastilha, padding 5/11/5/9, ícone 14 e rótulo 12; card com borda superior e inferior de 1,5 px na cor do status e padding 15/20; barra de progresso de 6 px; navbar flutuante com 64 de altura, 16 de margem lateral, 12 do rodapé, raio pastilha, fundo `#F8FAFC` opaco e sombra `0 8 24 rgba(15,23,42,.28)`; item ativo com ícone e rótulo em `#38BEC8` sobre pastilha `rgba(56,190,200,.16)`, item inativo em `#94A3B8`; badge `#C2670A` com borda de 2 px na cor do fundo da navbar.
 
 - [ ] **Step 1: Criar `lib/ui/core/widgets/status_chip.dart`**
 
@@ -1972,7 +1976,7 @@ class PillNavBar extends StatelessWidget {
   }
 
   Widget _buildItem(PillNavItem item, bool isSelected, VoidCallback onTap) {
-    final ink = isSelected ? AppColors.primaryDark : AppColors.textMuted;
+    final ink = isSelected ? AppColors.accent : AppColors.textMuted;
 
     return Semantics(
       selected: isSelected,
@@ -1985,7 +1989,7 @@ class PillNavBar extends StatelessWidget {
           height: 52,
           decoration: BoxDecoration(
             color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.16)
+                ? AppColors.accent.withValues(alpha: 0.16)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),

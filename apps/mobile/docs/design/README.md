@@ -20,16 +20,16 @@ Alguns quadros usam dados de um `<script type="text/x-dc">` no fim do arquivo
 
 ## Qual parte manda
 
-**As telas.** O bloco "Fundações e sistema de design" registra o raciocínio do
-designer, mas boa parte dele não foi seguida ao desenhar as telas — informação
-do próprio autor do projeto em 17/09/2026. Quando os dois divergirem, vale o
-quadro da tela. Exemplos de divergência já identificados:
+**As telas, fielmente.** Por decisão do autor do projeto (17/09/2026), o bloco
+"Fundações e sistema de design" é **desconsiderado**: ele registra um raciocínio
+que não foi seguido ao desenhar as telas. Não use aquele bloco como fonte de
+token, medida ou regra. Divergências conhecidas entre ele e as telas:
 
-- fundações descrevem a navbar como charcoal opaca; as telas usam pastilha clara `#F8FAFC`;
-- fundações colocam `EM_AVALIACAO` em teal; o brief escrito pede amarelo;
-- fundações propõem uma rampa própria de severidade; o brief escrito manda usar as cores do painel web.
+- fundações descrevem a navbar como charcoal opaca; as telas usam pastilha clara `#F8FAFC` com o item ativo em `#38BEC8`;
+- fundações colocam `EM_AVALIACAO` em teal e propõem uma rampa própria de severidade;
+- fundações propõem uma escala tipográfica M3 "redonda" (24/20/16/14), enquanto as telas usam os tamanhos intermediários que estão no markup.
 
-Para tokens que não estejam no canvas, vale `prompt-claude-design-mobile.md`
+Para tokens que não estejam nas telas, vale `prompt-claude-design-mobile.md`
 (valores reais de produção).
 
 ## De onde veio este arquivo
