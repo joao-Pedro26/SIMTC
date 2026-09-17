@@ -1,12 +1,19 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 
+/** Bucket privado das assinaturas de participantes (separado de `signatures`, dos consultores) */
+const PARTICIPANT_SIGNATURES_BUCKET = 'participant-signatures';
+
 @Injectable()
 export class PracticalAssessmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   /**
    * Resolve o ID do Consultant a partir do consultantId do JWT ou,
@@ -184,6 +191,54 @@ export class PracticalAssessmentsService {
         },
       },
     });
+  }
+
+  /**
+   * Salva a assinatura do participante (capturada no app mobile) no bucket privado
+   * `participant-signatures`, com o mesmo padrão de ConsultantsService.uploadSignature:
+   * apaga o arquivo anterior, sobe o novo com path único por envio (evita signed URL
+   * antiga em cache) e grava no banco só o path, nunca a URL.
+   */
+  async uploadParticipantSignature(id: string, buffer: Buffer, contentType: string) {
+    const previousPath = await this.findParticipantSignaturePath(id);
+    if (previousPath) {
+      // Limpeza best-effort: se falhar, sobra só um arquivo órfão no bucket,
+      // o que não deve impedir o novo envio (mesmo padrão dos outros uploads)
+      await this.storage.delete(PARTICIPANT_SIGNATURES_BUCKET, previousPath).catch(() => null);
+    }
+
+    const ext = contentType === 'image/png' ? 'png' : 'jpg';
+    const storagePath = `${id}/${Date.now()}.${ext}`;
+
+    // Bucket é privado: a URL pública devolvida pelo upload é ignorada
+    await this.storage.upload(PARTICIPANT_SIGNATURES_BUCKET, storagePath, buffer, contentType);
+
+    await this.prisma.practicalAssessment.update({
+      where: { id },
+      data: { participantSignatureUrl: storagePath },
+    });
+
+    const signedUrl = await this.storage.getSignedUrl(PARTICIPANT_SIGNATURES_BUCKET, storagePath, 3600);
+    return { signedUrl };
+  }
+
+  /** Signed URL (1h) da assinatura do participante, ou null se a avaliação ainda não tem assinatura */
+  async getParticipantSignatureSignedUrl(id: string) {
+    const storagePath = await this.findParticipantSignaturePath(id);
+    if (!storagePath) return null;
+
+    const signedUrl = await this.storage.getSignedUrl(PARTICIPANT_SIGNATURES_BUCKET, storagePath, 3600);
+    return { signedUrl };
+  }
+
+  /** Path da assinatura salva (ou null); lança 404 se a avaliação não existe */
+  private async findParticipantSignaturePath(id: string): Promise<string | null> {
+    const assessment = await this.prisma.practicalAssessment.findUnique({
+      where: { id },
+      select: { participantSignatureUrl: true },
+    });
+    if (!assessment) throw new NotFoundException('Avaliação não encontrada');
+    return assessment.participantSignatureUrl;
   }
 
   async assignParticipants(dto: AssignParticipantsDto, consultantIdFromJwt?: string, userId?: string) {
