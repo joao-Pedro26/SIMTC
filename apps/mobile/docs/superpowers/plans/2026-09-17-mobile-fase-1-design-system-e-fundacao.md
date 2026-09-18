@@ -2112,9 +2112,9 @@ class SkeletonListItem extends StatelessWidget {
           horizontal: BorderSide(color: AppColors.border, width: 1.5),
         ),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           SkeletonBox(width: 190, height: 16),
           SizedBox(height: AppSpacing.sm),
           SkeletonBox(width: 240, height: 13),
@@ -2323,10 +2323,10 @@ class _DsGalleryScreenState extends State<DsGalleryScreen> {
   }
 
   Widget _buildChipSamples() {
-    return Wrap(
+    return const Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
-      children: const [
+      children: [
         StatusChip(label: 'Pendente', icon: AppIcons.pending, tone: StatusTone.neutral),
         StatusChip(label: 'Em avaliação', icon: AppIcons.inProgress, tone: StatusTone.warning),
         StatusChip(label: 'Aprovado', icon: AppIcons.approved, tone: StatusTone.success),
