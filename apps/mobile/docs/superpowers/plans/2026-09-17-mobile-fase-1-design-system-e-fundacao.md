@@ -3582,7 +3582,7 @@ git commit -m "feat(mobile): cliente HTTP com refresh automático e guarda de to
 - Produces:
   - `enum AppUserRole { admin, consultant }` e `AuthUser({required String id, required String name, required String email, required AppUserRole role, String? consultantId})`, com `isAdmin`.
   - `AuthSession`: guarda o par de tokens em memória, grava no `TokenStorage` só quando "manter conectado" está ligado, e expõe `onExpired` (stream) para o app voltar ao login. Entregue ao `ApiClient` como as quatro funções que ele pede — é isso que evita dependência circular entre cliente HTTP e repositório.
-  - `AuthRepository extends ChangeNotifier` com `currentUser`, `isAuthenticated`, `login({email, password, keepSignedIn})`, `restoreSession()`, `requestPasswordReset(email)` e `logout()`, todos devolvendo `Result`.
+  - `AuthRepository extends ChangeNotifier` com `currentUser`, `isAuthenticated`, `login({email, password, keepSignedIn})`, `restoreSession()` e `requestPasswordReset(email)` devolvendo `Result`, e `logout()` devolvendo `Future<void>` — o logout limpa a sessão local mesmo quando a API recusa, então não há falha para o chamador tratar.
 - Contratos reais consumidos: `POST /auth/login` `{email, password}` → `{accessToken, refreshToken}`; `GET /auth/me` → `{id, name, email, role}`; `POST /auth/forgot-password` `{email}` → `204`; `POST /auth/logout` → `204`.
 - `consultantId` não vem do `/auth/me`: é lido do payload do access token (o JWT carrega `consultantId`), conforme `fase-0-auditoria.md`. Perfis sem `role` `ADMIN` ou `CONSULTANT` (ex.: `CLIENT`, que usa o portal web) são recusados no app.
 
