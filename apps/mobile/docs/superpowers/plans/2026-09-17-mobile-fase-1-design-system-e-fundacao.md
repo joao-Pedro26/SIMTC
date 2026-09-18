@@ -3274,6 +3274,17 @@ class _Reply {
   final Map<String, dynamic> body;
 }
 
+/// Corpo JSON pronto, no formato que o Dio espera do adaptador.
+ResponseBody _json(int statusCode, Map<String, dynamic> body) {
+  return ResponseBody.fromString(
+    jsonEncode(body),
+    statusCode,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
+}
+
 /// Adaptador que responde sem rede: cada requisição consome a próxima resposta
 /// da fila e fica registrada para inspeção no teste.
 class _FakeAdapter implements HttpClientAdapter {
@@ -3296,13 +3307,48 @@ class _FakeAdapter implements HttpClientAdapter {
     }
 
     final reply = replies.removeAt(0);
-    return ResponseBody.fromString(
-      jsonEncode(reply.body),
-      reply.statusCode,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
+    return _json(reply.statusCode, reply.body);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// Adaptador que decide a resposta pela rota e pelo token, não por uma fila:
+/// os testes de concorrência disparam requisições ao mesmo tempo e a ordem em
+/// que elas chegam aqui não é garantida.
+///
+/// Regra: quem chega com o token `expirado` leva 401; a rota de refresh devolve
+/// um token novo. O atraso do refresh garante que o segundo 401 chegue com a
+/// renovação ainda em andamento — que é exatamente o caso sob teste.
+class _RoutedAdapter implements HttpClientAdapter {
+  final List<RequestOptions> requests = [];
+  Duration refreshDelay = const Duration(milliseconds: 50);
+
+  int get refreshCount =>
+      requests.where((r) => r.path == ApiClient.refreshPath).length;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+
+    if (options.path == ApiClient.refreshPath) {
+      final geracao = refreshCount;
+      await Future<void>.delayed(refreshDelay);
+      return _json(200, {
+        'accessToken': 'token-renovado-$geracao',
+        'refreshToken': 'refresh-renovado-$geracao',
+      });
+    }
+
+    if (options.headers['Authorization'] == 'Bearer expirado') {
+      return _json(401, {'message': 'Unauthorized'});
+    }
+    return _json(200, {'ok': true});
   }
 
   @override
@@ -3311,16 +3357,16 @@ class _FakeAdapter implements HttpClientAdapter {
 
 void main() {
   late _FakeAdapter adapter;
+  late _RoutedAdapter routed;
   late List<String> renewedTokens;
   late int sessionExpiredCalls;
   String? accessToken;
   String? refreshToken;
 
-  ApiClient buildClient(List<_Reply> replies) {
-    adapter = _FakeAdapter(replies);
+  ApiClient buildClientWith(HttpClientAdapter httpAdapter) {
     renewedTokens = [];
     sessionExpiredCalls = 0;
-    final dio = Dio()..httpClientAdapter = adapter;
+    final dio = Dio()..httpClientAdapter = httpAdapter;
 
     return ApiClient(
       baseUrl: 'http://localhost:3001/api',
@@ -3334,6 +3380,16 @@ void main() {
       },
       onSessionExpired: () async => sessionExpiredCalls++,
     );
+  }
+
+  ApiClient buildClient(List<_Reply> replies) {
+    adapter = _FakeAdapter(replies);
+    return buildClientWith(adapter);
+  }
+
+  ApiClient buildRoutedClient() {
+    routed = _RoutedAdapter();
+    return buildClientWith(routed);
   }
 
   setUp(() {
@@ -3453,6 +3509,42 @@ void main() {
       ),
     );
   });
+
+  test('dois 401 simultâneos compartilham uma única renovação', () async {
+    accessToken = 'expirado';
+    final client = buildRoutedClient();
+
+    // As duas requisições partem antes de qualquer await: as duas levam o token
+    // expirado e as duas recebem 401.
+    final respostas = await Future.wait([
+      client.get<Map<String, dynamic>>('/training-sessions'),
+      client.get<Map<String, dynamic>>('/participants'),
+    ]);
+
+    expect(respostas.map((r) => r.statusCode).toList(), [200, 200]);
+    expect(routed.refreshCount, 1);
+    expect(renewedTokens, hasLength(1));
+    expect(sessionExpiredCalls, 0);
+  });
+
+  test('terminada a renovação, um 401 novo dispara outra', () async {
+    accessToken = 'expirado';
+    final client = buildRoutedClient();
+
+    await client.get<Map<String, dynamic>>('/training-sessions');
+    expect(routed.refreshCount, 1);
+
+    // O token renovado também expira: a próxima requisição tem de renovar de
+    // novo. Se a renovação em andamento não tivesse sido liberada ao terminar,
+    // este 401 esperaria por uma chamada já concluída, repetiria a requisição
+    // com o token velho e falharia.
+    accessToken = 'expirado';
+    final resposta = await client.get<Map<String, dynamic>>('/participants');
+
+    expect(resposta.statusCode, 200);
+    expect(routed.refreshCount, 2);
+    expect(sessionExpiredCalls, 0);
+  });
 }
 ```
 
@@ -3465,7 +3557,7 @@ flutter analyze
 flutter test test/data/services/api/api_client_test.dart
 ```
 
-Expected: `No issues found!` e `All tests passed!` (8 testes).
+Expected: `No issues found!` e `All tests passed!` (10 testes — os 8 acima mais os dois de refresh concorrente do Step 5).
 
 - [ ] **Step 7: Commit**
 
@@ -5041,7 +5133,7 @@ flutter analyze
 flutter test
 ```
 
-Expected: `No issues found!` e `All tests passed!` — 52 testes somando todas as tasks da fase (2 de config, 3 de tema, 9 de formulário, 6 de listagem, 5 de banco, 8 de API, 9 de auth, 3 de conectividade, 6 de login e 1 de abertura). Antes desta task a suíte tem 26; as Tasks 7 a 10 somam as outras 26. Saída limpa, sem avisos de overflow ou de fonte ausente.
+Expected: `No issues found!` e `All tests passed!` — 54 testes somando todas as tasks da fase (2 de config, 3 de tema, 9 de formulário, 6 de listagem, 5 de banco, 10 de API, 9 de auth, 3 de conectividade, 6 de login e 1 de abertura). Antes desta task a suíte tem 26; as Tasks 7 a 10 somam as outras 28. Saída limpa, sem avisos de overflow ou de fonte ausente.
 
 - [ ] **Step 9: Testar no aparelho físico**
 
