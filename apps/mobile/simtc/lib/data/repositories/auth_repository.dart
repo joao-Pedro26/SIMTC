@@ -1,75 +1,134 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../utils/api_constants.dart';
+import 'package:flutter/foundation.dart';
+
 import '../../utils/result.dart';
-import '../models/user_model.dart';
-import '../services/api/api_service.dart';
+import '../models/auth_user.dart';
+import '../services/api/api_client.dart';
+import '../services/api/api_exception.dart';
+import '../services/auth_session.dart';
 
-class AuthRepository {
-  final ApiService _apiService;
-  final FlutterSecureStorage _storage;
+/// Autenticação do app — sem nenhum atalho de desenvolvimento: se a API recusa,
+/// o login falha.
+class AuthRepository extends ChangeNotifier {
+  AuthRepository({required ApiClient apiClient, required AuthSession session})
+      : _api = apiClient,
+        _session = session;
 
-  UserModel? _currentUser;
-  UserModel? get currentUser => _currentUser;
+  final ApiClient _api;
+  final AuthSession _session;
 
-  AuthRepository({
-    ApiService? apiService,
-    FlutterSecureStorage? storage,
-  })  : _apiService = apiService ?? ApiService(),
-        _storage = storage ?? const FlutterSecureStorage();
+  AuthUser? _currentUser;
+  AuthUser? get currentUser => _currentUser;
+  bool get isAuthenticated => _currentUser != null;
 
-  Future<Result<UserModel>> login({
+  static const String _invalidCredentials = 'E-mail ou senha incorretos.';
+  static const String _roleNotAllowed =
+      'Esta conta não tem acesso ao app. Use o portal web.';
+  static const String _sessionEnded = 'Sua sessão expirou. Entre de novo.';
+
+  /// Entra com e-mail e senha. A senha não é aparada: espaços podem fazer parte dela.
+  Future<Result<AuthUser>> login({
     required String email,
     required String password,
+    required bool keepSignedIn,
   }) async {
-    final result = await _apiService.post<UserModel>(
-      ApiConstants.login,
-      data: {'email': email, 'password': password},
-      parser: (data) => UserModel.fromJson(data as Map<String, dynamic>),
-    );
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        '/auth/login',
+        data: {'email': email.trim(), 'password': password},
+      );
 
-    if (result is Success<UserModel>) {
-      _currentUser = result.data;
-      if (_currentUser?.token != null) {
-        await _storage.write(key: 'auth_token', value: _currentUser!.token);
-        _apiService.setAuthToken(_currentUser!.token!);
+      final data = response.data ?? const <String, dynamic>{};
+      final accessToken = data['accessToken'] as String?;
+      final refreshToken = data['refreshToken'] as String?;
+      if (accessToken == null || refreshToken == null) {
+        return Failure(Exception('login sem tokens'), _invalidCredentials);
       }
-      return result;
-    } else {
-      // Mock fallback for development/demo
-      if (email.isNotEmpty && password.length >= 4) {
-        final mockUser = UserModel(
-          id: 'user_1',
-          name: 'Instrutor SIMTC',
-          email: email,
-          token: 'mock_jwt_token_123',
-        );
-        _currentUser = mockUser;
-        await _storage.write(key: 'auth_token', value: mockUser.token);
-        _apiService.setAuthToken(mockUser.token!);
-        return Success(mockUser);
+
+      await _session.start(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        keepSignedIn: keepSignedIn,
+      );
+
+      final user = await _loadCurrentUser(accessToken);
+      if (user == null) {
+        await logout();
+        return Failure(Exception('perfil não permitido'), _roleNotAllowed);
       }
-      return result;
+
+      _currentUser = user;
+      notifyListeners();
+      return Success(user);
+    } on ApiException catch (error) {
+      await _session.clear();
+      return Failure(
+        error,
+        error.statusCode == 401 ? _invalidCredentials : error.message,
+      );
+    }
+  }
+
+  /// Tenta retomar a sessão salva na abertura do app.
+  Future<Result<AuthUser>> restoreSession() async {
+    final hasTokens = await _session.restoreFromStorage();
+    if (!hasTokens) {
+      return Failure(Exception('sem sessão salva'), _sessionEnded);
+    }
+
+    try {
+      final accessToken = await _session.readAccessToken();
+      final user = await _loadCurrentUser(accessToken ?? '');
+      if (user == null) {
+        await logout();
+        return Failure(Exception('perfil não permitido'), _roleNotAllowed);
+      }
+
+      _currentUser = user;
+      notifyListeners();
+      return Success(user);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) await _session.clear();
+      return Failure(error, error.isNetworkError ? error.message : _sessionEnded);
+    }
+  }
+
+  /// Pede o e-mail de redefinição de senha. O backend responde 204 mesmo quando
+  /// o e-mail não existe, para não revelar quais contas estão cadastradas — a
+  /// tela mostra a mesma mensagem nos dois casos.
+  Future<Result<void>> requestPasswordReset(String email) async {
+    try {
+      await _api.post<void>('/auth/forgot-password', data: {'email': email.trim()});
+      return const Success<void>(null);
+    } on ApiException catch (error) {
+      return Failure(error, error.message);
     }
   }
 
   Future<void> logout() async {
+    try {
+      await _api.post<void>('/auth/logout');
+    } on ApiException {
+      // Sem rede ou token já inválido: a sessão local é limpa de qualquer forma.
+    }
+    await _session.clear();
     _currentUser = null;
-    await _storage.delete(key: 'auth_token');
-    _apiService.clearAuthToken();
+    notifyListeners();
   }
 
-  Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: 'auth_token');
-    if (token != null && token.isNotEmpty) {
-      _apiService.setAuthToken(token);
-      _currentUser = const UserModel(
-        id: 'user_1',
-        name: 'Instrutor SIMTC',
-        email: 'instrutor@simtc.com.br',
-        token: 'mock_jwt_token_123',
-      );
-      return true;
-    }
-    return false;
+  /// Chamado quando o `ApiClient` desiste de renovar o token.
+  void handleSessionExpired() {
+    if (_currentUser == null) return;
+    _currentUser = null;
+    notifyListeners();
+  }
+
+  Future<AuthUser?> _loadCurrentUser(String accessToken) async {
+    final response = await _api.get<Map<String, dynamic>>('/auth/me');
+    final data = response.data ?? const <String, dynamic>{};
+    final payload = decodeJwtPayload(accessToken);
+    return AuthUser.fromMeJson(
+      data,
+      consultantId: payload?['consultantId'] as String?,
+    );
   }
 }
