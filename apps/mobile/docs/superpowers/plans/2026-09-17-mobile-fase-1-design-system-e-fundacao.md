@@ -652,6 +652,10 @@ abstract final class AppTypography {
   static TextStyle get chipLabel =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2);
 
+  /// Rótulo de opção ao lado de um controle (checkbox, rádio)
+  static TextStyle get optionLabel =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.2, color: AppColors.text2);
+
   /// Rótulo de item da navbar
   static TextStyle get navLabel =>
       _inter(size: 10, weight: FontWeight.w600, height: 1);
@@ -1041,12 +1045,18 @@ class _AppTextFieldState extends State<AppTextField> {
       child: InkWell(
         onTap: widget.onToggleObscure,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Icon(
-            widget.obscureText ? AppIcons.showPassword : AppIcons.hidePassword,
-            size: 22,
-            color: AppColors.text3,
+        // A área de toque é o tamanho do filho: um ícone de 22 com padding
+        // pequeno daria ~38 dp, abaixo do mínimo de 48 dp exigido para uso com
+        // o veículo em movimento.
+        child: SizedBox(
+          width: AppSpacing.touchTarget,
+          height: AppSpacing.touchTarget,
+          child: Center(
+            child: Icon(
+              widget.obscureText ? AppIcons.showPassword : AppIcons.hidePassword,
+              size: 22,
+              color: AppColors.text3,
+            ),
           ),
         ),
       ),
@@ -1240,13 +1250,7 @@ class AppCheckbox extends StatelessWidget {
               _buildBox(),
               const SizedBox(width: AppSpacing.sm + 2),
               Flexible(
-                child: Text(
-                  label,
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.text2,
-                    fontSize: 14,
-                  ),
-                ),
+                child: Text(label, style: AppTypography.optionLabel),
               ),
             ],
           ),
@@ -2778,7 +2782,9 @@ Expected: termina com `Succeeded after ...` e sem erros; `lib/data/services/loca
 - [ ] **Step 4: Criar `test/data/services/local/app_database_test.dart`**
 
 ```dart
-import 'package:drift/drift.dart';
+// Sem `package:drift/drift.dart` aqui: ele exporta uma função `isNull()`
+// obsoleta que colide com o matcher `isNull` do flutter_test. O que este teste
+// usa (`NativeDatabase`, `SqliteException`) vem de `drift/native.dart`.
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/services/local/app_database.dart';
