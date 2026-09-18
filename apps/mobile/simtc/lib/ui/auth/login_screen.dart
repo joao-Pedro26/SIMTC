@@ -1,127 +1,186 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../utils/app_colors.dart';
-import '../core/widgets/custom_button.dart';
-import '../core/widgets/custom_text_field.dart';
+
+import '../../data/repositories/auth_repository.dart';
+import '../../data/services/connectivity_service.dart';
+import '../../router.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_icons.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_typography.dart';
+import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_checkbox.dart';
+import '../core/widgets/app_text_field.dart';
+import '../core/widgets/inline_notice.dart';
 import 'login_viewmodel.dart';
 
-class LoginScreen extends StatelessWidget {
+/// Tela 1.2 do canvas.
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<LoginViewModel>();
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 36),
-                _buildFormFields(viewModel),
-                if (viewModel.errorMessage != null) ...[
-                  const SizedBox(height: 12),
-                  _buildErrorMessage(viewModel.errorMessage!),
-                ],
-                const SizedBox(height: 28),
-                _buildSubmitButton(context, viewModel),
-              ],
-            ),
+    return ChangeNotifierProvider<LoginViewModel>(
+      create: (context) => LoginViewModel(
+        authRepository: context.read<AuthRepository>(),
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          child: Consumer<LoginViewModel>(
+            builder: (context, viewModel, _) => _buildBody(context, viewModel),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return const Column(
-      children: [
-        Icon(
-          Icons.assignment_turned_in_rounded,
-          size: 72,
-          color: AppColors.primary,
-        ),
-        SizedBox(height: 16),
-        Text(
-          'SIMTC Treinamentos',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primaryDark,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Acesse sua conta para realizar e visualizar avaliações',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildBody(BuildContext context, LoginViewModel viewModel) {
+    final isOffline = context.watch<ConnectivityService>().isOffline;
 
-  Widget _buildFormFields(LoginViewModel viewModel) {
-    return Column(
-      children: [
-        CustomTextField(
-          label: 'E-mail',
-          hint: 'seu.email@simtc.com.br',
-          keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.email_outlined,
-          onChanged: viewModel.setEmail,
-        ),
-        const SizedBox(height: 16),
-        CustomTextField(
-          label: 'Senha',
-          hint: '••••••••',
-          obscureText: viewModel.obscurePassword,
-          prefixIcon: Icons.lock_outline,
-          suffixIcon: IconButton(
-            icon: Icon(
-              viewModel.obscurePassword
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
-              color: AppColors.textSecondary,
-            ),
-            onPressed: viewModel.togglePasswordVisibility,
-          ),
-          onChanged: viewModel.setPassword,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildErrorMessage(String errorMessage) {
-    return Text(
-      errorMessage,
-      style: const TextStyle(
-        color: AppColors.error,
-        fontSize: 13,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xxl,
+        AppSpacing.huge,
+        AppSpacing.xxl,
+        AppSpacing.xxl,
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildLogo(),
+          const SizedBox(height: AppSpacing.xxxl),
+          _buildEmailField(viewModel),
+          const SizedBox(height: AppSpacing.lg + 2),
+          _buildPasswordField(viewModel),
+          const SizedBox(height: AppSpacing.md),
+          _buildOptionsRow(viewModel),
+          if (viewModel.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            InlineNotice(
+              icon: AppIcons.needsReview,
+              message: viewModel.errorMessage!,
+              tone: NoticeTone.danger,
+            ),
+          ],
+          if (viewModel.infoMessage != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            InlineNotice(
+              icon: AppIcons.email,
+              message: viewModel.infoMessage!,
+              tone: NoticeTone.success,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg + 2),
+          _buildSubmitButton(context, viewModel),
+          if (isOffline) ...[
+            const SizedBox(height: AppSpacing.xxl),
+            _buildOfflineNotice(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Center(
+      child: Image.asset(
+        'assets/images/logo-simtc.png',
+        height: 150,
+        semanticLabel: 'SIM Treinamentos',
+      ),
+    );
+  }
+
+  Widget _buildEmailField(LoginViewModel viewModel) {
+    return AppTextField(
+      label: 'E-mail',
+      controller: _emailController,
+      icon: AppIcons.email,
+      hintText: 'seu.email@simtc.com.br',
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.username, AutofillHints.email],
+      enabled: !viewModel.isSubmitting,
+      onSubmitted: (_) => _passwordFocus.requestFocus(),
+      onChanged: viewModel.setEmail,
+    );
+  }
+
+  Widget _buildPasswordField(LoginViewModel viewModel) {
+    return AppTextField(
+      label: 'Senha',
+      controller: _passwordController,
+      focusNode: _passwordFocus,
+      icon: AppIcons.password,
+      obscureText: viewModel.obscurePassword,
+      onToggleObscure: viewModel.toggleObscurePassword,
+      textInputAction: TextInputAction.done,
+      autofillHints: const [AutofillHints.password],
+      enabled: !viewModel.isSubmitting,
+      onSubmitted: (_) => _submit(context, viewModel),
+      onChanged: viewModel.setPassword,
+    );
+  }
+
+  Widget _buildOptionsRow(LoginViewModel viewModel) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: AppCheckbox(
+            value: viewModel.keepSignedIn,
+            label: 'Manter conectado',
+            onChanged: viewModel.isSubmitting ? (_) {} : viewModel.setKeepSignedIn,
+          ),
+        ),
+        TextButton(
+          onPressed: viewModel.isSubmitting ? null : viewModel.requestPasswordReset,
+          child: Text('Esqueci a senha', style: AppTypography.link),
+        ),
+      ],
     );
   }
 
   Widget _buildSubmitButton(BuildContext context, LoginViewModel viewModel) {
-    return CustomButton(
+    return AppPrimaryButton(
       label: 'Entrar',
-      isLoading: viewModel.isLoading,
-      onPressed: () async {
-        final success = await viewModel.login();
-        if (success && context.mounted) {
-          context.go('/dashboard');
-        }
-      },
+      isLoading: viewModel.isSubmitting,
+      onPressed: viewModel.canSubmit ? () => _submit(context, viewModel) : null,
     );
+  }
+
+  Widget _buildOfflineNotice() {
+    return const InlineNotice(
+      icon: AppIcons.noSignal,
+      message:
+          'Sem conexão. O primeiro acesso neste aparelho precisa de internet para validar suas credenciais.',
+    );
+  }
+
+  Future<void> _submit(BuildContext context, LoginViewModel viewModel) async {
+    FocusScope.of(context).unfocus();
+    final entered = await viewModel.submit();
+    if (entered && context.mounted) {
+      context.go(AppRoutes.home);
+    }
   }
 }
