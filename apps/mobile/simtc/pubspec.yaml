@@ -27,8 +27,8 @@ dependencies:
   # Auth / tokens
   flutter_secure_storage: ^9.2.2
 
-  # UI
-  google_fonts: ^6.2.1
+  # UI — a tipografia é embutida em assets/fonts (ver lib/ui/core/theme),
+  # para o app abrir com a fonte certa mesmo sem rede
   flutter_svg: ^2.0.10+1
   cached_network_image: ^3.4.1
 
@@ -58,3 +58,10 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf
