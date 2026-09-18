@@ -162,12 +162,18 @@ class _AppTextFieldState extends State<AppTextField> {
       child: InkWell(
         onTap: widget.onToggleObscure,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Icon(
-            widget.obscureText ? AppIcons.showPassword : AppIcons.hidePassword,
-            size: 22,
-            color: AppColors.text3,
+        // A área de toque é o tamanho do filho: um ícone de 22 com padding
+        // pequeno daria ~38 dp, abaixo do mínimo de 48 dp exigido para uso com
+        // o veículo em movimento.
+        child: SizedBox(
+          width: AppSpacing.touchTarget,
+          height: AppSpacing.touchTarget,
+          child: Center(
+            child: Icon(
+              widget.obscureText ? AppIcons.showPassword : AppIcons.hidePassword,
+              size: 22,
+              color: AppColors.text3,
+            ),
           ),
         ),
       ),

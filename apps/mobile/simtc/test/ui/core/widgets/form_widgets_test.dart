@@ -61,6 +61,31 @@ void main() {
       await tester.tap(find.byIcon(AppIcons.showPassword));
       expect(toggles, 1);
     });
+
+    testWidgets('o alternador de senha respeita o alvo de toque de 48 dp', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'Senha',
+          controller: controller,
+          icon: AppIcons.password,
+          obscureText: true,
+          onToggleObscure: () {},
+        ),
+      );
+
+      final toggleSize = tester.getSize(
+        find.ancestor(
+          of: find.byIcon(AppIcons.showPassword),
+          matching: find.byType(SizedBox),
+        ).first,
+      );
+      expect(toggleSize.width, greaterThanOrEqualTo(48));
+      expect(toggleSize.height, greaterThanOrEqualTo(48));
+    });
   });
 
   group('AppPrimaryButton', () {

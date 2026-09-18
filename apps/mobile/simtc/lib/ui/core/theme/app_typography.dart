@@ -84,6 +84,10 @@ abstract final class AppTypography {
   static TextStyle get chipLabel =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2);
 
+  /// Rótulo de opção ao lado de um controle (checkbox, rádio)
+  static TextStyle get optionLabel =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.2, color: AppColors.text2);
+
   /// Rótulo de item da navbar
   static TextStyle get navLabel =>
       _inter(size: 10, weight: FontWeight.w600, height: 1);
