@@ -21,6 +21,17 @@ flutter test
 dart run build_runner build --delete-conflicting-outputs   # depois de mudar tabelas Drift ou modelos JSON
 ```
 
+## Ambientes
+
+A URL da API é resolvida em tempo de compilação por `--dart-define`:
+
+| Ambiente | Comando | URL |
+|---|---|---|
+| Desenvolvimento (padrão) | `flutter run -d <ID>` | `http://localhost:3001/api` (backend do PC, via `adb reverse`) |
+| Produção | `flutter build apk --release --dart-define=API_BASE_URL=https://api.simtc.com.br/api --dart-define=APP_ENV=prod` | `https://api.simtc.com.br/api` |
+
+Sem `--dart-define`, o app sempre aponta para o backend local — nenhuma build de desenvolvimento fala com produção por engano.
+
 ## Rodar no aparelho via USB
 
 1. No aparelho, em Opções do desenvolvedor, ativar **Depuração USB**.
