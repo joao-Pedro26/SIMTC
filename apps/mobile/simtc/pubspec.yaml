@@ -47,6 +47,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  mocktail: ^1.0.4
 
   # Code generation (Drift + JSON)
   drift_dev: ^2.18.0
