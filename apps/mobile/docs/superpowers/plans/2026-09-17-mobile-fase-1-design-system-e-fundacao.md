@@ -720,7 +720,7 @@ import 'app_typography.dart';
 /// Tema Material 3 único do app, montado sobre os tokens do DS.
 abstract final class AppTheme {
   static ThemeData get light {
-    final colorScheme = const ColorScheme.light(
+    const colorScheme = ColorScheme.light(
       primary: AppColors.primary,
       onPrimary: AppColors.surface,
       primaryContainer: AppColors.primarySurface,
