@@ -200,6 +200,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
       child: groups.isEmpty
           ? _buildEmptyState(viewModel)
           : ListView(
+              // Explícito por segurança: um `ListView` sem `controller` já é
+              // "primary" e ganha essa física por padrão, mas deixar
+              // implícito depende desse detalhe do framework — um
+              // `controller` adicionado aqui no futuro desligaria o padrão
+              // e devolveria o pull-to-refresh quebrado numa lista curta.
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(
                 top: AppSpacing.md,
                 bottom: AppSpacing.huge * 2,

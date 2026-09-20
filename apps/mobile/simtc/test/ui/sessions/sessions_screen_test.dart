@@ -176,4 +176,31 @@ void main() {
     expect(find.text('Suzano Papel'), findsOneWidget);
     expect(find.text('Bracell Celulose'), findsNothing);
   });
+
+  testWidgets(
+      'puxar uma lista mais curta que a tela ainda dispara a atualização',
+      (tester) async {
+    // Viewport bem maior que uma sessão só garante que a lista fica mais
+    // curta que a tela — o caso do dia a dia do filtro "Hoje", com uma ou
+    // duas sessões. `AlwaysScrollableScrollPhysics` é redundante aqui (o
+    // `ListView` sem controller já é "primary" e ganha essa física por
+    // padrão — ver `ScrollView` no SDK do Flutter), mas documenta a
+    // intenção e protege se algum dia o ramo populado ganhar um
+    // `controller` (o que desligaria o padrão automático).
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pump(tester);
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // init() já chamou syncAll uma vez; o arrasto precisa chamar de novo.
+    verify(repository.syncAll).called(2);
+  });
 }
