@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/connectivity_service.dart';
-import '../../router.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -178,9 +176,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit(BuildContext context, LoginViewModel viewModel) async {
     FocusScope.of(context).unfocus();
-    final entered = await viewModel.submit();
-    if (entered && context.mounted) {
-      context.go(AppRoutes.home);
-    }
+    // Entrar não navega daqui: o sucesso avisa o `AuthRepository`, e a guarda do
+    // router tira o usuário do login. Navegação manual espalhada pelas telas é
+    // exatamente o que essa guarda existe para evitar.
+    await viewModel.submit();
   }
 }

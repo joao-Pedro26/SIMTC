@@ -28,7 +28,21 @@ class _SplashScreenState extends State<SplashScreen> {
     final viewModel = SplashViewModel(
       authRepository: context.read<AuthRepository>(),
     );
-    final isSignedIn = await viewModel.decideInitialRoute();
+
+    var isSignedIn = false;
+    try {
+      isSignedIn = await viewModel.decideInitialRoute();
+    } catch (error, stack) {
+      // A abertura nunca pode terminar numa tela parada. Qualquer falha
+      // inesperada vai para o log e manda o usuário para o login, de onde ele
+      // consegue sair — travar aqui só se resolve reinstalando o app.
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack),
+      );
+    } finally {
+      viewModel.dispose();
+    }
+
     if (!mounted) return;
     context.go(isSignedIn ? AppRoutes.home : AppRoutes.login);
   }
@@ -65,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen> {
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: const LinearProgressIndicator(
           minHeight: 4,
-          backgroundColor: Color(0x24000000),
+          backgroundColor: AppColors.progressTrack,
           valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
         ),
       ),

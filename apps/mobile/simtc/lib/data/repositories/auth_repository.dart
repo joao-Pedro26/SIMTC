@@ -70,7 +70,18 @@ class AuthRepository extends ChangeNotifier {
 
   /// Tenta retomar a sessão salva na abertura do app.
   Future<Result<AuthUser>> restoreSession() async {
-    final hasTokens = await _session.restoreFromStorage();
+    final bool hasTokens;
+    try {
+      hasTokens = await _session.restoreFromStorage();
+    } catch (error) {
+      // A leitura do armazenamento seguro pode falhar por motivo fora do app:
+      // a keystore do Android é invalidada quando o aparelho restaura um backup
+      // ou o usuário troca o bloqueio de tela. Sem este catch, a exceção sobe
+      // até a tela de abertura e o app fica parado nela para sempre. Tratar
+      // como "não há sessão salva" manda para o login, que é recuperável.
+      return Failure(Exception('$error'), _sessionEnded);
+    }
+
     if (!hasTokens) {
       return Failure(Exception('sem sessão salva'), _sessionEnded);
     }

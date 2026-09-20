@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/auth_user.dart';
@@ -170,6 +171,20 @@ void main() {
     );
 
     expect((result as Failure<AuthUser>).message, contains('Sem conexão'));
+  });
+
+  test('restoreSession não trava quando o armazenamento seguro falha', () async {
+    // Cenário real: a keystore do Android é invalidada quando o aparelho
+    // restaura um backup ou o usuário troca o bloqueio de tela. Sem tratamento,
+    // a exceção sobe até a tela de abertura e o app fica parado nela.
+    when(() => storage.readAccess())
+        .thenThrow(PlatformException(code: 'storage_error'));
+
+    final result = await repository.restoreSession();
+
+    expect(result, isA<Failure<AuthUser>>());
+    expect((result as Failure<AuthUser>).message, contains('sessão'));
+    verifyNever(() => api.get<Map<String, dynamic>>('/auth/me'));
   });
 
   test('restoreSession sem tokens salvos falha sem chamar a API', () async {
