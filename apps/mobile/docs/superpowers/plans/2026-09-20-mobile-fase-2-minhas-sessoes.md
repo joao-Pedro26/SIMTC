@@ -343,17 +343,23 @@ Substituir o `return` de `findAll` e acrescentar o método privado logo abaixo d
   }
 ```
 
-- [ ] **Step 5: Rodar o teste e confirmar que passa**
+- [ ] **Step 5: Reconstruir o pacote de tipos compartilhados**
+
+Run: `cd packages/shared-types && npm run build`
+
+`@simtc/shared-types` aponta `main`/`types` para `./dist`, não para `./src`. Sem este build, o `ts-jest` e o `tsc --noEmit` leem o `dist` velho e o import de `TrainingSessionParticipantStats` no teste não resolve. Só inclua artefatos de `dist/` no commit se o repositório já os rastrear (confira com `git status`) — se forem ignorados, deixe fora.
+
+- [ ] **Step 6: Rodar o teste e confirmar que passa**
 
 Run: `cd apps/backend && npx jest test/training-sessions.service.spec.ts`
 Esperado: PASS, 5 testes.
 
-- [ ] **Step 6: Confirmar que a baseline do backend não piorou**
+- [ ] **Step 7: Confirmar que a baseline do backend não piorou**
 
 Run: `cd apps/backend && npx jest 2>&1 | tail -5` e depois `npx tsc --noEmit`
 Esperado: as mesmas 12 falhas pré-existentes (nenhuma nova) e `tsc` sem erro. Se aparecer uma 13ª falha, ela é sua — corrija antes de commitar.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add packages/shared-types/src/dtos/training.dto.ts apps/backend/src/training-sessions/training-sessions.service.ts apps/backend/test/training-sessions.service.spec.ts
@@ -1062,8 +1068,10 @@ git commit -m "feat(mobile): sincroniza e cacheia as sessoes do consultor"
   - `class SessionGroup { final String title; final List<TrainingSession> sessions; }`;
   - `List<SessionGroup> groupSessions(List<TrainingSession> sessions, SessionFilter filter, DateTime now)`;
   - `int countFor(List<TrainingSession> sessions, SessionFilter filter, DateTime now)`;
-  - `SessionsListViewModel({required SessionRepository repository, required ConnectivityService connectivity, DateTime Function()? now})` com `init()`, `groups`, `counts`, `filter`, `setFilter`, `refresh()`, `isLoading`, `isRefreshing`, `isOffline`, `errorMessage`, `clearError()`, `lastSyncedAt`.
+  - `SessionsListViewModel({required SessionRepository repository, required ConnectivityService connectivity, DateTime Function()? now})` com `init()`, `groups`, `counts`, `filter`, `setFilter`, `refresh()`, `isLoading`, `isRefreshing`, `errorMessage`, `clearError()`, `lastSyncedAt`.
   A Task 6 usa exatamente esses nomes.
+
+  **O ViewModel não expõe `isOffline`.** A tela observa o `ConnectivityService` direto, porque é ele que notifica quando a conexão muda; um getter no ViewModel devolveria o valor certo mas nunca dispararia rebuild, e seria uma armadilha silenciosa. O ViewModel usa a conectividade só para ouvir `onReconnected`.
 
 - [ ] **Step 1: Escrever o teste das regras de filtro**
 
@@ -1508,8 +1516,10 @@ class SessionsListViewModel extends ChangeNotifier {
   SessionFilter get filter => _filter;
   bool get isRefreshing => _isRefreshing;
   String? get errorMessage => _errorMessage;
+
+  /// Quando o cache foi atualizado pela última vez — a faixa de offline usa
+  /// isso para dizer a idade do que está na tela.
   DateTime? get lastSyncedAt => _lastSyncedAt;
-  bool get isOffline => _connectivity.isOffline;
 
   /// Só é carregamento antes da primeira leitura do cache. Depois disso, mesmo
   /// vazia, a tela já sabe o que mostrar — e skeleton por cima de dados velhos
@@ -1609,6 +1619,7 @@ git commit -m "feat(mobile): filtros, agrupamento e estado da lista de sessoes"
 **Interfaces:**
 - Consumes: tudo das tasks anteriores, mais os widgets da Fase 1 (`SessionCard`, `StatusChip`, `FilterChipBar`, `PillNavBar`, `SkeletonBox`, `ConnectivityBanner`, `InlineNotice`).
 - Produces: `SessionsScreen` (StatefulWidget sem parâmetros) e `SessionRepository` disponível no `MultiProvider`.
+- A tela é o único consumidor da superfície de erro do ViewModel: ela mostra `errorMessage` num `SnackBar` e chama `clearError()`, e passa `lastSyncedAt` formatado para a `ConnectivityBanner`. Sem isso, o critério de aceite da Task 7 ("puxar para atualizar offline mostra a mensagem de falha sem apagar a lista") não teria UI que o cumprisse.
 
 - [ ] **Step 1: Escrever o teste de widget que falha**
 
@@ -1693,6 +1704,11 @@ void main() {
     );
   }
 
+  /// O título é lido pelo key: o rótulo 'Sessões' da navbar tem o mesmo texto
+  /// do título quando o usuário é ADMIN, e `find.text` acharia os dois.
+  String titleText(WidgetTester tester) =>
+      tester.widget<Text>(find.byKey(const Key('sessions-title'))).data!;
+
   testWidgets('mostra skeleton antes da primeira leitura do cache',
       (tester) async {
     await pump(tester);
@@ -1719,7 +1735,7 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('Carla'), findsOneWidget);
-    expect(find.text('Minhas sessões'), findsOneWidget);
+    expect(titleText(tester), 'Minhas sessões');
   });
 
   testWidgets('para ADMIN o título é "Sessões"', (tester) async {
@@ -1734,8 +1750,22 @@ void main() {
     sessions.add([hoje()]);
     await tester.pump();
 
-    expect(find.text('Sessões'), findsOneWidget);
-    expect(find.text('Minhas sessões'), findsNothing);
+    expect(titleText(tester), 'Sessões');
+  });
+
+  testWidgets('falha ao atualizar aparece num SnackBar, sem apagar a lista',
+      (tester) async {
+    when(repository.syncAll)
+        .thenAnswer((_) async => Failure(Exception('sem rede'), 'Sem conexão.'));
+
+    await pump(tester);
+    sessions.add([hoje()]);
+    await tester.pump(); // entrega do stream e disparo do listener
+    await tester.pump(); // post-frame callback que mostra o SnackBar
+    await tester.pump(const Duration(milliseconds: 750)); // animação de entrada
+
+    expect(find.text('Sem conexão.'), findsOneWidget);
+    expect(find.byType(SessionCard), findsOneWidget);
   });
 
   testWidgets('cache vazio mostra o estado vazio, não o skeleton',
@@ -1823,9 +1853,32 @@ class _SessionsScreenState extends State<SessionsScreen> {
   )..init();
 
   @override
+  void initState() {
+    super.initState();
+    _viewModel.addListener(_showErrorWhenItArrives);
+  }
+
+  @override
   void dispose() {
+    _viewModel.removeListener(_showErrorWhenItArrives);
     _viewModel.dispose();
     super.dispose();
+  }
+
+  /// A falha de atualização é um aviso passageiro, não um estado da tela: a
+  /// lista cacheada continua válida e visível. Por isso SnackBar, e por isso a
+  /// mensagem é limpa assim que é agendada — limpar antes de agendar também
+  /// evita reentrância, já que `clearError()` notifica de novo.
+  void _showErrorWhenItArrives() {
+    final message = _viewModel.errorMessage;
+    if (message == null) return;
+    _viewModel.clearError();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    });
   }
 
   @override
@@ -1846,7 +1899,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
         child: Column(
           children: [
             _buildHeader(context),
-            ConnectivityBanner(isOffline: isOffline),
+            ConnectivityBanner(
+              isOffline: isOffline,
+              message: _offlineMessage(viewModel.lastSyncedAt),
+            ),
             _buildFilters(viewModel),
             Expanded(child: _buildBody(viewModel)),
           ],
@@ -1888,10 +1944,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
           const SizedBox(height: AppSpacing.sm + 2),
           Text(_greeting(user?.name), style: AppTypography.bodySmall),
           const SizedBox(height: AppSpacing.xxs),
-          Text(title, style: AppTypography.screenTitle),
+          // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
+          // mesmo texto quando o usuário é ADMIN.
+          Text(
+            title,
+            key: const Key('sessions-title'),
+            style: AppTypography.screenTitle,
+          ),
         ],
       ),
     );
+  }
+
+  /// Sem conexão, o consultor precisa saber a idade do que está vendo — uma
+  /// lista de ontem parece igualzinha a uma de agora. Devolve nulo quando o
+  /// cache nunca foi preenchido, e aí a faixa usa a mensagem padrão dela.
+  String? _offlineMessage(DateTime? lastSyncedAt) {
+    if (lastSyncedAt == null) return null;
+
+    String two(int value) => value.toString().padLeft(2, '0');
+    final d = lastSyncedAt;
+    return 'Sem conexão — dados de ${two(d.day)}/${two(d.month)} '
+        'às ${two(d.hour)}:${two(d.minute)}.';
   }
 
   /// Indicador de avaliações esperando envio. Fica sem badge até a Fase 4 criar
