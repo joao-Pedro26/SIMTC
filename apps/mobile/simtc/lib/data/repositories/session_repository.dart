@@ -1,0 +1,132 @@
+import 'package:drift/drift.dart';
+
+import '../../utils/result.dart';
+import '../models/training_session.dart';
+import '../services/api/api_client.dart';
+import '../services/api/api_exception.dart';
+import '../services/local/app_database.dart';
+
+/// Sessões de treinamento do consultor.
+///
+/// A regra desta camada é simples: **a tela lê do banco, nunca da resposta
+/// HTTP**. `syncAll()` baixa e grava; `watchSessions()` serve a lista. Sem rede,
+/// `syncAll()` falha e a lista continua vindo do cache — é assim que a Home
+/// funciona offline sem nenhum código de offline na tela.
+class SessionRepository {
+  SessionRepository({required ApiClient apiClient, required AppDatabase database})
+      : _api = apiClient,
+        _db = database;
+
+  final ApiClient _api;
+  final AppDatabase _db;
+
+  static const String _path = '/training-sessions';
+
+  /// Páginas maiores que o padrão do backend: a Home quer a lista inteira e
+  /// cada viagem extra custa caro no 4G do cliente.
+  static const int _pageSize = 50;
+
+  /// Teto de segurança para não girar para sempre se o backend devolver um
+  /// `totalPages` incoerente.
+  static const int _maxPages = 10;
+
+  static const String _offlineMessage =
+      'Não foi possível atualizar. Mostrando os dados já baixados.';
+
+  /// Lista do cache, da data mais próxima para a mais distante; sem data por
+  /// último, porque não dá para saber onde ela entra na agenda.
+  Stream<List<TrainingSession>> watchSessions() {
+    final query = _db.select(_db.sessions)
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.date.isNull()),
+        (t) => OrderingTerm(expression: t.date),
+        (t) => OrderingTerm(expression: t.companyName),
+      ]);
+
+    return query.watch().map(
+          (rows) => rows.map(TrainingSession.fromRow).toList(growable: false),
+        );
+  }
+
+  /// Quando o cache foi atualizado pela última vez — a tela mostra isso quando
+  /// está offline, para o consultor saber a idade do que está vendo.
+  Stream<DateTime?> watchLastSyncedAt() {
+    final cachedAt = _db.sessions.cachedAt.max();
+    final query = _db.selectOnly(_db.sessions)..addColumns([cachedAt]);
+    return query.watchSingleOrNull().map((row) => row?.read(cachedAt));
+  }
+
+  /// Baixa todas as páginas e regrava o cache. Devolve quantas sessões ficaram.
+  ///
+  /// Nada é escrito antes de todas as páginas chegarem: uma queda no meio do
+  /// caminho deixaria o cache com metade da agenda, que é pior do que a agenda
+  /// velha inteira.
+  Future<Result<int>> syncAll() async {
+    final sessions = <TrainingSession>[];
+    var reachedEnd = false;
+
+    try {
+      for (var page = 1; page <= _maxPages; page++) {
+        final response = await _api.get<Map<String, dynamic>>(
+          _path,
+          queryParameters: {'page': page, 'limit': _pageSize},
+        );
+
+        final body = response.data ?? const <String, dynamic>{};
+        final data = body['data'] as List<dynamic>? ?? const [];
+        sessions.addAll(
+          data.whereType<Map<String, dynamic>>().map(TrainingSession.fromJson),
+        );
+
+        final totalPages = (body['totalPages'] as num?)?.toInt() ?? page;
+        if (page >= totalPages) {
+          reachedEnd = true;
+          break;
+        }
+      }
+    } on ApiException catch (error) {
+      return Failure(error, _offlineMessage);
+    }
+
+    // Só poda quando a lista veio inteira: se o teto de páginas interrompeu o
+    // download, apagar "o que não veio" jogaria fora sessões válidas.
+    await _write(sessions, prune: reachedEnd);
+    return Success(sessions.length);
+  }
+
+  Future<void> _write(List<TrainingSession> sessions, {required bool prune}) {
+    final now = DateTime.now();
+
+    return _db.transaction(() async {
+      if (prune) {
+        final ids = sessions.map((s) => s.id).toList(growable: false);
+        // Participantes têm chave estrangeira para a sessão: apagar a sessão
+        // antes deles violaria a FK e derrubaria a transação inteira.
+        await (_db.delete(_db.participants)
+              ..where((t) => t.sessionId.isNotIn(ids)))
+            .go();
+        await (_db.delete(_db.sessions)..where((t) => t.id.isNotIn(ids))).go();
+      }
+
+      for (final session in sessions) {
+        await _db.into(_db.sessions).insertOnConflictUpdate(
+              SessionsCompanion.insert(
+                id: session.id,
+                companyName: session.companyName,
+                companyLogoUrl: Value(session.companyLogoUrl),
+                courseName: session.courseName,
+                city: session.city,
+                state: session.state,
+                date: Value(session.date),
+                status: session.status.wireValue,
+                notes: Value(session.notes),
+                totalParticipants: Value(session.totalParticipants),
+                assessableParticipants: Value(session.assessableParticipants),
+                assessedParticipants: Value(session.assessedParticipants),
+                cachedAt: now,
+              ),
+            );
+      }
+    });
+  }
+}
