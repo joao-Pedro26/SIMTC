@@ -28,3 +28,17 @@ export interface RegisterParticipantPublicDto {
 export interface UpdateParticipantTypeDto {
   participationType: ParticipationType;
 }
+
+/** Contagem de participantes de uma sessão, devolvida na listagem. */
+export interface TrainingSessionParticipantStats {
+  /** Todos os participantes inscritos na sessão. */
+  total: number;
+  /**
+   * Participantes que recebem avaliação prática (`TEORICA_E_PRATICA`).
+   * É o denominador do progresso: quem é `SOMENTE_TEORICA` nunca é avaliado,
+   * então incluí-lo faria a barra nunca chegar a 100%.
+   */
+  assessable: number;
+  /** Avaliáveis já concluídos (`APROVADO` ou `NECESSITA_REAVALIACAO`). */
+  assessed: number;
+}

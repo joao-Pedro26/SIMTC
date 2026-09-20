@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { StorageService } from '../storage/storage.service';
-import { JwtPayload } from '@simtc/shared-types';
+import { JwtPayload, TrainingSessionParticipantStats } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -47,7 +47,54 @@ export class TrainingSessionsService {
       this.prisma.trainingSession.count({ where }),
     ]);
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const stats = await this.participantStatsBySession(data.map((s) => s.id));
+
+    return {
+      data: data.map((session) => ({
+        ...session,
+        participantStats:
+          stats.get(session.id) ?? { total: 0, assessable: 0, assessed: 0 },
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Conta os participantes das sessões da página numa única query.
+   *
+   * O app mobile precisa de "X de Y avaliados" no card da Home; buscar o
+   * detalhe de cada sessão seria N+1 numa tela que abre em 4G.
+   */
+  private async participantStatsBySession(sessionIds: string[]) {
+    const stats = new Map<string, TrainingSessionParticipantStats>();
+    if (sessionIds.length === 0) return stats;
+
+    const rows = await this.prisma.trainingParticipant.groupBy({
+      by: ['trainingSessionId', 'status', 'participationType'],
+      where: { trainingSessionId: { in: sessionIds } },
+      _count: { _all: true },
+    });
+
+    for (const row of rows) {
+      const current =
+        stats.get(row.trainingSessionId) ?? { total: 0, assessable: 0, assessed: 0 };
+      const count = row._count._all;
+
+      current.total += count;
+      if (row.participationType === 'TEORICA_E_PRATICA') {
+        current.assessable += count;
+        if (row.status === 'APROVADO' || row.status === 'NECESSITA_REAVALIACAO') {
+          current.assessed += count;
+        }
+      }
+
+      stats.set(row.trainingSessionId, current);
+    }
+
+    return stats;
   }
 
   async findTrainingSessionById(id: string, user?: JwtPayload) {
