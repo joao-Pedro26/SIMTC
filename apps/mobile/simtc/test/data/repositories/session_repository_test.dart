@@ -117,4 +117,72 @@ void main() {
 
     expect(sessions.map((s) => s.id).toList(), ['cedo', 'tarde', 'sem-data']);
   });
+
+  test(
+      'poda apaga os participantes antes da sessão que sumiu do servidor '
+      '(FK ativa)', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('s1')], pageNumber: 1, totalPages: 1));
+    await repository.syncAll();
+
+    // A sessão 's1' precisa ter um participante cacheado: é isso que dá à FK
+    // algo para violar se a ordem de deleção em `_write` for invertida.
+    await db.into(db.participants).insert(
+          ParticipantsCompanion.insert(
+            id: 'tp-1',
+            sessionId: 's1',
+            name: 'João Pedro',
+            cpf: '12345678909',
+            participationType: 'TEORICA_E_PRATICA',
+            status: 'PENDENTE',
+            cachedAt: DateTime(2026, 9, 17, 8),
+          ),
+        );
+
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('s2')], pageNumber: 1, totalPages: 1));
+
+    final result = await repository.syncAll();
+
+    expect(result.isSuccess, isTrue);
+    final sessionIds = (await db.select(db.sessions).get()).map((r) => r.id).toList();
+    expect(sessionIds, ['s2']);
+    expect(await db.select(db.participants).get(), isEmpty);
+  });
+
+  test(
+      'teto de páginas suspende a poda: sessão que não veio nas páginas '
+      'baixadas sobrevive', () async {
+    // Semeia o cache diretamente (sem sync), para não depender da contagem
+    // de chamadas de uma primeira sincronização.
+    await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: 'antiga',
+            companyName: 'Bracell Celulose',
+            courseName: 'Direção Preventiva',
+            city: 'Lençóis Paulista',
+            state: 'SP',
+            status: 'PLANEJADO',
+            cachedAt: DateTime(2026, 9, 17, 8),
+          ),
+        );
+
+    // totalPages bem maior que o teto (_maxPages = 10): o laço nunca vê
+    // `page >= totalPages`, então `reachedEnd` fica falso e a poda é pulada.
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('nova')], pageNumber: 1, totalPages: 999));
+
+    final result = await repository.syncAll();
+
+    expect(result.isSuccess, isTrue);
+    // Prova que o laço realmente parou no teto, e não por outro motivo.
+    verify(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .called(10);
+    final ids = (await db.select(db.sessions).get()).map((r) => r.id).toList();
+    expect(ids, containsAll(['antiga', 'nova']));
+  });
 }
