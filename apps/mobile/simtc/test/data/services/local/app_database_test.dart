@@ -3,6 +3,8 @@
 // matcher `isNull` de `package:flutter_test` (erro `ambiguous_import`), e
 // nada deste arquivo precisa de um símbolo exclusivo dele — `NativeDatabase`
 // e `SqliteException` já vêm de `package:drift/native.dart`.
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/services/local/app_database.dart';
@@ -120,5 +122,53 @@ void main() {
 
     await mark('item-1', 'note-b');
     expect(() => mark('item-2', 'note-m'), throwsA(isA<SqliteException>()));
+  });
+
+  test('migra do esquema 1 para o 2 mantendo as sessões já cacheadas', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          // A tabela `sessions` exatamente como a Fase 1 a criou.
+          raw.execute('''
+            CREATE TABLE IF NOT EXISTS sessions (
+              id TEXT NOT NULL,
+              company_name TEXT NOT NULL,
+              company_logo_url TEXT NULL,
+              course_name TEXT NOT NULL,
+              city TEXT NOT NULL,
+              state TEXT NOT NULL,
+              date INTEGER NULL,
+              status TEXT NOT NULL,
+              notes TEXT NULL,
+              cached_at INTEGER NOT NULL,
+              PRIMARY KEY (id)
+            )
+          ''');
+          raw.execute('''
+            INSERT INTO sessions (id, company_name, course_name, city, state, status, cached_at)
+            VALUES ('sess-antiga', 'Bracell Celulose', 'Direção Preventiva',
+                    'Lençóis Paulista', 'SP', 'PLANEJADO', 0)
+          ''');
+          raw.execute('PRAGMA user_version = 1');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    final row = await migrated.select(migrated.sessions).getSingle();
+
+    expect(row.id, 'sess-antiga');
+    expect(row.companyName, 'Bracell Celulose');
+    expect(row.totalParticipants, 0);
+    expect(row.assessableParticipants, 0);
+    expect(row.assessedParticipants, 0);
   });
 }

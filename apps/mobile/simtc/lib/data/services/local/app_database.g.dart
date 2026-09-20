@@ -56,6 +56,30 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _totalParticipantsMeta =
+      const VerificationMeta('totalParticipants');
+  @override
+  late final GeneratedColumn<int> totalParticipants = GeneratedColumn<int>(
+      'total_participants', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _assessableParticipantsMeta =
+      const VerificationMeta('assessableParticipants');
+  @override
+  late final GeneratedColumn<int> assessableParticipants = GeneratedColumn<int>(
+      'assessable_participants', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _assessedParticipantsMeta =
+      const VerificationMeta('assessedParticipants');
+  @override
+  late final GeneratedColumn<int> assessedParticipants = GeneratedColumn<int>(
+      'assessed_participants', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _cachedAtMeta =
       const VerificationMeta('cachedAt');
   @override
@@ -73,6 +97,9 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         date,
         status,
         notes,
+        totalParticipants,
+        assessableParticipants,
+        assessedParticipants,
         cachedAt
       ];
   @override
@@ -138,6 +165,24 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
     }
+    if (data.containsKey('total_participants')) {
+      context.handle(
+          _totalParticipantsMeta,
+          totalParticipants.isAcceptableOrUnknown(
+              data['total_participants']!, _totalParticipantsMeta));
+    }
+    if (data.containsKey('assessable_participants')) {
+      context.handle(
+          _assessableParticipantsMeta,
+          assessableParticipants.isAcceptableOrUnknown(
+              data['assessable_participants']!, _assessableParticipantsMeta));
+    }
+    if (data.containsKey('assessed_participants')) {
+      context.handle(
+          _assessedParticipantsMeta,
+          assessedParticipants.isAcceptableOrUnknown(
+              data['assessed_participants']!, _assessedParticipantsMeta));
+    }
     if (data.containsKey('cached_at')) {
       context.handle(_cachedAtMeta,
           cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
@@ -171,6 +216,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      totalParticipants: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}total_participants'])!,
+      assessableParticipants: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}assessable_participants'])!,
+      assessedParticipants: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}assessed_participants'])!,
       cachedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
     );
@@ -193,6 +244,15 @@ class Session extends DataClass implements Insertable<Session> {
   final String status;
   final String? notes;
 
+  /// Total de participantes inscritos — mostrado na linha de meta do card.
+  final int totalParticipants;
+
+  /// Participantes que recebem avaliação prática: denominador do progresso.
+  final int assessableParticipants;
+
+  /// Avaliáveis já concluídos: numerador do progresso.
+  final int assessedParticipants;
+
   /// Quando esta linha veio da API — mostra ao usuário a idade do cache.
   final DateTime cachedAt;
   const Session(
@@ -205,6 +265,9 @@ class Session extends DataClass implements Insertable<Session> {
       this.date,
       required this.status,
       this.notes,
+      required this.totalParticipants,
+      required this.assessableParticipants,
+      required this.assessedParticipants,
       required this.cachedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -224,6 +287,9 @@ class Session extends DataClass implements Insertable<Session> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    map['total_participants'] = Variable<int>(totalParticipants);
+    map['assessable_participants'] = Variable<int>(assessableParticipants);
+    map['assessed_participants'] = Variable<int>(assessedParticipants);
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -242,6 +308,9 @@ class Session extends DataClass implements Insertable<Session> {
       status: Value(status),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      totalParticipants: Value(totalParticipants),
+      assessableParticipants: Value(assessableParticipants),
+      assessedParticipants: Value(assessedParticipants),
       cachedAt: Value(cachedAt),
     );
   }
@@ -259,6 +328,11 @@ class Session extends DataClass implements Insertable<Session> {
       date: serializer.fromJson<DateTime?>(json['date']),
       status: serializer.fromJson<String>(json['status']),
       notes: serializer.fromJson<String?>(json['notes']),
+      totalParticipants: serializer.fromJson<int>(json['totalParticipants']),
+      assessableParticipants:
+          serializer.fromJson<int>(json['assessableParticipants']),
+      assessedParticipants:
+          serializer.fromJson<int>(json['assessedParticipants']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -275,6 +349,9 @@ class Session extends DataClass implements Insertable<Session> {
       'date': serializer.toJson<DateTime?>(date),
       'status': serializer.toJson<String>(status),
       'notes': serializer.toJson<String?>(notes),
+      'totalParticipants': serializer.toJson<int>(totalParticipants),
+      'assessableParticipants': serializer.toJson<int>(assessableParticipants),
+      'assessedParticipants': serializer.toJson<int>(assessedParticipants),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -289,6 +366,9 @@ class Session extends DataClass implements Insertable<Session> {
           Value<DateTime?> date = const Value.absent(),
           String? status,
           Value<String?> notes = const Value.absent(),
+          int? totalParticipants,
+          int? assessableParticipants,
+          int? assessedParticipants,
           DateTime? cachedAt}) =>
       Session(
         id: id ?? this.id,
@@ -301,6 +381,10 @@ class Session extends DataClass implements Insertable<Session> {
         date: date.present ? date.value : this.date,
         status: status ?? this.status,
         notes: notes.present ? notes.value : this.notes,
+        totalParticipants: totalParticipants ?? this.totalParticipants,
+        assessableParticipants:
+            assessableParticipants ?? this.assessableParticipants,
+        assessedParticipants: assessedParticipants ?? this.assessedParticipants,
         cachedAt: cachedAt ?? this.cachedAt,
       );
   Session copyWithCompanion(SessionsCompanion data) {
@@ -318,6 +402,15 @@ class Session extends DataClass implements Insertable<Session> {
       date: data.date.present ? data.date.value : this.date,
       status: data.status.present ? data.status.value : this.status,
       notes: data.notes.present ? data.notes.value : this.notes,
+      totalParticipants: data.totalParticipants.present
+          ? data.totalParticipants.value
+          : this.totalParticipants,
+      assessableParticipants: data.assessableParticipants.present
+          ? data.assessableParticipants.value
+          : this.assessableParticipants,
+      assessedParticipants: data.assessedParticipants.present
+          ? data.assessedParticipants.value
+          : this.assessedParticipants,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -334,14 +427,29 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('date: $date, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
+          ..write('totalParticipants: $totalParticipants, ')
+          ..write('assessableParticipants: $assessableParticipants, ')
+          ..write('assessedParticipants: $assessedParticipants, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, companyName, companyLogoUrl, courseName,
-      city, state, date, status, notes, cachedAt);
+  int get hashCode => Object.hash(
+      id,
+      companyName,
+      companyLogoUrl,
+      courseName,
+      city,
+      state,
+      date,
+      status,
+      notes,
+      totalParticipants,
+      assessableParticipants,
+      assessedParticipants,
+      cachedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -355,6 +463,9 @@ class Session extends DataClass implements Insertable<Session> {
           other.date == this.date &&
           other.status == this.status &&
           other.notes == this.notes &&
+          other.totalParticipants == this.totalParticipants &&
+          other.assessableParticipants == this.assessableParticipants &&
+          other.assessedParticipants == this.assessedParticipants &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -368,6 +479,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<DateTime?> date;
   final Value<String> status;
   final Value<String?> notes;
+  final Value<int> totalParticipants;
+  final Value<int> assessableParticipants;
+  final Value<int> assessedParticipants;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const SessionsCompanion({
@@ -380,6 +494,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.date = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
+    this.totalParticipants = const Value.absent(),
+    this.assessableParticipants = const Value.absent(),
+    this.assessedParticipants = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -393,6 +510,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.date = const Value.absent(),
     required String status,
     this.notes = const Value.absent(),
+    this.totalParticipants = const Value.absent(),
+    this.assessableParticipants = const Value.absent(),
+    this.assessedParticipants = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -412,6 +532,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<DateTime>? date,
     Expression<String>? status,
     Expression<String>? notes,
+    Expression<int>? totalParticipants,
+    Expression<int>? assessableParticipants,
+    Expression<int>? assessedParticipants,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -425,6 +548,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (date != null) 'date': date,
       if (status != null) 'status': status,
       if (notes != null) 'notes': notes,
+      if (totalParticipants != null) 'total_participants': totalParticipants,
+      if (assessableParticipants != null)
+        'assessable_participants': assessableParticipants,
+      if (assessedParticipants != null)
+        'assessed_participants': assessedParticipants,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -440,6 +568,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       Value<DateTime?>? date,
       Value<String>? status,
       Value<String?>? notes,
+      Value<int>? totalParticipants,
+      Value<int>? assessableParticipants,
+      Value<int>? assessedParticipants,
       Value<DateTime>? cachedAt,
       Value<int>? rowid}) {
     return SessionsCompanion(
@@ -452,6 +583,10 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       date: date ?? this.date,
       status: status ?? this.status,
       notes: notes ?? this.notes,
+      totalParticipants: totalParticipants ?? this.totalParticipants,
+      assessableParticipants:
+          assessableParticipants ?? this.assessableParticipants,
+      assessedParticipants: assessedParticipants ?? this.assessedParticipants,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -487,6 +622,16 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (totalParticipants.present) {
+      map['total_participants'] = Variable<int>(totalParticipants.value);
+    }
+    if (assessableParticipants.present) {
+      map['assessable_participants'] =
+          Variable<int>(assessableParticipants.value);
+    }
+    if (assessedParticipants.present) {
+      map['assessed_participants'] = Variable<int>(assessedParticipants.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -508,6 +653,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('date: $date, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
+          ..write('totalParticipants: $totalParticipants, ')
+          ..write('assessableParticipants: $assessableParticipants, ')
+          ..write('assessedParticipants: $assessedParticipants, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3007,6 +3155,9 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   Value<DateTime?> date,
   required String status,
   Value<String?> notes,
+  Value<int> totalParticipants,
+  Value<int> assessableParticipants,
+  Value<int> assessedParticipants,
   required DateTime cachedAt,
   Value<int> rowid,
 });
@@ -3020,6 +3171,9 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<DateTime?> date,
   Value<String> status,
   Value<String?> notes,
+  Value<int> totalParticipants,
+  Value<int> assessableParticipants,
+  Value<int> assessedParticipants,
   Value<DateTime> cachedAt,
   Value<int> rowid,
 });
@@ -3080,6 +3234,18 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get totalParticipants => $composableBuilder(
+      column: $table.totalParticipants,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get assessableParticipants => $composableBuilder(
+      column: $table.assessableParticipants,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get assessedParticipants => $composableBuilder(
+      column: $table.assessedParticipants,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnFilters(column));
@@ -3143,6 +3309,18 @@ class $$SessionsTableOrderingComposer
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get totalParticipants => $composableBuilder(
+      column: $table.totalParticipants,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get assessableParticipants => $composableBuilder(
+      column: $table.assessableParticipants,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get assessedParticipants => $composableBuilder(
+      column: $table.assessedParticipants,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
 }
@@ -3182,6 +3360,15 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<int> get totalParticipants => $composableBuilder(
+      column: $table.totalParticipants, builder: (column) => column);
+
+  GeneratedColumn<int> get assessableParticipants => $composableBuilder(
+      column: $table.assessableParticipants, builder: (column) => column);
+
+  GeneratedColumn<int> get assessedParticipants => $composableBuilder(
+      column: $table.assessedParticipants, builder: (column) => column);
 
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
@@ -3240,6 +3427,9 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<DateTime?> date = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<int> totalParticipants = const Value.absent(),
+            Value<int> assessableParticipants = const Value.absent(),
+            Value<int> assessedParticipants = const Value.absent(),
             Value<DateTime> cachedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -3253,6 +3443,9 @@ class $$SessionsTableTableManager extends RootTableManager<
             date: date,
             status: status,
             notes: notes,
+            totalParticipants: totalParticipants,
+            assessableParticipants: assessableParticipants,
+            assessedParticipants: assessedParticipants,
             cachedAt: cachedAt,
             rowid: rowid,
           ),
@@ -3266,6 +3459,9 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<DateTime?> date = const Value.absent(),
             required String status,
             Value<String?> notes = const Value.absent(),
+            Value<int> totalParticipants = const Value.absent(),
+            Value<int> assessableParticipants = const Value.absent(),
+            Value<int> assessedParticipants = const Value.absent(),
             required DateTime cachedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -3279,6 +3475,9 @@ class $$SessionsTableTableManager extends RootTableManager<
             date: date,
             status: status,
             notes: notes,
+            totalParticipants: totalParticipants,
+            assessableParticipants: assessableParticipants,
+            assessedParticipants: assessedParticipants,
             cachedAt: cachedAt,
             rowid: rowid,
           ),

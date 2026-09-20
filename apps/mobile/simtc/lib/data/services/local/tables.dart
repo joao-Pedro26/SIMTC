@@ -27,6 +27,17 @@ class Sessions extends Table {
   TextColumn get status => text()();
   TextColumn get notes => text().nullable()();
 
+  /// Total de participantes inscritos — mostrado na linha de meta do card.
+  IntColumn get totalParticipants => integer().withDefault(const Constant(0))();
+
+  /// Participantes que recebem avaliação prática: denominador do progresso.
+  IntColumn get assessableParticipants =>
+      integer().withDefault(const Constant(0))();
+
+  /// Avaliáveis já concluídos: numerador do progresso.
+  IntColumn get assessedParticipants =>
+      integer().withDefault(const Constant(0))();
+
   /// Quando esta linha veio da API — mostra ao usuário a idade do cache.
   DateTimeColumn get cachedAt => dateTime()();
 

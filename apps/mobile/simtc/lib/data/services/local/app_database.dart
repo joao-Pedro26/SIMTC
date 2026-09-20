@@ -27,10 +27,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // Fase 2: contagens de participantes no card da Home. São cache —
+            // entram com 0 e o primeiro sync preenche. Migrar por `addColumn`
+            // (e não recriando a tabela) preserva a lista que o consultor já
+            // tem no aparelho, que é o que ele vê ao abrir o app offline.
+            await m.addColumn(sessions, sessions.totalParticipants);
+            await m.addColumn(sessions, sessions.assessableParticipants);
+            await m.addColumn(sessions, sessions.assessedParticipants);
+          }
+        },
         beforeOpen: (details) async {
           // O esquema usa chaves estrangeiras (participante → sessão, infração →
           // categoria); no SQLite elas só são aplicadas com este pragma ligado.
