@@ -5133,7 +5133,7 @@ flutter analyze
 flutter test
 ```
 
-Expected: `No issues found!` e `All tests passed!` — 54 testes somando todas as tasks da fase (2 de config, 3 de tema, 9 de formulário, 6 de listagem, 5 de banco, 10 de API, 9 de auth, 3 de conectividade, 6 de login e 1 de abertura). Antes desta task a suíte tem 26; as Tasks 7 a 10 somam as outras 28. Saída limpa, sem avisos de overflow ou de fonte ausente.
+Expected: `No issues found!` e `All tests passed!` — 55 testes somando todas as tasks da fase (2 de config, 3 de tema, 9 de formulário, 6 de listagem, 5 de banco, 10 de API, 9 de auth, 4 de conectividade, 6 de login e 1 de abertura). Antes desta task a suíte tem 26; as Tasks 7 a 10 somam as outras 29. Saída limpa, sem avisos de overflow ou de fonte ausente.
 
 - [ ] **Step 9: Testar no aparelho físico**
 

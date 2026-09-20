@@ -34,6 +34,21 @@ void main() {
     expect(service.isOffline, isTrue);
   });
 
+  test('abrindo o app sem rede, avisa os ouvintes já na primeira leitura', () async {
+    when(() => connectivity.checkConnectivity())
+        .thenAnswer((_) async => [ConnectivityResult.none]);
+
+    // O ouvinte entra antes do initialize, como a tela que já foi construída
+    // enquanto a primeira leitura de conectividade ainda estava em andamento.
+    var notifications = 0;
+    service.addListener(() => notifications++);
+
+    await service.initialize();
+
+    expect(service.isOffline, isTrue);
+    expect(notifications, 1);
+  });
+
   test('avisa os ouvintes quando a conexão cai', () async {
     when(() => connectivity.checkConnectivity())
         .thenAnswer((_) async => [ConnectivityResult.wifi]);
