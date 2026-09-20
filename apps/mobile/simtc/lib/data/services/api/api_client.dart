@@ -146,20 +146,6 @@ class ApiClient {
     return _run(() => _dio.delete<T>(path));
   }
 
-  /// Envio de arquivo (usado pela assinatura do participante, na Fase 5).
-  ///
-  /// O `contentType` da parte precisa ser informado: sem ele o dio manda
-  /// `application/octet-stream` e o backend recusa com 400.
-  Future<Response<T>> upload<T>(String path, FormData formData) {
-    return _run(
-      () => _dio.patch<T>(
-        path,
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      ),
-    );
-  }
-
   Future<Response<T>> _run<T>(Future<Response<T>> Function() request) async {
     try {
       return await request();

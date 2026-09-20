@@ -2030,12 +2030,6 @@ class $LocalAssessmentsTable extends LocalAssessments
   late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
       'session_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _remoteAssessmentIdMeta =
-      const VerificationMeta('remoteAssessmentId');
-  @override
-  late final GeneratedColumn<String> remoteAssessmentId =
-      GeneratedColumn<String>('remote_assessment_id', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
@@ -2059,22 +2053,6 @@ class $LocalAssessmentsTable extends LocalAssessments
               type: DriftSqlType.string, requiredDuringInsert: true)
           .withConverter<LocalSyncStatus>(
               $LocalAssessmentsTable.$convertersyncStatus);
-  static const VerificationMeta _signaturePathMeta =
-      const VerificationMeta('signaturePath');
-  @override
-  late final GeneratedColumn<String> signaturePath = GeneratedColumn<String>(
-      'signature_path', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _signatureUploadedMeta =
-      const VerificationMeta('signatureUploaded');
-  @override
-  late final GeneratedColumn<bool> signatureUploaded = GeneratedColumn<bool>(
-      'signature_uploaded', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'CHECK ("signature_uploaded" IN (0, 1))'),
-      defaultValue: const Constant(false));
   static const VerificationMeta _lastErrorMeta =
       const VerificationMeta('lastError');
   @override
@@ -2112,13 +2090,10 @@ class $LocalAssessmentsTable extends LocalAssessments
         id,
         trainingParticipantId,
         sessionId,
-        remoteAssessmentId,
         date,
         startTime,
         endTime,
         syncStatus,
-        signaturePath,
-        signatureUploaded,
         lastError,
         lastAttemptAt,
         attemptCount,
@@ -2154,12 +2129,6 @@ class $LocalAssessmentsTable extends LocalAssessments
     } else if (isInserting) {
       context.missing(_sessionIdMeta);
     }
-    if (data.containsKey('remote_assessment_id')) {
-      context.handle(
-          _remoteAssessmentIdMeta,
-          remoteAssessmentId.isAcceptableOrUnknown(
-              data['remote_assessment_id']!, _remoteAssessmentIdMeta));
-    }
     if (data.containsKey('date')) {
       context.handle(
           _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
@@ -2175,18 +2144,6 @@ class $LocalAssessmentsTable extends LocalAssessments
     if (data.containsKey('end_time')) {
       context.handle(_endTimeMeta,
           endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta));
-    }
-    if (data.containsKey('signature_path')) {
-      context.handle(
-          _signaturePathMeta,
-          signaturePath.isAcceptableOrUnknown(
-              data['signature_path']!, _signaturePathMeta));
-    }
-    if (data.containsKey('signature_uploaded')) {
-      context.handle(
-          _signatureUploadedMeta,
-          signatureUploaded.isAcceptableOrUnknown(
-              data['signature_uploaded']!, _signatureUploadedMeta));
     }
     if (data.containsKey('last_error')) {
       context.handle(_lastErrorMeta,
@@ -2236,8 +2193,6 @@ class $LocalAssessmentsTable extends LocalAssessments
           data['${effectivePrefix}training_participant_id'])!,
       sessionId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}session_id'])!,
-      remoteAssessmentId: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}remote_assessment_id']),
       date: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
       startTime: attachedDatabase.typeMapping
@@ -2247,10 +2202,6 @@ class $LocalAssessmentsTable extends LocalAssessments
       syncStatus: $LocalAssessmentsTable.$convertersyncStatus.fromSql(
           attachedDatabase.typeMapping.read(
               DriftSqlType.string, data['${effectivePrefix}sync_status'])!),
-      signaturePath: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}signature_path']),
-      signatureUploaded: attachedDatabase.typeMapping.read(
-          DriftSqlType.bool, data['${effectivePrefix}signature_uploaded'])!,
       lastError: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
       lastAttemptAt: attachedDatabase.typeMapping.read(
@@ -2281,19 +2232,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
   /// `TrainingParticipant.id`; um participante tem no máximo uma avaliação.
   final String trainingParticipantId;
   final String sessionId;
-
-  /// Id devolvido por `POST /practical-assessments/sync`, usado para enviar a assinatura.
-  final String? remoteAssessmentId;
   final DateTime date;
   final DateTime startTime;
   final DateTime? endTime;
   final LocalSyncStatus syncStatus;
-
-  /// Caminho do arquivo de assinatura no próprio aparelho.
-  final String? signaturePath;
-
-  /// A assinatura já foi aceita pelo backend?
-  final bool signatureUploaded;
 
   /// Mensagem do último erro de envio, mostrada na tela de Sincronização.
   final String? lastError;
@@ -2305,13 +2247,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       {required this.id,
       required this.trainingParticipantId,
       required this.sessionId,
-      this.remoteAssessmentId,
       required this.date,
       required this.startTime,
       this.endTime,
       required this.syncStatus,
-      this.signaturePath,
-      required this.signatureUploaded,
       this.lastError,
       this.lastAttemptAt,
       required this.attemptCount,
@@ -2323,9 +2262,6 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
     map['id'] = Variable<String>(id);
     map['training_participant_id'] = Variable<String>(trainingParticipantId);
     map['session_id'] = Variable<String>(sessionId);
-    if (!nullToAbsent || remoteAssessmentId != null) {
-      map['remote_assessment_id'] = Variable<String>(remoteAssessmentId);
-    }
     map['date'] = Variable<DateTime>(date);
     map['start_time'] = Variable<DateTime>(startTime);
     if (!nullToAbsent || endTime != null) {
@@ -2335,10 +2271,6 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       map['sync_status'] = Variable<String>(
           $LocalAssessmentsTable.$convertersyncStatus.toSql(syncStatus));
     }
-    if (!nullToAbsent || signaturePath != null) {
-      map['signature_path'] = Variable<String>(signaturePath);
-    }
-    map['signature_uploaded'] = Variable<bool>(signatureUploaded);
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
     }
@@ -2356,19 +2288,12 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       id: Value(id),
       trainingParticipantId: Value(trainingParticipantId),
       sessionId: Value(sessionId),
-      remoteAssessmentId: remoteAssessmentId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(remoteAssessmentId),
       date: Value(date),
       startTime: Value(startTime),
       endTime: endTime == null && nullToAbsent
           ? const Value.absent()
           : Value(endTime),
       syncStatus: Value(syncStatus),
-      signaturePath: signaturePath == null && nullToAbsent
-          ? const Value.absent()
-          : Value(signaturePath),
-      signatureUploaded: Value(signatureUploaded),
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
@@ -2389,15 +2314,11 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       trainingParticipantId:
           serializer.fromJson<String>(json['trainingParticipantId']),
       sessionId: serializer.fromJson<String>(json['sessionId']),
-      remoteAssessmentId:
-          serializer.fromJson<String?>(json['remoteAssessmentId']),
       date: serializer.fromJson<DateTime>(json['date']),
       startTime: serializer.fromJson<DateTime>(json['startTime']),
       endTime: serializer.fromJson<DateTime?>(json['endTime']),
       syncStatus: $LocalAssessmentsTable.$convertersyncStatus
           .fromJson(serializer.fromJson<String>(json['syncStatus'])),
-      signaturePath: serializer.fromJson<String?>(json['signaturePath']),
-      signatureUploaded: serializer.fromJson<bool>(json['signatureUploaded']),
       lastError: serializer.fromJson<String?>(json['lastError']),
       lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
       attemptCount: serializer.fromJson<int>(json['attemptCount']),
@@ -2412,14 +2333,11 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       'id': serializer.toJson<String>(id),
       'trainingParticipantId': serializer.toJson<String>(trainingParticipantId),
       'sessionId': serializer.toJson<String>(sessionId),
-      'remoteAssessmentId': serializer.toJson<String?>(remoteAssessmentId),
       'date': serializer.toJson<DateTime>(date),
       'startTime': serializer.toJson<DateTime>(startTime),
       'endTime': serializer.toJson<DateTime?>(endTime),
       'syncStatus': serializer.toJson<String>(
           $LocalAssessmentsTable.$convertersyncStatus.toJson(syncStatus)),
-      'signaturePath': serializer.toJson<String?>(signaturePath),
-      'signatureUploaded': serializer.toJson<bool>(signatureUploaded),
       'lastError': serializer.toJson<String?>(lastError),
       'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
       'attemptCount': serializer.toJson<int>(attemptCount),
@@ -2432,13 +2350,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           {String? id,
           String? trainingParticipantId,
           String? sessionId,
-          Value<String?> remoteAssessmentId = const Value.absent(),
           DateTime? date,
           DateTime? startTime,
           Value<DateTime?> endTime = const Value.absent(),
           LocalSyncStatus? syncStatus,
-          Value<String?> signaturePath = const Value.absent(),
-          bool? signatureUploaded,
           Value<String?> lastError = const Value.absent(),
           Value<DateTime?> lastAttemptAt = const Value.absent(),
           int? attemptCount,
@@ -2449,16 +2364,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
         trainingParticipantId:
             trainingParticipantId ?? this.trainingParticipantId,
         sessionId: sessionId ?? this.sessionId,
-        remoteAssessmentId: remoteAssessmentId.present
-            ? remoteAssessmentId.value
-            : this.remoteAssessmentId,
         date: date ?? this.date,
         startTime: startTime ?? this.startTime,
         endTime: endTime.present ? endTime.value : this.endTime,
         syncStatus: syncStatus ?? this.syncStatus,
-        signaturePath:
-            signaturePath.present ? signaturePath.value : this.signaturePath,
-        signatureUploaded: signatureUploaded ?? this.signatureUploaded,
         lastError: lastError.present ? lastError.value : this.lastError,
         lastAttemptAt:
             lastAttemptAt.present ? lastAttemptAt.value : this.lastAttemptAt,
@@ -2473,20 +2382,11 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           ? data.trainingParticipantId.value
           : this.trainingParticipantId,
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
-      remoteAssessmentId: data.remoteAssessmentId.present
-          ? data.remoteAssessmentId.value
-          : this.remoteAssessmentId,
       date: data.date.present ? data.date.value : this.date,
       startTime: data.startTime.present ? data.startTime.value : this.startTime,
       endTime: data.endTime.present ? data.endTime.value : this.endTime,
       syncStatus:
           data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
-      signaturePath: data.signaturePath.present
-          ? data.signaturePath.value
-          : this.signaturePath,
-      signatureUploaded: data.signatureUploaded.present
-          ? data.signatureUploaded.value
-          : this.signatureUploaded,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
       lastAttemptAt: data.lastAttemptAt.present
           ? data.lastAttemptAt.value
@@ -2505,13 +2405,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           ..write('id: $id, ')
           ..write('trainingParticipantId: $trainingParticipantId, ')
           ..write('sessionId: $sessionId, ')
-          ..write('remoteAssessmentId: $remoteAssessmentId, ')
           ..write('date: $date, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
           ..write('syncStatus: $syncStatus, ')
-          ..write('signaturePath: $signaturePath, ')
-          ..write('signatureUploaded: $signatureUploaded, ')
           ..write('lastError: $lastError, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('attemptCount: $attemptCount, ')
@@ -2526,13 +2423,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       id,
       trainingParticipantId,
       sessionId,
-      remoteAssessmentId,
       date,
       startTime,
       endTime,
       syncStatus,
-      signaturePath,
-      signatureUploaded,
       lastError,
       lastAttemptAt,
       attemptCount,
@@ -2545,13 +2439,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           other.id == this.id &&
           other.trainingParticipantId == this.trainingParticipantId &&
           other.sessionId == this.sessionId &&
-          other.remoteAssessmentId == this.remoteAssessmentId &&
           other.date == this.date &&
           other.startTime == this.startTime &&
           other.endTime == this.endTime &&
           other.syncStatus == this.syncStatus &&
-          other.signaturePath == this.signaturePath &&
-          other.signatureUploaded == this.signatureUploaded &&
           other.lastError == this.lastError &&
           other.lastAttemptAt == this.lastAttemptAt &&
           other.attemptCount == this.attemptCount &&
@@ -2563,13 +2454,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
   final Value<String> id;
   final Value<String> trainingParticipantId;
   final Value<String> sessionId;
-  final Value<String?> remoteAssessmentId;
   final Value<DateTime> date;
   final Value<DateTime> startTime;
   final Value<DateTime?> endTime;
   final Value<LocalSyncStatus> syncStatus;
-  final Value<String?> signaturePath;
-  final Value<bool> signatureUploaded;
   final Value<String?> lastError;
   final Value<DateTime?> lastAttemptAt;
   final Value<int> attemptCount;
@@ -2580,13 +2468,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     this.id = const Value.absent(),
     this.trainingParticipantId = const Value.absent(),
     this.sessionId = const Value.absent(),
-    this.remoteAssessmentId = const Value.absent(),
     this.date = const Value.absent(),
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
     this.syncStatus = const Value.absent(),
-    this.signaturePath = const Value.absent(),
-    this.signatureUploaded = const Value.absent(),
     this.lastError = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
     this.attemptCount = const Value.absent(),
@@ -2598,13 +2483,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     required String id,
     required String trainingParticipantId,
     required String sessionId,
-    this.remoteAssessmentId = const Value.absent(),
     required DateTime date,
     required DateTime startTime,
     this.endTime = const Value.absent(),
     required LocalSyncStatus syncStatus,
-    this.signaturePath = const Value.absent(),
-    this.signatureUploaded = const Value.absent(),
     this.lastError = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
     this.attemptCount = const Value.absent(),
@@ -2623,13 +2505,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     Expression<String>? id,
     Expression<String>? trainingParticipantId,
     Expression<String>? sessionId,
-    Expression<String>? remoteAssessmentId,
     Expression<DateTime>? date,
     Expression<DateTime>? startTime,
     Expression<DateTime>? endTime,
     Expression<String>? syncStatus,
-    Expression<String>? signaturePath,
-    Expression<bool>? signatureUploaded,
     Expression<String>? lastError,
     Expression<DateTime>? lastAttemptAt,
     Expression<int>? attemptCount,
@@ -2642,14 +2521,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       if (trainingParticipantId != null)
         'training_participant_id': trainingParticipantId,
       if (sessionId != null) 'session_id': sessionId,
-      if (remoteAssessmentId != null)
-        'remote_assessment_id': remoteAssessmentId,
       if (date != null) 'date': date,
       if (startTime != null) 'start_time': startTime,
       if (endTime != null) 'end_time': endTime,
       if (syncStatus != null) 'sync_status': syncStatus,
-      if (signaturePath != null) 'signature_path': signaturePath,
-      if (signatureUploaded != null) 'signature_uploaded': signatureUploaded,
       if (lastError != null) 'last_error': lastError,
       if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
       if (attemptCount != null) 'attempt_count': attemptCount,
@@ -2663,13 +2538,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       {Value<String>? id,
       Value<String>? trainingParticipantId,
       Value<String>? sessionId,
-      Value<String?>? remoteAssessmentId,
       Value<DateTime>? date,
       Value<DateTime>? startTime,
       Value<DateTime?>? endTime,
       Value<LocalSyncStatus>? syncStatus,
-      Value<String?>? signaturePath,
-      Value<bool>? signatureUploaded,
       Value<String?>? lastError,
       Value<DateTime?>? lastAttemptAt,
       Value<int>? attemptCount,
@@ -2681,13 +2553,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       trainingParticipantId:
           trainingParticipantId ?? this.trainingParticipantId,
       sessionId: sessionId ?? this.sessionId,
-      remoteAssessmentId: remoteAssessmentId ?? this.remoteAssessmentId,
       date: date ?? this.date,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       syncStatus: syncStatus ?? this.syncStatus,
-      signaturePath: signaturePath ?? this.signaturePath,
-      signatureUploaded: signatureUploaded ?? this.signatureUploaded,
       lastError: lastError ?? this.lastError,
       lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
       attemptCount: attemptCount ?? this.attemptCount,
@@ -2710,9 +2579,6 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     if (sessionId.present) {
       map['session_id'] = Variable<String>(sessionId.value);
     }
-    if (remoteAssessmentId.present) {
-      map['remote_assessment_id'] = Variable<String>(remoteAssessmentId.value);
-    }
     if (date.present) {
       map['date'] = Variable<DateTime>(date.value);
     }
@@ -2725,12 +2591,6 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(
           $LocalAssessmentsTable.$convertersyncStatus.toSql(syncStatus.value));
-    }
-    if (signaturePath.present) {
-      map['signature_path'] = Variable<String>(signaturePath.value);
-    }
-    if (signatureUploaded.present) {
-      map['signature_uploaded'] = Variable<bool>(signatureUploaded.value);
     }
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
@@ -2759,13 +2619,10 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
           ..write('id: $id, ')
           ..write('trainingParticipantId: $trainingParticipantId, ')
           ..write('sessionId: $sessionId, ')
-          ..write('remoteAssessmentId: $remoteAssessmentId, ')
           ..write('date: $date, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
           ..write('syncStatus: $syncStatus, ')
-          ..write('signaturePath: $signaturePath, ')
-          ..write('signatureUploaded: $signatureUploaded, ')
           ..write('lastError: $lastError, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('attemptCount: $attemptCount, ')
@@ -4721,13 +4578,10 @@ typedef $$LocalAssessmentsTableCreateCompanionBuilder
   required String id,
   required String trainingParticipantId,
   required String sessionId,
-  Value<String?> remoteAssessmentId,
   required DateTime date,
   required DateTime startTime,
   Value<DateTime?> endTime,
   required LocalSyncStatus syncStatus,
-  Value<String?> signaturePath,
-  Value<bool> signatureUploaded,
   Value<String?> lastError,
   Value<DateTime?> lastAttemptAt,
   Value<int> attemptCount,
@@ -4740,13 +4594,10 @@ typedef $$LocalAssessmentsTableUpdateCompanionBuilder
   Value<String> id,
   Value<String> trainingParticipantId,
   Value<String> sessionId,
-  Value<String?> remoteAssessmentId,
   Value<DateTime> date,
   Value<DateTime> startTime,
   Value<DateTime?> endTime,
   Value<LocalSyncStatus> syncStatus,
-  Value<String?> signaturePath,
-  Value<bool> signatureUploaded,
   Value<String?> lastError,
   Value<DateTime?> lastAttemptAt,
   Value<int> attemptCount,
@@ -4800,10 +4651,6 @@ class $$LocalAssessmentsTableFilterComposer
   ColumnFilters<String> get sessionId => $composableBuilder(
       column: $table.sessionId, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get remoteAssessmentId => $composableBuilder(
-      column: $table.remoteAssessmentId,
-      builder: (column) => ColumnFilters(column));
-
   ColumnFilters<DateTime> get date => $composableBuilder(
       column: $table.date, builder: (column) => ColumnFilters(column));
 
@@ -4817,13 +4664,6 @@ class $$LocalAssessmentsTableFilterComposer
       get syncStatus => $composableBuilder(
           column: $table.syncStatus,
           builder: (column) => ColumnWithTypeConverterFilters(column));
-
-  ColumnFilters<String> get signaturePath => $composableBuilder(
-      column: $table.signaturePath, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get signatureUploaded => $composableBuilder(
-      column: $table.signatureUploaded,
-      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnFilters(column));
@@ -4882,10 +4722,6 @@ class $$LocalAssessmentsTableOrderingComposer
   ColumnOrderings<String> get sessionId => $composableBuilder(
       column: $table.sessionId, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get remoteAssessmentId => $composableBuilder(
-      column: $table.remoteAssessmentId,
-      builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<DateTime> get date => $composableBuilder(
       column: $table.date, builder: (column) => ColumnOrderings(column));
 
@@ -4897,14 +4733,6 @@ class $$LocalAssessmentsTableOrderingComposer
 
   ColumnOrderings<String> get syncStatus => $composableBuilder(
       column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get signaturePath => $composableBuilder(
-      column: $table.signaturePath,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<bool> get signatureUploaded => $composableBuilder(
-      column: $table.signatureUploaded,
-      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnOrderings(column));
@@ -4942,9 +4770,6 @@ class $$LocalAssessmentsTableAnnotationComposer
   GeneratedColumn<String> get sessionId =>
       $composableBuilder(column: $table.sessionId, builder: (column) => column);
 
-  GeneratedColumn<String> get remoteAssessmentId => $composableBuilder(
-      column: $table.remoteAssessmentId, builder: (column) => column);
-
   GeneratedColumn<DateTime> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
 
@@ -4957,12 +4782,6 @@ class $$LocalAssessmentsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<LocalSyncStatus, String> get syncStatus =>
       $composableBuilder(
           column: $table.syncStatus, builder: (column) => column);
-
-  GeneratedColumn<String> get signaturePath => $composableBuilder(
-      column: $table.signaturePath, builder: (column) => column);
-
-  GeneratedColumn<bool> get signatureUploaded => $composableBuilder(
-      column: $table.signatureUploaded, builder: (column) => column);
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
@@ -5030,13 +4849,10 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String> trainingParticipantId = const Value.absent(),
             Value<String> sessionId = const Value.absent(),
-            Value<String?> remoteAssessmentId = const Value.absent(),
             Value<DateTime> date = const Value.absent(),
             Value<DateTime> startTime = const Value.absent(),
             Value<DateTime?> endTime = const Value.absent(),
             Value<LocalSyncStatus> syncStatus = const Value.absent(),
-            Value<String?> signaturePath = const Value.absent(),
-            Value<bool> signatureUploaded = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
             Value<DateTime?> lastAttemptAt = const Value.absent(),
             Value<int> attemptCount = const Value.absent(),
@@ -5048,13 +4864,10 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             id: id,
             trainingParticipantId: trainingParticipantId,
             sessionId: sessionId,
-            remoteAssessmentId: remoteAssessmentId,
             date: date,
             startTime: startTime,
             endTime: endTime,
             syncStatus: syncStatus,
-            signaturePath: signaturePath,
-            signatureUploaded: signatureUploaded,
             lastError: lastError,
             lastAttemptAt: lastAttemptAt,
             attemptCount: attemptCount,
@@ -5066,13 +4879,10 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             required String id,
             required String trainingParticipantId,
             required String sessionId,
-            Value<String?> remoteAssessmentId = const Value.absent(),
             required DateTime date,
             required DateTime startTime,
             Value<DateTime?> endTime = const Value.absent(),
             required LocalSyncStatus syncStatus,
-            Value<String?> signaturePath = const Value.absent(),
-            Value<bool> signatureUploaded = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
             Value<DateTime?> lastAttemptAt = const Value.absent(),
             Value<int> attemptCount = const Value.absent(),
@@ -5084,13 +4894,10 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             id: id,
             trainingParticipantId: trainingParticipantId,
             sessionId: sessionId,
-            remoteAssessmentId: remoteAssessmentId,
             date: date,
             startTime: startTime,
             endTime: endTime,
             syncStatus: syncStatus,
-            signaturePath: signaturePath,
-            signatureUploaded: signatureUploaded,
             lastError: lastError,
             lastAttemptAt: lastAttemptAt,
             attemptCount: attemptCount,

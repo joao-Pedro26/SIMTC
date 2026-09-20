@@ -111,7 +111,7 @@ class _AppTextFieldState extends State<AppTextField> {
       decoration: BoxDecoration(
         color: widget.enabled ? AppColors.surface : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: _borderColor, width: 1.5),
+        border: Border.all(color: _borderColor, width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2),
       child: Row(

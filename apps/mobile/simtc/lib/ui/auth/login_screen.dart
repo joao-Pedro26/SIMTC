@@ -53,14 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildBody(BuildContext context, LoginViewModel viewModel) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
-    final viewportHeight = MediaQuery.of(context).size.height -
-        MediaQuery.of(context).padding.top -
-        MediaQuery.of(context).padding.bottom;
 
-    return SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: viewportHeight),
-        child: Padding(
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xxl,
             AppSpacing.huge,
@@ -68,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
             AppSpacing.xxl,
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildLogo(),
@@ -103,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 

@@ -102,19 +102,10 @@ class LocalAssessments extends Table {
   /// `TrainingParticipant.id`; um participante tem no máximo uma avaliação.
   TextColumn get trainingParticipantId => text()();
   TextColumn get sessionId => text()();
-
-  /// Id devolvido por `POST /practical-assessments/sync`, usado para enviar a assinatura.
-  TextColumn get remoteAssessmentId => text().nullable()();
   DateTimeColumn get date => dateTime()();
   DateTimeColumn get startTime => dateTime()();
   DateTimeColumn get endTime => dateTime().nullable()();
   TextColumn get syncStatus => textEnum<LocalSyncStatus>()();
-
-  /// Caminho do arquivo de assinatura no próprio aparelho.
-  TextColumn get signaturePath => text().nullable()();
-
-  /// A assinatura já foi aceita pelo backend?
-  BoolColumn get signatureUploaded => boolean().withDefault(const Constant(false))();
 
   /// Mensagem do último erro de envio, mostrada na tela de Sincronização.
   TextColumn get lastError => text().nullable()();

@@ -69,7 +69,6 @@ void main() {
 
     final row = await db.select(db.localAssessments).getSingle();
     expect(row.syncStatus, LocalSyncStatus.draft);
-    expect(row.signatureUploaded, isFalse);
     expect(row.attemptCount, 0);
   });
 

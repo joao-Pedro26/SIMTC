@@ -41,7 +41,7 @@ Estado registrado na Fase 0: Flutter 3.41.6 / Dart 3.11.4, `flutter analyze` sem
 
 Pacotes a decidir em cada fase:
 - mocks para os testes (Fase 1);
-- captura de assinatura, por pacote ou `CustomPainter` (Fase 5);
+- ~~captura de assinatura, por pacote ou `CustomPainter` (Fase 5)~~ — não se aplica mais: mudou em 20/09/2026, a assinatura passou a ser capturada no formulário web de inscrição, não no app (ver `brainstorm-app-mobile.md` seção 0 item 4);
 - `flutter_adaptive_scaffold`: conferir se continua mantido antes de adotar (Fase 7);
 - versão do app na tela de Perfil (Fase 8).
 

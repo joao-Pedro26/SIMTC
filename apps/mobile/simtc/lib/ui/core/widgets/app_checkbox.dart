@@ -24,9 +24,8 @@ class AppCheckbox extends StatelessWidget {
     return Semantics(
       checked: value,
       label: label,
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: AppSpacing.touchTarget),
           child: Row(
