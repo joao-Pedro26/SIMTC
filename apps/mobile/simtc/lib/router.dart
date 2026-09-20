@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'data/repositories/auth_repository.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
-import 'ui/home/home_placeholder_screen.dart';
+import 'ui/sessions/sessions_screen.dart';
 import 'ui/splash/splash_screen.dart';
 
 abstract final class AppRoutes {
@@ -31,7 +31,7 @@ GoRouter createRouter(AuthRepository auth) {
       ),
       GoRoute(
         path: AppRoutes.home,
-        builder: (context, state) => const HomePlaceholderScreen(),
+        builder: (context, state) => const SessionsScreen(),
       ),
       if (kDebugMode)
         GoRoute(

@@ -3,6 +3,7 @@ import 'package:provider/single_child_widget.dart';
 
 import 'config/app_config.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/repositories/session_repository.dart';
 import 'data/services/api/api_client.dart';
 import 'data/services/auth_session.dart';
 import 'data/services/connectivity_service.dart';
@@ -21,6 +22,7 @@ class AppDependencies {
     required this.session,
     required this.apiClient,
     required this.authRepository,
+    required this.sessionRepository,
     required this.connectivityService,
   });
 
@@ -41,6 +43,10 @@ class AppDependencies {
     );
 
     authRepository = AuthRepository(apiClient: apiClient, session: session);
+    final sessionRepository = SessionRepository(
+      apiClient: apiClient,
+      database: database,
+    );
 
     return AppDependencies._(
       database: database,
@@ -48,6 +54,7 @@ class AppDependencies {
       session: session,
       apiClient: apiClient,
       authRepository: authRepository,
+      sessionRepository: sessionRepository,
       connectivityService: ConnectivityService()..initialize(),
     );
   }
@@ -57,6 +64,7 @@ class AppDependencies {
   final AuthSession session;
   final ApiClient apiClient;
   final AuthRepository authRepository;
+  final SessionRepository sessionRepository;
   final ConnectivityService connectivityService;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
@@ -69,6 +77,7 @@ class AppDependencies {
         Provider<AuthSession>.value(value: session),
         Provider<ApiClient>.value(value: apiClient),
         ChangeNotifierProvider<AuthRepository>.value(value: authRepository),
+        Provider<SessionRepository>.value(value: sessionRepository),
         ChangeNotifierProvider<ConnectivityService>.value(
           value: connectivityService,
         ),
