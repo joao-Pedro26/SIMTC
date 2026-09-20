@@ -53,47 +53,56 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildBody(BuildContext context, LoginViewModel viewModel) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
+    final viewportHeight = MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.top -
+        MediaQuery.of(context).padding.bottom;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xxl,
-        AppSpacing.huge,
-        AppSpacing.xxl,
-        AppSpacing.xxl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildLogo(),
-          const SizedBox(height: AppSpacing.xxxl),
-          _buildEmailField(viewModel),
-          const SizedBox(height: AppSpacing.lg + 2),
-          _buildPasswordField(viewModel),
-          const SizedBox(height: AppSpacing.md),
-          _buildOptionsRow(viewModel),
-          if (viewModel.errorMessage != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            InlineNotice(
-              icon: AppIcons.needsReview,
-              message: viewModel.errorMessage!,
-              tone: NoticeTone.danger,
-            ),
-          ],
-          if (viewModel.infoMessage != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            InlineNotice(
-              icon: AppIcons.email,
-              message: viewModel.infoMessage!,
-              tone: NoticeTone.success,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg + 2),
-          _buildSubmitButton(context, viewModel),
-          if (isOffline) ...[
-            const SizedBox(height: AppSpacing.xxl),
-            _buildOfflineNotice(),
-          ],
-        ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: viewportHeight),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xxl,
+            AppSpacing.huge,
+            AppSpacing.xxl,
+            AppSpacing.xxl,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildLogo(),
+              const SizedBox(height: AppSpacing.xxxl),
+              _buildEmailField(viewModel),
+              const SizedBox(height: AppSpacing.lg + 2),
+              _buildPasswordField(viewModel),
+              const SizedBox(height: AppSpacing.md),
+              _buildOptionsRow(viewModel),
+              if (viewModel.errorMessage != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                InlineNotice(
+                  icon: AppIcons.needsReview,
+                  message: viewModel.errorMessage!,
+                  tone: NoticeTone.danger,
+                ),
+              ],
+              if (viewModel.infoMessage != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                InlineNotice(
+                  icon: AppIcons.email,
+                  message: viewModel.infoMessage!,
+                  tone: NoticeTone.success,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg + 2),
+              _buildSubmitButton(context, viewModel),
+              if (isOffline) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                _buildOfflineNotice(),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
