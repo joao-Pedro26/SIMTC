@@ -140,4 +140,25 @@ void main() {
     expect(viewModel.errorMessage, 'Sem conexão.');
     expect(viewModel.groups.single.sessions, hasLength(1));
   });
+
+  test(
+      'uma exceção que escapa do Result não trava _isRefreshing: o próximo '
+      'refresh funciona', () async {
+    // Um defeito real do repository (ou de um mock de teste) pode lançar em
+    // vez de devolver `Failure`. Sem o `finally`, `_isRefreshing` ficaria
+    // preso em `true` e todo refresh seguinte cairia no guard-clause de
+    // início de `refresh()` sem fazer nada.
+    when(repository.syncAll).thenThrow(StateError('bug inesperado'));
+
+    final viewModel = build()..init();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.isRefreshing, isFalse);
+
+    when(repository.syncAll).thenAnswer((_) async => const Success(1));
+    await viewModel.refresh();
+
+    verify(repository.syncAll).called(2);
+    expect(viewModel.isRefreshing, isFalse);
+  });
 }

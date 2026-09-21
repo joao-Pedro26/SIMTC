@@ -95,14 +95,26 @@ class SessionRepository {
           break;
         }
       }
+
+      // Só poda quando a lista veio inteira: se o teto de páginas interrompeu
+      // o download, apagar "o que não veio" jogaria fora sessões válidas.
+      //
+      // `_write` fica dentro deste `try`: uma falha de escrita do drift não
+      // pode subir crua — quem chama (`SessionsListViewModel.refresh`) espera
+      // sempre um `Result`, e uma exceção sem tratamento trava o
+      // pull-to-refresh (o `_isRefreshing` de lá nunca volta a `false`).
+      await _write(sessions, prune: reachedEnd);
+      return Success(sessions.length);
     } on ApiException catch (error) {
       return Failure(error, _offlineMessage);
+    } catch (error) {
+      // Rede de segurança para o que não é `ApiException`: um `TypeError` do
+      // `fromJson` (campo com tipo inesperado do backend) ou uma falha de
+      // escrita do drift, por exemplo. O cache antigo continua intacto — a
+      // escrita só acontece dentro da transação de `_write`, que não chegou
+      // a ser chamada ou foi desfeita por inteiro.
+      return Failure(Exception('$error'), _offlineMessage);
     }
-
-    // Só poda quando a lista veio inteira: se o teto de páginas interrompeu o
-    // download, apagar "o que não veio" jogaria fora sessões válidas.
-    await _write(sessions, prune: reachedEnd);
-    return Success(sessions.length);
   }
 
   Future<void> _write(List<TrainingSession> sessions, {required bool prune}) {

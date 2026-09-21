@@ -92,13 +92,21 @@ class SessionsListViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final result = await _repository.syncAll();
-
-    _isRefreshing = false;
-    if (result case Failure(message: final message)) {
-      _errorMessage = message ?? 'Não foi possível atualizar as sessões.';
+    try {
+      final result = await _repository.syncAll();
+      if (result case Failure(message: final message)) {
+        _errorMessage = message ?? 'Não foi possível atualizar as sessões.';
+      }
+    } catch (_) {
+      // `syncAll` já devolve `Result` para todo erro esperado; isto é uma
+      // rede de segurança contra o que escapar dele. Sem ela, `_isRefreshing`
+      // travaria em `true` e todo refresh seguinte (puxar, voltar a conexão,
+      // reabrir a tela) cairia no guard-clause de início deste método.
+      _errorMessage = 'Não foi possível atualizar as sessões.';
+    } finally {
+      _isRefreshing = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void clearError() {

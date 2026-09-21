@@ -101,6 +101,27 @@ void main() {
     expect(await db.select(db.sessions).get(), hasLength(1));
   });
 
+  test(
+      'uma exceção fora do ApiException também vira Failure, sem subir crua '
+      'e travar o pull-to-refresh', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('s1')], pageNumber: 1, totalPages: 1));
+    await repository.syncAll();
+
+    // Simula um `TypeError` do `fromJson` (campo com tipo inesperado) ou uma
+    // falha de escrita do drift — nenhum dos dois é um `ApiException`.
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenThrow(StateError('bug inesperado no parsing'));
+
+    final result = await repository.syncAll();
+
+    expect(result.isFailure, isTrue);
+    expect(await db.select(db.sessions).get(), hasLength(1),
+        reason: 'o cache velho continua válido quando o sync quebra');
+  });
+
   test('watchSessions ordena pela data mais próxima e deixa sem data por último',
       () async {
     when(() => api.get<Map<String, dynamic>>('/training-sessions',
