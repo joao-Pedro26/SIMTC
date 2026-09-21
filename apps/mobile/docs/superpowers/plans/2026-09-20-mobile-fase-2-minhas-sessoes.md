@@ -2447,7 +2447,11 @@ Em outro terminal, com o motorola conectado: `adb reverse tcp:3001 tcp:3001`
 
 - [ ] **Step 2: Instalar no aparelho**
 
-Run: `cd apps/mobile/simtc && flutter run --dart-define=API_BASE_URL=http://localhost:3001/api`
+Descubra o id com `flutter devices` e rode:
+
+Run: `cd apps/mobile/simtc && flutter run -d <ID_DO_APARELHO>`
+
+**Sem `--dart-define`.** O padrão de `AppConfig.apiBaseUrl` já é `http://localhost:3001/api`, e nenhuma build de desenvolvimento fala com produção por engano. Se o aparelho estiver por Wi-Fi, o id é `<IP>:5555` (ver `apps/mobile/simtc/README.md`).
 
 O app já tem o banco da Fase 1 instalado; a migração 1→2 da Task 2 roda sozinha na primeira abertura. **Não desinstale o app antes de testar** — a migração precisa ser exercitada com dados reais, e é exatamente isso que este passo verifica.
 
@@ -2463,6 +2467,14 @@ O app já tem o banco da Fase 1 instalado; a migração 1→2 da Task 2 roda soz
 - [ ] desativar o modo avião com o app aberto atualiza a lista sozinho;
 - [ ] tocar em "Sincronizar" ou "Perfil" mostra "Disponível em breve" sem quebrar nada;
 - [ ] logar com um usuário ADMIN mostra o título "Sessões".
+
+Acrescentados depois da revisão final e da Task 8 — cada um cobre um defeito que foi encontrado e corrigido, então são os que têm mais chance de pegar regressão:
+
+- [ ] **a sessão de hoje aparece em "Hoje", e não no grupo "Outras"** — era o defeito de fuso; se ela vier como atrasada, o `.toLocal()` voltou;
+- [ ] uma sessão **sem data** aparece no grupo "Outras" (a Task 8 podia tê-la excluído do filtro sem que nenhum teste percebesse);
+- [ ] o chip "Concluídas" mostra sessões dos **últimos 90 dias**; uma concluída mais antiga que isso **não** aparece — mudança consciente da Task 8;
+- [ ] **primeiro login com cache vazio mostra o skeleton enquanto baixa**, não "Nenhuma sessão para hoje";
+**Não verificável neste aparelho, e por quê:** "sair e entrar com outro consultor não mostra a agenda do anterior" não entra neste roteiro. O botão "Sair" saiu junto com a tela provisória e só volta na tela de Perfil (Fase 7), e limpar os dados do app pelas configurações do Android apagaria o cache junto — o teste passaria sem provar nada. A limpeza de cache em `logout()` e `handleSessionExpired()` fica coberta pelos testes automatizados de `auth_repository_test.dart`, que usam um banco real. **Este item vira parte do roteiro de aceite da Fase 7**, quando existir um jeito de deslogar pela interface.
 
 - [ ] **Step 4: Registrar o resultado**
 
