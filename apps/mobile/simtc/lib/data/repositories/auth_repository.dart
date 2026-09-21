@@ -9,12 +9,23 @@ import '../services/auth_session.dart';
 /// Autenticação do app — sem nenhum atalho de desenvolvimento: se a API recusa,
 /// o login falha.
 class AuthRepository extends ChangeNotifier {
-  AuthRepository({required ApiClient apiClient, required AuthSession session})
-      : _api = apiClient,
-        _session = session;
+  AuthRepository({
+    required ApiClient apiClient,
+    required AuthSession session,
+    required Future<void> Function() clearLocalCache,
+  })  : _api = apiClient,
+        _session = session,
+        _clearLocalCache = clearLocalCache;
 
   final ApiClient _api;
   final AuthSession _session;
+
+  /// Apaga o cache local de sessões (Drift). `watchSessions()` não tem
+  /// escopo de usuário, então logout e expiração de sessão precisam limpar o
+  /// cache — senão o próximo consultor a entrar no aparelho herda a agenda do
+  /// anterior enquanto offline. Passado pelo `AppDependencies`, que é quem
+  /// conhece o `AppDatabase` — este repositório não precisa conhecê-lo.
+  final Future<void> Function() _clearLocalCache;
 
   AuthUser? _currentUser;
   AuthUser? get currentUser => _currentUser;
@@ -122,15 +133,17 @@ class AuthRepository extends ChangeNotifier {
       // Sem rede ou token já inválido: a sessão local é limpa de qualquer forma.
     }
     await _session.clear();
+    await _clearLocalCache();
     _currentUser = null;
     notifyListeners();
   }
 
   /// Chamado quando o `ApiClient` desiste de renovar o token.
-  void handleSessionExpired() {
+  Future<void> handleSessionExpired() async {
     if (_currentUser == null) return;
     _currentUser = null;
     notifyListeners();
+    await _clearLocalCache();
   }
 
   Future<AuthUser?> _loadCurrentUser(String accessToken) async {

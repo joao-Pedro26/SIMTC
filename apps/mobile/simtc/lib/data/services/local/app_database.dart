@@ -50,4 +50,19 @@ class AppDatabase extends _$AppDatabase {
       );
 
   static QueryExecutor _openConnection() => driftDatabase(name: 'simtc');
+
+  /// Apaga o cache de sessões e participantes.
+  ///
+  /// Chamado ao trocar de consultor (logout ou expiração do refresh token):
+  /// `watchSessions()` não tem escopo de usuário, então sem isto a Home do
+  /// próximo consultor a entrar mostraria a agenda do anterior — offline, por
+  /// tempo indefinido — até o primeiro sync.
+  Future<void> clearSessionsCache() {
+    return transaction(() async {
+      // Participantes têm FK para a sessão: apagar antes deles evita violar
+      // a restrição, mesma ordem usada em `SessionRepository._write`.
+      await delete(participants).go();
+      await delete(sessions).go();
+    });
+  }
 }

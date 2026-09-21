@@ -38,11 +38,15 @@ class AppDependencies {
       onTokensRenewed: session.updateTokens,
       onSessionExpired: () async {
         await session.expire();
-        authRepository.handleSessionExpired();
+        await authRepository.handleSessionExpired();
       },
     );
 
-    authRepository = AuthRepository(apiClient: apiClient, session: session);
+    authRepository = AuthRepository(
+      apiClient: apiClient,
+      session: session,
+      clearLocalCache: database.clearSessionsCache,
+    );
     final sessionRepository = SessionRepository(
       apiClient: apiClient,
       database: database,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +10,7 @@ import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/auth_session.dart';
+import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/data/services/local/token_storage.dart';
 import 'package:simtc/utils/result.dart';
 
@@ -39,6 +41,7 @@ void main() {
   late _MockApiClient api;
   late _MockTokenStorage storage;
   late AuthSession session;
+  late AppDatabase db;
   late AuthRepository repository;
 
   const accessToken = 'cabecalho.payload.assinatura';
@@ -47,7 +50,12 @@ void main() {
     api = _MockApiClient();
     storage = _MockTokenStorage();
     session = AuthSession(storage);
-    repository = AuthRepository(apiClient: api, session: session);
+    db = AppDatabase(NativeDatabase.memory());
+    repository = AuthRepository(
+      apiClient: api,
+      session: session,
+      clearLocalCache: db.clearSessionsCache,
+    );
 
     when(() => storage.persist(
           accessToken: any(named: 'accessToken'),
@@ -60,7 +68,35 @@ void main() {
     when(() => storage.readRefresh()).thenAnswer((_) async => null);
   });
 
-  tearDown(() => session.dispose());
+  tearDown(() async {
+    session.dispose();
+    await db.close();
+  });
+
+  Future<void> seedCache() async {
+    await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: 'sess-antigo-consultor',
+            companyName: 'Bracell Celulose',
+            courseName: 'Direção Preventiva',
+            city: 'Lençóis Paulista',
+            state: 'SP',
+            status: 'PLANEJADO',
+            cachedAt: DateTime(2026, 9, 17, 8),
+          ),
+        );
+    await db.into(db.participants).insert(
+          ParticipantsCompanion.insert(
+            id: 'tp-1',
+            sessionId: 'sess-antigo-consultor',
+            name: 'João Pedro',
+            cpf: '12345678909',
+            participationType: 'TEORICA_E_PRATICA',
+            status: 'PENDENTE',
+            cachedAt: DateTime(2026, 9, 17, 8),
+          ),
+        );
+  }
 
   void stubLogin({required String token}) {
     when(() => api.post<Map<String, dynamic>>('/auth/login', data: any(named: 'data')))
@@ -218,6 +254,35 @@ void main() {
     expect(repository.isAuthenticated, isFalse);
     expect(await session.readAccessToken(), isNull);
     verify(() => storage.clear()).called(greaterThanOrEqualTo(1));
+  });
+
+  test(
+      'logout apaga o cache de sessões — senão o próximo consultor a entrar '
+      'herda a agenda do anterior enquanto offline', () async {
+    await seedCache();
+    when(() => api.post<void>('/auth/logout')).thenAnswer(
+        (_) async => Response<void>(requestOptions: RequestOptions(path: '/auth/logout')));
+
+    await repository.logout();
+
+    expect(await db.select(db.sessions).get(), isEmpty);
+    expect(await db.select(db.participants).get(), isEmpty);
+  });
+
+  test(
+      'handleSessionExpired apaga o cache de sessões — é o caminho real '
+      'quando o refresh token expira e outro consultor entra depois',
+      () async {
+    stubLogin(token: fakeJwt({'sub': 'user-1'}));
+    stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+    await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: true);
+    await seedCache();
+
+    await repository.handleSessionExpired();
+
+    expect(repository.isAuthenticated, isFalse);
+    expect(await db.select(db.sessions).get(), isEmpty);
+    expect(await db.select(db.participants).get(), isEmpty);
   });
 
   test('esqueci a senha chama o endpoint e trata a resposta vazia', () async {
