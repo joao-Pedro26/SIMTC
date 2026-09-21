@@ -1,34 +1,88 @@
 // `isNull` é escondido de propósito: `package:drift/drift.dart` exporta uma
 // função top-level deprecated com esse nome, que conflita com o matcher
 // `isNull` de `package:flutter_test` (erro `ambiguous_import`). O teste de
-// atomicidade da migração abaixo precisa de `MigrationStrategy` e
-// `QueryExecutor`, que só vêm do pacote inteiro — `package:drift/native.dart`
-// não os reexporta.
+// atomicidade da migração abaixo precisa de `DatabaseDelegate` e companhia
+// (`package:drift/backends.dart`, a API para escrever backends/testes de
+// baixo nível) — `package:drift/native.dart` não os reexporta.
+import 'dart:async';
 import 'dart:io';
 
+import 'package:drift/backends.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 
-/// Mesma migração 1→2 da `AppDatabase` real, mas interrompida de propósito
-/// entre o primeiro e o segundo `addColumn` — simula o processo sendo morto
-/// no meio da migração, o cenário que o `transaction()` em `app_database.dart`
-/// existe para proteger.
-class _FlakyMigrationDatabase extends AppDatabase {
-  _FlakyMigrationDatabase(super.executor);
+/// Derruba a enésima instrução `ALTER TABLE` antes que ela chegue ao SQLite —
+/// simula o processo sendo morto no meio da migração 1→2 (a `addColumn` da
+/// `AppDatabase` real gera três `ALTER TABLE`, um por coluna nova).
+///
+/// Onde a falha é injetada, e por quê: um `QueryInterceptor` em volta do
+/// `QueryExecutor` (a rota sugerida à primeira vista) **não funciona aqui** —
+/// drift roda `beforeOpen`/`onUpgrade` direto contra o `DatabaseDelegate` do
+/// engine (`DelegatedDatabase._runMigrations` monta um `_BeforeOpeningExecutor`
+/// que lê `delegate` por baixo do `QueryExecutor` de fora), então um
+/// interceptor de `QueryExecutor` nunca vê as instruções da migração —
+/// confirmado empiricamente: um interceptor desse tipo não disparou nem uma
+/// vez durante a migração. `DatabaseDelegate.runCustom` é o único ponto por
+/// onde toda e qualquer instrução passa, dentro ou fora de `beforeOpen`,
+/// dentro ou fora de transação — por isso a falha é injetada aqui, envolvendo
+/// o `DatabaseDelegate` real do `NativeDatabase` (campo público
+/// `delegate`), sem tocar no getter `migration` de `AppDatabase`.
+class _FailOnNthAlterTableDelegate extends DatabaseDelegate {
+  _FailOnNthAlterTableDelegate(this._inner, this._failOnNth);
+
+  final DatabaseDelegate _inner;
+  final int _failOnNth;
+  int _alterTableCount = 0;
 
   @override
-  MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await transaction(() async {
-              await m.addColumn(sessions, sessions.totalParticipants);
-              throw StateError('migração interrompida de propósito (teste)');
-            });
-          }
-        },
-      );
+  DbVersionDelegate get versionDelegate => _inner.versionDelegate;
+
+  @override
+  TransactionDelegate get transactionDelegate => _inner.transactionDelegate;
+
+  @override
+  FutureOr<bool> get isOpen => _inner.isOpen;
+
+  @override
+  Future<void> open(QueryExecutorUser db) => _inner.open(db);
+
+  @override
+  Future<void> close() => _inner.close();
+
+  @override
+  void notifyDatabaseOpened(OpeningDetails details) =>
+      _inner.notifyDatabaseOpened(details);
+
+  @override
+  Future<QueryResult> runSelect(String statement, List<Object?> args) =>
+      _inner.runSelect(statement, args);
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) =>
+      _inner.runUpdate(statement, args);
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) =>
+      _inner.runInsert(statement, args);
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) =>
+      _inner.runBatched(statements);
+
+  @override
+  Future<void> runCustom(String statement, List<Object?> args) {
+    if (statement.startsWith('ALTER TABLE')) {
+      _alterTableCount++;
+      if (_alterTableCount == _failOnNth) {
+        throw StateError(
+          'migração interrompida de propósito (teste, injetada no DatabaseDelegate)',
+        );
+      }
+    }
+    return _inner.runCustom(statement, args);
+  }
 }
 
 void main() {
@@ -220,10 +274,16 @@ void main() {
           raw.execute('PRAGMA user_version = 1');
         };
 
-    /// Abre com a migração instável e devolve o erro que ela lança — a
-    /// abertura (`select`) dispara a migração de forma preguiçosa.
+    /// Abre o `AppDatabase` real — o getter `migration` de produção, sem
+    /// nenhuma sobrescrita — sobre um `DatabaseDelegate` que derruba a 2ª
+    /// instrução `ALTER TABLE` (a migração real faz 3, uma por coluna nova).
+    /// A 1ª tem sucesso, a 2ª nunca chega ao SQLite. A abertura (`select`)
+    /// dispara a migração de forma preguiçosa.
     Future<Object> openAndCaptureError() async {
-      final db = _FlakyMigrationDatabase(NativeDatabase(file, setup: rawSetup()));
+      final realDelegate = NativeDatabase(file, setup: rawSetup()).delegate;
+      final executor =
+          DelegatedDatabase(_FailOnNthAlterTableDelegate(realDelegate, 2));
+      final db = AppDatabase(executor);
       try {
         await db.select(db.sessions).get();
         fail('esperava que a migração falhasse de propósito');
@@ -237,12 +297,20 @@ void main() {
     final firstError = await openAndCaptureError();
     expect('$firstError', contains('interrompida de propósito'));
 
-    // Reabrir com a MESMA migração instável: se a primeira tentativa tivesse
-    // deixado a primeira coluna já criada fora de uma transação (o bug
-    // original — `addColumn` sem `transaction()`), esta segunda tentativa
-    // quebraria com "duplicate column name" em vez do erro proposital de
-    // novo. O mesmo erro nas duas vezes prova que nada da tentativa anterior
-    // sobrou: nem a coluna, nem a versão do esquema.
+    // Reabrir sobre o MESMO arquivo com um novo `_FailOnNthAlterTableDelegate`
+    // (contagem do zero): se a primeira tentativa tivesse deixado a primeira
+    // coluna já criada fora de uma transação (o bug original — `addColumn`
+    // sem `transaction()`), esta segunda tentativa quebraria com "duplicate
+    // column name" ao tentar recriar a mesma coluna, em vez do erro
+    // proposital de novo. O mesmo erro nas duas vezes prova que nada da
+    // tentativa anterior sobrou: nem a coluna, nem a versão do esquema.
+    //
+    // A falha é injetada de fora do getter `migration` — quem está sob teste
+    // é o `migration` real de `AppDatabase`, sem cópia nem sobrescrita.
+    // Verificado manualmente: reverter o `transaction()` em
+    // `app_database.dart` faz este `secondError` virar "duplicate column
+    // name: total_participants" e a asserção abaixo falhar; devolvê-lo faz
+    // o teste passar de novo.
     final secondError = await openAndCaptureError();
     expect('$secondError', contains('interrompida de propósito'),
         reason: 'se a 1ª tentativa tivesse deixado a coluna já criada fora '
