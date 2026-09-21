@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaginationDto {
@@ -17,4 +17,9 @@ export class PaginationDto {
   @IsString()
   @IsOptional()
   companyId?: string;
+
+  /** Data ISO (`YYYY-MM-DD`). Traz sessões a partir dela, mais as sem data. */
+  @IsDateString()
+  @IsOptional()
+  from?: string;
 }

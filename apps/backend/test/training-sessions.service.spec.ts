@@ -100,4 +100,35 @@ describe('TrainingSessionsService.findAll', () => {
 
     expect(mockPrisma.trainingParticipant.groupBy).not.toHaveBeenCalled();
   });
+
+  it('sem `from`, não filtra por data', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, {});
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.OR).toBeUndefined();
+  });
+
+  it('com `from`, traz o que é a partir da data E o que não tem data', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, { from: '2026-06-22' });
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.OR).toEqual([
+      { date: { gte: new Date('2026-06-22') } },
+      { date: null },
+    ]);
+  });
+
+  it('`from` convive com o filtro de consultor', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, { from: '2026-06-22' });
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.consultants).toEqual({ some: { consultantId: 'c1' } });
+    expect(args.where.OR).toHaveLength(2);
+  });
 });

@@ -28,6 +28,15 @@ export class TrainingSessionsService {
       where.companyId = pagination.companyId;
     }
 
+    if (pagination.from) {
+      // Sessão sem data também entra: ela alimenta o grupo "Outras" do app, que
+      // existe para nenhuma sessão sumir da tela do consultor.
+      where.OR = [
+        { date: { gte: new Date(pagination.from) } },
+        { date: null },
+      ];
+    }
+
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
