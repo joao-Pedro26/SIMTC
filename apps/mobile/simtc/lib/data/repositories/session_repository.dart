@@ -30,6 +30,12 @@ class SessionRepository {
   /// `totalPages` incoerente.
   static const int _maxPages = 10;
 
+  /// Quanto passado o app carrega. Fora disso, o consultor consulta pelo painel
+  /// web — baixar o histórico inteiro faria o admin, que recebe todas as sessões
+  /// do sistema, estourar o teto de páginas e ficar com uma lista parcial em
+  /// silêncio. Decidido com o usuário em 20/09/2026.
+  static const int _historyWindowDays = 90;
+
   static const String _offlineMessage =
       'Não foi possível atualizar. Mostrando os dados já baixados.';
 
@@ -65,11 +71,22 @@ class SessionRepository {
     final sessions = <TrainingSession>[];
     var reachedEnd = false;
 
+    // Calculado uma vez antes do laço: uma virada de meia-noite no meio do
+    // sync não pode mudar o filtro entre páginas.
+    final from = DateTime.now().subtract(
+      const Duration(days: _historyWindowDays),
+    );
+    String dois(int value) => value.toString().padLeft(2, '0');
+
     try {
       for (var page = 1; page <= _maxPages; page++) {
         final response = await _api.get<Map<String, dynamic>>(
           _path,
-          queryParameters: {'page': page, 'limit': _pageSize},
+          queryParameters: {
+            'page': page,
+            'limit': _pageSize,
+            'from': '${from.year}-${dois(from.month)}-${dois(from.day)}',
+          },
         );
 
         final body = response.data ?? const <String, dynamic>{};

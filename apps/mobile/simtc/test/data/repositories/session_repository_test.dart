@@ -55,11 +55,15 @@ void main() {
   tearDown(() => db.close());
 
   test('percorre todas as páginas e grava tudo no cache', () async {
+    final from = DateTime.now().subtract(const Duration(days: 90));
+    String dois(int value) => value.toString().padLeft(2, '0');
+    final fromParam = '${from.year}-${dois(from.month)}-${dois(from.day)}';
+
     when(() => api.get<Map<String, dynamic>>('/training-sessions',
-            queryParameters: {'page': 1, 'limit': 50}))
+            queryParameters: {'page': 1, 'limit': 50, 'from': fromParam}))
         .thenAnswer((_) async => page([sessionJson('s1')], pageNumber: 1, totalPages: 2));
     when(() => api.get<Map<String, dynamic>>('/training-sessions',
-            queryParameters: {'page': 2, 'limit': 50}))
+            queryParameters: {'page': 2, 'limit': 50, 'from': fromParam}))
         .thenAnswer((_) async => page([sessionJson('s2')], pageNumber: 2, totalPages: 2));
 
     final result = await repository.syncAll();
@@ -232,5 +236,25 @@ void main() {
         .called(10);
     final ids = (await db.select(db.sessions).get()).map((r) => r.id).toList();
     expect(ids, containsAll(['antiga', 'nova']));
+  });
+
+  test('pede só a janela de 90 dias, contando a partir de hoje', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([], pageNumber: 1, totalPages: 1));
+
+    await repository.syncAll();
+
+    final captured = verify(() => api.get<Map<String, dynamic>>(
+          '/training-sessions',
+          queryParameters: captureAny(named: 'queryParameters'),
+        )).captured.single as Map<String, dynamic>;
+
+    final esperado = DateTime.now().subtract(const Duration(days: 90));
+    String dois(int v) => v.toString().padLeft(2, '0');
+    expect(
+      captured['from'],
+      '${esperado.year}-${dois(esperado.month)}-${dois(esperado.day)}',
+    );
   });
 }
