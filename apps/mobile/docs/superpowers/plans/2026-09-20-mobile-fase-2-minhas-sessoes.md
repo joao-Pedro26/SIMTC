@@ -19,6 +19,11 @@
 5. **Regra dos três chips:** **Hoje** = `date` é hoje; **Próximos 7 dias** = `date` entre amanhã e +7 dias; **Concluídas** = `status = CONCLUIDO`, qualquer data. Sessões sem `date` e sessões atrasadas (data passada, status diferente de `CONCLUIDO`) aparecem num grupo **"Outras"** no fim do filtro **Hoje**, para nenhuma sessão sumir da tela.
 6. **Navbar sim, busca não:** a `PillNavBar` já entra com a moldura definitiva, com "Sincronizar" e "Perfil" desabilitados até as Fases 5 e 7. O ícone de busca do canvas fica de fora porque não existe endpoint de busca — volta quando houver.
 
+### Decidido depois da revisão final de branch (20/09/2026)
+
+7. **Sessões `CANCELADO` não aparecem em lugar nenhum do app, e isso é intencional.** Elas ficam fora dos três chips e também fora do grupo "Outras". Isso parece contradizer a justificativa do "Outras" ("para nenhuma sessão sumir da tela"), e uma revisão futura vai reclamar — por isso está escrito aqui. O motivo: não há nada que o consultor possa fazer numa sessão cancelada (não dá para avaliar ninguém, e o backend recusa ações), então mostrá-la seria ruído numa tela que ele olha entre um cliente e outro. A regra do "Outras" vale para sessões que ainda podem receber trabalho.
+8. **Janela de 90 dias no backend (Task 8).** O app pedia a base inteira, o que quebra para `ADMIN` a partir de 501 sessões. `GET /training-sessions` ganhou o parâmetro `from`, e o app pede os últimos 90 dias mais as sessões sem data. **Consequência aceita:** o chip "Concluídas" passa a mostrar os últimos 90 dias, não "qualquer data" — o que a decisão 5 acima dizia. Filtrar por "minhas sessões" foi recusado por contrariar a decisão 3.
+
 ## Global Constraints
 
 **Repositório e processo**
@@ -2208,6 +2213,218 @@ Esperado: `No issues found!` e todos os testes passando (os 56 da Fase 1 mais os
 git add apps/mobile/simtc/lib/ui/sessions/sessions_screen.dart apps/mobile/simtc/lib/app_providers.dart apps/mobile/simtc/lib/router.dart apps/mobile/simtc/test/ui/sessions/sessions_screen_test.dart
 git add -u apps/mobile/simtc/lib/ui/home
 git commit -m "feat(mobile): tela de minhas sessoes substitui a home provisoria"
+```
+
+---
+
+## Task 8: Janela de 90 dias no backend + teste de migração que morde
+
+Acrescentada em 20/09/2026, depois da revisão final de branch. Duas frentes, na mesma área (o que o app baixa e o banco local), num commit cada.
+
+**Files:**
+- Modify: `apps/backend/src/common/dto/pagination.dto.ts`
+- Modify: `apps/backend/src/training-sessions/training-sessions.service.ts` (`findAll`)
+- Modify: `apps/backend/test/training-sessions.service.spec.ts`
+- Modify: `apps/mobile/simtc/lib/data/repositories/session_repository.dart`
+- Modify: `apps/mobile/simtc/test/data/repositories/session_repository_test.dart`
+- Modify: `apps/mobile/simtc/test/data/services/local/app_database_test.dart`
+
+**Interfaces:**
+- Consumes: `findAll` e `syncAll()` como estão hoje.
+- Produces: `GET /training-sessions` aceita `from` (data ISO `YYYY-MM-DD`); `SessionRepository` passa a enviá-lo.
+
+### Frente A — o app para de baixar a base inteira
+
+**O problema.** `_pageSize = 50` e `_maxPages = 10` limitam o download a 500 sessões. Para `role = ADMIN`, o endpoint devolve **todas** as sessões do sistema, então a partir de 501 o admin vê uma lista permanentemente parcial, `reachedEnd` nunca fica verdadeiro, a poda nunca roda e sessões apagadas no servidor ficam no cache para sempre — tudo em silêncio. Hoje são 37 sessões; isso chega em um ou dois anos.
+
+**A decisão do usuário (20/09/2026):** resolver de verdade agora, com filtro de data no backend, janela de **90 dias**. Filtrar por "minhas sessões" foi recusado porque contraria a decisão já tomada de que ADMIN vê tudo.
+
+**Consequência aceita, e que precisa estar visível:** o chip "Concluídas" passa a mostrar os últimos 90 dias, não mais "qualquer data". Para um app de campo isso é mais útil que o histórico inteiro, e é o que limita o download.
+
+- [ ] **Step 1: Escrever os testes de backend que falham**
+
+Em `apps/backend/test/training-sessions.service.spec.ts`, acrescentar ao `describe` existente:
+
+```ts
+  it('sem `from`, não filtra por data', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, {});
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.OR).toBeUndefined();
+  });
+
+  it('com `from`, traz o que é a partir da data E o que não tem data', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, { from: '2026-06-22' });
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.OR).toEqual([
+      { date: { gte: new Date('2026-06-22') } },
+      { date: null },
+    ]);
+  });
+
+  it('`from` convive com o filtro de consultor', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, { from: '2026-06-22' });
+
+    const [[args]] = mockPrisma.trainingSession.findMany.mock.calls;
+    expect(args.where.consultants).toEqual({ some: { consultantId: 'c1' } });
+    expect(args.where.OR).toHaveLength(2);
+  });
+```
+
+A sessão **sem data** tem de continuar chegando: ela alimenta o grupo "Outras", que existe justamente para nenhuma sessão sumir da tela. Um filtro `date: { gte: from }` sozinho a excluiria.
+
+- [ ] **Step 2: Rodar e confirmar que falha**
+
+Run: `cd apps/backend && npx jest test/training-sessions.service.spec.ts`
+Esperado: FAIL nos dois últimos — `where.OR` é `undefined` porque `from` ainda não existe.
+
+- [ ] **Step 3: Implementar o filtro**
+
+Em `apps/backend/src/common/dto/pagination.dto.ts`, acrescentar ao `PaginationDto`:
+
+```ts
+  /** Data ISO (`YYYY-MM-DD`). Traz sessões a partir dela, mais as sem data. */
+  @IsDateString()
+  @IsOptional()
+  from?: string;
+```
+
+e `IsDateString` ao import de `class-validator`.
+
+Em `findAll`, logo depois do bloco `if (pagination.companyId) { ... }`:
+
+```ts
+    if (pagination.from) {
+      // Sessão sem data também entra: ela alimenta o grupo "Outras" do app, que
+      // existe para nenhuma sessão sumir da tela do consultor.
+      where.OR = [
+        { date: { gte: new Date(pagination.from) } },
+        { date: null },
+      ];
+    }
+```
+
+- [ ] **Step 4: Rodar e confirmar que passa, e que a baseline não piorou**
+
+Run: `cd apps/backend && npx jest test/training-sessions.service.spec.ts` → PASS, 8 testes.
+Depois: `npx jest 2>&1 | tail -5` e `npx tsc --noEmit` → as mesmas **12 falhas pré-existentes**, nenhuma nova, `tsc` sem erro.
+
+- [ ] **Step 5: Reconstruir os tipos compartilhados se você tiver mexido neles**
+
+Run: `cd packages/shared-types && npm run build`
+
+Só é necessário se você tiver alterado algo em `packages/shared-types/src`. O `PaginationDto` vive no backend, então provavelmente não. Confira com `git status` e não commite `dist/` sem mudança real.
+
+- [ ] **Step 6: Commit do backend**
+
+```bash
+git add apps/backend/src/common/dto/pagination.dto.ts apps/backend/src/training-sessions/training-sessions.service.ts apps/backend/test/training-sessions.service.spec.ts
+git commit -m "feat(backend): filtra sessoes por data inicial na listagem"
+```
+
+- [ ] **Step 7: Escrever o teste do app que falha**
+
+Em `apps/mobile/simtc/test/data/repositories/session_repository_test.dart`, acrescentar:
+
+```dart
+  test('pede só a janela de 90 dias, contando a partir de hoje', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([], pageNumber: 1, totalPages: 1));
+
+    await repository.syncAll();
+
+    final captured = verify(() => api.get<Map<String, dynamic>>(
+          '/training-sessions',
+          queryParameters: captureAny(named: 'queryParameters'),
+        )).captured.single as Map<String, dynamic>;
+
+    final esperado = DateTime.now().subtract(const Duration(days: 90));
+    final dois = (int v) => v.toString().padLeft(2, '0');
+    expect(
+      captured['from'],
+      '${esperado.year}-${dois(esperado.month)}-${dois(esperado.day)}',
+    );
+  });
+```
+
+- [ ] **Step 8: Rodar e confirmar que falha**
+
+Run: `cd apps/mobile/simtc && flutter test test/data/repositories/session_repository_test.dart`
+Esperado: FAIL — `captured['from']` é nulo.
+
+- [ ] **Step 9: Enviar a janela**
+
+Em `lib/data/repositories/session_repository.dart`, acrescentar a constante junto das outras:
+
+```dart
+  /// Quanto passado o app carrega. Fora disso, o consultor consulta pelo painel
+  /// web — baixar o histórico inteiro faria o admin, que recebe todas as sessões
+  /// do sistema, estourar o teto de páginas e ficar com uma lista parcial em
+  /// silêncio. Decidido com o usuário em 20/09/2026.
+  static const int _historyWindowDays = 90;
+```
+
+e incluir `from` nos `queryParameters` do `syncAll()`:
+
+```dart
+        final from = DateTime.now().subtract(
+          const Duration(days: _historyWindowDays),
+        );
+        String dois(int value) => value.toString().padLeft(2, '0');
+
+        final response = await _api.get<Map<String, dynamic>>(
+          _path,
+          queryParameters: {
+            'page': page,
+            'limit': _pageSize,
+            'from': '${from.year}-${dois(from.month)}-${dois(from.day)}',
+          },
+        );
+```
+
+Calcule o `from` **uma vez antes do laço**, não a cada página — uma virada de meia-noite no meio do sync mudaria o filtro entre páginas.
+
+- [ ] **Step 10: Rodar e confirmar que passa**
+
+Run: `cd apps/mobile/simtc && flutter test && flutter analyze`
+Esperado: tudo passando e `No issues found!`. Os testes que já existiam e casavam `queryParameters` exatos vão precisar do `from` — ajuste-os, sem afrouxar as asserções.
+
+- [ ] **Step 11: Commit do app**
+
+```bash
+git add apps/mobile/simtc/lib/data/repositories/session_repository.dart apps/mobile/simtc/test/data/repositories/session_repository_test.dart
+git commit -m "feat(mobile): baixa so a janela de 90 dias de sessoes"
+```
+
+### Frente B — o teste de migração precisa morder o código de produção
+
+**O problema.** O teste de atomicidade acrescentado na onda de correção define `_FlakyMigrationDatabase extends AppDatabase` e **sobrescreve o getter `migration` inteiro**, com uma reimplementação própria que já traz o `transaction()`. Ele prova que `transaction()` + `addColumn` do drift é atômico — verificação de premissa válida — mas não pina a mudança feita no arquivo de produção: **reverter o `transaction()` real em `app_database.dart` deixa o teste verde**.
+
+Isso é o mesmo padrão que esta fase já rejeitou duas vezes: um teste que não falha quando a correção é revertida não protege nada.
+
+- [ ] **Step 12: Fazer o teste exercitar o `AppDatabase` real**
+
+Em `apps/mobile/simtc/test/data/services/local/app_database_test.dart`, reescrever o teste de atomicidade para que a migração sob teste seja a de `AppDatabase`, não uma cópia. A falha no meio da migração precisa ser injetada **de fora** do getter `migration` — por exemplo por um `QueryExecutor` que envolva o real e lance na enésima instrução `ALTER TABLE`, deixando o `migration` de produção intacto.
+
+O critério de aceitação é comportamental, não estrutural: **tire o `transaction(...)` de `app_database.dart` e o teste tem de falhar; devolva e ele tem de passar.** Registre as duas saídas no relatório. Se você não conseguir construir uma injeção que satisfaça esse critério sem duplicar o `migration`, **não force** — reporte DONE_WITH_CONCERNS explicando o que tentou e por que não fecha, e deixe no teste um comentário dizendo exatamente o que ele cobre e o que não cobre. Um teste honesto sobre seu alcance vale mais que um que finge.
+
+- [ ] **Step 13: Rodar a suíte e o analyze**
+
+Run: `cd apps/mobile/simtc && flutter test && flutter analyze`
+
+- [ ] **Step 14: Commit**
+
+```bash
+git add apps/mobile/simtc/test/data/services/local/app_database_test.dart
+git commit -m "test(mobile): faz o teste de migracao cobrir o codigo de producao"
 ```
 
 ---
