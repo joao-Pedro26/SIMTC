@@ -45,10 +45,16 @@ class SessionsListViewModel extends ChangeNotifier {
   /// isso para dizer a idade do que está na tela.
   DateTime? get lastSyncedAt => _lastSyncedAt;
 
-  /// Só é carregamento antes da primeira leitura do cache. Depois disso, mesmo
-  /// vazia, a tela já sabe o que mostrar — e skeleton por cima de dados velhos
-  /// esconderia justamente o que o consultor precisa ver quando está offline.
-  bool get isLoading => !_hasLoadedOnce;
+  /// Antes da primeira leitura do cache, é sempre carregamento. Depois disso,
+  /// mesmo vazia, a tela já sabe o que mostrar — e skeleton por cima de dados
+  /// velhos esconderia justamente o que o consultor precisa ver quando está
+  /// offline. A exceção é o cache vazio que nunca foi sincronizado (primeiro
+  /// login): aí o stream do Drift emite `[]` na hora, e sem esta distinção a
+  /// tela afirmaria "sem sessão nenhuma" enquanto o primeiro sync ainda
+  /// baixa em 4G ruim — então o carregamento continua até ele terminar.
+  bool get isLoading =>
+      !_hasLoadedOnce ||
+      (_sessions.isEmpty && _lastSyncedAt == null && _isRefreshing);
 
   List<SessionGroup> get groups => groupSessions(_sessions, _filter, _now());
 

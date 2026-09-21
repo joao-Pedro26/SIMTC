@@ -142,6 +142,13 @@ void main() {
 
   testWidgets('cache vazio mostra o estado vazio, não o skeleton',
       (tester) async {
+    // `watchLastSyncedAt` não nulo garante que este teste cobre o cache
+    // genuinamente vazio (já sincronizado antes, sem sessão nenhuma) — e não
+    // o caso "nunca sincronizou", que fica de propósito no skeleton até o
+    // primeiro sync terminar (ver `sessions_list_viewmodel_test.dart`).
+    when(repository.watchLastSyncedAt)
+        .thenAnswer((_) => Stream.value(DateTime(2026, 9, 20, 8)));
+
     await pump(tester);
     sessions.add(const []);
     await tester.pump();

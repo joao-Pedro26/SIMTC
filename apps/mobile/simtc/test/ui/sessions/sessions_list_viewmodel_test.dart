@@ -142,6 +142,30 @@ void main() {
   });
 
   test(
+      'cache vazio e nunca sincronizado mantém o carregamento até o primeiro '
+      'sync terminar', () async {
+    // Cenário do primeiro login: o cache Drift está genuinamente vazio, o
+    // stream emite `[]` na hora, e sem esta distinção a tela afirmaria "sem
+    // sessão" enquanto ainda está baixando em 4G ruim.
+    final syncCompleter = Completer<Result<int>>();
+    when(repository.syncAll).thenAnswer((_) => syncCompleter.future);
+    when(repository.watchLastSyncedAt).thenAnswer((_) => Stream.value(null));
+
+    final viewModel = build()..init();
+    sessions.add(const []);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.isLoading, isTrue,
+        reason: 'o primeiro sync ainda está em andamento');
+
+    syncCompleter.complete(const Success(0));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.isLoading, isFalse,
+        reason: 'o sync terminou; agora é um cache genuinamente vazio');
+  });
+
+  test(
       'uma exceção que escapa do Result não trava _isRefreshing: o próximo '
       'refresh funciona', () async {
     // Um defeito real do repository (ou de um mock de teste) pode lançar em
