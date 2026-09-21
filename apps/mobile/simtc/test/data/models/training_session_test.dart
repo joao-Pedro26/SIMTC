@@ -66,4 +66,21 @@ void main() {
 
     expect(session.meta, 'Lençóis Paulista/SP · 1 participante');
   });
+
+  test('date é tratado como data de calendário, não como instante', () {
+    // O backend grava a data do formulário web como meia-noite UTC
+    // ("2026-09-20T00:00:00.000Z"). Um fuso negativo (ex.: -03:00) faria
+    // `.toLocal()` voltar um dia, então aqui a asserção trava os três campos
+    // em vez de comparar `DateTime` inteiro — um `toLocal()` reintroduzido
+    // pode até bater num fuso UTC+, mas nunca nos três campos abaixo em
+    // qualquer fuso negativo, que é o caso real do Brasil.
+    final session = TrainingSession.fromJson(
+      json(date: '2026-09-20T00:00:00.000Z'),
+    );
+
+    expect(session.date, isNotNull);
+    expect(session.date!.year, 2026);
+    expect(session.date!.month, 9);
+    expect(session.date!.day, 20);
+  });
 }

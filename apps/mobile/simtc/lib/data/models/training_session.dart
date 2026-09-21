@@ -75,6 +75,13 @@ class TrainingSession {
     final course = json['course'] as Map<String, dynamic>? ?? const {};
     final stats = json['participantStats'] as Map<String, dynamic>? ?? const {};
     final date = json['date'] as String?;
+    // `date` não é um instante, é uma data de calendário: o formulário web
+    // manda "2026-09-20" de um <input type="date">, o backend grava
+    // "2026-09-20T00:00:00.000Z", e todo formatador do app web lê os três
+    // campos direto da string, sem conversão de fuso. `.toLocal()` aqui
+    // voltaria a data um dia em qualquer fuso negativo (ex.: -03:00) — por
+    // isso o parse fica em UTC e só os campos de calendário são mantidos.
+    final parsedDate = date == null ? null : DateTime.tryParse(date)?.toUtc();
 
     return TrainingSession(
       id: json['id'] as String? ?? '',
@@ -83,7 +90,9 @@ class TrainingSession {
       courseName: course['name'] as String? ?? '',
       city: json['city'] as String? ?? '',
       state: json['state'] as String? ?? '',
-      date: date == null ? null : DateTime.tryParse(date)?.toLocal(),
+      date: parsedDate == null
+          ? null
+          : DateTime(parsedDate.year, parsedDate.month, parsedDate.day),
       status: SessionStatus.parse(json['status'] as String?),
       notes: json['notes'] as String?,
       totalParticipants: _asInt(stats['total']),
