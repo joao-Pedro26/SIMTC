@@ -73,7 +73,18 @@ class SessionRepository {
         );
 
         final body = response.data ?? const <String, dynamic>{};
-        final data = body['data'] as List<dynamic>? ?? const [];
+        final data = body['data'];
+        // Um corpo 200 fora do formato esperado (vazio, `{}`, envelope
+        // renomeado numa futura mudança de backend, resposta de proxy) não
+        // pode virar "página vazia": isso levaria a `reachedEnd = true` e a
+        // poda apagaria o cache inteiro (`id NOT IN ()` é sempre verdadeiro
+        // no SQLite). Só poda quando a resposta foi de fato entendida.
+        if (data is! List) {
+          return Failure(
+            Exception('resposta de $_path fora do formato esperado'),
+            _offlineMessage,
+          );
+        }
         sessions.addAll(
           data.whereType<Map<String, dynamic>>().map(TrainingSession.fromJson),
         );

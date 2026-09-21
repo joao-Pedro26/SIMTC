@@ -153,6 +153,33 @@ void main() {
   });
 
   test(
+      'resposta 200 fora do formato esperado vira Failure, sem apagar o '
+      'cache', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('s1')], pageNumber: 1, totalPages: 1));
+    await repository.syncAll();
+
+    // Corpo 200 sem a chave 'data' como lista: envelope renomeado numa
+    // mudança futura do backend, resposta de proxy, etc. Antes da correção
+    // isto virava `data: []` -> `reachedEnd = true` -> poda com lista de ids
+    // vazia, e `id NOT IN ()` no SQLite apaga a tabela inteira.
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => Response<Map<String, dynamic>>(
+              requestOptions: RequestOptions(path: '/training-sessions'),
+              statusCode: 200,
+              data: const <String, dynamic>{},
+            ));
+
+    final result = await repository.syncAll();
+
+    expect(result.isFailure, isTrue);
+    expect(await db.select(db.sessions).get(), hasLength(1),
+        reason: 'uma resposta que não foi entendida não pode apagar o cache');
+  });
+
+  test(
       'teto de páginas suspende a poda: sessão que não veio nas páginas '
       'baixadas sobrevive', () async {
     // Semeia o cache diretamente (sem sync), para não depender da contagem
