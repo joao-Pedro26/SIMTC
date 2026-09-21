@@ -1,13 +1,35 @@
-// `package:drift/drift.dart` não é importado aqui de propósito: ele exporta
-// uma função top-level deprecated chamada `isNull` que conflita com o
-// matcher `isNull` de `package:flutter_test` (erro `ambiguous_import`), e
-// nada deste arquivo precisa de um símbolo exclusivo dele — `NativeDatabase`
-// e `SqliteException` já vêm de `package:drift/native.dart`.
+// `isNull` é escondido de propósito: `package:drift/drift.dart` exporta uma
+// função top-level deprecated com esse nome, que conflita com o matcher
+// `isNull` de `package:flutter_test` (erro `ambiguous_import`). O teste de
+// atomicidade da migração abaixo precisa de `MigrationStrategy` e
+// `QueryExecutor`, que só vêm do pacote inteiro — `package:drift/native.dart`
+// não os reexporta.
 import 'dart:io';
 
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/services/local/app_database.dart';
+
+/// Mesma migração 1→2 da `AppDatabase` real, mas interrompida de propósito
+/// entre o primeiro e o segundo `addColumn` — simula o processo sendo morto
+/// no meio da migração, o cenário que o `transaction()` em `app_database.dart`
+/// existe para proteger.
+class _FlakyMigrationDatabase extends AppDatabase {
+  _FlakyMigrationDatabase(super.executor);
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await transaction(() async {
+              await m.addColumn(sessions, sessions.totalParticipants);
+              throw StateError('migração interrompida de propósito (teste)');
+            });
+          }
+        },
+      );
+}
 
 void main() {
   late AppDatabase db;
@@ -170,5 +192,60 @@ void main() {
     expect(row.totalParticipants, 0);
     expect(row.assessableParticipants, 0);
     expect(row.assessedParticipants, 0);
+  });
+
+  test(
+      'onUpgrade é atômico: uma falha no meio da migração não deixa coluna '
+      'já criada nem a versão marcada como migrada', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_atomica');
+    final file = File('${directory.path}/simtc.sqlite');
+    addTearDown(() => directory.deleteSync(recursive: true));
+
+    DatabaseSetup rawSetup() => (raw) {
+          raw.execute('''
+            CREATE TABLE IF NOT EXISTS sessions (
+              id TEXT NOT NULL,
+              company_name TEXT NOT NULL,
+              company_logo_url TEXT NULL,
+              course_name TEXT NOT NULL,
+              city TEXT NOT NULL,
+              state TEXT NOT NULL,
+              date INTEGER NULL,
+              status TEXT NOT NULL,
+              notes TEXT NULL,
+              cached_at INTEGER NOT NULL,
+              PRIMARY KEY (id)
+            )
+          ''');
+          raw.execute('PRAGMA user_version = 1');
+        };
+
+    /// Abre com a migração instável e devolve o erro que ela lança — a
+    /// abertura (`select`) dispara a migração de forma preguiçosa.
+    Future<Object> openAndCaptureError() async {
+      final db = _FlakyMigrationDatabase(NativeDatabase(file, setup: rawSetup()));
+      try {
+        await db.select(db.sessions).get();
+        fail('esperava que a migração falhasse de propósito');
+      } catch (error) {
+        return error;
+      } finally {
+        await db.close();
+      }
+    }
+
+    final firstError = await openAndCaptureError();
+    expect('$firstError', contains('interrompida de propósito'));
+
+    // Reabrir com a MESMA migração instável: se a primeira tentativa tivesse
+    // deixado a primeira coluna já criada fora de uma transação (o bug
+    // original — `addColumn` sem `transaction()`), esta segunda tentativa
+    // quebraria com "duplicate column name" em vez do erro proposital de
+    // novo. O mesmo erro nas duas vezes prova que nada da tentativa anterior
+    // sobrou: nem a coluna, nem a versão do esquema.
+    final secondError = await openAndCaptureError();
+    expect('$secondError', contains('interrompida de propósito'),
+        reason: 'se a 1ª tentativa tivesse deixado a coluna já criada fora '
+            'de uma transação, esta falharia com "duplicate column name"');
   });
 }
