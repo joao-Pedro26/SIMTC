@@ -1673,6 +1673,13 @@ Sem `--dart-define` — o padrão já aponta para o backend local.
 - [ ] sessões `CANCELADO` continuam fora de tudo (nenhuma seção, nenhum "Ver mais" as revela);
 - [ ] nenhuma sessão que aparecia antes desta mudança sumiu — some só o comportamento de esconder por filtro.
 
+Acrescentados depois da revisão final — cada um cobre um defeito que foi encontrado e corrigido, então são os que têm mais chance de pegar regressão:
+
+- [ ] **com "Concluídas" tendo só 1 ou 2 sessões**, rolar a lista até o fim absoluto (além do conteúdo, até travar) — o chip "Concluídas" tem que destacar mesmo assim. Era o bug real: uma seção curta no fim da lista nunca tinha seu cabeçalho empurrado pra cima da linha de ativação, e o chip ficava preso na seção anterior;
+- [ ] rolar até "Concluídas" destacar por scroll manual (não por toque) — o chip destacado tem que aparecer **visível** na barra, sem precisar arrastar a barra horizontalmente pra achá-lo. Em celular de entrada (tela estreita) os três chips não cabem de uma vez;
+- [ ] tocar rapidamente em dois chips diferentes em sequência (ex.: "Concluídas" e, sem esperar a animação terminar, "Esta semana") — a lista e o chip destacado no final têm que corresponder ao **segundo** toque, nunca uma mistura dos dois nem o chip errado;
+- [ ] **com nenhuma sessão marcada para hoje, mas alguma sessão atrasada/sem data** — a seção "Hoje" mostra "Nenhuma sessão para hoje." acima de "Outras · N", em vez de emendar direto no bloco "Outras" sem aviso.
+
 ## Pendências levadas para fases seguintes
 
 - Nenhuma identificada até aqui. Se a validação em aparelho revelar algo, registrar aqui antes de fechar o plano.
