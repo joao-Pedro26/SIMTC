@@ -67,6 +67,57 @@ void main() {
     expect(find.text('3'), findsOneWidget);
   });
 
+  testWidgets(
+      'quando selectedIndex muda por fora (ex.: destaque por scroll manual), '
+      'a barra rola até o chip ficar visível', (tester) async {
+    // 360dp — Android de entrada, onde os três chips com contadores não
+    // cabem de uma vez.
+    tester.view.physicalSize = const Size(360, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var selectedIndex = 0;
+    late StateSetter setInnerState;
+
+    await _pump(
+      tester,
+      StatefulBuilder(
+        builder: (context, setState) {
+          setInnerState = setState;
+          return FilterChipBar(
+            selectedIndex: selectedIndex,
+            onSelect: (i) => setState(() => selectedIndex = i),
+            items: const [
+              FilterChipData(label: 'Hoje', count: 2),
+              FilterChipData(label: 'Próximos 7 dias', count: 5),
+              FilterChipData(label: 'Concluídas', count: 12),
+            ],
+          );
+        },
+      ),
+    );
+
+    final viewportWidth = tester.getSize(find.byType(FilterChipBar)).width;
+
+    // Antes de qualquer mudança, "Concluídas" começa fora da faixa visível —
+    // confirma que o cenário do teste é o real (barra mais larga que a tela).
+    final beforeRect =
+        tester.getRect(find.widgetWithText(InkWell, 'Concluídas'));
+    expect(beforeRect.right, greaterThan(viewportWidth));
+
+    // Muda `selectedIndex` sem passar por nenhum toque no chip — o
+    // equivalente ao que `sessions_screen.dart` faz quando o scroll manual
+    // destaca a seção mais visível.
+    setInnerState(() => selectedIndex = 2);
+    await tester.pumpAndSettle();
+
+    final afterRect =
+        tester.getRect(find.widgetWithText(InkWell, 'Concluídas'));
+    expect(afterRect.left, greaterThanOrEqualTo(0));
+    expect(afterRect.right, lessThanOrEqualTo(viewportWidth));
+  });
+
   testWidgets('SessionCard mostra os dados, responde ao toque e esconde a barra sem progresso',
       (tester) async {
     var taps = 0;
