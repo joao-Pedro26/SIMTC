@@ -9,6 +9,7 @@ import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/utils/result.dart';
@@ -247,5 +248,177 @@ void main() {
 
     // init() já chamou syncAll uma vez; o arrasto precisa chamar de novo.
     verify(repository.syncAll).called(2);
+  });
+
+  bool isChipSelected(WidgetTester tester, String label) {
+    final inkWell = tester.widget<InkWell>(find.widgetWithText(InkWell, label));
+    final container = inkWell.child! as Container;
+    final decoration = container.decoration! as BoxDecoration;
+    return decoration.color == AppColors.primary;
+  }
+
+  testWidgets('tocar num chip rola até a seção correspondente', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final muitasHoje = List.generate(
+      20,
+      (i) => TrainingSession(
+        id: 'h$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    // Mais de uma sessão concluída — com só uma, a seção "Concluídas" é curta
+    // demais para o `ListView` conseguir rolar o cabeçalho até o topo da
+    // viewport (não há conteúdo suficiente abaixo dele para "empurrá-lo").
+    // Com um punhado de sessões concluídas, o alinhamento no topo é possível
+    // de verdade — o que é o cenário realista (empresa com várias sessões).
+    final concluidas = List.generate(
+      5,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: i == 0 ? 'Empresa Concluída' : 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, 1 + i),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...muitasHoje, ...concluidas]);
+    await tester.pump();
+
+    // Antes de tocar, as 10 primeiras sessões de hoje já preenchem a tela —
+    // a seção Concluídas está fora da área visível.
+    expect(find.text('Empresa Concluída'), findsNothing);
+
+    // A barra de chips é horizontal e, com os contadores, as três pastilhas
+    // não cabem nos 400px — "Concluídas" fica fora da faixa visível até a
+    // barra rolar até ela.
+    await tester.ensureVisible(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Empresa Concluída'), findsOneWidget);
+    // O cabeçalho de "Concluídas" alinha no topo da área rolável, mas a área
+    // rolável já começa a ~195px (cabeçalho da tela + faixa de conectividade
+    // + barra de chips) — por isso o teto realista não é perto de 0.
+    expect(tester.getTopLeft(find.text('Empresa Concluída')).dy, lessThan(300));
+  });
+
+  testWidgets('rolar manualmente destaca o chip da seção mais visível',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final muitasHoje = List.generate(
+      15,
+      (i) => TrainingSession(
+        id: 'h$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    // Mais de uma sessão concluída — com só uma, a seção é curta demais para
+    // o cabeçalho passar do topo da área rolável mesmo no fim do scroll (o
+    // `ListView` não tem conteúdo abaixo dele pra "empurrá-lo" até lá).
+    final concluidas = List.generate(
+      5,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, 1 + i),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...muitasHoje, ...concluidas]);
+    await tester.pump();
+
+    expect(isChipSelected(tester, 'Hoje'), isTrue);
+
+    // `fling` (não `drag`) de propósito: um único `drag` seguido de um só
+    // `pump` faz o `ScrollController` notificar o listener ANTES do layout
+    // recalcular a posição das seções — o listener lê geometria de um frame
+    // atrás. Um arrasto de verdade gera vários frames intercalados até
+    // assentar (como no dispositivo real); `pumpAndSettle` cobre isso.
+    await tester.fling(find.byType(ListView), const Offset(0, -2200), 3000);
+    await tester.pumpAndSettle();
+
+    expect(isChipSelected(tester, 'Concluídas'), isTrue);
+  });
+
+  testWidgets(
+      'depois de rolar manualmente, tocar num chip ainda rola pra seção certa '
+      'sem piscar', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final muitasHoje = List.generate(
+      15,
+      (i) => TrainingSession(
+        id: 'h$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add(muitasHoje);
+    await tester.pump();
+
+    // Rola o bastante pra "Empresa Hoje 0" sair da tela — não precisa ser um
+    // arrasto grande, só o suficiente pra provar que o toque no chip precisa
+    // rolar de volta de verdade, não que ela já estava visível.
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pump();
+    expect(find.text('Empresa Hoje 0'), findsNothing);
+
+    await tester.tap(find.widgetWithText(InkWell, 'Hoje'));
+    await tester.pumpAndSettle();
+
+    expect(isChipSelected(tester, 'Hoje'), isTrue);
+    expect(find.text('Empresa Hoje 0'), findsOneWidget);
   });
 }

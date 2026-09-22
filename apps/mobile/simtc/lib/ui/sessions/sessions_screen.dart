@@ -33,14 +33,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
     connectivity: context.read<ConnectivityService>(),
   )..init();
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _listKey = GlobalKey();
+  final Map<SessionFilter, GlobalKey> _sectionKeys = {
+    for (final filter in SessionFilter.values) filter: GlobalKey(),
+  };
+
+  /// Suspende a leitura do scroll manual enquanto um toque de chip está
+  /// animando o `Scrollable.ensureVisible` — sem isso, o chip picaria entre
+  /// seções intermediárias até o scroll assentar no destino.
+  bool _isProgrammaticScroll = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel.addListener(_showErrorWhenItArrives);
+    _scrollController.addListener(_updateActiveChipFromScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_updateActiveChipFromScroll);
+    _scrollController.dispose();
     _viewModel.removeListener(_showErrorWhenItArrives);
     _viewModel.dispose();
     super.dispose();
@@ -68,6 +82,48 @@ class _SessionsScreenState extends State<SessionsScreen> {
       listenable: _viewModel,
       builder: (context, _) => _buildScaffold(context, _viewModel),
     );
+  }
+
+  /// Toque num chip: marca a seção correspondente e rola até ela.
+  Future<void> _onChipTap(SessionFilter filter) async {
+    _viewModel.setFilter(filter);
+
+    final target = _sectionKeys[filter]?.currentContext;
+    if (target == null) return;
+
+    _isProgrammaticScroll = true;
+    await Scrollable.ensureVisible(
+      target,
+      alignment: 0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    _isProgrammaticScroll = false;
+  }
+
+  /// Enquanto o dedo rola a lista (sem ter tocado em nenhum chip), decide
+  /// qual seção está mais visível — a última cujo topo já passou do topo da
+  /// área rolável — e destaca o chip correspondente. Nunca dispara um novo
+  /// scroll: só o toque explícito faz isso, senão vira loop.
+  void _updateActiveChipFromScroll() {
+    if (_isProgrammaticScroll) return;
+
+    final listBox = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (listBox == null || !listBox.attached) return;
+    final activationOffset = listBox.localToGlobal(Offset.zero).dy;
+
+    SessionFilter? active;
+    for (final filter in SessionFilter.values) {
+      final box = _sectionKeys[filter]?.currentContext?.findRenderObject()
+          as RenderBox?;
+      if (box == null || !box.attached) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      if (top <= activationOffset) {
+        active = filter;
+      }
+    }
+
+    if (active != null) _viewModel.setFilter(active);
   }
 
   Widget _buildScaffold(BuildContext context, SessionsListViewModel viewModel) {
@@ -185,7 +241,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             FilterChipData(label: filter.label, count: counts[filter]),
         ],
         selectedIndex: SessionFilter.values.indexOf(viewModel.filter),
-        onSelect: (index) => viewModel.setFilter(SessionFilter.values[index]),
+        onSelect: (index) => _onChipTap(SessionFilter.values[index]),
       ),
     );
   }
@@ -197,10 +253,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
       color: AppColors.primary,
       onRefresh: viewModel.refresh,
       child: ListView(
+        key: _listKey,
+        controller: _scrollController,
         // Explícito por segurança: um `ListView` sem `controller` já é
         // "primary" e ganha essa física por padrão, mas deixar implícito
         // depende desse detalhe do framework.
         physics: const AlwaysScrollableScrollPhysics(),
+        // O `Scrollable.ensureVisible` do toque no chip só encontra a seção
+        // se ela já estiver montada na árvore — a virtualização do `ListView`
+        // descarta o que sai do `cacheExtent` padrão (250px lógicos), bem
+        // menos do que um scroll comum leva o consultor. `visibleCount` de
+        // cada bloco (Task 1/3) já limita quantos itens existem na lista
+        // lógica; isto só dá mais margem para o que já está nela continuar
+        // pré-montado fora da viewport.
+        cacheExtent: 3000.0,
         padding: const EdgeInsets.only(
           top: AppSpacing.md,
           bottom: AppSpacing.huge * 2,
@@ -222,6 +288,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   ) {
     return [
       Padding(
+        key: _sectionKeys[section.filter],
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.xl,
           AppSpacing.md,
