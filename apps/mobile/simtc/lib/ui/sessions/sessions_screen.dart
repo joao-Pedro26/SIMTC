@@ -102,27 +102,44 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _viewModel.setFilter(filter);
 
     var target = _sectionKeys[filter]?.currentContext;
-    if (target == null && _scrollController.hasClients) {
-      // A seção não está montada — saiu da faixa que o ListView mantém
-      // construída mesmo com o cacheExtent recalibrado. "Hoje" é sempre a
-      // primeira seção, "Concluídas" a última; saltar pro extremo
-      // correspondente e esperar um frame geralmente é suficiente para o
-      // Flutter montar aquela área antes de tentar de novo. "Esta semana",
-      // no meio, não tem esse atalho determinístico — fica sem animar nesse
-      // caso raro, sem quebrar o app.
-      final position = _scrollController.position;
-      final extent = filter == SessionFilter.hoje
-          ? position.minScrollExtent
-          : position.maxScrollExtent;
-      _scrollController.jumpTo(extent);
-      await WidgetsBinding.instance.endOfFrame;
-      target = _sectionKeys[filter]?.currentContext;
-    }
 
-    if (target == null || !target.mounted) return;
-
+    // O contador protege a operação inteira, não só o `ensureVisible` final:
+    // o `jumpTo` do fallback logo abaixo também mexe em `ScrollPosition`, e
+    // `ScrollPosition.forcePixels` notifica os listeners de forma síncrona
+    // (`scroll_position.dart`), sem esperar nenhum layout. Se o contador só
+    // fosse incrementado depois do fallback, esse `jumpTo` reabriria a
+    // mesma dessincronia que o Achado B corrigiu — `_updateActiveChipFromScroll`
+    // rodaria com geometria desatualizada e destacaria o chip errado, mesmo
+    // o `ensureVisible` seguinte rolando pro lugar certo.
     _programmaticScrollCount++;
     try {
+      if (target == null && _scrollController.hasClients) {
+        // A seção não está montada — saiu da faixa que o ListView mantém
+        // construída mesmo com o cacheExtent recalibrado. "Hoje" é sempre a
+        // primeira seção, "Concluídas" a última; saltar pro extremo
+        // correspondente e esperar um frame geralmente é suficiente para o
+        // Flutter montar aquela área antes de tentar de novo. "Esta semana",
+        // no meio, não tem esse atalho determinístico — fica sem animar
+        // nesse caso raro, sem quebrar o app.
+        final position = _scrollController.position;
+        final originalOffset = position.pixels;
+        final extent = filter == SessionFilter.hoje
+            ? position.minScrollExtent
+            : position.maxScrollExtent;
+        _scrollController.jumpTo(extent);
+        await WidgetsBinding.instance.endOfFrame;
+        target = _sectionKeys[filter]?.currentContext;
+        if (target == null || !target.mounted) {
+          // O fallback não achou a seção nem depois do salto — volta pra
+          // onde estava em vez de deixar o consultor largado num extremo da
+          // lista sem nenhum efeito visível que explique o porquê.
+          _scrollController.jumpTo(originalOffset);
+          return;
+        }
+      }
+
+      if (target == null || !target.mounted) return;
+
       await Scrollable.ensureVisible(
         target,
         alignment: 0,

@@ -515,14 +515,22 @@ void main() {
       await tester.pump();
     }
 
-    // Volta pro topo — os chips ficam sempre visíveis lá, então o consultor
-    // pode tocar em "Concluídas" de qualquer lugar da lista. Nesse ponto a
-    // seção "Concluídas" está bem fora do `cacheExtent` (confirmado com um
-    // teste de depuração: ~9176px de conteúdo total, `GlobalKey` sem
-    // `currentContext`) — é o `_onChipTap` quem precisa saltar pro
-    // `maxScrollExtent` (Hoje/Concluídas são sempre a primeira/última seção)
-    // antes de conseguir montar o alvo e rolar de verdade.
-    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    // Quase pro topo (não exatamente 0) — os chips ficam sempre visíveis lá,
+    // então o consultor pode tocar em "Concluídas" de qualquer lugar da
+    // lista. O offset 20 (em vez de 0) é de propósito: a 0 exato, o topo do
+    // cabeçalho de "Hoje" fica alguns pixels ABAIXO da borda da área rolável
+    // (por causa do padding do `ListView`) e a checagem `top <=
+    // activationOffset` do listener nunca marca nada como ativo — o que
+    // mascararia a regressão do `jumpTo` prematuro em vez de provar a
+    // correção. A partir de ~12px de scroll, "Hoje" já cruzou essa linha e
+    // o listener, se disparado com geometria desatualizada (o bug), marcaria
+    // "Hoje" como ativo por engano. Nesse ponto a seção "Concluídas" está
+    // bem fora do `cacheExtent` (confirmado com um teste de depuração:
+    // ~9176px de conteúdo total, `GlobalKey` sem `currentContext`) — é o
+    // `_onChipTap` quem precisa saltar pro `maxScrollExtent` (Hoje/Concluídas
+    // são sempre a primeira/última seção) antes de conseguir montar o alvo e
+    // rolar de verdade.
+    tester.state<ScrollableState>(scrollable).position.jumpTo(20);
     await tester.pump();
     expect(find.text('Empresa Concluída'), findsNothing);
 
@@ -532,6 +540,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Empresa Concluída'), findsOneWidget);
+    // O `jumpTo` do fallback dispara `ScrollPosition.forcePixels`, que
+    // notifica os listeners de forma síncrona — se o contador de scroll
+    // programático só protegesse o `ensureVisible` final (não o fallback
+    // inteiro), esse salto reabriria o listener de scroll manual no meio do
+    // caminho e destacaria "Hoje" (a seção cujo topo passa primeiro pela
+    // ativação, com a geometria desatualizada de antes do salto) em vez de
+    // "Concluídas", mesmo com o conteúdo certo rolando pra tela.
+    expect(isChipSelected(tester, 'Concluídas'), isTrue);
+    expect(isChipSelected(tester, 'Hoje'), isFalse);
   });
 
   testWidgets(
