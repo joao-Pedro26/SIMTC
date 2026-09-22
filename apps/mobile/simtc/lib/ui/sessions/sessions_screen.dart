@@ -157,15 +157,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// scroll: só o toque explícito faz isso, senão vira loop.
   void _updateActiveChipFromScroll() {
     if (_programmaticScrollCount > 0) return;
+    if (!_scrollController.hasClients) return;
 
     final listBox = _listKey.currentContext?.findRenderObject() as RenderBox?;
     if (listBox == null || !listBox.attached) return;
     final activationOffset = listBox.localToGlobal(Offset.zero).dy;
 
+    RenderBox? sectionBox(SessionFilter filter) =>
+        _sectionKeys[filter]?.currentContext?.findRenderObject() as RenderBox?;
+
     SessionFilter? active;
     for (final filter in SessionFilter.values) {
-      final box = _sectionKeys[filter]?.currentContext?.findRenderObject()
-          as RenderBox?;
+      final box = sectionBox(filter);
       if (box == null || !box.attached) continue;
       final top = box.localToGlobal(Offset.zero).dy;
       if (top <= activationOffset) {
@@ -173,7 +176,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
       }
     }
 
-    if (active != null) _viewModel.setFilter(active);
+    // No fim absoluto do scroll, a última seção ("Concluídas") pode ser curta
+    // demais para o cabeçalho dela cruzar a linha de ativação — não há
+    // conteúdo abaixo dela pra "empurrá-la" pra cima do topo da área rolável.
+    // Sem este caso especial, o chip ficaria preso na seção anterior mesmo
+    // com "Concluídas" inteira na tela. Aqui o critério vira só "está
+    // montada", não "cruzou a linha".
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 1) {
+      for (final filter in SessionFilter.values.reversed) {
+        final box = sectionBox(filter);
+        if (box != null && box.attached) {
+          active = filter;
+          break;
+        }
+      }
+    }
+
+    // Quando nenhuma seção cruzou a linha (topo absoluto da lista, ou um
+    // fling rápido que passa por este listener antes do layout assentar), o
+    // filtro ativo cai para "Hoje" em vez de ficar preso na última seção que
+    // alguma vez foi destacada.
+    _viewModel.setFilter(active ?? SessionFilter.hoje);
   }
 
   Widget _buildScaffold(BuildContext context, SessionsListViewModel viewModel) {

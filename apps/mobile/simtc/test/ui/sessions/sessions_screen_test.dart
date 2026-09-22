@@ -344,24 +344,26 @@ void main() {
         assessedParticipants: 0,
       ),
     );
-    // Mais de uma sessão concluída — com só uma, a seção é curta demais para
-    // o cabeçalho passar do topo da área rolável mesmo no fim do scroll (o
-    // `ListView` não tem conteúdo abaixo dele pra "empurrá-lo" até lá).
-    final concluidas = List.generate(
-      5,
-      (i) => TrainingSession(
-        id: 'concluida-$i',
-        companyName: 'Empresa Concluída $i',
+    // Só uma sessão concluída, de propósito: a seção é curta demais para o
+    // cabeçalho dela cruzar o topo da área rolável mesmo no fim absoluto do
+    // scroll (o `ListView` não tem conteúdo abaixo dela pra "empurrá-la" até
+    // lá). Sem o caso especial de fim de scroll em
+    // `_updateActiveChipFromScroll`, o chip ficaria preso em "Hoje" mesmo com
+    // "Concluídas" inteira na tela — é exatamente o que este teste prova.
+    final concluidas = [
+      TrainingSession(
+        id: 'concluida-0',
+        companyName: 'Empresa Concluída 0',
         courseName: 'Curso',
         city: 'Bauru',
         state: 'SP',
-        date: DateTime(2026, 8, 1 + i),
+        date: DateTime(2026, 8, 1),
         status: SessionStatus.concluido,
         totalParticipants: 1,
         assessableParticipants: 1,
         assessedParticipants: 1,
       ),
-    );
+    ];
 
     await pump(tester);
     sessions.add([...muitasHoje, ...concluidas]);
