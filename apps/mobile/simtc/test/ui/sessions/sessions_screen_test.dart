@@ -421,4 +421,190 @@ void main() {
     expect(isChipSelected(tester, 'Hoje'), isTrue);
     expect(find.text('Empresa Hoje 0'), findsOneWidget);
   });
+
+  testWidgets(
+      'quando "Hoje" cresce além do cacheExtent, tocar em "Concluídas" ainda '
+      'rola até lá', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final hojePrincipal = List.generate(
+      10,
+      (i) => TrainingSession(
+        id: 'hp$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    // "Outras": sessões abertas com data passada — o cenário do consultor que
+    // fica dias sem abrir o app e volta com um acúmulo bem maior que os 10
+    // exibidos por padrão (por isso 30: dá pra revelar duas vezes).
+    final outras = List.generate(
+      30,
+      (i) => TrainingSession(
+        id: 'ou$i',
+        companyName: 'Empresa Outras $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now().subtract(Duration(days: 10 + i)),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final proximos7 = List.generate(
+      10,
+      (i) => TrainingSession(
+        id: 'p7$i',
+        companyName: 'Empresa Semana $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now().add(Duration(days: 1 + (i % 7))),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final concluidas = List.generate(
+      5,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: i == 0 ? 'Empresa Concluída' : 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, 1 + i),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...hojePrincipal, ...outras, ...proximos7, ...concluidas]);
+    await tester.pump();
+
+    // Revela todo o bloco "Outras" — mais de 5000px de conteúdo antes mesmo
+    // de "Concluídas" começar, o cenário que o revisor apontou como comum
+    // (não extremo) num dia de consultor ocupado.
+    final scrollable = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Scrollable),
+    );
+    for (var i = 0; i < 2; i++) {
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('ver-mais-hojeOutras')),
+        300,
+        scrollable: scrollable,
+      );
+      await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
+      await tester.pump();
+    }
+
+    // Volta pro topo — os chips ficam sempre visíveis lá, então o consultor
+    // pode tocar em "Concluídas" de qualquer lugar da lista. Nesse ponto a
+    // seção "Concluídas" está bem fora do `cacheExtent` (confirmado com um
+    // teste de depuração: ~9176px de conteúdo total, `GlobalKey` sem
+    // `currentContext`) — é o `_onChipTap` quem precisa saltar pro
+    // `maxScrollExtent` (Hoje/Concluídas são sempre a primeira/última seção)
+    // antes de conseguir montar o alvo e rolar de verdade.
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pump();
+    expect(find.text('Empresa Concluída'), findsNothing);
+
+    await tester.ensureVisible(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Empresa Concluída'), findsOneWidget);
+  });
+
+  testWidgets(
+      'dois toques rápidos em chips diferentes: o destaque final é o do '
+      'segundo toque', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final muitasHoje = List.generate(
+      15,
+      (i) => TrainingSession(
+        id: 'h$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final concluidas = List.generate(
+      5,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, 1 + i),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...muitasHoje, ...concluidas]);
+    await tester.pump();
+
+    // "Concluídas" não cabe nos 400px iniciais da barra — traz ela pra faixa
+    // visível ANTES da corrida começar (isso não interfere na race: só torna
+    // o toque capaz de acertar o InkWell).
+    await tester.ensureVisible(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.pump();
+
+    // Nem "Hoje" (padrão inicial) nem "Concluídas" fazem prova de nada
+    // sozinhos — "Hoje" já começa selecionado, então um teste que terminasse
+    // nele passaria mesmo que os dois toques tivessem sido ignorados. Por
+    // isso o segundo toque é em "Próximos 7 dias", que só fica selecionado
+    // se o SEGUNDO toque realmente processou.
+    //
+    // Toca em "Concluídas" e, sem esperar a animação (300ms) terminar, toca
+    // em "Próximos 7 dias" — a corrida que o revisor identificou: a animação
+    // do primeiro toque é cancelada pela do segundo, o que resolve a
+    // `Future` do primeiro `ensureVisible` na hora
+    // (`DrivenScrollActivity.dispose()` completa o completer
+    // incondicionalmente). Com um booleano ingênuo, isso reabriria o
+    // listener de scroll manual com a animação do segundo toque ainda em
+    // voo. Sem esperar nada entre os dois toques (nenhum `pump` no meio)
+    // garante que a primeira animação ainda está rodando.
+    await tester.tap(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.tap(find.widgetWithText(InkWell, 'Próximos 7 dias'));
+    await tester.pumpAndSettle();
+
+    expect(isChipSelected(tester, 'Próximos 7 dias'), isTrue);
+    expect(isChipSelected(tester, 'Hoje'), isFalse);
+    expect(isChipSelected(tester, 'Concluídas'), isFalse);
+    expect(find.text('Esta semana'), findsOneWidget);
+  });
 }

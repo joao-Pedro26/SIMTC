@@ -39,10 +39,23 @@ class _SessionsScreenState extends State<SessionsScreen> {
     for (final filter in SessionFilter.values) filter: GlobalKey(),
   };
 
-  /// Suspende a leitura do scroll manual enquanto um toque de chip está
-  /// animando o `Scrollable.ensureVisible` — sem isso, o chip picaria entre
-  /// seções intermediárias até o scroll assentar no destino.
-  bool _isProgrammaticScroll = false;
+  /// Suspende a leitura do scroll manual enquanto alguma animação de toque de
+  /// chip está rodando — sem isso, o chip picaria entre seções intermediárias
+  /// até o scroll assentar no destino. É contador, não booleano: um segundo
+  /// toque antes do primeiro `Scrollable.ensureVisible` terminar cancela a
+  /// activity anterior, o que resolve a `Future` dela imediatamente
+  /// (`DrivenScrollActivity.dispose()` chama `_completer.complete()` sem
+  /// condição). Com um booleano, essa resolução antecipada zeraria a flag com
+  /// a animação do segundo toque ainda em voo, reabrindo o listener no meio
+  /// do caminho. O contador só chega a 0 quando a última chamada em voo
+  /// também terminar seu `finally`.
+  int _programmaticScrollCount = 0;
+
+  /// ~130px por card (`SessionCard`) × até 20 na seção "Hoje" (bloco
+  /// principal + "Outras", que acumula se o consultor ficar tempo sem abrir
+  /// o app) + headers + margem para a seção seguinte. Ver `session_card.dart`
+  /// para a origem do número por card.
+  static const double _sectionsCacheExtent = 5000.0;
 
   @override
   void initState() {
@@ -88,17 +101,37 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _onChipTap(SessionFilter filter) async {
     _viewModel.setFilter(filter);
 
-    final target = _sectionKeys[filter]?.currentContext;
-    if (target == null) return;
+    var target = _sectionKeys[filter]?.currentContext;
+    if (target == null && _scrollController.hasClients) {
+      // A seção não está montada — saiu da faixa que o ListView mantém
+      // construída mesmo com o cacheExtent recalibrado. "Hoje" é sempre a
+      // primeira seção, "Concluídas" a última; saltar pro extremo
+      // correspondente e esperar um frame geralmente é suficiente para o
+      // Flutter montar aquela área antes de tentar de novo. "Esta semana",
+      // no meio, não tem esse atalho determinístico — fica sem animar nesse
+      // caso raro, sem quebrar o app.
+      final position = _scrollController.position;
+      final extent = filter == SessionFilter.hoje
+          ? position.minScrollExtent
+          : position.maxScrollExtent;
+      _scrollController.jumpTo(extent);
+      await WidgetsBinding.instance.endOfFrame;
+      target = _sectionKeys[filter]?.currentContext;
+    }
 
-    _isProgrammaticScroll = true;
-    await Scrollable.ensureVisible(
-      target,
-      alignment: 0,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-    _isProgrammaticScroll = false;
+    if (target == null || !target.mounted) return;
+
+    _programmaticScrollCount++;
+    try {
+      await Scrollable.ensureVisible(
+        target,
+        alignment: 0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } finally {
+      _programmaticScrollCount--;
+    }
   }
 
   /// Enquanto o dedo rola a lista (sem ter tocado em nenhum chip), decide
@@ -106,7 +139,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// área rolável — e destaca o chip correspondente. Nunca dispara um novo
   /// scroll: só o toque explícito faz isso, senão vira loop.
   void _updateActiveChipFromScroll() {
-    if (_isProgrammaticScroll) return;
+    if (_programmaticScrollCount > 0) return;
 
     final listBox = _listKey.currentContext?.findRenderObject() as RenderBox?;
     if (listBox == null || !listBox.attached) return;
@@ -265,8 +298,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
         // menos do que um scroll comum leva o consultor. `visibleCount` de
         // cada bloco (Task 1/3) já limita quantos itens existem na lista
         // lógica; isto só dá mais margem para o que já está nela continuar
-        // pré-montado fora da viewport.
-        cacheExtent: 3000.0,
+        // pré-montado fora da viewport. Quando mesmo assim a seção sair dessa
+        // faixa, `_onChipTap` tem um fallback determinístico (ver lá).
+        cacheExtent: _sectionsCacheExtent,
         padding: const EdgeInsets.only(
           top: AppSpacing.md,
           bottom: AppSpacing.huge * 2,
