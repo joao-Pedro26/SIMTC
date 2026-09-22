@@ -13,6 +13,10 @@ import 'session_filter.dart';
 /// A lista nunca vem da resposta HTTP: chega pelo stream do cache. O sync é um
 /// efeito colateral que atualiza o cache — se falhar, a tela continua com o que
 /// tem e só ganha uma mensagem.
+///
+/// As três seções (Hoje, Esta semana, Concluídas) estão sempre todas
+/// presentes — os chips não filtram, só marcam qual seção está em foco (a
+/// tela usa isso pra saber pra onde rolar e qual chip destacar).
 class SessionsListViewModel extends ChangeNotifier {
   SessionsListViewModel({
     required SessionRepository repository,
@@ -32,6 +36,7 @@ class SessionsListViewModel extends ChangeNotifier {
 
   List<TrainingSession> _sessions = const [];
   SessionFilter _filter = SessionFilter.hoje;
+  final Map<SessionBlockId, int> _visibleCounts = {};
   bool _hasLoadedOnce = false;
   bool _isRefreshing = false;
   String? _errorMessage;
@@ -56,11 +61,13 @@ class SessionsListViewModel extends ChangeNotifier {
       !_hasLoadedOnce ||
       (_sessions.isEmpty && _lastSyncedAt == null && _isRefreshing);
 
-  List<SessionGroup> get groups => groupSessions(_sessions, _filter, _now());
+  /// As três seções, sempre nesta ordem, sempre as três — nunca escondidas.
+  List<SessionSection> get sections =>
+      buildSections(_sessions, _now(), _visibleCounts);
 
   Map<SessionFilter, int> get counts => {
         for (final filter in SessionFilter.values)
-          filter: countFor(_sessions, filter, _now()),
+          filter: chipCountFor(_sessions, filter, _now()),
       };
 
   /// Assina o cache e dispara o primeiro sync. Chamado uma vez pela tela.
@@ -84,9 +91,20 @@ class SessionsListViewModel extends ChangeNotifier {
     unawaited(refresh());
   }
 
+  /// Marca qual seção está em foco — não esconde nem revela nenhuma sessão,
+  /// as três seções continuam sempre visíveis. A tela usa isto pra saber
+  /// qual chip destacar; quem decide rolar a lista é a tela, não o VM.
   void setFilter(SessionFilter value) {
     if (_filter == value) return;
     _filter = value;
+    notifyListeners();
+  }
+
+  /// Revela mais `sessionsPageSize` sessões no bloco pedido. Os dados já
+  /// estão todos em memória — isto é paginação de exibição, não busca nova.
+  void revealMore(SessionBlockId id) {
+    _visibleCounts[id] =
+        (_visibleCounts[id] ?? sessionsPageSize) + sessionsPageSize;
     notifyListeners();
   }
 

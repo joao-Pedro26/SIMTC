@@ -56,6 +56,13 @@ void main() {
         now: () => agora,
       );
 
+  SessionBlock blockOf(
+    SessionsListViewModel vm,
+    SessionFilter filter, {
+    int index = 0,
+  }) =>
+      vm.sections.firstWhere((s) => s.filter == filter).blocks[index];
+
   setUp(() {
     repository = _MockSessionRepository();
     connectivity = _FakeConnectivity();
@@ -80,7 +87,10 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(viewModel.isLoading, isFalse);
-    expect(viewModel.groups.single.sessions.single.id, 'hoje');
+    expect(
+      blockOf(viewModel, SessionFilter.hoje).dayGroups.single.sessions.single.id,
+      'hoje',
+    );
   });
 
   test('sincroniza sozinho ao abrir', () async {
@@ -114,17 +124,49 @@ void main() {
     expect(viewModel.counts[SessionFilter.concluidas], 1);
   });
 
-  test('trocar o filtro remonta os grupos sem nova chamada de rede', () async {
+  test('trocar o filtro não esconde nenhuma seção — as três continuam com tudo',
+      () async {
     final viewModel = build()..init();
     sessions.add([session('amanha', date: DateTime(2026, 9, 21, 8))]);
     await Future<void>.delayed(Duration.zero);
 
-    expect(viewModel.groups, isEmpty);
+    expect(
+      blockOf(viewModel, SessionFilter.proximos7).dayGroups.single.sessions.single.id,
+      'amanha',
+    );
 
     viewModel.setFilter(SessionFilter.proximos7);
 
-    expect(viewModel.groups.single.sessions.single.id, 'amanha');
+    // A seção continua com a mesma sessão — trocar o filtro só muda qual
+    // seção está "em foco", nunca esconde nenhuma.
+    expect(
+      blockOf(viewModel, SessionFilter.proximos7).dayGroups.single.sessions.single.id,
+      'amanha',
+    );
+    expect(viewModel.filter, SessionFilter.proximos7);
     verify(repository.syncAll).called(1);
+  });
+
+  test('revealMore aumenta as sessões visíveis só no bloco pedido, sem nova rede',
+      () async {
+    final viewModel = build()..init();
+    sessions.add(List.generate(
+      15,
+      (i) => session('c$i',
+          status: SessionStatus.concluido, date: DateTime(2026, 8, i + 1)),
+    ));
+    await Future<void>.delayed(Duration.zero);
+
+    final antes = blockOf(viewModel, SessionFilter.concluidas);
+    expect(antes.visibleCount, sessionsPageSize);
+    expect(antes.hasMore, isTrue);
+
+    viewModel.revealMore(SessionBlockId.concluidas);
+
+    final depois = blockOf(viewModel, SessionFilter.concluidas);
+    expect(depois.visibleCount, 15);
+    expect(depois.hasMore, isFalse);
+    verify(repository.syncAll).called(1); // não chamou de novo
   });
 
   test('falha no refresh vira mensagem, sem apagar a lista', () async {
@@ -138,7 +180,10 @@ void main() {
     await viewModel.refresh();
 
     expect(viewModel.errorMessage, 'Sem conexão.');
-    expect(viewModel.groups.single.sessions, hasLength(1));
+    expect(
+      blockOf(viewModel, SessionFilter.hoje).dayGroups.single.sessions,
+      hasLength(1),
+    );
   });
 
   test(
@@ -168,10 +213,6 @@ void main() {
   test(
       'uma exceção que escapa do Result não trava _isRefreshing: o próximo '
       'refresh funciona', () async {
-    // Um defeito real do repository (ou de um mock de teste) pode lançar em
-    // vez de devolver `Failure`. Sem o `finally`, `_isRefreshing` ficaria
-    // preso em `true` e todo refresh seguinte cairia no guard-clause de
-    // início de `refresh()` sem fazer nada.
     when(repository.syncAll).thenThrow(StateError('bug inesperado'));
 
     final viewModel = build()..init();
