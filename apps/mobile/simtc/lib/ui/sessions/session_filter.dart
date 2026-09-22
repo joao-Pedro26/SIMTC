@@ -1,6 +1,6 @@
 import '../../data/models/training_session.dart';
 
-/// Os três chips da tela 1.3.
+/// Os três chips da tela 1.3. Também identificam qual seção cada chip alveja.
 enum SessionFilter {
   hoje('Hoje'),
   proximos7('Próximos 7 dias'),
@@ -11,12 +11,73 @@ enum SessionFilter {
   final String label;
 }
 
-/// Um bloco da lista, com o cabeçalho que aparece acima dele.
-class SessionGroup {
-  SessionGroup({required this.title, required this.sessions});
+/// Identifica um bloco que pagina de forma independente dos demais — a chave
+/// que o ViewModel usa pra guardar "quantas sessões estão reveladas" por
+/// bloco.
+enum SessionBlockId { hojePrincipal, hojeOutras, semana, concluidas }
 
-  final String title;
+/// Quantas sessões um bloco revela de início, e quantas a mais a cada
+/// "Ver mais". Os dados já estão todos no cache local — isto é paginação de
+/// exibição, não uma nova busca.
+const int sessionsPageSize = 10;
+
+/// Um agrupamento visual dentro de um bloco. Só tem título em "Esta semana"
+/// (um por dia); nos demais blocos é um grupo único sem título.
+class SessionDayGroup {
+  SessionDayGroup({this.title, required this.sessions});
+
+  final String? title;
   final List<TrainingSession> sessions;
+}
+
+/// Um bloco pagina de forma independente dos outros blocos da mesma seção —
+/// é por isso que "Outras" nunca engole as sessões de hoje, e vice-versa.
+class SessionBlock {
+  SessionBlock({
+    required this.id,
+    this.title,
+    required this.dayGroups,
+    required this.totalCount,
+    required this.visibleCount,
+  });
+
+  final SessionBlockId id;
+
+  /// Subtítulo do bloco (ex.: "Outras · 3"). Nulo quando o bloco não tem
+  /// subtítulo próprio.
+  final String? title;
+
+  /// As sessões do bloco, já cortadas em `visibleCount` e organizadas em
+  /// grupos por dia (um único grupo sem título, exceto em "Esta semana").
+  final List<SessionDayGroup> dayGroups;
+
+  /// Quantas sessões o bloco tem ao todo, antes de truncar.
+  final int totalCount;
+
+  /// Quantas estão reveladas agora.
+  final int visibleCount;
+
+  /// Se ainda há sessões por revelar — controla o botão "Ver mais".
+  bool get hasMore => visibleCount < totalCount;
+}
+
+/// Uma das três seções de topo — sempre existe, é o alvo do chip
+/// correspondente, mesmo quando não tem nenhuma sessão.
+class SessionSection {
+  SessionSection({
+    required this.filter,
+    required this.title,
+    required this.blocks,
+  });
+
+  final SessionFilter filter;
+  final String title;
+  final List<SessionBlock> blocks;
+
+  /// Verdadeiro quando nenhum bloco da seção tem sessão nenhuma — a tela usa
+  /// isto pra saber quando mostrar a mensagem de "nada por aqui" em vez dos
+  /// cards.
+  bool get isEmpty => blocks.every((block) => block.totalCount == 0);
 }
 
 const List<String> _meses = [
@@ -59,10 +120,10 @@ bool _ehOutra(TrainingSession session, DateTime hoje) {
   return _dia(session.date!).isBefore(hoje);
 }
 
-/// Quantas sessões o chip anuncia. Conta só o grupo principal do filtro — o
-/// grupo "Outras" carrega o próprio número no cabeçalho, para o chip não
+/// Quantas sessões o chip anuncia. Conta só o bloco principal da seção — o
+/// bloco "Outras" carrega o próprio número no cabeçalho, para o chip não
 /// prometer um número diferente do que a lista mostra.
-int countFor(
+int chipCountFor(
   List<TrainingSession> sessions,
   SessionFilter filter,
   DateTime now,
@@ -76,52 +137,119 @@ int countFor(
   };
 }
 
-/// Monta os blocos da lista para o filtro escolhido.
+int _visibleCountFor(
+  Map<SessionBlockId, int> visibleCounts,
+  SessionBlockId id,
+) =>
+    visibleCounts[id] ?? sessionsPageSize;
+
+/// Um bloco sem subdivisão por dia: as sessões truncadas viram um único
+/// `SessionDayGroup` sem título.
+SessionBlock _buildFlatBlock({
+  required SessionBlockId id,
+  String? title,
+  required List<TrainingSession> all,
+  required int visibleCount,
+}) {
+  final visible = all.take(visibleCount).toList();
+  return SessionBlock(
+    id: id,
+    title: title,
+    dayGroups: [SessionDayGroup(sessions: visible)],
+    totalCount: all.length,
+    visibleCount: visible.length,
+  );
+}
+
+/// O bloco de "Esta semana": as sessões truncadas se dividem em um
+/// `SessionDayGroup` por dia.
+SessionBlock _buildWeekBlock({
+  required List<TrainingSession> all,
+  required int visibleCount,
+}) {
+  final visible = all.take(visibleCount).toList();
+  final dayGroups = <SessionDayGroup>[];
+  DateTime? diaAtual;
+
+  for (final session in visible) {
+    final dia = _dia(session.date!);
+    if (dia != diaAtual) {
+      diaAtual = dia;
+      dayGroups.add(SessionDayGroup(
+        title: '${_diaDaSemana(dia)}, ${_diaEMes(dia)}',
+        sessions: [],
+      ));
+    }
+    dayGroups.last.sessions.add(session);
+  }
+
+  return SessionBlock(
+    id: SessionBlockId.semana,
+    dayGroups: dayGroups,
+    totalCount: all.length,
+    visibleCount: visible.length,
+  );
+}
+
+/// Monta as três seções da tela, sempre nesta ordem e sempre as três — nunca
+/// escondidas, mesmo vazias. `visibleCounts` diz quantas sessões cada bloco
+/// revela; um bloco sem entrada no mapa mostra as primeiras `sessionsPageSize`.
 ///
 /// A entrada já vem ordenada pelo repository (data mais próxima primeiro, sem
-/// data por último), então aqui só é preciso particionar.
-List<SessionGroup> groupSessions(
+/// data por último), então aqui só é preciso particionar e truncar.
+List<SessionSection> buildSections(
   List<TrainingSession> sessions,
-  SessionFilter filter,
   DateTime now,
+  Map<SessionBlockId, int> visibleCounts,
 ) {
   final hoje = _dia(now);
 
-  switch (filter) {
-    case SessionFilter.hoje:
-      final doDia = sessions.where((s) => _ehHoje(s, hoje)).toList();
-      final outras = sessions.where((s) => _ehOutra(s, hoje)).toList();
+  final doDia = sessions.where((s) => _ehHoje(s, hoje)).toList();
+  final outras = sessions.where((s) => _ehOutra(s, hoje)).toList();
+  final daSemana = sessions.where((s) => _ehProximos7(s, hoje)).toList();
+  final concluidas = sessions.where(_ehConcluida).toList();
 
-      return [
-        if (doDia.isNotEmpty)
-          SessionGroup(title: 'Hoje · ${_diaEMes(hoje)}', sessions: doDia),
-        if (outras.isNotEmpty)
-          SessionGroup(title: 'Outras · ${outras.length}', sessions: outras),
-      ];
+  final hojePrincipal = _buildFlatBlock(
+    id: SessionBlockId.hojePrincipal,
+    all: doDia,
+    visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.hojePrincipal),
+  );
+  final hojeOutras = _buildFlatBlock(
+    id: SessionBlockId.hojeOutras,
+    title: 'Outras · ${outras.length}',
+    all: outras,
+    visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.hojeOutras),
+  );
 
-    case SessionFilter.proximos7:
-      final groups = <SessionGroup>[];
-      DateTime? diaAtual;
+  final semanaBlock = _buildWeekBlock(
+    all: daSemana,
+    visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.semana),
+  );
 
-      for (final session in sessions.where((s) => _ehProximos7(s, hoje))) {
-        final dia = _dia(session.date!);
-        if (dia != diaAtual) {
-          diaAtual = dia;
-          groups.add(SessionGroup(
-            title: '${_diaDaSemana(dia)}, ${_diaEMes(dia)}',
-            sessions: [],
-          ));
-        }
-        groups.last.sessions.add(session);
-      }
+  final concluidasBlock = _buildFlatBlock(
+    id: SessionBlockId.concluidas,
+    all: concluidas,
+    visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.concluidas),
+  );
 
-      return groups;
-
-    case SessionFilter.concluidas:
-      final concluidas = sessions.where(_ehConcluida).toList();
-      return [
-        if (concluidas.isNotEmpty)
-          SessionGroup(title: 'Concluídas', sessions: concluidas),
-      ];
-  }
+  return [
+    SessionSection(
+      filter: SessionFilter.hoje,
+      title: 'Hoje · ${_diaEMes(hoje)}',
+      blocks: [
+        hojePrincipal,
+        if (outras.isNotEmpty) hojeOutras,
+      ],
+    ),
+    SessionSection(
+      filter: SessionFilter.proximos7,
+      title: 'Esta semana',
+      blocks: [semanaBlock],
+    ),
+    SessionSection(
+      filter: SessionFilter.concluidas,
+      title: 'Concluídas',
+      blocks: [concluidasBlock],
+    ),
+  ];
 }

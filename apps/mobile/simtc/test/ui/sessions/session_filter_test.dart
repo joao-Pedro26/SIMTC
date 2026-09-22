@@ -36,55 +36,118 @@ void main() {
   // Na ordem que o repository entrega: data mais próxima primeiro, sem data no fim.
   final todas = [concluida, atrasada, hoje, amanha, emSete, emOito, semData];
 
-  List<String> idsOf(List<SessionGroup> groups) =>
-      groups.expand((g) => g.sessions).map((s) => s.id).toList();
+  List<String> idsOf(SessionBlock block) =>
+      block.dayGroups.expand((g) => g.sessions).map((s) => s.id).toList();
 
-  test('Hoje traz as de hoje e junta sem data e atrasadas em "Outras"', () {
-    final groups = groupSessions(todas, SessionFilter.hoje, agora);
+  test('as três seções sempre existem, nesta ordem, mesmo vazias', () {
+    final sections = buildSections(const [], agora, const {});
 
-    expect(groups.first.title, 'Hoje · 20 set');
-    expect(groups.first.sessions.map((s) => s.id).toList(), ['hoje']);
-    expect(groups.last.title, 'Outras · 2');
-    expect(groups.last.sessions.map((s) => s.id).toList(),
-        ['atrasada', 'sem-data']);
+    expect(
+      sections.map((s) => s.filter).toList(),
+      [SessionFilter.hoje, SessionFilter.proximos7, SessionFilter.concluidas],
+    );
+    expect(sections.every((s) => s.isEmpty), isTrue);
   });
 
-  test('Próximos 7 dias vai de amanhã até o sétimo dia, um grupo por dia', () {
-    final groups = groupSessions(todas, SessionFilter.proximos7, agora);
+  test(
+      'Hoje traz as de hoje no bloco principal, e junta sem data e atrasadas '
+      'em "Outras"', () {
+    final sections = buildSections(todas, agora, const {});
+    final hojeSection = sections.first;
 
-    expect(idsOf(groups), ['amanha', 'em-sete']);
-    expect(groups.first.title, 'Seg, 21 set');
+    expect(hojeSection.title, 'Hoje · 20 set');
+    expect(idsOf(hojeSection.blocks[0]), ['hoje']);
+    expect(hojeSection.blocks[1].title, 'Outras · 2');
+    expect(idsOf(hojeSection.blocks[1]), ['atrasada', 'sem-data']);
+  });
+
+  test('sem sessão "outra", o bloco Outras nem aparece na lista de blocos',
+      () {
+    final sections = buildSections([hoje], agora, const {});
+
+    expect(sections.first.blocks, hasLength(1));
+  });
+
+  test('Esta semana é um bloco só, com um SessionDayGroup por dia', () {
+    final sections = buildSections(todas, agora, const {});
+    final semanaSection = sections[1];
+    final semanaBlock = semanaSection.blocks.single;
+
+    expect(semanaSection.title, 'Esta semana');
+    expect(idsOf(semanaBlock), ['amanha', 'em-sete']);
+    expect(
+      semanaBlock.dayGroups.map((g) => g.title).toList(),
+      ['Seg, 21 set', 'Dom, 27 set'],
+    );
   });
 
   test('Concluídas ignora a data e pega só o status', () {
-    final groups = groupSessions(todas, SessionFilter.concluidas, agora);
+    final sections = buildSections(todas, agora, const {});
+    final concluidasSection = sections.last;
 
-    expect(groups.single.title, 'Concluídas');
-    expect(idsOf(groups), ['concluida']);
+    expect(concluidasSection.title, 'Concluídas');
+    expect(idsOf(concluidasSection.blocks.single), ['concluida']);
   });
 
-  test('sessão de hoje já concluída não aparece em Hoje, e sim em Concluídas', () {
+  test('sessão de hoje já concluída não aparece em Hoje, e sim em Concluídas',
+      () {
     final hojeConcluida = session('hoje-ok',
         date: DateTime(2026, 9, 20, 7), status: SessionStatus.concluido);
+    final sections = buildSections([hojeConcluida], agora, const {});
 
-    expect(idsOf(groupSessions([hojeConcluida], SessionFilter.hoje, agora)),
-        isEmpty);
-    expect(idsOf(groupSessions([hojeConcluida], SessionFilter.concluidas, agora)),
-        ['hoje-ok']);
+    expect(idsOf(sections.first.blocks[0]), isEmpty);
+    expect(idsOf(sections.last.blocks.single), ['hoje-ok']);
   });
 
-  test('o contador do chip conta só o grupo principal do filtro', () {
-    expect(countFor(todas, SessionFilter.hoje, agora), 1);
-    expect(countFor(todas, SessionFilter.proximos7, agora), 2);
-    expect(countFor(todas, SessionFilter.concluidas, agora), 1);
-  });
-
-  test('sessão cancelada não entra em nenhum filtro de agenda', () {
+  test('sessão cancelada não entra em nenhuma seção', () {
     final cancelada = session('cancelada',
         date: DateTime(2026, 9, 20, 8), status: SessionStatus.cancelado);
+    final sections = buildSections([cancelada], agora, const {});
 
-    expect(idsOf(groupSessions([cancelada], SessionFilter.hoje, agora)), isEmpty);
-    expect(idsOf(groupSessions([cancelada], SessionFilter.proximos7, agora)),
-        isEmpty);
+    expect(sections.every((s) => s.isEmpty), isTrue);
+  });
+
+  test('o contador do chip conta só o bloco principal, nunca "Outras"', () {
+    expect(chipCountFor(todas, SessionFilter.hoje, agora), 1);
+    expect(chipCountFor(todas, SessionFilter.proximos7, agora), 2);
+    expect(chipCountFor(todas, SessionFilter.concluidas, agora), 1);
+  });
+
+  test('sem visibleCounts, cada bloco mostra até sessionsPageSize sessões',
+      () {
+    final muitas = List.generate(
+      15,
+      (i) => session('c$i',
+          status: SessionStatus.concluido, date: DateTime(2026, 8, i + 1)),
+    );
+    final sections = buildSections(muitas, agora, const {});
+    final block = sections.last.blocks.single;
+
+    expect(block.totalCount, 15);
+    expect(block.visibleCount, sessionsPageSize);
+    expect(block.hasMore, isTrue);
+  });
+
+  test(
+      'visibleCounts revela mais sessões só no bloco pedido, sem afetar os '
+      'outros', () {
+    final muitasConcluidas = List.generate(
+      15,
+      (i) => session('c$i',
+          status: SessionStatus.concluido, date: DateTime(2026, 8, i + 1)),
+    );
+    final sections = buildSections(
+      [...muitasConcluidas, hoje],
+      agora,
+      {SessionBlockId.concluidas: 20},
+    );
+
+    final concluidasBlock = sections.last.blocks.single;
+    expect(concluidasBlock.visibleCount, 15);
+    expect(concluidasBlock.hasMore, isFalse);
+
+    final hojeBlock = sections.first.blocks[0];
+    expect(hojeBlock.visibleCount, 1);
+    expect(hojeBlock.hasMore, isFalse);
   });
 }
