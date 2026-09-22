@@ -76,8 +76,6 @@ void main() {
     );
   }
 
-  /// O título é lido pelo key: o rótulo 'Sessões' da navbar tem o mesmo texto
-  /// do título quando o usuário é ADMIN, e `find.text` acharia os dois.
   String titleText(WidgetTester tester) =>
       tester.widget<Text>(find.byKey(const Key('sessions-title'))).data!;
 
@@ -140,7 +138,7 @@ void main() {
     expect(find.byType(SessionCard), findsOneWidget);
   });
 
-  testWidgets('cache vazio mostra o estado vazio, não o skeleton',
+  testWidgets('cache vazio mostra as três seções vazias, não o skeleton',
       (tester) async {
     // `watchLastSyncedAt` não nulo garante que este teste cobre o cache
     // genuinamente vazio (já sincronizado antes, sem sessão nenhuma) — e não
@@ -153,11 +151,15 @@ void main() {
     sessions.add(const []);
     await tester.pump();
 
-    expect(find.byKey(const Key('sessions-empty')), findsOneWidget);
     expect(find.byKey(const Key('sessions-skeleton')), findsNothing);
+    expect(find.text('Nenhuma sessão para hoje.'), findsOneWidget);
+    expect(find.text('Nada agendado para os próximos 7 dias.'), findsOneWidget);
+    expect(find.text('Nenhuma sessão concluída ainda.'), findsOneWidget);
   });
 
-  testWidgets('trocar de chip mostra a sessão do outro período', (tester) async {
+  testWidgets(
+      'sessões de hoje e da semana aparecem juntas, sem precisar trocar de chip',
+      (tester) async {
     final amanha = TrainingSession(
       id: 'sess-2',
       companyName: 'Suzano Papel',
@@ -175,13 +177,53 @@ void main() {
     sessions.add([hoje(), amanha]);
     await tester.pump();
 
-    expect(find.text('Suzano Papel'), findsNothing);
+    expect(find.text('Bracell Celulose'), findsOneWidget);
+    expect(find.text('Suzano Papel'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('Próximos 7 dias'));
+  testWidgets(
+      'bloco com mais de 10 sessões mostra "Ver mais", que revela o resto',
+      (tester) async {
+    final muitas = List.generate(15, (i) {
+      return TrainingSession(
+        id: 'c$i',
+        companyName: 'Empresa $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, i % 28 + 1),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      );
+    });
+
+    await pump(tester);
+    sessions.add(muitas);
     await tester.pump();
 
-    expect(find.text('Suzano Papel'), findsOneWidget);
-    expect(find.text('Bracell Celulose'), findsNothing);
+    expect(find.text('Empresa 0'), findsOneWidget);
+    expect(find.text('Empresa 10'), findsNothing);
+
+    // O `ListView` só monta o que cabe na viewport de teste — igual a um
+    // aparelho real com mais sessões do que a tela mostra de uma vez, é
+    // preciso rolar até o botão pra ele entrar na árvore.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ver-mais-concluidas')),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.byKey(const ValueKey('ver-mais-concluidas')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('ver-mais-concluidas')));
+    await tester.pump();
+
+    expect(find.text('Empresa 10'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ver-mais-concluidas')), findsNothing);
   });
 
   testWidgets(
@@ -189,11 +231,7 @@ void main() {
       (tester) async {
     // Viewport bem maior que uma sessão só garante que a lista fica mais
     // curta que a tela — o caso do dia a dia do filtro "Hoje", com uma ou
-    // duas sessões. `AlwaysScrollableScrollPhysics` é redundante aqui (o
-    // `ListView` sem controller já é "primary" e ganha essa física por
-    // padrão — ver `ScrollView` no SDK do Flutter), mas documenta a
-    // intenção e protege se algum dia o ramo populado ganhar um
-    // `controller` (o que desligaria o padrão automático).
+    // duas sessões.
     tester.view.physicalSize = const Size(400, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);

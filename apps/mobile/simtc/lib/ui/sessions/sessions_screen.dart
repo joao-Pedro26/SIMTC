@@ -174,6 +174,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final counts = viewModel.counts;
 
     return Container(
+      alignment: Alignment.centerLeft,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
@@ -192,32 +193,33 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget _buildBody(SessionsListViewModel viewModel) {
     if (viewModel.isLoading) return _buildSkeleton();
 
-    final groups = viewModel.groups;
-
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: viewModel.refresh,
-      child: groups.isEmpty
-          ? _buildEmptyState(viewModel)
-          : ListView(
-              // Explícito por segurança: um `ListView` sem `controller` já é
-              // "primary" e ganha essa física por padrão, mas deixar
-              // implícito depende desse detalhe do framework — um
-              // `controller` adicionado aqui no futuro desligaria o padrão
-              // e devolveria o pull-to-refresh quebrado numa lista curta.
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(
-                top: AppSpacing.md,
-                bottom: AppSpacing.huge * 2,
-              ),
-              children: [
-                for (final group in groups) ..._buildGroup(group),
-              ],
-            ),
+      child: ListView(
+        // Explícito por segurança: um `ListView` sem `controller` já é
+        // "primary" e ganha essa física por padrão, mas deixar implícito
+        // depende desse detalhe do framework.
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(
+          top: AppSpacing.md,
+          bottom: AppSpacing.huge * 2,
+        ),
+        children: [
+          for (final section in viewModel.sections)
+            ..._buildSection(viewModel, section),
+        ],
+      ),
     );
   }
 
-  List<Widget> _buildGroup(SessionGroup group) {
+  /// As três seções sempre aparecem, sempre nesta ordem — os chips só rolam
+  /// até elas, nunca escondem nenhuma. Cada bloco dentro da seção pagina de
+  /// forma independente dos demais.
+  List<Widget> _buildSection(
+    SessionsListViewModel viewModel,
+    SessionSection section,
+  ) {
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -227,12 +229,87 @@ class _SessionsScreenState extends State<SessionsScreen> {
           AppSpacing.sm + 2,
         ),
         child: Text(
-          group.title,
+          section.title,
           style: AppTypography.meta.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
-      for (final session in group.sessions) _buildCard(session),
+      if (section.isEmpty)
+        _buildSectionEmpty(section.filter)
+      else
+        for (final block in section.blocks) ..._buildBlock(viewModel, block),
     ];
+  }
+
+  List<Widget> _buildBlock(SessionsListViewModel viewModel, SessionBlock block) {
+    return [
+      if (block.title != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.xs,
+          ),
+          child: Text(
+            block.title!,
+            style: AppTypography.meta.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      for (final dayGroup in block.dayGroups) ..._buildDayGroup(dayGroup),
+      if (block.hasMore) _buildRevealMoreButton(viewModel, block),
+    ];
+  }
+
+  List<Widget> _buildDayGroup(SessionDayGroup dayGroup) {
+    return [
+      if (dayGroup.title != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.xs,
+          ),
+          child: Text(dayGroup.title!, style: AppTypography.meta),
+        ),
+      for (final session in dayGroup.sessions) _buildCard(session),
+    ];
+  }
+
+  Widget _buildRevealMoreButton(
+    SessionsListViewModel viewModel,
+    SessionBlock block,
+  ) {
+    return Padding(
+      key: ValueKey('ver-mais-${block.id.name}'),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Center(
+        child: TextButton(
+          onPressed: () => viewModel.revealMore(block.id),
+          child: Text('Ver mais', style: AppTypography.link),
+        ),
+      ),
+    );
+  }
+
+  /// A seção nunca some, mesmo vazia — é o que garante que o chip sempre tem
+  /// um lugar real pra rolar até.
+  Widget _buildSectionEmpty(SessionFilter filter) {
+    final message = switch (filter) {
+      SessionFilter.hoje => 'Nenhuma sessão para hoje.',
+      SessionFilter.proximos7 => 'Nada agendado para os próximos 7 dias.',
+      SessionFilter.concluidas => 'Nenhuma sessão concluída ainda.',
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        0,
+        AppSpacing.xl,
+        AppSpacing.md,
+      ),
+      child: InlineNotice(icon: AppIcons.sessions, message: message),
+    );
   }
 
   Widget _buildCard(TrainingSession session) {
@@ -298,29 +375,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  /// A lista precisa rolar mesmo vazia, senão o pull-to-refresh não tem o que
-  /// arrastar — e é justamente quando está vazia que o consultor puxa.
-  Widget _buildEmptyState(SessionsListViewModel viewModel) {
-    final message = switch (viewModel.filter) {
-      SessionFilter.hoje => 'Nenhuma sessão para hoje.',
-      SessionFilter.proximos7 => 'Nada agendado para os próximos 7 dias.',
-      SessionFilter.concluidas => 'Nenhuma sessão concluída ainda.',
-    };
-
-    return ListView(
-      key: const Key('sessions-empty'),
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      children: [
-        const SizedBox(height: AppSpacing.huge),
-        InlineNotice(
-          icon: AppIcons.sessions,
-          message: '$message Puxe para atualizar.',
-        ),
-      ],
     );
   }
 
