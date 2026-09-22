@@ -408,6 +408,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   List<Widget> _buildBlock(SessionsListViewModel viewModel, SessionBlock block) {
+    // O bloco principal de "Hoje" pode ficar vazio mesmo com a seção não
+    // vazia (há sessões em "Outras") — os outros blocos com `totalCount == 0`
+    // nunca chegam aqui, porque `_buildSection` já mostra a seção inteira
+    // vazia (`_buildSectionEmpty`) quando todo bloco dela está vazio. Aqui é
+    // só o primeiro bloco que está vazio; "Outras" continua aparecendo logo
+    // depois, sem se esconder.
+    if (block.id == SessionBlockId.hojePrincipal && block.totalCount == 0) {
+      return [_buildSectionEmpty(SessionFilter.hoje)];
+    }
+
     return [
       if (block.title != null)
         Padding(

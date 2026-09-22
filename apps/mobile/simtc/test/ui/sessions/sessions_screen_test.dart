@@ -159,6 +159,37 @@ void main() {
   });
 
   testWidgets(
+      'sem sessão hoje mas com "Outras", mostra o aviso de hoje livre antes '
+      'delas, sem esconder "Outras"', (tester) async {
+    final atrasada = TrainingSession(
+      id: 'atrasada-1',
+      companyName: 'Suzano Papel',
+      courseName: 'Operação de Empilhadeira',
+      city: 'Bauru',
+      state: 'SP',
+      date: DateTime.now().subtract(const Duration(days: 3)),
+      status: SessionStatus.planejado,
+      totalParticipants: 3,
+      assessableParticipants: 3,
+      assessedParticipants: 0,
+    );
+
+    await pump(tester);
+    sessions.add([atrasada]);
+    await tester.pump();
+
+    expect(find.text('Nenhuma sessão para hoje.'), findsOneWidget);
+    expect(find.text('Outras · 1'), findsOneWidget);
+    expect(find.text('Suzano Papel'), findsOneWidget);
+
+    // O aviso vem ANTES de "Outras" — não depois.
+    final noticeY =
+        tester.getTopLeft(find.text('Nenhuma sessão para hoje.')).dy;
+    final outrasY = tester.getTopLeft(find.text('Outras · 1')).dy;
+    expect(noticeY, lessThan(outrasY));
+  });
+
+  testWidgets(
       'sessões de hoje e da semana aparecem juntas, sem precisar trocar de chip',
       (tester) async {
     final amanha = TrainingSession(
