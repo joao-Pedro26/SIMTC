@@ -44,7 +44,7 @@ class SessionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           border: Border.symmetric(
-            horizontal: BorderSide(color: accentColor, width: 1.5),
+            horizontal: BorderSide(color: accentColor, width: 0.5),
           ),
         ),
         child: Column(
