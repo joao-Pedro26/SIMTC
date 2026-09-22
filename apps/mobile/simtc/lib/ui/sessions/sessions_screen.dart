@@ -57,6 +57,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// para a origem do número por card.
   static const double _sectionsCacheExtent = 5000.0;
 
+  /// Cada toque em chip tem sua própria geração. Um segundo toque, disparado
+  /// enquanto o primeiro ainda está suspenso num `await` (fallback de seção
+  /// desmontada, ou a animação final do `ensureVisible`), incrementa este
+  /// contador — quando o primeiro retoma, `gen != _tapGeneration` avisa que
+  /// ele não é mais a chamada mais recente e ele deve parar sem mexer em
+  /// `_scrollController` nem em `_viewModel`. Sem isso, o primeiro toque
+  /// retomaria depois do `await` e continuaria pro alvo antigo, cancelando a
+  /// animação do segundo toque no meio do caminho (ver `_onChipTap`).
+  int _tapGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +109,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   /// Toque num chip: marca a seção correspondente e rola até ela.
   Future<void> _onChipTap(SessionFilter filter) async {
+    final gen = ++_tapGeneration;
+    final previousFilter = _viewModel.filter;
     _viewModel.setFilter(filter);
 
     var target = _sectionKeys[filter]?.currentContext;
@@ -119,8 +131,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
         // primeira seção, "Concluídas" a última; saltar pro extremo
         // correspondente e esperar um frame geralmente é suficiente para o
         // Flutter montar aquela área antes de tentar de novo. "Esta semana",
-        // no meio, não tem esse atalho determinístico — fica sem animar
-        // nesse caso raro, sem quebrar o app.
+        // no meio, também usa o salto pro fim — não tem o mesmo atalho
+        // determinístico de extremo próprio, então o efeito visível nesse
+        // caso raro é um salto até o fim da lista seguido da animação de
+        // `ensureVisible` subindo até a seção, em vez de uma rolagem direta.
         final position = _scrollController.position;
         final originalOffset = position.pixels;
         final extent = filter == SessionFilter.hoje
@@ -128,12 +142,22 @@ class _SessionsScreenState extends State<SessionsScreen> {
             : position.maxScrollExtent;
         _scrollController.jumpTo(extent);
         await WidgetsBinding.instance.endOfFrame;
+
+        // Um segundo toque pode ter começado (e até terminado) enquanto este
+        // estava suspenso aqui — se essa geração não é mais a mais recente,
+        // ou o State já foi descartado, parar sem tocar em
+        // `_scrollController`/`_viewModel` de novo: eles podem não refletir
+        // mais esta chamada, ou nem existir.
+        if (gen != _tapGeneration || !mounted) return;
+
         target = _sectionKeys[filter]?.currentContext;
         if (target == null || !target.mounted) {
           // O fallback não achou a seção nem depois do salto — volta pra
-          // onde estava em vez de deixar o consultor largado num extremo da
-          // lista sem nenhum efeito visível que explique o porquê.
+          // onde estava e pro filtro que estava ativo antes deste toque, em
+          // vez de deixar o consultor largado num extremo da lista com o
+          // chip marcando uma seção que não está na tela.
           _scrollController.jumpTo(originalOffset);
+          _viewModel.setFilter(previousFilter);
           return;
         }
       }
@@ -146,6 +170,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+      if (gen != _tapGeneration || !mounted) return;
     } finally {
       _programmaticScrollCount--;
     }

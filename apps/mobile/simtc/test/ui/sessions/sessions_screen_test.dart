@@ -626,4 +626,239 @@ void main() {
     expect(isChipSelected(tester, 'Concluídas'), isFalse);
     expect(find.text('Esta semana'), findsOneWidget);
   });
+
+  testWidgets(
+      'dois toques rápidos quando o PRIMEIRO passa pelo fallback (seção '
+      'desmontada): o resultado final é o do segundo toque, não uma mistura '
+      'dos dois', (tester) async {
+    // Viewport larga o bastante pra "Hoje" e "Concluídas" caberem juntos na
+    // barra de chips sem precisar rolar — a corrida deste teste é sobre a
+    // ORDEM em que os dois toques retomam depois de um `await`, não sobre a
+    // barra de chips (achado 2, testado à parte).
+    tester.view.physicalSize = const Size(600, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final hojePrincipal = List.generate(
+      10,
+      (i) => TrainingSession(
+        id: 'hp$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    // "Outras" grande o bastante (revelada até o fim) pra, junto de "Hoje",
+    // empurrar "Concluídas" pra fora do cacheExtent quando a lista está no
+    // topo — o pré-requisito pra este toque cair no caminho do FALLBACK, não
+    // no caminho direto que o teste anterior já cobre.
+    final outras = List.generate(
+      30,
+      (i) => TrainingSession(
+        id: 'ou$i',
+        companyName: 'Empresa Outras $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now().subtract(Duration(days: 10 + i)),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final proximos7 = [
+      TrainingSession(
+        id: 'p7-0',
+        companyName: 'Empresa Semana',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now().add(const Duration(days: 2)),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    ];
+    final concluidas = List.generate(
+      5,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: i == 0 ? 'Empresa Concluída' : 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, 1 + i),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...hojePrincipal, ...outras, ...proximos7, ...concluidas]);
+    await tester.pump();
+
+    final scrollable = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Scrollable),
+    );
+    for (var i = 0; i < 2; i++) {
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('ver-mais-hojeOutras')),
+        300,
+        scrollable: scrollable,
+      );
+      await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
+      await tester.pump();
+    }
+
+    // Volta pro topo sem passar por `_onChipTap` — só a preparação do
+    // cenário, não a corrida que este teste prova. No topo, "Hoje" está
+    // sempre montada (é a primeira seção) enquanto "Concluídas" continua fora
+    // do cacheExtent — a combinação exata que o achado pede: o primeiro toque
+    // cai no fallback, o segundo (num alvo já montado) tem caminho direto.
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+    expect(find.text('Empresa Concluída'), findsNothing);
+    expect(isChipSelected(tester, 'Hoje'), isTrue);
+
+    // Toca em "Concluídas" — fora do cacheExtent daqui, então este toque
+    // entra no caminho do fallback (`jumpTo` pro fim + `await endOfFrame`,
+    // um frame inteiro) — e, sem esperar esse `await` terminar, toca em
+    // "Hoje", já montada: caminho direto, chama `ensureVisible` na hora. Sem
+    // o contador de geração, quando o primeiro toque retomasse (depois do
+    // `endOfFrame`, com "Concluídas" já montada — o próprio salto do
+    // fallback levou a lista até o fim), ele chamaria `ensureVisible` pra
+    // "Concluídas" por cima da animação do segundo toque, cancelando-a — a
+    // lista terminaria em "Concluídas" com o chip marcando "Hoje".
+    await tester.tap(find.widgetWithText(InkWell, 'Concluídas'));
+    await tester.tap(find.widgetWithText(InkWell, 'Hoje'));
+    await tester.pumpAndSettle();
+
+    expect(isChipSelected(tester, 'Hoje'), isTrue);
+    expect(isChipSelected(tester, 'Concluídas'), isFalse);
+    // Não basta o chip: confirma que a lista realmente mostra "Hoje" NA TELA
+    // (não só montada em algum lugar do cacheExtent) — é a prova de que o
+    // `ensureVisible` do segundo toque venceu, não o do primeiro.
+    expect(
+      tester.getTopLeft(find.text('Empresa Hoje 0')).dy,
+      inInclusiveRange(0.0, 700.0),
+    );
+  });
+
+  testWidgets(
+      'quando o fallback não acha a seção nem depois do salto, o chip volta '
+      'a marcar o filtro que estava ativo antes do toque', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final hojePrincipal = List.generate(
+      10,
+      (i) => TrainingSession(
+        id: 'hp$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final proximos7 = List.generate(
+      10,
+      (i) => TrainingSession(
+        id: 'p7$i',
+        companyName: 'Empresa Semana $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now().add(Duration(days: 1 + (i % 7))),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    // "Concluídas" ganha um total bem maior que o padrão — revelada até
+    // quase o fim, sobra tanto conteúdo abaixo de "Esta semana" que, mesmo
+    // saltando pro fim absoluto da lista (o que `_onChipTap` faz pra
+    // qualquer filtro que não seja "Hoje"), "Esta semana" continua fora do
+    // cacheExtent. É o cenário em que o fallback genuinamente falha.
+    final concluidas = List.generate(
+      45,
+      (i) => TrainingSession(
+        id: 'concluida-$i',
+        companyName: 'Empresa Concluída $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime(2026, 8, i % 28 + 1),
+        status: SessionStatus.concluido,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 1,
+      ),
+    );
+
+    await pump(tester);
+    sessions.add([...hojePrincipal, ...proximos7, ...concluidas]);
+    await tester.pump();
+
+    final scrollable = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Scrollable),
+    );
+    for (var i = 0; i < 3; i++) {
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('ver-mais-concluidas')),
+        300,
+        scrollable: scrollable,
+      );
+      // `scrollUntilVisible` para assim que o botão fica parcialmente
+      // visível — o suficiente pra passar no hit-test em alguns casos, mas
+      // não sempre. `ensureVisible` garante que ele fica inteiramente dentro
+      // da viewport antes do toque.
+      await tester.ensureVisible(find.byKey(const ValueKey('ver-mais-concluidas')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('ver-mais-concluidas')));
+      await tester.pump();
+    }
+
+    // Rola direto pro fim absoluto — sem passar por `_onChipTap` — só pra
+    // preparar o cenário. O scroll manual já destaca "Concluídas" por conta
+    // própria (é a seção mais visível no fim da lista).
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(isChipSelected(tester, 'Concluídas'), isTrue);
+    // Confirma a premissa do teste: "Esta semana" está mesmo fora da árvore
+    // aqui — não só fora da viewport.
+    expect(find.text('Esta semana'), findsNothing);
+
+    await tester.ensureVisible(find.widgetWithText(InkWell, 'Próximos 7 dias'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(InkWell, 'Próximos 7 dias'));
+    await tester.pumpAndSettle();
+
+    // O fallback saltou pro fim (onde já estava) e não achou "Esta semana"
+    // mesmo assim — o chip volta a marcar "Concluídas", o filtro que estava
+    // ativo antes deste toque, não "Próximos 7 dias".
+    expect(isChipSelected(tester, 'Concluídas'), isTrue);
+    expect(isChipSelected(tester, 'Próximos 7 dias'), isFalse);
+  });
 }
