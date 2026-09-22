@@ -150,4 +150,33 @@ void main() {
     expect(hojeBlock.visibleCount, 1);
     expect(hojeBlock.hasMore, isFalse);
   });
+
+  test(
+      'com mais de sessionsPageSize em "Hoje" e em "Outras" ao mesmo tempo, '
+      'revelar mais só em "Outras" não mexe em "Hoje"', () {
+    final muitasHoje = List.generate(
+      15,
+      (i) => session('hoje-$i', date: DateTime(2026, 9, 20, 8 + i % 12)),
+    );
+    final muitasOutras = List.generate(
+      15,
+      (i) => session('outra-$i', date: DateTime(2026, 9, 1 + i)),
+    );
+
+    final sections = buildSections(
+      [...muitasHoje, ...muitasOutras],
+      agora,
+      {SessionBlockId.hojeOutras: 20},
+    );
+
+    final hojePrincipal = sections.first.blocks[0];
+    expect(hojePrincipal.totalCount, 15);
+    expect(hojePrincipal.visibleCount, sessionsPageSize);
+    expect(hojePrincipal.hasMore, isTrue);
+
+    final hojeOutras = sections.first.blocks[1];
+    expect(hojeOutras.totalCount, 15);
+    expect(hojeOutras.visibleCount, 15);
+    expect(hojeOutras.hasMore, isFalse);
+  });
 }
