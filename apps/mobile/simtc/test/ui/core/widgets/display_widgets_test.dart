@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
+import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/core/widgets/severity_badge.dart';
 import 'package:simtc/ui/core/widgets/skeleton.dart';
 import 'package:simtc/ui/core/widgets/status_chip.dart';
+import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 
 Future<void> _pump(WidgetTester tester, Widget child) {
   return tester.pumpWidget(
@@ -172,5 +174,43 @@ void main() {
 
     expect(find.byType(SkeletonBox), findsNWidgets(4));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AppTopBar mostra o título e o voltar desempilha a tela',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Scaffold(
+                      body: AppTopBar(
+                        title: 'Detalhe da sessão',
+                        trailing: SyncStatusIndicator(),
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalhe da sessão'), findsOneWidget);
+    expect(find.byIcon(AppIcons.syncDone), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalhe da sessão'), findsNothing);
+    expect(find.text('abrir'), findsOneWidget);
   });
 }

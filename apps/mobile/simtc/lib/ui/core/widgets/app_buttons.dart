@@ -129,3 +129,73 @@ class AppSecondaryButton extends StatelessWidget {
     );
   }
 }
+
+/// Botão de chamada para ação em laranja, na altura mínima de toque — para
+/// ações dentro de uma linha de lista, como "Atribuir a mim". O canvas o
+/// desenha com 36dp; aqui ele tem 48dp, o alvo mínimo do DS (o consultor usa
+/// o app dentro do veículo).
+class AppCtaButton extends StatelessWidget {
+  const AppCtaButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.isLoading = false,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AppSpacing.touchTarget,
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: isLoading ? null : onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.cta,
+          foregroundColor: AppColors.ctaInk,
+          disabledBackgroundColor: isLoading ? AppColors.cta : AppColors.border,
+          disabledForegroundColor:
+              isLoading ? AppColors.ctaInk : AppColors.textMuted,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: AppTypography.buttonCompact,
+        ),
+        child: isLoading ? _buildSpinner() : _buildContent(),
+      ),
+    );
+  }
+
+  Widget _buildSpinner() {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        strokeWidth: 2.5,
+        valueColor: AlwaysStoppedAnimation<Color>(AppColors.ctaInk),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    // Sem `style` no `Text`: a cor vem do botão, e assim o rótulo fica cinza
+    // junto com o fundo quando o botão está desabilitado (offline).
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 19),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+  }
+}

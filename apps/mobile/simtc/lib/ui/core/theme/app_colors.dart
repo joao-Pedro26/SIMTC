@@ -22,6 +22,10 @@ abstract final class AppColors {
   static const Color ctaHover = Color(0xFFE09510);
   static const Color ctaSoft = Color(0xFFFEF8EE);
 
+  /// Tinta sobre o laranja de CTA ("Atribuir a mim") — branco sobre #F5A520
+  /// não passa no contraste; o canvas usa este marrom escuro.
+  static const Color ctaInk = Color(0xFF3D2500);
+
   static const Color mauve = Color(0xFF9B80A8);
   static const Color mauveSoft = Color(0xFFF5F0F8);
   static const Color mauveBorder = Color(0xFFCFBBD8);

@@ -26,4 +26,15 @@ abstract final class AppIcons {
   static const IconData needsReview = Icons.error_outline;
   static const IconData theoryOnly = Icons.menu_book_outlined;
   static const IconData logout = Icons.logout;
+  static const IconData back = Icons.chevron_left;
+  static const IconData place = Icons.place_outlined;
+  static const IconData event = Icons.event_outlined;
+  static const IconData notes = Icons.sticky_note_2_outlined;
+  static const IconData startSession = Icons.play_arrow_rounded;
+  static const IconData assign = Icons.person_add_alt_1_outlined;
+
+  /// Participante: pendente, em avaliação comigo e com outro consultor
+  static const IconData notStarted = Icons.radio_button_unchecked;
+  static const IconData evaluating = Icons.play_circle_outline;
+  static const IconData lockedByOther = Icons.lock_outline;
 }

@@ -60,6 +60,10 @@ abstract final class AppTypography {
   static TextStyle get cardTitle =>
       _inter(size: 16, weight: FontWeight.w600, height: 1.3);
 
+  /// Nome da empresa no cabeçalho do detalhe da sessão
+  static TextStyle get detailTitle =>
+      _inter(size: 18, weight: FontWeight.w600, height: 1.25);
+
   /// Texto padrão
   static TextStyle get body =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.35, color: AppColors.text3);
@@ -100,6 +104,10 @@ abstract final class AppTypography {
   static TextStyle get button =>
       _inter(size: 16, weight: FontWeight.w700, height: 1.2, color: AppColors.surface);
 
+  /// Texto de botão compacto, dentro de uma linha de lista ("Atribuir a mim")
+  static TextStyle get buttonCompact =>
+      _inter(size: 14, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
+
   /// Link discreto ("Esqueci a senha")
   static TextStyle get link =>
       _inter(size: 13.5, weight: FontWeight.w600, height: 1.2, color: AppColors.primary);
@@ -107,6 +115,10 @@ abstract final class AppTypography {
   /// Contadores e números (filtros, badges, percentuais)
   static TextStyle get counter =>
       _mono(size: 11, weight: FontWeight.w600, height: 1.2);
+
+  /// CPF mascarado, cronômetro e códigos — o token "code / mono" do canvas
+  static TextStyle get code =>
+      _mono(size: 12, weight: FontWeight.w600, height: 1.2, color: AppColors.text3);
 
   /// Campo de senha mascarado
   static TextStyle get passwordDots =>

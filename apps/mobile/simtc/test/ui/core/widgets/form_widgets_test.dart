@@ -120,6 +120,50 @@ void main() {
     });
   });
 
+  group('AppCtaButton', () {
+    testWidgets('dispara a ação e tem pelo menos o alvo mínimo de toque',
+        (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        AppCtaButton(
+          label: 'Atribuir a mim',
+          icon: AppIcons.assign,
+          onPressed: () => taps++,
+        ),
+      );
+
+      await tester.tap(find.text('Atribuir a mim'));
+      expect(taps, 1);
+      expect(tester.getSize(find.byType(AppCtaButton)).height,
+          greaterThanOrEqualTo(48));
+    });
+
+    testWidgets('em carregamento mostra o indicador e não responde ao toque',
+        (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        AppCtaButton(
+          label: 'Atribuir a mim',
+          isLoading: true,
+          onPressed: () => taps++,
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.tap(find.byType(AppCtaButton));
+      expect(taps, 0);
+    });
+
+    testWidgets('sem ação, fica desabilitado', (tester) async {
+      await _pump(tester, const AppCtaButton(label: 'Atribuir a mim'));
+
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.onPressed, isNull);
+    });
+  });
+
   group('AppCheckbox', () {
     testWidgets('o toque devolve o valor invertido', (tester) async {
       bool? received;
