@@ -27,34 +27,44 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            // Fase 2: contagens de participantes no card da Home. São cache —
-            // entram com 0 e o primeiro sync preenche. Migrar por `addColumn`
-            // (e não recriando a tabela) preserva a lista que o consultor já
-            // tem no aparelho, que é o que ele vê ao abrir o app offline.
-            //
-            // `onUpgrade` do drift não roda em transação por conta própria —
-            // o `user_version` só é gravado depois que ele termina (ver
-            // `_runMigrations` em drift/src/runtime/executor/helpers/
-            // engines.dart). Sem este `transaction()`, o Android matando o
-            // app entre o 1º e o 2º `addColumn` deixaria o arquivo com
-            // `user_version = 1` e uma coluna já criada; na abertura
-            // seguinte o `addColumn` estouraria "duplicate column name" e o
-            // app não abriria o banco nunca mais. Envolver em `transaction`
-            // torna a migração tudo-ou-nada: uma falha no meio desfaz as
-            // colunas já adicionadas e o app tenta migrar de novo na
-            // próxima abertura.
-            await transaction(() async {
+          // `onUpgrade` do drift não roda em transação por conta própria — o
+          // `user_version` só é gravado depois que ele termina (ver
+          // `_runMigrations` em drift/src/runtime/executor/helpers/
+          // engines.dart). Sem este `transaction()`, o Android matando o app
+          // entre dois `addColumn` deixaria o arquivo com a versão antiga e
+          // uma coluna já criada; na abertura seguinte o `addColumn`
+          // estouraria "duplicate column name" e o app não abriria o banco
+          // nunca mais. Uma transação só para todos os passos torna a
+          // migração tudo-ou-nada — inclusive para quem pula do esquema 1
+          // direto para o 3.
+          await transaction(() async {
+            if (from < 2) {
+              // Fase 2: contagens de participantes no card da Home. São cache
+              // — entram com 0 e o primeiro sync preenche. Migrar por
+              // `addColumn` (e não recriando a tabela) preserva a lista que o
+              // consultor já tem no aparelho, que é o que ele vê offline.
               await m.addColumn(sessions, sessions.totalParticipants);
               await m.addColumn(sessions, sessions.assessableParticipants);
               await m.addColumn(sessions, sessions.assessedParticipants);
-            });
-          }
+            }
+            if (from < 3) {
+              // Fase 3: quem pode iniciar a sessão, quando os participantes
+              // dela foram baixados, e quem avaliou cada participante e
+              // quando. Tudo anulável — o próximo sync preenche.
+              await m.addColumn(sessions, sessions.responsibleConsultantId);
+              await m.addColumn(sessions, sessions.participantsSyncedAt);
+              await m.addColumn(
+                participants,
+                participants.assessedByConsultantId,
+              );
+              await m.addColumn(participants, participants.assessedAt);
+            }
+          });
         },
         beforeOpen: (details) async {
           // O esquema usa chaves estrangeiras (participante → sessão, infração →

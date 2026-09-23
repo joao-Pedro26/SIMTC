@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -256,5 +257,39 @@ void main() {
       captured['from'],
       '${esperado.year}-${dois(esperado.month)}-${dois(esperado.day)}',
     );
+  });
+
+  test(
+      'sync da lista grava o responsável e não apaga o logo que o detalhe '
+      'gravou', () async {
+    // O detalhe da sessão (Fase 3) já gravou o logo e a data de sync dos
+    // participantes; a listagem não traz nenhum dos dois.
+    await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: 's1',
+            companyName: 'Bracell Celulose',
+            companyLogoUrl: const Value('https://cdn.simtc/logos/bracell.png'),
+            courseName: 'Direção Preventiva',
+            city: 'Lençóis Paulista',
+            state: 'SP',
+            status: 'PLANEJADO',
+            participantsSyncedAt: Value(DateTime(2026, 9, 22, 8)),
+            cachedAt: DateTime(2026, 9, 22, 8),
+          ),
+        );
+
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([
+              {...sessionJson('s1'), 'responsibleConsultantId': 'c-resp'},
+            ], pageNumber: 1, totalPages: 1));
+
+    final result = await repository.syncAll();
+
+    expect(result.isSuccess, isTrue);
+    final row = await db.select(db.sessions).getSingle();
+    expect(row.responsibleConsultantId, 'c-resp');
+    expect(row.companyLogoUrl, 'https://cdn.simtc/logos/bracell.png');
+    expect(row.participantsSyncedAt, DateTime(2026, 9, 22, 8));
   });
 }

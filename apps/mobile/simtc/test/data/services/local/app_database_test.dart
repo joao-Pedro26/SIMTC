@@ -14,8 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 
 /// Derruba a enésima instrução `ALTER TABLE` antes que ela chegue ao SQLite —
-/// simula o processo sendo morto no meio da migração 1→2 (a `addColumn` da
-/// `AppDatabase` real gera três `ALTER TABLE`, um por coluna nova).
+/// simula o processo sendo morto no meio de uma migração (cada `addColumn` da
+/// `AppDatabase` real gera um `ALTER TABLE`).
 ///
 /// Onde a falha é injetada, e por quê: um `QueryInterceptor` em volta do
 /// `QueryExecutor` (a rota sugerida à primeira vista) **não funciona aqui** —
@@ -84,6 +84,63 @@ class _FailOnNthAlterTableDelegate extends DatabaseDelegate {
     return _inner.runCustom(statement, args);
   }
 }
+
+/// A tabela `sessions` exatamente como a Fase 1 a criou (esquema 1).
+const String _sessionsV1 = '''
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    company_logo_url TEXT NULL,
+    course_name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    date INTEGER NULL,
+    status TEXT NOT NULL,
+    notes TEXT NULL,
+    cached_at INTEGER NOT NULL,
+    PRIMARY KEY (id)
+  )
+''';
+
+/// A tabela `sessions` como a Fase 2 a deixou (esquema 2): a do esquema 1 mais
+/// as três contagens.
+const String _sessionsV2 = '''
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    company_logo_url TEXT NULL,
+    course_name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    date INTEGER NULL,
+    status TEXT NOT NULL,
+    notes TEXT NULL,
+    total_participants INTEGER NOT NULL DEFAULT 0,
+    assessable_participants INTEGER NOT NULL DEFAULT 0,
+    assessed_participants INTEGER NOT NULL DEFAULT 0,
+    cached_at INTEGER NOT NULL,
+    PRIMARY KEY (id)
+  )
+''';
+
+/// A tabela `participants` como as Fases 1 e 2 a deixaram — igual nos
+/// esquemas 1 e 2, porque só a Fase 3 mexe nela.
+const String _participantsV1 = '''
+  CREATE TABLE IF NOT EXISTS participants (
+    id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions (id),
+    name TEXT NOT NULL,
+    cpf TEXT NOT NULL,
+    email TEXT NULL,
+    participation_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    assigned_consultant_id TEXT NULL,
+    assigned_consultant_name TEXT NULL,
+    score REAL NULL,
+    cached_at INTEGER NOT NULL,
+    PRIMARY KEY (id)
+  )
+''';
 
 void main() {
   late AppDatabase db;
@@ -200,7 +257,8 @@ void main() {
     expect(() => mark('item-2', 'note-m'), throwsA(isA<SqliteException>()));
   });
 
-  test('migra do esquema 1 para o 2 mantendo as sessões já cacheadas', () async {
+  test('migra do esquema 1 para o atual mantendo as sessões já cacheadas',
+      () async {
     final directory = Directory.systemTemp.createTempSync('simtc_migracao');
     final file = File('${directory.path}/simtc.sqlite');
 
@@ -208,22 +266,11 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
-          // A tabela `sessions` exatamente como a Fase 1 a criou.
-          raw.execute('''
-            CREATE TABLE IF NOT EXISTS sessions (
-              id TEXT NOT NULL,
-              company_name TEXT NOT NULL,
-              company_logo_url TEXT NULL,
-              course_name TEXT NOT NULL,
-              city TEXT NOT NULL,
-              state TEXT NOT NULL,
-              date INTEGER NULL,
-              status TEXT NOT NULL,
-              notes TEXT NULL,
-              cached_at INTEGER NOT NULL,
-              PRIMARY KEY (id)
-            )
-          ''');
+          // O banco como a Fase 1 o criou: todas as tabelas existem (a Fase 1
+          // criou o esquema inteiro), mas `sessions` ainda sem as contagens e
+          // `participants` sem as colunas da Fase 3.
+          raw.execute(_sessionsV1);
+          raw.execute(_participantsV1);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status, cached_at)
             VALUES ('sess-antiga', 'Bracell Celulose', 'Direção Preventiva',
@@ -246,6 +293,56 @@ void main() {
     expect(row.totalParticipants, 0);
     expect(row.assessableParticipants, 0);
     expect(row.assessedParticipants, 0);
+    expect(row.responsibleConsultantId, isNull);
+    expect(row.participantsSyncedAt, isNull);
+  });
+
+  test(
+      'migra do esquema 2 para o 3 mantendo sessões e participantes já '
+      'cacheados', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_v3');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          raw.execute(_sessionsV2);
+          raw.execute(_participantsV1);
+          raw.execute('''
+            INSERT INTO sessions (id, company_name, course_name, city, state, status,
+                                  total_participants, assessable_participants,
+                                  assessed_participants, cached_at)
+            VALUES ('sess-1', 'Bracell Celulose', 'Direção Preventiva',
+                    'Lençóis Paulista', 'SP', 'EM_ANDAMENTO', 5, 4, 2, 0)
+          ''');
+          raw.execute('''
+            INSERT INTO participants (id, session_id, name, cpf, participation_type,
+                                      status, cached_at)
+            VALUES ('tp-1', 'sess-1', 'Ana Paula Ribeiro', '042.118.***-**',
+                    'TEORICA_E_PRATICA', 'PENDENTE', 0)
+          ''');
+          raw.execute('PRAGMA user_version = 2');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    final session = await migrated.select(migrated.sessions).getSingle();
+    expect(session.totalParticipants, 5,
+        reason: 'as contagens da Fase 2 sobrevivem à migração');
+    expect(session.responsibleConsultantId, isNull);
+    expect(session.participantsSyncedAt, isNull);
+
+    final participant =
+        await migrated.select(migrated.participants).getSingle();
+    expect(participant.name, 'Ana Paula Ribeiro');
+    expect(participant.assessedByConsultantId, isNull);
+    expect(participant.assessedAt, isNull);
   });
 
   test(
@@ -256,29 +353,16 @@ void main() {
     addTearDown(() => directory.deleteSync(recursive: true));
 
     DatabaseSetup rawSetup() => (raw) {
-          raw.execute('''
-            CREATE TABLE IF NOT EXISTS sessions (
-              id TEXT NOT NULL,
-              company_name TEXT NOT NULL,
-              company_logo_url TEXT NULL,
-              course_name TEXT NOT NULL,
-              city TEXT NOT NULL,
-              state TEXT NOT NULL,
-              date INTEGER NULL,
-              status TEXT NOT NULL,
-              notes TEXT NULL,
-              cached_at INTEGER NOT NULL,
-              PRIMARY KEY (id)
-            )
-          ''');
+          raw.execute(_sessionsV1);
+          raw.execute(_participantsV1);
           raw.execute('PRAGMA user_version = 1');
         };
 
     /// Abre o `AppDatabase` real — o getter `migration` de produção, sem
     /// nenhuma sobrescrita — sobre um `DatabaseDelegate` que derruba a 2ª
-    /// instrução `ALTER TABLE` (a migração real faz 3, uma por coluna nova).
-    /// A 1ª tem sucesso, a 2ª nunca chega ao SQLite. A abertura (`select`)
-    /// dispara a migração de forma preguiçosa.
+    /// instrução `ALTER TABLE` (a partir do esquema 1 a migração faz sete:
+    /// três da Fase 2 e quatro da Fase 3). A 1ª tem sucesso, a 2ª nunca chega
+    /// ao SQLite. A abertura (`select`) dispara a migração de forma preguiçosa.
     Future<Object> openAndCaptureError() async {
       final realDelegate = NativeDatabase(file, setup: rawSetup()).delegate;
       final executor =
@@ -315,5 +399,46 @@ void main() {
     expect('$secondError', contains('interrompida de propósito'),
         reason: 'se a 1ª tentativa tivesse deixado a coluna já criada fora '
             'de uma transação, esta falharia com "duplicate column name"');
+  });
+
+  test(
+      'a migração 2→3 também é atômica: uma falha nas colunas de participante '
+      'desfaz as de sessão', () async {
+    final directory =
+        Directory.systemTemp.createTempSync('simtc_migracao_v3_atomica');
+    final file = File('${directory.path}/simtc.sqlite');
+    addTearDown(() => directory.deleteSync(recursive: true));
+
+    DatabaseSetup rawSetup() => (raw) {
+          raw.execute(_sessionsV2);
+          raw.execute(_participantsV1);
+          raw.execute('PRAGMA user_version = 2');
+        };
+
+    /// A migração 2→3 faz quatro `ALTER TABLE`: dois em `sessions` e dois em
+    /// `participants`. Derrubar o 3º deixa as duas colunas de sessão já
+    /// criadas — só a transação de `onUpgrade` impede que elas fiquem.
+    Future<Object> openAndCaptureError() async {
+      final realDelegate = NativeDatabase(file, setup: rawSetup()).delegate;
+      final executor =
+          DelegatedDatabase(_FailOnNthAlterTableDelegate(realDelegate, 3));
+      final db = AppDatabase(executor);
+      try {
+        await db.select(db.sessions).get();
+        fail('esperava que a migração falhasse de propósito');
+      } catch (error) {
+        return error;
+      } finally {
+        await db.close();
+      }
+    }
+
+    final firstError = await openAndCaptureError();
+    expect('$firstError', contains('interrompida de propósito'));
+
+    final secondError = await openAndCaptureError();
+    expect('$secondError', contains('interrompida de propósito'),
+        reason: 'sem a transação, a 2ª tentativa quebraria com "duplicate '
+            'column name: responsible_consultant_id"');
   });
 }

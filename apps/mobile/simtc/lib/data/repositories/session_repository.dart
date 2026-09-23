@@ -149,11 +149,15 @@ class SessionRepository {
       }
 
       for (final session in sessions) {
+        // `companyLogoUrl` fica de fora de propósito: a listagem não traz o
+        // logo (só o detalhe da sessão traz), e um `Value(null)` aqui apagaria
+        // a cada sync da Home o logo que o detalhe gravou. No upsert, coluna
+        // ausente do companion não é tocada. Pelo mesmo motivo,
+        // `participantsSyncedAt` também fica de fora.
         await _db.into(_db.sessions).insertOnConflictUpdate(
               SessionsCompanion.insert(
                 id: session.id,
                 companyName: session.companyName,
-                companyLogoUrl: Value(session.companyLogoUrl),
                 courseName: session.courseName,
                 city: session.city,
                 state: session.state,
@@ -163,6 +167,7 @@ class SessionRepository {
                 totalParticipants: Value(session.totalParticipants),
                 assessableParticipants: Value(session.assessableParticipants),
                 assessedParticipants: Value(session.assessedParticipants),
+                responsibleConsultantId: Value(session.responsibleConsultantId),
                 cachedAt: now,
               ),
             );

@@ -46,6 +46,8 @@ class TrainingSession {
     this.companyLogoUrl,
     this.date,
     this.notes,
+    this.responsibleConsultantId,
+    this.participantsSyncedAt,
   });
 
   final String id;
@@ -67,6 +69,15 @@ class TrainingSession {
 
   /// Numerador do progresso: avaliáveis já concluídos.
   final int assessedParticipants;
+
+  /// `Consultant.id` do responsável pela sessão. Só ele (ou um ADMIN) pode
+  /// iniciá-la — é o que o backend confere em `POST /:id/start`.
+  final String? responsibleConsultantId;
+
+  /// Quando os participantes desta sessão foram baixados pela última vez.
+  /// Só existe no cache (quem grava é o detalhe da sessão); nulo quer dizer
+  /// "nunca baixados", que a tela 1.4 distingue de "baixados e sem ninguém".
+  final DateTime? participantsSyncedAt;
 
   static int _asInt(Object? value) => value is num ? value.toInt() : 0;
 
@@ -98,6 +109,7 @@ class TrainingSession {
       totalParticipants: _asInt(stats['total']),
       assessableParticipants: _asInt(stats['assessable']),
       assessedParticipants: _asInt(stats['assessed']),
+      responsibleConsultantId: json['responsibleConsultantId'] as String?,
     );
   }
 
@@ -116,6 +128,8 @@ class TrainingSession {
       totalParticipants: row.totalParticipants,
       assessableParticipants: row.assessableParticipants,
       assessedParticipants: row.assessedParticipants,
+      responsibleConsultantId: row.responsibleConsultantId,
+      participantsSyncedAt: row.participantsSyncedAt,
     );
   }
 

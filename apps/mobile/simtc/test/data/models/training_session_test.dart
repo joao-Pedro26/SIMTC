@@ -83,4 +83,15 @@ void main() {
     expect(session.date!.month, 9);
     expect(session.date!.day, 20);
   });
+
+  test('lê o consultor responsável da sessão', () {
+    final session = TrainingSession.fromJson({
+      ...json(),
+      'responsibleConsultantId': 'c-resp',
+    });
+
+    expect(session.responsibleConsultantId, 'c-resp');
+    expect(session.participantsSyncedAt, isNull,
+        reason: 'a data de sync dos participantes só existe no cache');
+  });
 }

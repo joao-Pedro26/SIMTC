@@ -38,6 +38,13 @@ class Sessions extends Table {
   IntColumn get assessedParticipants =>
       integer().withDefault(const Constant(0))();
 
+  /// `Consultant.id` do responsável — decide quem vê "Iniciar sessão".
+  TextColumn get responsibleConsultantId => text().nullable()();
+
+  /// Quando os participantes desta sessão foram baixados pela última vez.
+  /// Nulo = nunca baixados, o que a tela distingue de "baixados e vazia".
+  DateTimeColumn get participantsSyncedAt => dateTime().nullable()();
+
   /// Quando esta linha veio da API — mostra ao usuário a idade do cache.
   DateTimeColumn get cachedAt => dateTime()();
 
@@ -60,6 +67,12 @@ class Participants extends Table {
 
   /// Score da avaliação já sincronizada, quando houver.
   RealColumn get score => real().nullable()();
+
+  /// `PracticalAssessment.consultantId`: quem fez a avaliação — filtro "Meus".
+  TextColumn get assessedByConsultantId => text().nullable()();
+
+  /// Fim (ou início) da avaliação sincronizada — a linha "hoje 08:12".
+  DateTimeColumn get assessedAt => dateTime().nullable()();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override
