@@ -201,21 +201,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
       }
     }
 
-    // No fim absoluto do scroll, a última seção ("Concluídas") pode ser curta
-    // demais para o cabeçalho dela cruzar a linha de ativação — não há
-    // conteúdo abaixo dela pra "empurrá-la" pra cima do topo da área rolável.
-    // Sem este caso especial, o chip ficaria preso na seção anterior mesmo
-    // com "Concluídas" inteira na tela. Aqui o critério vira só "está
-    // montada", não "cruzou a linha".
+    // No fim absoluto do scroll, a seção na tela é sempre a última
+    // ("Concluídas" — as três existem sempre, nesta ordem). A geometria não
+    // serve aqui: se ela for curta, o cabeçalho nunca cruza a linha de
+    // ativação (não há conteúdo abaixo para empurrá-lo); se for longa (dezenas
+    // de concluídas, agora com um subtítulo por dia), o cabeçalho sai do
+    // cacheExtent e nem está montado. Nos dois casos o chip ficaria preso numa
+    // seção anterior.
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 1) {
-      for (final filter in SessionFilter.values.reversed) {
-        final box = sectionBox(filter);
-        if (box != null && box.attached) {
-          active = filter;
-          break;
-        }
-      }
+      active = SessionFilter.values.last;
     }
 
     // Quando nenhuma seção cruzou a linha (topo absoluto da lista, ou um
@@ -387,17 +382,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
     SessionSection section,
   ) {
     return [
-      Padding(
-        key: _sectionKeys[section.filter],
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.md,
-          AppSpacing.xl,
-          AppSpacing.sm + 2,
+      Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
-        child: Text(
-          section.title,
-          style: AppTypography.meta.copyWith(fontWeight: FontWeight.w600),
+        child: Padding(
+          key: _sectionKeys[section.filter],
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg - 1,
+          ),
+          child: Text(section.title, style: AppTypography.sectionTitle),
         ),
       ),
       if (section.isEmpty)
@@ -443,7 +438,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xl,
-            AppSpacing.sm,
+            AppSpacing.sm + 2,
             AppSpacing.xl,
             AppSpacing.xs,
           ),
@@ -490,30 +485,27 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   Widget _buildCard(TrainingSession session) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: SessionCard(
-        companyName: session.companyName,
-        courseName: session.courseName,
-        meta: session.meta,
-        accentColor: _accentFor(session.status),
-        statusChip: StatusChip(
-          label: session.status.label,
-          icon: _iconFor(session.status),
-          tone: _toneFor(session.status),
-        ),
-        progressValue: session.progress,
-        progressLabel: session.progressLabel,
-        // O detalhe da sessão é a Fase 3; até lá o card não navega.
-        onTap: null,
+    return SessionCard(
+      companyName: session.companyName,
+      courseName: session.courseName,
+      meta: session.meta,
+      accentColor: _accentFor(session.status),
+      statusChip: StatusChip(
+        label: session.status.label,
+        icon: _iconFor(session.status),
+        tone: _toneFor(session.status),
       ),
+      progressValue: session.progress,
+      progressLabel: session.progressLabel,
+      // O detalhe da sessão é a Fase 3; até lá o card não navega.
+      onTap: null,
     );
   }
 
   Color _accentFor(SessionStatus status) => switch (status) {
         SessionStatus.planejado => AppColors.border,
         SessionStatus.emAndamento => AppColors.primary,
-        SessionStatus.concluido => AppColors.successBorder,
+        SessionStatus.concluido => AppColors.border,
         SessionStatus.cancelado => AppColors.dangerBorder,
       };
 

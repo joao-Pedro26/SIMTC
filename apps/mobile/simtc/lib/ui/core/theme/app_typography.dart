@@ -72,6 +72,10 @@ abstract final class AppTypography {
   static TextStyle get meta =>
       _inter(size: 12.5, weight: FontWeight.w400, height: 1.3, color: AppColors.text3);
 
+  /// Cabeçalho de seção de lista ("Hoje · 23 set", "Concluídas")
+  static TextStyle get sectionTitle =>
+      _inter(size: 13, weight: FontWeight.w700, height: 1.3, color: AppColors.text3);
+
   /// Rótulo de campo de formulário
   static TextStyle get fieldLabel =>
       _inter(size: 12.5, weight: FontWeight.w600, height: 1.2, color: AppColors.text3);

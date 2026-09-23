@@ -179,4 +179,25 @@ void main() {
     expect(hojeOutras.visibleCount, 15);
     expect(hojeOutras.hasMore, isFalse);
   });
+
+  test(
+      'Concluídas divide por dia, como "Esta semana", mas pagina com o id do '
+      'próprio bloco', () {
+    final sections = buildSections([
+      session('c1', status: SessionStatus.concluido, date: DateTime(2026, 9, 10, 8)),
+      session('c2', status: SessionStatus.concluido, date: DateTime(2026, 9, 10, 14)),
+      session('c3', status: SessionStatus.concluido, date: DateTime(2026, 9, 12, 8)),
+    ], agora, const {});
+    final block = sections.last.blocks.single;
+
+    // O "Ver mais" da tela chama `revealMore(block.id)`: com o id de "Esta
+    // semana" aqui, o toque em Concluídas revelaria as sessões da semana.
+    expect(block.id, SessionBlockId.concluidas);
+    expect(
+      block.dayGroups.map((g) => g.title).toList(),
+      ['Qui, 10 set', 'Sáb, 12 set'],
+    );
+    expect(idsOf(block), ['c1', 'c2', 'c3']);
+    expect(block.dayGroups.first.sessions, hasLength(2));
+  });
 }

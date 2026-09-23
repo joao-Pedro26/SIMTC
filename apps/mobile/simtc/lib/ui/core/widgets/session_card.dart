@@ -6,8 +6,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
 /// Linha de sessão da Home: empresa, curso, metadados, chip de status e, quando
-/// houver, o progresso de avaliação. O traço superior e inferior usa a cor do
-/// status, como no canvas.
+/// houver, o progresso de avaliação. O traço superior usa a cor do status.
 class SessionCard extends StatelessWidget {
   const SessionCard({
     super.key,
@@ -43,8 +42,8 @@ class SessionCard extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          border: Border.symmetric(
-            horizontal: BorderSide(color: accentColor, width: 0.5),
+          border: Border(
+            top: BorderSide(color: accentColor, width: 0.8),
           ),
         ),
         child: Column(

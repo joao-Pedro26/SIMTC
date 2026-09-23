@@ -21,8 +21,9 @@ enum SessionBlockId { hojePrincipal, hojeOutras, semana, concluidas }
 /// exibição, não uma nova busca.
 const int sessionsPageSize = 10;
 
-/// Um agrupamento visual dentro de um bloco. Só tem título em "Esta semana"
-/// (um por dia); nos demais blocos é um grupo único sem título.
+/// Um agrupamento visual dentro de um bloco. Tem título nos blocos divididos
+/// por dia ("Esta semana" e "Concluídas"); em "Hoje" é um grupo único sem
+/// título.
 class SessionDayGroup {
   SessionDayGroup({this.title, required this.sessions});
 
@@ -48,7 +49,8 @@ class SessionBlock {
   final String? title;
 
   /// As sessões do bloco, já cortadas em `visibleCount` e organizadas em
-  /// grupos por dia (um único grupo sem título, exceto em "Esta semana").
+  /// grupos por dia (um único grupo sem título em "Hoje"; um por dia em "Esta
+  /// semana" e "Concluídas").
   final List<SessionDayGroup> dayGroups;
 
   /// Quantas sessões o bloco tem ao todo, antes de truncar.
@@ -161,9 +163,11 @@ SessionBlock _buildFlatBlock({
   );
 }
 
-/// O bloco de "Esta semana": as sessões truncadas se dividem em um
-/// `SessionDayGroup` por dia.
-SessionBlock _buildWeekBlock({
+/// Um bloco dividido por dia ("Esta semana" e "Concluídas"): as sessões
+/// truncadas viram um `SessionDayGroup` por dia. O `id` vem de quem chama —
+/// é ele que o "Ver mais" usa para saber qual bloco revelar.
+SessionBlock _buildDayBlock({
+  required SessionBlockId id,
   required List<TrainingSession> all,
   required int visibleCount,
 }) {
@@ -184,7 +188,7 @@ SessionBlock _buildWeekBlock({
   }
 
   return SessionBlock(
-    id: SessionBlockId.semana,
+    id: id,
     dayGroups: dayGroups,
     totalCount: all.length,
     visibleCount: visible.length,
@@ -221,12 +225,13 @@ List<SessionSection> buildSections(
     visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.hojeOutras),
   );
 
-  final semanaBlock = _buildWeekBlock(
+  final semanaBlock = _buildDayBlock(
+    id: SessionBlockId.semana,
     all: daSemana,
     visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.semana),
   );
 
-  final concluidasBlock = _buildFlatBlock(
+  final concluidasBlock = _buildDayBlock(
     id: SessionBlockId.concluidas,
     all: concluidas,
     visibleCount: _visibleCountFor(visibleCounts, SessionBlockId.concluidas),
