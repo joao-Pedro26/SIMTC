@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/training_session.dart';
+import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/ui/sessions/session_filter.dart';
@@ -10,6 +11,8 @@ import 'package:simtc/ui/sessions/sessions_list_viewmodel.dart';
 import 'package:simtc/utils/result.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
+
+class _MockCatalogRepository extends Mock implements AssessmentCatalogRepository {}
 
 /// Conectividade de mentira: o serviço real conversa com o plugin de
 /// plataforma, que não existe num teste de unidade.
@@ -30,6 +33,7 @@ class _FakeConnectivity extends ConnectivityService {
 
 void main() {
   late _MockSessionRepository repository;
+  late _MockCatalogRepository catalog;
   late _FakeConnectivity connectivity;
   late StreamController<List<TrainingSession>> sessions;
 
@@ -52,6 +56,7 @@ void main() {
 
   SessionsListViewModel build() => SessionsListViewModel(
         repository: repository,
+        catalog: catalog,
         connectivity: connectivity,
         now: () => agora,
       );
@@ -65,6 +70,7 @@ void main() {
 
   setUp(() {
     repository = _MockSessionRepository();
+    catalog = _MockCatalogRepository();
     connectivity = _FakeConnectivity();
     sessions = StreamController<List<TrainingSession>>.broadcast();
 
@@ -72,6 +78,7 @@ void main() {
     when(repository.watchLastSyncedAt)
         .thenAnswer((_) => Stream.value(DateTime(2026, 9, 20, 8)));
     when(repository.syncAll).thenAnswer((_) async => const Success(1));
+    when(catalog.sync).thenAnswer((_) async => const Success(7));
   });
 
   tearDown(() {
@@ -225,5 +232,40 @@ void main() {
 
     verify(repository.syncAll).called(2);
     expect(viewModel.isRefreshing, isFalse);
+  });
+
+  test('baixa o catálogo junto com a agenda, ao abrir e na volta da conexão',
+      () async {
+    build().init();
+    await Future<void>.delayed(Duration.zero);
+
+    connectivity.reconnect();
+    await Future<void>.delayed(Duration.zero);
+
+    verify(catalog.sync).called(2);
+  });
+
+  test('falha do catálogo não vira mensagem na Home', () async {
+    when(catalog.sync).thenAnswer(
+      (_) async => Failure(Exception('sem rede'), 'Não foi possível atualizar o catálogo.'),
+    );
+
+    final viewModel = build()..init();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.errorMessage, isNull);
+    expect(viewModel.isRefreshing, isFalse);
+  });
+
+  test('um catálogo lento não segura o puxar para atualizar', () async {
+    final catalogo = Completer<Result<int>>();
+    when(catalog.sync).thenAnswer((_) => catalogo.future);
+
+    final viewModel = build();
+    await viewModel.refresh();
+
+    expect(viewModel.isRefreshing, isFalse,
+        reason: 'o refresh terminou mesmo com o catálogo ainda baixando');
+    catalogo.complete(const Success(7));
   });
 }

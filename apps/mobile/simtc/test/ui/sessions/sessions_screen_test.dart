@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/models/training_session.dart';
+import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
@@ -18,9 +19,12 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
+class _MockCatalogRepository extends Mock implements AssessmentCatalogRepository {}
+
 void main() {
   late _MockSessionRepository repository;
   late _MockAuthRepository auth;
+  late _MockCatalogRepository catalog;
   late StreamController<List<TrainingSession>> sessions;
   late ConnectivityService connectivity;
 
@@ -50,6 +54,7 @@ void main() {
   setUp(() {
     repository = _MockSessionRepository();
     auth = _MockAuthRepository();
+    catalog = _MockCatalogRepository();
     sessions = StreamController<List<TrainingSession>>.broadcast();
     connectivity = ConnectivityService();
 
@@ -57,6 +62,7 @@ void main() {
     when(repository.watchLastSyncedAt).thenAnswer((_) => Stream.value(null));
     when(repository.syncAll).thenAnswer((_) async => const Success(0));
     when(() => auth.currentUser).thenReturn(consultor);
+    when(catalog.sync).thenAnswer((_) async => const Success(7));
   });
 
   tearDown(() {
@@ -69,6 +75,7 @@ void main() {
       MultiProvider(
         providers: [
           Provider<SessionRepository>.value(value: repository),
+          Provider<AssessmentCatalogRepository>.value(value: catalog),
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
         ],

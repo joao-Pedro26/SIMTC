@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/training_session.dart';
+import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../utils/result.dart';
@@ -20,13 +21,16 @@ import 'session_filter.dart';
 class SessionsListViewModel extends ChangeNotifier {
   SessionsListViewModel({
     required SessionRepository repository,
+    required AssessmentCatalogRepository catalog,
     required ConnectivityService connectivity,
     DateTime Function()? now,
   })  : _repository = repository,
+        _catalog = catalog,
         _connectivity = connectivity,
         _now = now ?? DateTime.now;
 
   final SessionRepository _repository;
+  final AssessmentCatalogRepository _catalog;
   final ConnectivityService _connectivity;
   final DateTime Function() _now;
 
@@ -116,6 +120,13 @@ class SessionsListViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    // O catálogo de avaliação desce junto com a agenda (decisão de
+    // 23/09/2026): é o que garante que ele já está no aparelho quando o
+    // consultor perde o sinal no pátio. Corre em paralelo e em silêncio — o
+    // puxar para atualizar não espera por ele, e a falha dele não vira
+    // mensagem na Home; o próximo refresh tenta de novo.
+    unawaited(_syncCatalog());
+
     try {
       final result = await _repository.syncAll();
       if (result case Failure(message: final message)) {
@@ -130,6 +141,15 @@ class SessionsListViewModel extends ChangeNotifier {
     } finally {
       _isRefreshing = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _syncCatalog() async {
+    try {
+      await _catalog.sync();
+    } catch (_) {
+      // `sync` já devolve `Result`; isto só impede que um erro inesperado
+      // escape como exceção não tratada.
     }
   }
 

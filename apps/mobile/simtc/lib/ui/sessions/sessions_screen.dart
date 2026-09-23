@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/training_session.dart';
+import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
@@ -30,6 +31,7 @@ class SessionsScreen extends StatefulWidget {
 class _SessionsScreenState extends State<SessionsScreen> {
   late final SessionsListViewModel _viewModel = SessionsListViewModel(
     repository: context.read<SessionRepository>(),
+    catalog: context.read<AssessmentCatalogRepository>(),
     connectivity: context.read<ConnectivityService>(),
   )..init();
 
