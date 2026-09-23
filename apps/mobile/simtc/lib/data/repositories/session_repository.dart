@@ -39,6 +39,9 @@ class SessionRepository {
   static const String _offlineMessage =
       'Não foi possível atualizar. Mostrando os dados já baixados.';
 
+  static const String _startFailed =
+      'Não foi possível iniciar a sessão. Tente de novo.';
+
   /// Lista do cache, da data mais próxima para a mais distante; sem data por
   /// último, porque não dá para saber onde ela entra na agenda.
   Stream<List<TrainingSession>> watchSessions() {
@@ -52,6 +55,42 @@ class SessionRepository {
     return query.watch().map(
           (rows) => rows.map(TrainingSession.fromRow).toList(growable: false),
         );
+  }
+
+  /// Uma sessão do cache — o cabeçalho da tela 1.4. Emite nulo se ela não
+  /// estiver no aparelho (a Home podou, por exemplo).
+  Stream<TrainingSession?> watchSession(String sessionId) {
+    final query = _db.select(_db.sessions)
+      ..where((t) => t.id.equals(sessionId));
+    return query.watchSingleOrNull().map(
+          (row) => row == null ? null : TrainingSession.fromRow(row),
+        );
+  }
+
+  /// Inicia a sessão (`POST /training-sessions/:id/start`). Só o ADMIN e o
+  /// consultor responsável podem — o backend responde 403 para os demais.
+  ///
+  /// Com sucesso, o status local muda na hora para os botões de atribuir
+  /// aparecerem sem esperar o re-sync do detalhe.
+  Future<Result<void>> start(String sessionId) async {
+    try {
+      await _api.post<Map<String, dynamic>>('$_path/$sessionId/start');
+    } on ApiException catch (error) {
+      final ownMessage = error.statusCode == 403 || error.isNetworkError;
+      return Failure(error, ownMessage ? error.message : _startFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _startFailed);
+    }
+
+    try {
+      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        SessionsCompanion(status: Value(SessionStatus.emAndamento.wireValue)),
+      );
+    } catch (_) {
+      // O backend já iniciou; o re-sync do detalhe corrige a linha local.
+    }
+    return const Success<void>(null);
   }
 
   /// Quando o cache foi atualizado pela última vez — a tela mostra isso quando

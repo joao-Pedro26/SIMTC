@@ -7,6 +7,7 @@ import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/local/app_database.dart';
+import 'package:simtc/utils/result.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
@@ -291,5 +292,86 @@ void main() {
     expect(row.responsibleConsultantId, 'c-resp');
     expect(row.companyLogoUrl, 'https://cdn.simtc/logos/bracell.png');
     expect(row.participantsSyncedAt, DateTime(2026, 9, 22, 8));
+  });
+
+  test('watchSession emite a sessão pedida, e nulo se ela não está no cache',
+      () async {
+    await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: 's1',
+            companyName: 'Bracell Celulose',
+            courseName: 'Direção Preventiva',
+            city: 'Lençóis Paulista',
+            state: 'SP',
+            status: 'EM_ANDAMENTO',
+            responsibleConsultantId: const Value('c-resp'),
+            cachedAt: DateTime(2026, 9, 22, 8),
+          ),
+        );
+
+    final session = await repository.watchSession('s1').first;
+    final missing = await repository.watchSession('nao-existe').first;
+
+    expect(session?.companyName, 'Bracell Celulose');
+    expect(session?.responsibleConsultantId, 'c-resp');
+    expect(missing, isNull);
+  });
+
+  group('start', () {
+    Future<void> seedPlanned() {
+      return db.into(db.sessions).insert(
+            SessionsCompanion.insert(
+              id: 's1',
+              companyName: 'Bracell Celulose',
+              courseName: 'Direção Preventiva',
+              city: 'Lençóis Paulista',
+              state: 'SP',
+              status: 'PLANEJADO',
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+    }
+
+    test('chama o /start e já marca a sessão local como em andamento',
+        () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenAnswer((_) async => Response<Map<String, dynamic>>(
+                requestOptions:
+                    RequestOptions(path: '/training-sessions/s1/start'),
+                statusCode: 201,
+                data: {'id': 's1', 'status': 'EM_ANDAMENTO'},
+              ));
+
+      final result = await repository.start('s1');
+
+      expect(result.isSuccess, isTrue);
+      final row = await db.select(db.sessions).getSingle();
+      expect(row.status, 'EM_ANDAMENTO');
+    });
+
+    test('403 devolve a mensagem do backend e não mexe no status local',
+        () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenThrow(const ApiException(
+        message:
+            'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
+        statusCode: 403,
+      ));
+
+      final result = await repository.start('s1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.message,
+          'message',
+          'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
+        ),
+      );
+      final row = await db.select(db.sessions).getSingle();
+      expect(row.status, 'PLANEJADO');
+    });
   });
 }
