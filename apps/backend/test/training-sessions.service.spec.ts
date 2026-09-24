@@ -67,6 +67,20 @@ describe('TrainingSessionsService.findAll', () => {
     );
   });
 
+  it('traz o logo da empresa, que o card de sessão do app mostra', async () => {
+    mockPrisma.trainingSession.findMany.mockResolvedValue([]);
+
+    await service.findAll(consultant, {});
+
+    expect(mockPrisma.trainingSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          company: { select: { id: true, name: true, logoUrl: true } },
+        }),
+      }),
+    );
+  });
+
   it('conta apenas TEORICA_E_PRATICA como avaliável e como avaliado', async () => {
     mockPrisma.trainingSession.findMany.mockResolvedValue([session('s1')]);
     mockPrisma.trainingParticipant.groupBy.mockResolvedValue([

@@ -45,7 +45,9 @@ export class TrainingSessionsService {
       this.prisma.trainingSession.findMany({
         where,
         include: {
-          company: { select: { id: true, name: true } },
+          // `logoUrl` é o logo do card de sessão do app mobile (bucket público,
+          // carrega sem token).
+          company: { select: { id: true, name: true, logoUrl: true } },
           course: { select: { id: true, name: true } },
           responsibleConsultant: { select: { id: true, name: true } },
         },
