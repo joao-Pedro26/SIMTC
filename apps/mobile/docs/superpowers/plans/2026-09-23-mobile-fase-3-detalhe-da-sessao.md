@@ -5799,6 +5799,11 @@ Acrescentados depois da revisão final (commit `402838c`), cada um cobre um defe
 - [ ] tocar em "Atribuir a mim" e voltar para a Home **antes** da resposta chegar: nenhuma linha vermelha "used after being disposed" aparece no console do `flutter run`;
 - [ ] abrir uma sessão e tocar em "Atribuir a mim" logo em seguida, com a rede lenta: a linha termina como "Avaliando · você" e não volta para "Pendente" quando a primeira atualização chega atrasada.
 
+Acrescentados com o novo export do canvas (24/09/2026, commits `14f0556` e `1ba0b39` — **reinicie o backend**, a listagem passou a enviar o logo):
+- [ ] os cards da Home mostram, à esquerda do nome, o logo da empresa (44×44) ou, sem logo cadastrado, as iniciais em teal ("BR" para uma palavra só, "BC" para "Bracell Celulose") — sem precisar abrir a sessão antes;
+- [ ] o logo do cabeçalho do detalhe aparece sem borda;
+- [ ] em modo avião, os logos que já apareceram uma vez continuam aparecendo (cache de imagem).
+
 Conhecido, ainda não tratado (ver Pendências): o toque nos cards e nas linhas não mostra a animação de toque (ripple), e offline numa sessão nunca baixada aparecem ao mesmo tempo o aviso "ainda não foram baixados" e o SnackBar "Mostrando os dados já baixados".
 
 ADMIN:
