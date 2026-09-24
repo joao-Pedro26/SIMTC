@@ -5795,6 +5795,12 @@ Regressões da Task 0 (os defeitos que os testes pegaram):
 - [ ] a seção Concluídas mostra um subtítulo por dia, e o "Ver mais" dela revela mais **concluídas** (não sessões de "Esta semana");
 - [ ] com muitas concluídas reveladas, rolar até o fim absoluto da lista destaca o chip "Concluídas".
 
+Acrescentados depois da revisão final (commit `402838c`), cada um cobre um defeito corrigido:
+- [ ] tocar em "Atribuir a mim" e voltar para a Home **antes** da resposta chegar: nenhuma linha vermelha "used after being disposed" aparece no console do `flutter run`;
+- [ ] abrir uma sessão e tocar em "Atribuir a mim" logo em seguida, com a rede lenta: a linha termina como "Avaliando · você" e não volta para "Pendente" quando a primeira atualização chega atrasada.
+
+Conhecido, ainda não tratado (ver Pendências): o toque nos cards e nas linhas não mostra a animação de toque (ripple), e offline numa sessão nunca baixada aparecem ao mesmo tempo o aviso "ainda não foram baixados" e o SnackBar "Mostrando os dados já baixados".
+
 ADMIN:
 - [ ] logado como ADMIN, a tela é a mesma do consultor, e "Iniciar sessão" aparece em sessões `PLANEJADO` mesmo sem ser o responsável.
 
@@ -5814,6 +5820,11 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 4. Se algo
 | 4 | O "Avaliando · você" ganha o cronômetro do canvas (vem do `startTime` do rascunho local). |
 | 4 | `SyncStatusIndicator` ganha o badge com a contagem da fila local — um lugar só para a Home e o detalhe. |
 | 4 | O catálogo é trocado inteiro a cada refresh da Home. Se o admin remover uma infração enquanto houver um rascunho que a marcou, o `infractionNoteId` do rascunho deixa de existir no aparelho (e no backend). Decidir o tratamento ao desenhar o rascunho. |
+| 4 | `CatalogCategory/Infraction/Note.fromJson` aceitam item sem `id` como `''`. Ao consumir `loadCatalog()` no checklist, descartar ids vazios (como o `syncSession` faz com participantes). |
+| — (decidir com o usuário) | Offline numa sessão nunca baixada, o aviso "Os participantes desta sessão ainda não foram baixados…" aparece junto com o SnackBar "Não foi possível atualizar. Mostrando os dados já baixados." — mensagens contraditórias, e cada sessão aberta offline enfileira um SnackBar. Sugestão da revisão final: não mostrar o SnackBar de falha de rede quando a sessão nunca foi baixada. |
+| 7 | `SessionsListViewModel` chama `notifyListeners` depois de `await` sem guarda de dispose (a correção de `402838c` foi só na `SessionDetailViewModel`). Hoje a Home só é descartada no logout, que ainda não existe na interface; aplicar a mesma guarda quando a tela de Perfil trouxer o logout. |
+| 8 | O toque em `SessionCard` e `ParticipantRow` não mostra ripple: o `InkWell` envolve um `Container` com cor opaca, que pinta por cima da animação. Trocar por `Ink(decoration: …)` ou `Material(color: …)` em volta do `InkWell`. |
+| 8 | Dois toques rápidos num card da Home (ou numa linha de participante) empilham duas telas iguais. |
 | 5 | O resultado substitui a tela provisória da rota `…/result`. "Reavaliar" chama `assign` antes de reabrir o checklist (seção 0.4 do brainstorm) — `ParticipantRepository.assign` já existe. |
 | 6 | Variante ADMIN do quadro `1f`: editar sessão, gerenciar consultores ("3 consultores" no cabeçalho) e adicionar participante. |
 | 8 | Busca local na lista de participantes (a lupa do canvas), junto com a busca da Home. |
