@@ -281,14 +281,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
-          Text(_greeting(user?.name), style: AppTypography.bodySmall),
+          Text(_greeting(user?.name), style: AppTypography.homeGreeting),
           const SizedBox(height: AppSpacing.xxs),
           // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
           // mesmo texto quando o usuário é ADMIN.
           Text(
             title,
             key: const Key('sessions-title'),
-            style: AppTypography.screenTitle,
+            style: AppTypography.homeTitle,
           ),
         ],
       ),
@@ -368,18 +368,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
     SessionSection section,
   ) {
     return [
-      Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.border)),
+      Padding(
+        key: _sectionKeys[section.filter],
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.lg - 1,
         ),
-        child: Padding(
-          key: _sectionKeys[section.filter],
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: AppSpacing.lg - 1,
-          ),
-          child: Text(section.title, style: AppTypography.sectionTitle),
-        ),
+        child: Text(section.title, style: AppTypography.sectionTitle),
       ),
       if (section.isEmpty)
         _buildSectionEmpty(section.filter)
@@ -406,7 +401,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             AppSpacing.xl,
             AppSpacing.sm,
             AppSpacing.xl,
-            AppSpacing.xs,
+            AppSpacing.sm,
           ),
           child: Text(
             block.title!,

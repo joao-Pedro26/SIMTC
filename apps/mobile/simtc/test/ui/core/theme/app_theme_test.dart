@@ -33,6 +33,18 @@ void main() {
       expect(AppTypography.counter.fontFamily, AppTypography.monoFamily);
     });
 
+    test('saudação e título da Home têm os tamanhos ajustados no aparelho', () {
+      // 14 e 24, escolhidos pelo usuário em 24/09/2026 (o canvas usa 13 e
+      // 22). São estilos próprios da Home: `bodySmall` e `screenTitle`
+      // continuam como estão nos avisos, nos SnackBars e no tema.
+      expect(AppTypography.homeGreeting.fontSize, 14);
+      expect(AppTypography.homeGreeting.color, AppTypography.bodySmall.color);
+      expect(AppTypography.homeTitle.fontSize, 24);
+      expect(AppTypography.homeTitle.fontWeight, FontWeight.w700);
+      expect(AppTypography.bodySmall.fontSize, 13);
+      expect(AppTypography.screenTitle.fontSize, 22);
+    });
+
     test('estilos variáveis carregam o eixo wght correspondente ao peso', () {
       final style = AppTypography.button;
       expect(style.fontWeight, FontWeight.w700);

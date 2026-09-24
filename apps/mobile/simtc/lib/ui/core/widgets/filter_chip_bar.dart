@@ -106,14 +106,14 @@ class _FilterChipBarState extends State<FilterChipBar> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 36),
+        constraints: const BoxConstraints(minHeight: AppSpacing.xxxl + 2),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
             color: isSelected ? AppColors.primaryDark : AppColors.borderStrong,
-            width: 1.5,
+            width: 0.5,
           ),
         ),
         child: Row(

@@ -52,6 +52,16 @@ abstract final class AppTypography {
   static TextStyle get screenTitle =>
       _inter(size: 22, weight: FontWeight.w700, height: 1.2, letterSpacing: -0.22);
 
+  /// Título da Home ("Minhas sessões" / "Sessões") — maior que o
+  /// `screenTitle`, ajustado no aparelho em 24/09/2026.
+  static TextStyle get homeTitle =>
+      _inter(size: 24, weight: FontWeight.w700, height: 1.2, letterSpacing: -0.22);
+
+  /// Saudação acima do título da Home ("Bom dia, Carla") — ajustada no
+  /// aparelho em 24/09/2026.
+  static TextStyle get homeGreeting =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.45, color: AppColors.text2);
+
   /// Título de barra superior em fluxo empilhado ("Detalhe da sessão")
   static TextStyle get appBarTitle =>
       _inter(size: 17, weight: FontWeight.w600, height: 1.25);
