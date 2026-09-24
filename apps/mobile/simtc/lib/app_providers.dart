@@ -4,6 +4,7 @@ import 'package:provider/single_child_widget.dart';
 import 'config/app_config.dart';
 import 'data/repositories/assessment_catalog_repository.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/repositories/participant_repository.dart';
 import 'data/repositories/session_repository.dart';
 import 'data/services/api/api_client.dart';
 import 'data/services/auth_session.dart';
@@ -24,6 +25,7 @@ class AppDependencies {
     required this.apiClient,
     required this.authRepository,
     required this.sessionRepository,
+    required this.participantRepository,
     required this.catalogRepository,
     required this.connectivityService,
   });
@@ -53,6 +55,10 @@ class AppDependencies {
       apiClient: apiClient,
       database: database,
     );
+    final participantRepository = ParticipantRepository(
+      apiClient: apiClient,
+      database: database,
+    );
     final catalogRepository = AssessmentCatalogRepository(
       apiClient: apiClient,
       database: database,
@@ -65,6 +71,7 @@ class AppDependencies {
       apiClient: apiClient,
       authRepository: authRepository,
       sessionRepository: sessionRepository,
+      participantRepository: participantRepository,
       catalogRepository: catalogRepository,
       connectivityService: ConnectivityService()..initialize(),
     );
@@ -76,6 +83,7 @@ class AppDependencies {
   final ApiClient apiClient;
   final AuthRepository authRepository;
   final SessionRepository sessionRepository;
+  final ParticipantRepository participantRepository;
   final AssessmentCatalogRepository catalogRepository;
   final ConnectivityService connectivityService;
 
@@ -90,6 +98,7 @@ class AppDependencies {
         Provider<ApiClient>.value(value: apiClient),
         ChangeNotifierProvider<AuthRepository>.value(value: authRepository),
         Provider<SessionRepository>.value(value: sessionRepository),
+        Provider<ParticipantRepository>.value(value: participantRepository),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
         ChangeNotifierProvider<ConnectivityService>.value(
           value: connectivityService,

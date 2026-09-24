@@ -1,0 +1,387 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
+import 'package:simtc/data/models/auth_user.dart';
+import 'package:simtc/data/models/session_participant.dart';
+import 'package:simtc/data/models/training_session.dart';
+import 'package:simtc/data/repositories/auth_repository.dart';
+import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_repository.dart';
+import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/router.dart';
+import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/evaluation/evaluation_placeholder_screen.dart';
+import 'package:simtc/ui/session_detail/session_detail_screen.dart';
+import 'package:simtc/utils/result.dart';
+
+class _MockSessionRepository extends Mock implements SessionRepository {}
+
+class _MockParticipantRepository extends Mock implements ParticipantRepository {}
+
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
+class _MockConnectivity extends Mock implements Connectivity {}
+
+void main() {
+  late _MockSessionRepository sessions;
+  late _MockParticipantRepository participants;
+  late _MockAuthRepository auth;
+  late ConnectivityService connectivity;
+  late StreamController<TrainingSession?> sessionStream;
+  late StreamController<List<SessionParticipant>> participantsStream;
+
+  const consultora = AuthUser(
+    id: 'u1',
+    name: 'Carla Souza',
+    email: 'carla@simtc.com.br',
+    role: AppUserRole.consultant,
+    consultantId: 'c-eu',
+  );
+
+  TrainingSession session({
+    SessionStatus status = SessionStatus.emAndamento,
+    String? responsible = 'c-resp',
+    bool downloaded = true,
+  }) {
+    return TrainingSession(
+      id: 'sess-1',
+      companyName: 'Bracell Celulose',
+      courseName: 'Direção Defensiva — Veículo Pesado',
+      city: 'Itabira',
+      state: 'MG',
+      date: DateTime(2026, 9, 12),
+      status: status,
+      notes: 'Pátio 3 — apresentar-se na portaria B às 07h30.',
+      totalParticipants: 0,
+      assessableParticipants: 0,
+      assessedParticipants: 0,
+      responsibleConsultantId: responsible,
+      participantsSyncedAt: downloaded ? DateTime(2026, 9, 23, 8) : null,
+    );
+  }
+
+  SessionParticipant participant(
+    String id,
+    String name, {
+    ParticipantStatus status = ParticipantStatus.pendente,
+    ParticipationType type = ParticipationType.teoricaEPratica,
+    String? assignedTo,
+    String? assignedName,
+    double? score,
+  }) {
+    return SessionParticipant(
+      id: id,
+      sessionId: 'sess-1',
+      name: name,
+      maskedCpf: '042.118.***-**',
+      participationType: type,
+      status: status,
+      assignedConsultantId: assignedTo,
+      assignedConsultantName: assignedName,
+      score: score,
+    );
+  }
+
+  setUp(() {
+    sessions = _MockSessionRepository();
+    participants = _MockParticipantRepository();
+    auth = _MockAuthRepository();
+    connectivity = ConnectivityService();
+    sessionStream = StreamController<TrainingSession?>.broadcast();
+    participantsStream = StreamController<List<SessionParticipant>>.broadcast();
+
+    when(() => sessions.watchSession('sess-1'))
+        .thenAnswer((_) => sessionStream.stream);
+    when(() => participants.watchBySession('sess-1'))
+        .thenAnswer((_) => participantsStream.stream);
+    when(() => participants.syncSession('sess-1'))
+        .thenAnswer((_) async => const Success(0));
+    when(() => auth.currentUser).thenReturn(consultora);
+    when(() => auth.isAuthenticated).thenReturn(true);
+  });
+
+  tearDown(() {
+    sessionStream.close();
+    participantsStream.close();
+    connectivity.dispose();
+  });
+
+  Widget withProviders(Widget child) {
+    return MultiProvider(
+      providers: [
+        Provider<SessionRepository>.value(value: sessions),
+        Provider<ParticipantRepository>.value(value: participants),
+        ChangeNotifierProvider<AuthRepository>.value(value: auth),
+        ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+      ],
+      child: child,
+    );
+  }
+
+  /// Tela alta: a lista inteira fica montada, sem depender de rolagem.
+  void tallScreen(WidgetTester tester) {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
+  Future<void> show(
+    WidgetTester tester, {
+    TrainingSession? withSession,
+    List<SessionParticipant> withParticipants = const [],
+  }) async {
+    tallScreen(tester);
+    await tester.pumpWidget(
+      withProviders(
+        const MaterialApp(home: SessionDetailScreen(sessionId: 'sess-1')),
+      ),
+    );
+    sessionStream.add(withSession ?? session());
+    participantsStream.add(withParticipants);
+    await tester.pump();
+  }
+
+  Future<void> goOffline() async {
+    final plugin = _MockConnectivity();
+    when(plugin.checkConnectivity)
+        .thenAnswer((_) async => [ConnectivityResult.none]);
+    when(() => plugin.onConnectivityChanged)
+        .thenAnswer((_) => const Stream.empty());
+    connectivity.dispose();
+    connectivity = ConnectivityService(connectivity: plugin);
+    await connectivity.initialize();
+  }
+
+  testWidgets('mostra skeleton antes da primeira leitura do cache',
+      (tester) async {
+    await tester.pumpWidget(
+      withProviders(
+        const MaterialApp(home: SessionDetailScreen(sessionId: 'sess-1')),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('session-detail-skeleton')), findsOneWidget);
+  });
+
+  testWidgets(
+      'o cabeçalho mostra empresa, curso, local, data, status, observações e '
+      'progresso', (tester) async {
+    await show(tester, withParticipants: [
+      participant('a', 'Ana Paula Ribeiro', status: ParticipantStatus.aprovado, score: 90),
+      participant('b', 'Bruno Lima'),
+    ]);
+
+    expect(find.text('Bracell Celulose'), findsOneWidget);
+    expect(find.text('Direção Defensiva — Veículo Pesado'), findsOneWidget);
+    expect(find.text('Itabira/MG'), findsOneWidget);
+    expect(find.text('12 set 2026'), findsOneWidget);
+    expect(find.text('Em andamento'), findsOneWidget);
+    expect(find.text('Pátio 3 — apresentar-se na portaria B às 07h30.'),
+        findsOneWidget);
+    expect(find.text('1 de 2 participantes avaliados'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('BC'), findsOneWidget, reason: 'iniciais no lugar do logo');
+  });
+
+  testWidgets('cada situação de participante tem o seu chip', (tester) async {
+    await show(tester, withParticipants: [
+      participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu'),
+      participant('2', 'Carlos Eduardo Nunes'),
+      participant('3', 'Marcos Vinícius Alves',
+          status: ParticipantStatus.emAvaliacao,
+          assignedTo: 'c-2',
+          assignedName: 'Rafael Lima'),
+      participant('4', 'Juliana Freitas Costa',
+          status: ParticipantStatus.aprovado, score: 86.4),
+      participant('5', 'Rodrigo Tavares',
+          status: ParticipantStatus.necessitaReavaliacao, score: 62),
+      participant('6', 'Simone Barbosa', type: ParticipationType.somenteTeorica),
+    ]);
+
+    expect(find.text('Avaliando · você'), findsOneWidget);
+    expect(find.text('Pendente'), findsOneWidget);
+    expect(find.text('Rafael Lima'), findsOneWidget);
+    expect(find.text('Em avaliação com outro consultor.'), findsOneWidget);
+    expect(find.text('Aprovado · 86%'), findsOneWidget);
+    expect(find.text('Reavaliar · 62%'), findsOneWidget);
+    expect(find.text('Somente teórica'), findsOneWidget);
+    expect(find.text('042.118.***-**'), findsNWidgets(6));
+  });
+
+  testWidgets('"Atribuir a mim" chama o repositório com o consultor logado',
+      (tester) async {
+    when(() => participants.assign('2',
+            consultantId: 'c-eu', consultantName: 'Carla Souza'))
+        .thenAnswer((_) async => const Success<void>(null));
+
+    await show(tester, withParticipants: [
+      participant('2', 'Carlos Eduardo Nunes'),
+    ]);
+
+    await tester.tap(find.text('Atribuir a mim'));
+    await tester.pump(); // resposta do assign
+    await tester.pump(); // post-frame do SnackBar
+    await tester.pump(const Duration(milliseconds: 750));
+
+    verify(() => participants.assign('2',
+        consultantId: 'c-eu', consultantName: 'Carla Souza')).called(1);
+    expect(find.text('Participante atribuído a você.'), findsOneWidget);
+  });
+
+  testWidgets('offline, "Atribuir a mim" fica desabilitado e o aviso explica',
+      (tester) async {
+    await goOffline();
+
+    await show(tester, withParticipants: [
+      participant('2', 'Carlos Eduardo Nunes'),
+    ]);
+
+    final button = tester.widget<AppCtaButton>(find.byType(AppCtaButton));
+    expect(button.onPressed, isNull);
+    expect(
+      find.text('Sem conexão: dá para ver a lista e abrir quem já é seu, '
+          'mas atribuir precisa de internet.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sessão planejada não oferece "Atribuir a mim"', (tester) async {
+    await show(
+      tester,
+      withSession: session(status: SessionStatus.planejado, responsible: 'c-2'),
+      withParticipants: [participant('2', 'Carlos Eduardo Nunes')],
+    );
+
+    expect(find.text('Atribuir a mim'), findsNothing);
+    expect(find.text('Iniciar sessão'), findsNothing);
+    expect(
+      find.text('Aguardando o responsável iniciar a sessão para atribuir e '
+          'avaliar participantes.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('o responsável inicia a sessão depois de confirmar',
+      (tester) async {
+    when(() => sessions.start('sess-1'))
+        .thenAnswer((_) async => const Success<void>(null));
+
+    await show(
+      tester,
+      withSession: session(status: SessionStatus.planejado, responsible: 'c-eu'),
+    );
+
+    await tester.tap(find.text('Iniciar sessão'));
+    await tester.pumpAndSettle();
+    expect(find.text('Iniciar a sessão?'), findsOneWidget);
+
+    await tester.tap(find.text('Iniciar'));
+    await tester.pumpAndSettle();
+
+    verify(() => sessions.start('sess-1')).called(1);
+  });
+
+  testWidgets('sessão nunca baixada avisa, em vez de dizer que está vazia',
+      (tester) async {
+    await show(tester, withSession: session(downloaded: false));
+
+    expect(
+      find.text('Os participantes desta sessão ainda não foram baixados. '
+          'Puxe para atualizar quando houver conexão.'),
+      findsOneWidget,
+    );
+    expect(find.text('Nenhum participante inscrito nesta sessão.'), findsNothing);
+  });
+
+  testWidgets('os chips filtram a lista', (tester) async {
+    await show(tester, withParticipants: [
+      participant('2', 'Carlos Eduardo Nunes'),
+      participant('4', 'Juliana Freitas Costa',
+          status: ParticipantStatus.aprovado, score: 86),
+    ]);
+
+    // Com os contadores, os quatro chips não cabem em 420px: traz
+    // "Concluídos" para a faixa visível antes do toque.
+    await tester.ensureVisible(find.widgetWithText(InkWell, 'Concluídos'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(InkWell, 'Concluídos'));
+    await tester.pump();
+
+    expect(find.text('Juliana Freitas Costa'), findsOneWidget);
+    expect(find.text('Carlos Eduardo Nunes'), findsNothing);
+  });
+
+  group('navegação pelas rotas reais', () {
+    Future<void> showWithRouter(
+      WidgetTester tester,
+      List<SessionParticipant> list,
+    ) async {
+      tallScreen(tester);
+      final router = createRouter(
+        auth,
+        initialLocation: AppRoutes.sessionDetail('sess-1'),
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        withProviders(MaterialApp.router(routerConfig: router)),
+      );
+      sessionStream.add(session());
+      participantsStream.add(list);
+      await tester.pump();
+    }
+
+    testWidgets('o meu participante abre o checklist (provisório)',
+        (tester) async {
+      await showWithRouter(tester, [
+        participant('1', 'Ana Paula Ribeiro',
+            status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu'),
+      ]);
+
+      await tester.tap(find.text('Ana Paula Ribeiro'));
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<EvaluationPlaceholderScreen>(
+        find.byType(EvaluationPlaceholderScreen),
+      );
+      expect(screen.kind, EvaluationPlaceholderKind.checklist);
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+    });
+
+    testWidgets('um concluído abre o resultado (provisório)', (tester) async {
+      await showWithRouter(tester, [
+        participant('4', 'Juliana Freitas Costa',
+            status: ParticipantStatus.aprovado, score: 86),
+      ]);
+
+      await tester.tap(find.text('Juliana Freitas Costa'));
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<EvaluationPlaceholderScreen>(
+        find.byType(EvaluationPlaceholderScreen),
+      );
+      expect(screen.kind, EvaluationPlaceholderKind.result);
+    });
+
+    testWidgets('pendente e de outro consultor não abrem nada', (tester) async {
+      await showWithRouter(tester, [
+        participant('2', 'Carlos Eduardo Nunes'),
+        participant('3', 'Marcos Vinícius Alves',
+            status: ParticipantStatus.emAvaliacao, assignedTo: 'c-2'),
+      ]);
+
+      await tester.tap(find.text('Carlos Eduardo Nunes'));
+      await tester.tap(find.text('Marcos Vinícius Alves'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EvaluationPlaceholderScreen), findsNothing);
+    });
+  });
+}

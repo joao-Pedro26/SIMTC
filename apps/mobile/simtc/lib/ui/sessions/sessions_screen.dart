@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/training_session.dart';
@@ -6,6 +7,8 @@ import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../router.dart';
+import '../core/date_labels.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -17,7 +20,9 @@ import '../core/widgets/pill_nav_bar.dart';
 import '../core/widgets/session_card.dart';
 import '../core/widgets/skeleton.dart';
 import '../core/widgets/status_chip.dart';
+import '../core/widgets/sync_status_indicator.dart';
 import 'session_filter.dart';
+import 'session_status_style.dart';
 import 'sessions_list_viewmodel.dart';
 
 /// Tela 1.3 — a Home do app.
@@ -234,7 +239,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             _buildHeader(context),
             ConnectivityBanner(
               isOffline: isOffline,
-              message: _offlineMessage(viewModel.lastSyncedAt),
+              message: offlineDataMessage(viewModel.lastSyncedAt),
             ),
             _buildFilters(viewModel),
             Expanded(child: _buildBody(viewModel)),
@@ -271,7 +276,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 semanticLabel: 'SIM Treinamentos',
               ),
               const Spacer(),
-              _buildSyncIndicator(),
+              const SyncStatusIndicator(),
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
@@ -286,28 +291,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  /// Sem conexão, o consultor precisa saber a idade do que está vendo — uma
-  /// lista de ontem parece igualzinha a uma de agora. Devolve nulo quando o
-  /// cache nunca foi preenchido, e aí a faixa usa a mensagem padrão dela.
-  String? _offlineMessage(DateTime? lastSyncedAt) {
-    if (lastSyncedAt == null) return null;
-
-    String two(int value) => value.toString().padLeft(2, '0');
-    final d = lastSyncedAt;
-    return 'Sem conexão — dados de ${two(d.day)}/${two(d.month)} '
-        'às ${two(d.hour)}:${two(d.minute)}.';
-  }
-
-  /// Indicador de avaliações esperando envio. Fica sem badge até a Fase 4 criar
-  /// a fila local; já existe para o consultor aprender onde olhar.
-  Widget _buildSyncIndicator() {
-    return const SizedBox(
-      width: AppSpacing.touchTarget,
-      height: AppSpacing.touchTarget,
-      child: Icon(AppIcons.syncDone, color: AppColors.text3),
     );
   }
 
@@ -491,39 +474,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
       companyName: session.companyName,
       courseName: session.courseName,
       meta: session.meta,
-      accentColor: _accentFor(session.status),
+      accentColor: session.status.accentColor,
       statusChip: StatusChip(
         label: session.status.label,
-        icon: _iconFor(session.status),
-        tone: _toneFor(session.status),
+        icon: session.status.icon,
+        tone: session.status.tone,
       ),
       progressValue: session.progress,
       progressLabel: session.progressLabel,
-      // O detalhe da sessão é a Fase 3; até lá o card não navega.
-      onTap: null,
+      onTap: () => context.push(AppRoutes.sessionDetail(session.id)),
     );
   }
-
-  Color _accentFor(SessionStatus status) => switch (status) {
-        SessionStatus.planejado => AppColors.border,
-        SessionStatus.emAndamento => AppColors.primary,
-        SessionStatus.concluido => AppColors.border,
-        SessionStatus.cancelado => AppColors.dangerBorder,
-      };
-
-  StatusTone _toneFor(SessionStatus status) => switch (status) {
-        SessionStatus.planejado => StatusTone.neutral,
-        SessionStatus.emAndamento => StatusTone.info,
-        SessionStatus.concluido => StatusTone.success,
-        SessionStatus.cancelado => StatusTone.danger,
-      };
-
-  IconData _iconFor(SessionStatus status) => switch (status) {
-        SessionStatus.planejado => AppIcons.pending,
-        SessionStatus.emAndamento => AppIcons.inProgress,
-        SessionStatus.concluido => AppIcons.approved,
-        SessionStatus.cancelado => AppIcons.needsReview,
-      };
 
   Widget _buildSkeleton() {
     return ListView.builder(

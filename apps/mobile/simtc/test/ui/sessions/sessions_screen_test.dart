@@ -5,13 +5,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
+import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
+import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
+import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/utils/result.dart';
 
@@ -20,6 +24,8 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockCatalogRepository extends Mock implements AssessmentCatalogRepository {}
+
+class _MockParticipantRepository extends Mock implements ParticipantRepository {}
 
 void main() {
   late _MockSessionRepository repository;
@@ -898,5 +904,41 @@ void main() {
     // ativo antes deste toque, não "Próximos 7 dias".
     expect(isChipSelected(tester, 'Concluídas'), isTrue);
     expect(isChipSelected(tester, 'Próximos 7 dias'), isFalse);
+  });
+
+  testWidgets('tocar no card abre o detalhe daquela sessão', (tester) async {
+    final participants = _MockParticipantRepository();
+    when(() => auth.isAuthenticated).thenReturn(true);
+    when(() => repository.watchSession('sess-1'))
+        .thenAnswer((_) => Stream.value(hoje()));
+    when(() => participants.watchBySession('sess-1'))
+        .thenAnswer((_) => Stream.value(const <SessionParticipant>[]));
+    when(() => participants.syncSession('sess-1'))
+        .thenAnswer((_) async => const Success(0));
+
+    final router = createRouter(auth, initialLocation: AppRoutes.home);
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<SessionRepository>.value(value: repository),
+          Provider<AssessmentCatalogRepository>.value(value: catalog),
+          Provider<ParticipantRepository>.value(value: participants),
+          ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.tap(find.byType(SessionCard));
+    await tester.pumpAndSettle();
+
+    final detail =
+        tester.widget<SessionDetailScreen>(find.byType(SessionDetailScreen));
+    expect(detail.sessionId, 'sess-1');
   });
 }
