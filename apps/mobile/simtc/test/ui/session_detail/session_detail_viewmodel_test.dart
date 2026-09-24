@@ -392,4 +392,73 @@ void main() {
     expect(vm.message, 'Não foi possível atualizar. Mostrando os dados já baixados.');
     expect(vm.visibleParticipants, hasLength(1));
   });
+
+  group('proteções contra dispose e refresh em voo', () {
+    test(
+        'sync que só responde depois do dispose não notifica um ChangeNotifier morto',
+        () async {
+      final sync = Completer<Result<int>>();
+      when(() => participants.syncSession('sess-1'))
+          .thenAnswer((_) => sync.future);
+
+      // init() dispara o primeiro refresh e fica esperando o cache.
+      final vm = build()..init();
+      await Future<void>.delayed(Duration.zero);
+
+      vm.dispose();
+      sync.complete(const Success(0));
+
+      // Se o `finally` do refresh chamar notifyListeners sem guarda, o erro
+      // "used after being disposed" escapa como erro assíncrono não tratado.
+      await pumpEventQueue();
+    });
+
+    test(
+        'atribuir que só responde depois do dispose não tenta baixar de novo',
+        () async {
+      final resposta = Completer<Result<void>>();
+      when(() => participants.assign('p1',
+              consultantId: any(named: 'consultantId'),
+              consultantName: any(named: 'consultantName')))
+          .thenAnswer((_) => resposta.future);
+      final vm = await ready(withParticipants: [participant('p1')]);
+
+      final assignFuture = vm.assign('p1');
+      vm.dispose();
+      resposta.complete(const Success<void>(null));
+      await assignFuture;
+      await pumpEventQueue();
+
+      // Só o sync inicial do ready(): nenhum resync depois do dispose.
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
+    test(
+        'resync depois de atribuir não se perde quando um refresh já está em voo',
+        () async {
+      final primeiroSync = Completer<Result<int>>();
+      when(() => participants.syncSession('sess-1'))
+          .thenAnswer((_) => primeiroSync.future);
+      when(() => participants.assign('p1',
+              consultantId: any(named: 'consultantId'),
+              consultantName: any(named: 'consultantName')))
+          .thenAnswer((_) async => const Success<void>(null));
+
+      // init() dispara o primeiro refresh, que fica pendente no cache.
+      final vm = build()..init();
+      sessionStream.add(session());
+      participantsStream.add([participant('p1')]);
+      await Future<void>.delayed(Duration.zero);
+
+      // O assign termina e tenta um resync enquanto o 1º refresh ainda voa.
+      await vm.assign('p1');
+      await Future<void>.delayed(Duration.zero);
+
+      primeiroSync.complete(const Success(0));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => participants.syncSession('sess-1')).called(2);
+    });
+  });
 }

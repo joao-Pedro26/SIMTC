@@ -61,6 +61,18 @@ class SessionDetailViewModel extends ChangeNotifier {
   ParticipantFilter _filter = ParticipantFilter.todos;
   String? _message;
 
+  // A tela pode ser fechada enquanto um sync/assign/start ainda está em voo
+  // (são todos `unawaited`). Sem esta guarda, o `finally` desses métodos
+  // chama notifyListeners depois do dispose, o que derruba o app em debug.
+  bool _disposed = false;
+
+  // Se um refresh chega enquanto outro já está em andamento, ele hoje é
+  // simplesmente descartado. Isso perde o resync de pós-ação (assign/start),
+  // que existe justamente para sobrescrever o palpite otimista local com o
+  // estado oficial do servidor — sem ele, uma resposta atrasada do refresh
+  // anterior pode chegar depois e desfazer a atribuição na tela.
+  bool _refreshQueued = false;
+
   /// Nula depois de carregada quer dizer que a sessão não está mais no
   /// aparelho (a Home podou, por exemplo).
   TrainingSession? get session => _session;
@@ -181,7 +193,14 @@ class SessionDetailViewModel extends ChangeNotifier {
 
   /// Abertura da tela, puxar para atualizar e volta da conexão caem aqui.
   Future<void> refresh() async {
-    if (_isRefreshing) return;
+    if (_disposed) return;
+
+    if (_isRefreshing) {
+      // Não perde o pedido: um refresh que chega no meio de outro (o resync
+      // de pós-ação, por exemplo) é enfileirado, não descartado.
+      _refreshQueued = true;
+      return;
+    }
 
     _isRefreshing = true;
     notifyListeners();
@@ -198,6 +217,12 @@ class SessionDetailViewModel extends ChangeNotifier {
     } finally {
       _isRefreshing = false;
       notifyListeners();
+      // Roda o refresh que ficou pendente — mas não depois do dispose, senão
+      // reinicia um sync que ninguém mais vai observar.
+      if (_refreshQueued && !_disposed) {
+        _refreshQueued = false;
+        unawaited(refresh());
+      }
     }
   }
 
@@ -238,7 +263,8 @@ class SessionDetailViewModel extends ChangeNotifier {
       notifyListeners();
     }
 
-    if (resync) unawaited(refresh());
+    // A tela pode ter sido fechada enquanto a resposta ainda viajava.
+    if (resync && !_disposed) unawaited(refresh());
   }
 
   /// "Iniciar sessão" — só o responsável ou um ADMIN chegam a ver o botão.
@@ -265,7 +291,8 @@ class SessionDetailViewModel extends ChangeNotifier {
       notifyListeners();
     }
 
-    if (resync) unawaited(refresh());
+    // A tela pode ter sido fechada enquanto a resposta ainda viajava.
+    if (resync && !_disposed) unawaited(refresh());
   }
 
   void clearMessage() {
@@ -274,8 +301,17 @@ class SessionDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Chamadas `unawaited` (sync, assign, start) podem terminar depois que a
+  // tela já foi fechada; sem esta guarda, o `finally` delas chamaria
+  // notifyListeners num ChangeNotifier morto.
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _sessionSubscription?.cancel();
     _participantsSubscription?.cancel();
     _reconnectSubscription?.cancel();
