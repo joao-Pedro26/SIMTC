@@ -64,6 +64,10 @@ abstract final class AppTypography {
   static TextStyle get detailTitle =>
       _inter(size: 18, weight: FontWeight.w600, height: 1.25);
 
+  /// Iniciais da empresa no lugar do logo (card da Home, detalhe da sessão)
+  static TextStyle get logoInitials =>
+      _inter(size: 14, weight: FontWeight.w700, height: 1, color: AppColors.primaryDark);
+
   /// Texto padrão
   static TextStyle get body =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.35, color: AppColors.text3);

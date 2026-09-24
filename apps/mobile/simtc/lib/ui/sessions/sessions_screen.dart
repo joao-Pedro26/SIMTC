@@ -13,6 +13,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/filter_chip_bar.dart';
 import '../core/widgets/inline_notice.dart';
@@ -471,6 +472,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   Widget _buildCard(TrainingSession session) {
     return SessionCard(
+      leading: CompanyLogo.card(
+        companyName: session.companyName,
+        url: session.companyLogoUrl,
+      ),
       companyName: session.companyName,
       courseName: session.courseName,
       meta: session.meta,

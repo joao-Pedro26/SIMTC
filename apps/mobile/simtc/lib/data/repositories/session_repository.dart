@@ -188,15 +188,19 @@ class SessionRepository {
       }
 
       for (final session in sessions) {
-        // `companyLogoUrl` fica de fora de propósito: a listagem não traz o
-        // logo (só o detalhe da sessão traz), e um `Value(null)` aqui apagaria
-        // a cada sync da Home o logo que o detalhe gravou. No upsert, coluna
-        // ausente do companion não é tocada. Pelo mesmo motivo,
-        // `participantsSyncedAt` também fica de fora.
+        // O logo só entra quando a listagem o traz (o card da Home o mostra
+        // desde 24/09/2026). Nulo fica de fora em vez de virar `Value(null)`:
+        // um backend ainda sem o campo na listagem apagaria, a cada sync da
+        // Home, o logo que o detalhe gravou — no upsert, coluna ausente do
+        // companion não é tocada. `participantsSyncedAt` fica sempre de fora:
+        // só o detalhe sabe quando baixou os participantes.
         await _db.into(_db.sessions).insertOnConflictUpdate(
               SessionsCompanion.insert(
                 id: session.id,
                 companyName: session.companyName,
+                companyLogoUrl: session.companyLogoUrl == null
+                    ? const Value.absent()
+                    : Value(session.companyLogoUrl),
                 courseName: session.courseName,
                 city: session.city,
                 state: session.state,

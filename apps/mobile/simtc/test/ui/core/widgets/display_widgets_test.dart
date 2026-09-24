@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
+import 'package:simtc/ui/core/widgets/company_logo.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
@@ -144,6 +145,71 @@ void main() {
 
     await tester.tap(find.text('Bracell'));
     expect(taps, 1);
+  });
+
+  testWidgets('SessionCard mostra o logo da empresa antes do nome', (tester) async {
+    await _pump(
+      tester,
+      const SessionCard(
+        companyName: 'Bracell',
+        courseName: 'Direção Preventiva',
+        meta: 'Hoje · Itabira/MG',
+        leading: CompanyLogo.card(companyName: 'Bracell'),
+        statusChip: StatusChip(
+          label: 'Planejado',
+          icon: AppIcons.sessions,
+          tone: StatusTone.info,
+        ),
+      ),
+    );
+
+    final logoX = tester.getTopLeft(find.byType(CompanyLogo)).dx;
+    final nameX = tester.getTopLeft(find.text('Bracell')).dx;
+    expect(logoX, lessThan(nameX));
+  });
+
+  group('CompanyLogo', () {
+    testWidgets('sem logo, mostra as iniciais das duas primeiras palavras',
+        (tester) async {
+      await _pump(tester, const CompanyLogo.card(companyName: 'Bracell Celulose'));
+
+      expect(find.text('BC'), findsOneWidget);
+    });
+
+    testWidgets('empresa de uma palavra só usa as duas primeiras letras',
+        (tester) async {
+      await _pump(tester, const CompanyLogo.card(companyName: 'Bracell'));
+
+      expect(find.text('BR'), findsOneWidget);
+    });
+
+    testWidgets('no card tem 44 de lado; no cabeçalho do detalhe, 52',
+        (tester) async {
+      await _pump(
+        tester,
+        const Row(
+          children: [
+            CompanyLogo.card(key: Key('card'), companyName: 'Bracell'),
+            CompanyLogo.header(key: Key('header'), companyName: 'Bracell'),
+          ],
+        ),
+      );
+
+      expect(tester.getSize(find.byKey(const Key('card'))), const Size(44, 44));
+      expect(tester.getSize(find.byKey(const Key('header'))), const Size(52, 52));
+    });
+
+    testWidgets('não tem borda (export de 24/09/2026)', (tester) async {
+      await _pump(tester, const CompanyLogo.header(companyName: 'Bracell'));
+
+      final box = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(CompanyLogo),
+          matching: find.byType(Container),
+        ).first,
+      );
+      expect((box.decoration! as BoxDecoration).border, isNull);
+    });
   });
 
   testWidgets('PillNavBar marca o item ativo, mostra o badge e devolve o toque',

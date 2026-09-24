@@ -5,8 +5,9 @@ import '../theme/app_icons.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
-/// Linha de sessão da Home: empresa, curso, metadados, chip de status e, quando
-/// houver, o progresso de avaliação. O traço superior usa a cor do status.
+/// Linha de sessão da Home: logo da empresa, empresa, curso, metadados, chip de
+/// status e, quando houver, o progresso de avaliação. O traço superior usa a
+/// cor do status.
 class SessionCard extends StatelessWidget {
   const SessionCard({
     super.key,
@@ -14,12 +15,15 @@ class SessionCard extends StatelessWidget {
     required this.courseName,
     required this.meta,
     required this.statusChip,
+    this.leading,
     this.accentColor = AppColors.border,
     this.progressLabel,
     this.progressValue,
     this.onTap,
   });
 
+  /// Logo da empresa, à esquerda do nome (`CompanyLogo.card`).
+  final Widget? leading;
   final String companyName;
   final String courseName;
   final String meta;
@@ -66,6 +70,10 @@ class SessionCard extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (leading != null) ...[
+          leading!,
+          const SizedBox(width: AppSpacing.md),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -294,6 +294,26 @@ void main() {
     expect(row.participantsSyncedAt, DateTime(2026, 9, 22, 8));
   });
 
+  test('sync da lista grava o logo da empresa que a listagem traz', () async {
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([
+              {
+                ...sessionJson('s1'),
+                'company': {
+                  'id': 'emp-1',
+                  'name': 'Bracell Celulose',
+                  'logoUrl': 'https://cdn.simtc/logos/bracell.png',
+                },
+              },
+            ], pageNumber: 1, totalPages: 1));
+
+    await repository.syncAll();
+
+    final row = await db.select(db.sessions).getSingle();
+    expect(row.companyLogoUrl, 'https://cdn.simtc/logos/bracell.png');
+  });
+
   test('watchSession emite a sessão pedida, e nulo se ela não está no cache',
       () async {
     await db.into(db.sessions).insert(

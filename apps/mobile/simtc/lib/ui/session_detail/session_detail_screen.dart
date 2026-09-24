@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +16,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/filter_chip_bar.dart';
 import '../core/widgets/inline_notice.dart';
@@ -167,7 +167,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLogo(session),
+        CompanyLogo.header(
+          companyName: session.companyName,
+          url: session.companyLogoUrl,
+        ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
@@ -180,50 +183,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  /// Logo da empresa (bucket público, sem token). O `cached_network_image`
-  /// guarda o arquivo no aparelho, então ele continua aparecendo offline
-  /// depois da primeira vez; sem logo, ou sem rede na primeira vez, ficam as
-  /// iniciais da empresa.
-  Widget _buildLogo(TrainingSession session) {
-    final url = session.companyLogoUrl;
-    final initials = _buildInitials(session.companyName);
-
-    return Container(
-      width: AppSpacing.huge + AppSpacing.xs,
-      height: AppSpacing.huge + AppSpacing.xs,
-      padding: const EdgeInsets.all(AppSpacing.xs + 2),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.primarySurface),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: url == null
-          ? initials
-          : CachedNetworkImage(
-              imageUrl: url,
-              fit: BoxFit.contain,
-              placeholder: (context, _) => initials,
-              errorWidget: (context, _, __) => initials,
-            ),
-    );
-  }
-
-  Widget _buildInitials(String companyName) {
-    final words = companyName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .take(2);
-    final initials = words.map((word) => word[0].toUpperCase()).join();
-
-    return Center(
-      child: Text(
-        initials,
-        style: AppTypography.cardTitle.copyWith(color: AppColors.primaryDark),
-      ),
     );
   }
 

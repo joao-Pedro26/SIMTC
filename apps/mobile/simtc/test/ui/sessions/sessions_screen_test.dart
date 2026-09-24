@@ -112,6 +112,16 @@ void main() {
     expect(find.text('2 de 8 avaliados'), findsOneWidget);
   });
 
+  testWidgets('o card mostra o logo da empresa ou, sem logo, as iniciais',
+      (tester) async {
+    await pump(tester);
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    expect(find.text('BC'), findsOneWidget,
+        reason: 'Bracell Celulose não tem logo no teste');
+  });
+
   testWidgets('saúda o consultor pelo primeiro nome e usa o título dele',
       (tester) async {
     await pump(tester);
