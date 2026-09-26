@@ -210,6 +210,23 @@ void main() {
       );
       expect((box.decoration! as BoxDecoration).border, isNull);
     });
+
+    group('isSvgLogoUrl', () {
+      // O bucket `logos` (companies.service.ts, uploadCompanyLogo) grava a
+      // extensão sempre em minúsculas e nunca com query string — o cache
+      // busting é pelo timestamp no caminho, não por `?v=`.
+      test('reconhece a extensão .svg', () {
+        expect(
+          isSvgLogoUrl('https://cdn.simtc/logos/emp-1/123.svg'),
+          isTrue,
+        );
+      });
+
+      test('não reconhece raster (png/jpg) como svg', () {
+        expect(isSvgLogoUrl('https://cdn.simtc/logos/emp-1/123.png'), isFalse);
+        expect(isSvgLogoUrl('https://cdn.simtc/logos/emp-1/123.jpg'), isFalse);
+      });
+    });
   });
 
   testWidgets('PillNavBar marca o item ativo, mostra o badge e devolve o toque',
