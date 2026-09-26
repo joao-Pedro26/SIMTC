@@ -5811,9 +5811,11 @@ ADMIN:
 
 **Não verificável neste aparelho, e por quê:** "ADMIN sem perfil de consultor não vê 'Atribuir a mim'" depende de um usuário ADMIN sem `consultantId`, que o seed não cria — a premissa do brainstorm é que todo ADMIN é consultor. A regra fica coberta pelos testes da ViewModel.
 
-- [ ] **Step 4: Registrar o resultado**
+- [x] **Step 4: Registrar o resultado**
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 4. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
+
+**Validado em 26/09/2026, no aparelho físico, pelo usuário — roteiro completo, incluindo o logo em SVG da Bracell (commit `17b79ff`). Aval dado para planejar a Fase 4.**
 
 ---
 
