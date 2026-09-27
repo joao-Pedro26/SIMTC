@@ -258,6 +258,33 @@ void main() {
     expect(list.map((p) => p.name), ['Ana', 'Bruno']);
   });
 
+  group('watchParticipant', () {
+    test('traz o participante do cache pelo id', () async {
+      await seedSession();
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-1',
+              sessionId: 'sess-1',
+              name: 'Carlos Eduardo Nunes',
+              cpf: '187.443.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'PENDENTE',
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+
+      final participant = await repository.watchParticipant('tp-1').first;
+
+      expect(participant?.name, 'Carlos Eduardo Nunes');
+    });
+
+    test('emite nulo se o participante não estiver no aparelho', () async {
+      final participant = await repository.watchParticipant('tp-inexistente').first;
+
+      expect(participant, isNull);
+    });
+  });
+
   group('assign', () {
     const assignPath = '/practical-assessments/assign';
 

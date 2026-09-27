@@ -45,6 +45,16 @@ class ParticipantRepository {
         );
   }
 
+  /// Um participante do cache — o cabeçalho do checklist (Fase 4). Emite
+  /// nulo se ele não estiver no aparelho.
+  Stream<SessionParticipant?> watchParticipant(String participantId) {
+    final query = _db.select(_db.participants)
+      ..where((t) => t.id.equals(participantId));
+    return query.watchSingleOrNull().map(
+          (row) => row == null ? null : SessionParticipant.fromRow(row),
+        );
+  }
+
   /// Baixa `GET /training-sessions/:id` e regrava a sessão e os participantes
   /// dela numa transação só. Devolve quantos participantes ficaram.
   Future<Result<int>> syncSession(String sessionId) async {
