@@ -134,6 +134,53 @@ abstract final class AppTypography {
   static TextStyle get code =>
       _mono(size: 12, weight: FontWeight.w600, height: 1.2, color: AppColors.text3);
 
+  // ─── Checklist (quadro "1b" do canvas) ────────────────────────────────────
+
+  /// "salvo", ao lado do cronômetro
+  static TextStyle get savedLabel =>
+      _inter(size: 11.5, weight: FontWeight.w500, height: 1.2, color: AppColors.savedInk);
+
+  /// "1 de 4 categorias revisadas"
+  static TextStyle get checklistProgress =>
+      _inter(size: 12, weight: FontWeight.w500, height: 1.2, color: AppColors.text3);
+
+  /// Score geral ao lado do progresso ("86,7%")
+  static TextStyle get checklistProgressValue =>
+      _inter(size: 12, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryDark);
+
+  /// Código da categoria no chip do acordeão ("CV")
+  static TextStyle get categoryCode =>
+      _mono(size: 11, weight: FontWeight.w700, height: 1.2, letterSpacing: 0.44);
+
+  /// Nome da categoria no acordeão ("Controle do Veículo")
+  static TextStyle get categoryName =>
+      _inter(size: 15, weight: FontWeight.w600, height: 1.25);
+
+  /// "6 itens", na categoria fechada
+  static TextStyle get categoryCount =>
+      _inter(size: 12, weight: FontWeight.w400, height: 1.3, color: AppColors.textMuted);
+
+  /// Selo de score da categoria aberta ("86,7%"). A tela de resultado (quadro
+  /// "5a", Fase 5) desenha o dela com 11,5.
+  static TextStyle get scoreBadge =>
+      _inter(size: 11, weight: FontWeight.w700, height: 1.3);
+
+  /// Número do item da infração na ficha oficial
+  static TextStyle get infractionNumber =>
+      _mono(size: 12, weight: FontWeight.w600, height: 1.55, color: AppColors.textMuted);
+
+  /// Descrição da infração ("bodyLarge" da escala do canvas)
+  static TextStyle get infractionDescription =>
+      _inter(size: 16, weight: FontWeight.w400, height: 1.4);
+
+  /// Código B/PM/M dentro do botão de nota
+  static TextStyle get noteButton =>
+      _inter(size: 15, weight: FontWeight.w700, height: 1.1);
+
+  /// Observação da nota escolhida, na caixa abaixo dos botões
+  static TextStyle get noteComment =>
+      _inter(size: 13.5, weight: FontWeight.w400, height: 1.45, color: AppColors.noteCommentInk);
+
   /// Campo de senha mascarado
   static TextStyle get passwordDots =>
       _mono(size: 18, weight: FontWeight.w600, height: 1.3, letterSpacing: 2.5);

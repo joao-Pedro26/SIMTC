@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
@@ -137,6 +138,32 @@ void main() {
       expect(taps, 1);
       expect(tester.getSize(find.byType(AppCtaButton)).height,
           greaterThanOrEqualTo(48));
+    });
+
+    testWidgets('o tamanho large tem 56dp, texto 16 e ícone 22, como o '
+        '"Finalizar avaliação" do canvas', (tester) async {
+      await _pump(
+        tester,
+        const AppCtaButton(
+          label: 'Finalizar avaliação',
+          icon: AppIcons.check,
+          size: AppCtaSize.large,
+        ),
+      );
+
+      expect(tester.getSize(find.byType(AppCtaButton)).height, 56);
+      expect(tester.widget<Icon>(find.byIcon(AppIcons.check)).size, 22);
+      final text = tester.renderObject<RenderParagraph>(find.text('Finalizar avaliação'));
+      expect(text.text.style?.fontSize, 16);
+    });
+
+    testWidgets('o tamanho padrão continua compacto: 48dp e texto 14',
+        (tester) async {
+      await _pump(tester, AppCtaButton(label: 'Atribuir a mim', onPressed: () {}));
+
+      expect(tester.getSize(find.byType(AppCtaButton)).height, 48);
+      final text = tester.renderObject<RenderParagraph>(find.text('Atribuir a mim'));
+      expect(text.text.style?.fontSize, 14);
     });
 
     testWidgets('em carregamento mostra o indicador e não responde ao toque',

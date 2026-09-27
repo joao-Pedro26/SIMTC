@@ -37,4 +37,10 @@ abstract final class AppIcons {
   static const IconData notStarted = Icons.radio_button_unchecked;
   static const IconData evaluating = Icons.play_circle_outline;
   static const IconData lockedByOther = Icons.lock_outline;
+
+  /// Checklist (Fase 4): cronômetro, acordeão e "Finalizar avaliação".
+  static const IconData timer = Icons.timer_outlined;
+  static const IconData expandMore = Icons.expand_more;
+  static const IconData expandLess = Icons.expand_less;
+  static const IconData finish = Icons.task_alt;
 }

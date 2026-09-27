@@ -130,10 +130,20 @@ class AppSecondaryButton extends StatelessWidget {
   }
 }
 
-/// Botão de chamada para ação em laranja, na altura mínima de toque — para
-/// ações dentro de uma linha de lista, como "Atribuir a mim". O canvas o
-/// desenha com 36dp; aqui ele tem 48dp, o alvo mínimo do DS (o consultor usa
-/// o app dentro do veículo).
+/// Tamanho do [AppCtaButton].
+enum AppCtaSize {
+  /// 48dp, texto 14 — ação dentro de uma linha de lista ("Atribuir a mim").
+  compact,
+
+  /// 56dp, texto 16 — ação principal isolada no rodapé ("Finalizar
+  /// avaliação", quadro "1b").
+  large,
+}
+
+/// Botão de chamada para ação em laranja. No tamanho `compact`, é a ação de
+/// uma linha de lista, como "Atribuir a mim": o canvas o desenha com 36dp,
+/// aqui ele tem 48dp, o alvo mínimo do DS (o consultor usa o app dentro do
+/// veículo).
 class AppCtaButton extends StatelessWidget {
   const AppCtaButton({
     super.key,
@@ -141,17 +151,21 @@ class AppCtaButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.icon,
+    this.size = AppCtaSize.compact,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
   final IconData? icon;
+  final AppCtaSize size;
+
+  bool get _large => size == AppCtaSize.large;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: AppSpacing.touchTarget,
+      height: _large ? AppSpacing.controlHeight : AppSpacing.touchTarget,
       width: double.infinity,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
@@ -166,7 +180,9 @@ class AppCtaButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: AppTypography.buttonCompact,
+          // A cor do `textStyle` não vale num botão — quem pinta o rótulo é o
+          // `foregroundColor`. Daqui só saem o tamanho e o peso.
+          textStyle: _large ? AppTypography.button : AppTypography.buttonCompact,
         ),
         child: isLoading ? _buildSpinner() : _buildContent(),
       ),
@@ -191,7 +207,7 @@ class AppCtaButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 19),
+          Icon(icon, size: _large ? 22 : 19),
           const SizedBox(width: AppSpacing.sm),
         ],
         Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),

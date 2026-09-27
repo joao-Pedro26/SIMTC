@@ -72,6 +72,47 @@ abstract final class AppColors {
   static const Color neutralBorder = Color(0xFFCBD5E1);
   static const Color neutralInk = Color(0xFF334155);
 
+  // ─── Checklist: notas B/PM/M e o selo de score da categoria ───────────────
+  // Escala própria da spec "4z" do canvas (Checklist), diferente da escala
+  // genérica de severidade acima (`severityGoodBg` etc., que hoje não tem
+  // nenhum consumidor real — a Fase 4 é a primeira tela a mostrar B/PM/M de
+  // verdade, e usa os valores exatos desta spec, não os da escala genérica).
+  static const Color noteBBg = Color(0xFFE7F5EC);
+  static const Color noteBBorder = Color(0xFF8FCDA6);
+  static const Color noteBInk = Color(0xFF1B7940);
+  static const Color noteBFill = Color(0xFF22A55A);
+  static const Color noteBSelectedInk = Color(0xFF0B2D18);
+
+  static const Color notePmBg = Color(0xFFFFF6D9);
+  static const Color notePmBorder = Color(0xFFE3C24D);
+  static const Color notePmInk = Color(0xFF7A5900);
+  static const Color notePmFill = Color(0xFFE0A500);
+  static const Color notePmSelectedInk = Color(0xFF3D2E00);
+
+  static const Color noteMBg = Color(0xFFFDE2E1);
+  static const Color noteMBorder = Color(0xFFE2857A);
+  static const Color noteMInk = Color(0xFF9B2C22);
+  static const Color noteMFill = Color(0xFFE63946);
+  static const Color noteMSelectedInk = Color(0xFF3C0805);
+
+  /// Selo de score por faixa (spec "5a"): ≥85% reaproveita `successBg`/
+  /// `successInk`; 70–84% e <70% reaproveitam `notePmBg`/`notePmInk` e
+  /// `noteMBg`/`noteMInk` acima — não por coincidência, a spec usa os mesmos
+  /// tons da severidade PM/M para as faixas média/baixa do score.
+  static const Color categoryChipBg = Color(0xFFEEF4F5);
+
+  /// Cabeçalho da categoria aberta no acordeão do checklist (quadro "1b").
+  static const Color categoryExpandedBg = Color(0xFFF1FAFB);
+  static const Color categoryExpandedBorder = Color(0xFFD6EDF0);
+
+  /// Indicador "salvo" do cabeçalho do checklist (quadro "1b") — um verde
+  /// próprio, mais vivo que o `successInk` dos chips.
+  static const Color savedInk = Color(0xFF15803D);
+
+  /// Texto da observação da nota escolhida (quadro "1b"). A caixa usa
+  /// `warningBg`/`warningBorder`/`warningInk`; só o texto é mais escuro.
+  static const Color noteCommentInk = Color(0xFF5C3A10);
+
   /// Sombra da navbar flutuante
   static const Color navShadow = Color(0x4715172A);
 
