@@ -10,7 +10,7 @@
 
 **Spec:** `brainstorm-implementacao-mobile.md` → "Fase 4 — Checklist de Avaliação (offline-first)"; canvas `apps/mobile/docs/design/SIMTC-Mobile.dc.html`, quadro `1b` (linhas 1050–1121; dados de exemplo em 3424–3516), spec `4z` (3213–3242) e spec `5a` (3244–3268); pendências da Fase 3 na última seção de `2026-09-23-mobile-fase-3-detalhe-da-sessao.md`. O desenho aprovado em 26/09/2026 está na seção "Decisões tomadas com o usuário" abaixo — a trilha mobile não usa doc de spec separado, o plano é o documento.
 
-**Validação prévia:** todo o código deste plano foi escrito e rodado numa cópia descartável do app antes de o plano ser fechado, e depois as tasks foram **reencenadas em ordem** numa segunda cópia limpa do app (HEAD `5536fcf`): em cada task, o teste falhou antes da implementação pelo motivo descrito no passo "Esperado", e cada checkpoint bateu o número de testes — **215 → 217 → 230 → 242 → 255 → 264 → 274**, com `flutter analyze` sem issues em todos. Os blocos de código do plano foram gerados a partir dessa cópia por um script que confere cada "Substituir / por" contra o arquivo real — o que está aqui é, byte a byte, o código que passou.
+**Validação prévia:** todo o código deste plano foi escrito e rodado numa cópia descartável do app antes de o plano ser fechado, e depois as tasks foram **reencenadas em ordem** numa segunda cópia limpa do app (HEAD `5536fcf`): em cada task, o teste falhou antes da implementação pelo motivo descrito no passo "Esperado", e cada checkpoint bateu o número de testes — **215 → 217 → 230 → 242 → 255 → 265 → 275**, com `flutter analyze` sem issues em todos. Os blocos de código do plano foram gerados a partir dessa cópia por um script que confere cada "Substituir / por" contra o arquivo real — o que está aqui é, byte a byte, o código que passou.
 
 ## Decisões tomadas com o usuário
 
@@ -71,7 +71,7 @@ Os cinco casos que o spec implica, que um usuário real vai encontrar, e onde ca
 2. **Catálogo ausente no aparelho** → aviso, sem "Finalizar", e `finish()` recusa. Preso em: `sem catálogo no aparelho, não finaliza — uma avaliação vazia daria 100%` (Task 5) e `sem catálogo no aparelho, avisa e não oferece "Finalizar"` (Task 6).
 3. **Catálogo mudou depois da marcação** (o admin removeu a infração ou a nota no painel web) → a marcação some da tela e do score, sem quebrar e sem contar como revisada. Preso em: `marcação de infração que não existe mais no catálogo é ignorada, sem quebrar` e `marcação com nota que não existe mais no catálogo aparece como "sem infração" …` (Task 4).
 4. **Reabrir um participante já finalizado** (até a Fase 5 enviar, o detalhe continua mostrando "Avaliando · você") → retoma a mesma avaliação, sem estourar a chave única de `trainingParticipantId`. Preso em: `reabrir o checklist de um participante já finalizado retoma a mesma avaliação, sem estourar a chave única` (Task 3).
-5. **Sair da tela com o cronômetro correndo** → nenhum `notifyListeners` depois do dispose, e o cronômetro para ao finalizar. Preso em: `dispose cancela o timer sem lançar notifyListeners depois de morto` e `marca local, sinaliza isFinished e para o cronômetro` (Task 5).
+5. **Sair da tela com o cronômetro correndo, ou com uma escrita ainda em voo** → o cronômetro é cancelado, nada notifica a tela morta, e o cronômetro também para ao finalizar. Preso em: `dispose cancela o cronômetro: nenhum timer fica pendente`, `uma escrita que termina depois do dispose não notifica a tela morta` e `marca local, sinaliza isFinished e para o cronômetro` (Task 5).
 
 ## Estado herdado (ponto de partida)
 
@@ -1627,10 +1627,6 @@ double overallScoreOf(List<ChecklistCategory> sections) {
   if (score >= 70) return (bg: AppColors.notePmBg, ink: AppColors.notePmInk);
   return (bg: AppColors.noteMBg, ink: AppColors.noteMInk);
 }
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
-}
 ```
 
 - [ ] **Step 4: Rodar tudo**
@@ -1649,7 +1645,7 @@ git commit -m "feat(mobile): regras do checklist - secoes, revisadas e score"
 
 ## Task 5: `ChecklistViewModel`
 
-O estado da tela 1.5. O catálogo é lido uma vez (não muda durante a avaliação); as marcações vêm de um stream, mas `toggleNote` usa a lista que `mark`/`unmark` devolvem — o stream de uma assinatura já aberta pode notificar um turno de evento depois da escrita, e o botão tem de aparecer pressionado na hora. O cronômetro é um `Timer.periodic` de verdade: nos testes, um intervalo bem curto e um relógio próprio (`now`) que o teste avança, sem `fake_async`. A guarda de dispose segue o padrão de `402838c`: `notifyListeners` sobrescrito para não notificar depois do dispose, e `init()` parando depois de cada `await` se a tela já saiu (para não criar o cronômetro nem assinaturas que ninguém vai cancelar).
+O estado da tela 1.5. O catálogo é lido uma vez (não muda durante a avaliação); as marcações vêm de um stream, mas `toggleNote` usa a lista que `mark`/`unmark` devolvem — o stream de uma assinatura já aberta pode notificar um turno de evento depois da escrita, e o botão tem de aparecer pressionado na hora. O cronômetro é um `Timer.periodic` de verdade: nos testes, um intervalo bem curto e um relógio próprio (`now`) que o teste avança, sem `fake_async`. A guarda de dispose segue o padrão de `402838c`: `notifyListeners` sobrescrito para não notificar depois do dispose, e `init()` parando depois de cada `await` se a tela já saiu (para não criar o cronômetro nem assinaturas que ninguém vai cancelar). O teste do cancelamento é um `testWidgets` de propósito: o binding falha o teste se ele terminar com um `Timer` pendente — por isso o banco dos testes desta task também fecha os streams na hora (ver Global Constraints).
 
 **Files:**
 - Create: `lib/ui/checklist/checklist_viewmodel.dart`
@@ -1668,6 +1664,7 @@ O estado da tela 1.5. O catálogo é lido uma vez (não muda durante a avaliaç�
 Criar `test/ui/checklist/checklist_viewmodel_test.dart`:
 
 ```dart
+import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -1698,7 +1695,12 @@ void main() {
 
   setUp(() {
     api = _MockApiClient();
-    db = AppDatabase(NativeDatabase.memory());
+    // Um dos testes é `testWidgets` (relógio falso): sem fechar os streams na
+    // hora, o `Timer` de duração zero que o drift agenda ao cancelar um
+    // stream ficaria pendente e derrubaria o teste.
+    db = AppDatabase(
+      DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
+    );
     assessmentRepository = AssessmentRepository(database: db);
     participantRepository = ParticipantRepository(apiClient: api, database: db);
     catalogRepository = AssessmentCatalogRepository(apiClient: api, database: db);
@@ -1923,16 +1925,31 @@ void main() {
     });
   });
 
-  test('dispose cancela o timer sem lançar notifyListeners depois de morto', () async {
+  testWidgets('dispose cancela o cronômetro: nenhum timer fica pendente', (tester) async {
     await seedParticipant();
     await seedCatalog();
-    final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+    final vm = buildViewModel();
     await vm.init();
+    expect(vm.isLoading, isFalse, reason: 'o init terminou e ligou o cronômetro');
 
     vm.dispose();
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-    // Se o guard falhar, o ChangeNotifier lança ao notificar depois do
-    // dispose — o teste não faria expect nenhum, só sobreviveria.
+    // O `testWidgets` falha sozinho se terminar com um `Timer` pendente: um
+    // `Timer.periodic` que o dispose esquecesse de cancelar ficaria aqui.
+  });
+
+  test('uma escrita que termina depois do dispose não notifica a tela morta',
+      () async {
+    await seedParticipant();
+    await seedCatalog();
+    final vm = buildViewModel();
+    await vm.init();
+
+    final pending = vm.toggleNote('inf-1', 'note-b');
+    vm.dispose();
+
+    // Sem a guarda, o `notifyListeners` do fim do `toggleNote` lançaria
+    // "used after being disposed" e esta escrita terminaria com erro.
+    await expectLater(pending, completes);
   });
 }
 ```
@@ -2145,16 +2162,12 @@ String _formatElapsed(Duration elapsed) {
   final seconds = (total.inSeconds % 60).toString().padLeft(2, '0');
   return '$hours:$minutes:$seconds';
 }
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
-}
 ```
 
 - [ ] **Step 4: Rodar tudo**
 
 Run: `flutter analyze && flutter test`
-Esperado: `No issues found!` e **264 testes passando**.
+Esperado: `No issues found!` e **265 testes passando**.
 
 - [ ] **Step 5: Commit**
 
@@ -2840,7 +2853,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: AppSpacing.xxs - 1),
                     _buildTimerRow(),
                   ],
                 ),
@@ -3504,7 +3517,7 @@ por:
 - [ ] **Step 7: Rodar tudo**
 
 Run: `flutter analyze && flutter test`
-Esperado: `No issues found!` e **274 testes passando**.
+Esperado: `No issues found!` e **275 testes passando**.
 
 - [ ] **Step 8: Commit**
 
