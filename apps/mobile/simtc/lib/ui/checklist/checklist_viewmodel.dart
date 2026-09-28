@@ -79,9 +79,10 @@ class ChecklistViewModel extends ChangeNotifier {
   bool get hasUnreviewedCategories => unreviewedCount > 0;
 
   /// O catálogo nunca chegou a este aparelho (a descida junto com a Home
-  /// falhou). Sem ele não há o que avaliar — e finalizar uma avaliação sem
-  /// categoria nenhuma daria 100%, "Aprovado".
-  bool get hasCatalog => _catalog.isNotEmpty;
+  /// falhou) — ou só tem itens sem id, que as seções descartam. Sem seção
+  /// não há o que avaliar, e finalizar uma avaliação sem categoria nenhuma
+  /// daria 100%, "Aprovado".
+  bool get hasCatalog => sections.isNotEmpty;
 
   /// "00:12:34" desde o início da avaliação — `00:00:00` antes de o rascunho
   /// abrir.

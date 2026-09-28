@@ -220,6 +220,55 @@ void main() {
     expect(find.text('2'), findsNothing);
   });
 
+  testWidgets(
+      'abrir a próxima categoria rola até o cabeçalho dela — sem isso, a de '
+      'cima fecha e a recém-aberta fica acima da tela', (tester) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    // As duas categorias altas, cada infração com os 3 botões: com uma só
+    // alta, a lista encolhe tanto ao fechar a de cima que a rolagem volta
+    // sozinha para o topo e o defeito some.
+    Future<void> addTallInfractions(String categoryId, int from, int to) async {
+      for (var order = from; order <= to; order++) {
+        final id = 'inf-$categoryId-$order';
+        await db.into(db.infractions).insert(
+              InfractionsCompanion.insert(
+                id: id,
+                categoryId: categoryId,
+                description: 'Infração alta, item $order',
+                order: order,
+              ),
+            );
+        for (final (type, deduction) in [('B', 1), ('PM', 3), ('M', 5)]) {
+          await db.into(db.infractionNotes).insert(
+                InfractionNotesCompanion.insert(
+                  id: 'note-$id-$type',
+                  infractionId: id,
+                  noteType: type,
+                  deduction: deduction,
+                ),
+              );
+        }
+      }
+    }
+
+    await addTallInfractions('cat-1', 2, 9);
+    await addSecondCategory();
+    await addTallInfractions('cat-2', 10, 17);
+    await pumpScreen(tester);
+
+    await tester.scrollUntilVisible(find.text('Respeito às Regras'), 200);
+    await tester.tap(find.text('Respeito às Regras'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('Respeito às Regras')).dy,
+        greaterThanOrEqualTo(0));
+    expect(tester.getBottomLeft(find.text('Infração da ficha, item 3')).dy,
+        lessThanOrEqualTo(915));
+  });
+
   testWidgets('marcar a nota M zera o score da categoria e do geral', (tester) async {
     await pumpScreen(tester);
 

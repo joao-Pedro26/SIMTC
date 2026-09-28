@@ -220,6 +220,22 @@ void main() {
 
       expect(vm.elapsedLabel, '01:02:03');
     });
+
+    test('o cronômetro avisa a tela a cada tick', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      var notifications = 0;
+      vm.addListener(() => notifications++);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(notifications, greaterThan(0),
+          reason: 'o elapsedLabel é calculado na leitura; sem o aviso do tick, '
+              'o cronômetro da tela ficaria parado');
+    });
   });
 
   group('finish', () {
@@ -256,6 +272,28 @@ void main() {
       expect(vm.isFinished, isFalse);
       final row = await db.select(db.localAssessments).getSingle();
       expect(row.syncStatus, LocalSyncStatus.draft);
+    });
+
+    test(
+        'catálogo só com categoria sem id vale como sem catálogo — nada a '
+        'avaliar, então também não finaliza', () async {
+      await seedParticipant();
+      await db.into(db.assessmentCategories).insert(
+            AssessmentCategoriesCompanion.insert(
+              id: '',
+              code: '??',
+              name: 'Categoria sem id',
+              order: 1,
+            ),
+          );
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      expect(vm.hasCatalog, isFalse);
+      await vm.finish();
+
+      expect(vm.isFinished, isFalse);
     });
   });
 

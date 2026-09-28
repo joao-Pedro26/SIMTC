@@ -136,6 +136,11 @@ abstract final class AppTypography {
 
   // ─── Checklist (quadro "1b" do canvas) ────────────────────────────────────
 
+  /// Nome do participante no cabeçalho — 16/1.25 no canvas (o `cardTitle`
+  /// tem altura de linha 1.3)
+  static TextStyle get checklistParticipantName =>
+      _inter(size: 16, weight: FontWeight.w600, height: 1.25);
+
   /// "salvo", ao lado do cronômetro
   static TextStyle get savedLabel =>
       _inter(size: 11.5, weight: FontWeight.w500, height: 1.2, color: AppColors.savedInk);

@@ -46,6 +46,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   bool _poppedForFinish = false;
 
+  /// Cabeçalho da categoria aberta — há no máximo uma, então uma chave basta.
+  final GlobalKey _openHeaderKey = GlobalKey();
+
   @override
   void dispose() {
     _viewModel.dispose();
@@ -123,7 +126,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   children: [
                     Text(
                       _viewModel.participant?.name ?? '',
-                      style: AppTypography.cardTitle,
+                      style: AppTypography.checklistParticipantName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -266,7 +269,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
     return InkWell(
       key: ValueKey('category-${category.id}'),
-      onTap: () => _viewModel.toggleCategory(category.id),
+      onTap: () => _openCategory(category.id),
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.xl),
         decoration: const BoxDecoration(
@@ -314,8 +317,27 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  /// Abrir uma categoria fecha a que estava aberta; se ela ficava acima, a
+  /// lista encolhe e o cabeçalho da recém-aberta sairia da tela. A lista rola
+  /// até ele (decisão de 27/09/2026) — o consultor começa sempre pela
+  /// primeira infração.
+  void _openCategory(String categoryId) {
+    _viewModel.toggleCategory(categoryId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final header = _openHeaderKey.currentContext;
+      if (header == null) return;
+      Scrollable.ensureVisible(
+        header,
+        alignment: 0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
   Widget _buildExpandedHeader(ChecklistCategory category) {
     return InkWell(
+      key: _openHeaderKey,
       onTap: () => _viewModel.toggleCategory(category.id),
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.xl),
