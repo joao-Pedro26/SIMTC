@@ -47,6 +47,32 @@ class AuthUser {
         'CONSULTANT' => AppUserRole.consultant,
         _ => null,
       };
+
+  /// Perfil guardado no aparelho para abrir o app sem rede (ver
+  /// `AuthRepository.restoreSession`). Não é o formato do backend.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'role': role.name,
+        'consultantId': consultantId,
+      };
+
+  /// Lê o perfil guardado por [toJson]. Devolve null se ele estiver
+  /// incompleto ou com um papel que o app não aceita.
+  static AuthUser? fromJson(Map<String, dynamic> json) {
+    final role = AppUserRole.values.asNameMap()[json['role']];
+    final id = json['id'];
+    if (role == null || id is! String || id.isEmpty) return null;
+
+    return AuthUser(
+      id: id,
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      role: role,
+      consultantId: json['consultantId'] as String?,
+    );
+  }
 }
 
 /// Lê o payload de um JWT sem validar a assinatura — a validação é do backend;

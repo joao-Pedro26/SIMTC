@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import '../models/auth_user.dart';
 import 'local/token_storage.dart';
 
 /// Par de tokens da sessão corrente.
@@ -55,6 +57,26 @@ class AuthSession {
     _refreshToken = refreshToken;
     if (_keepSignedIn) {
       await _storage.persist(accessToken: accessToken, refreshToken: refreshToken);
+    }
+  }
+
+  /// Guarda o perfil que o servidor acabou de confirmar — só com "manter
+  /// conectado", a mesma regra dos tokens.
+  Future<void> saveUser(AuthUser user) async {
+    if (!_keepSignedIn) return;
+    await _storage.persistUser(jsonEncode(user.toJson()));
+  }
+
+  /// O último perfil guardado, ou null. Nunca lança: um perfil ilegível
+  /// (armazenamento corrompido, formato antigo) vale como "não há perfil".
+  Future<AuthUser?> readSavedUser() async {
+    try {
+      final json = await _storage.readUser();
+      if (json == null) return null;
+      final decoded = jsonDecode(json);
+      return decoded is Map<String, dynamic> ? AuthUser.fromJson(decoded) : null;
+    } catch (_) {
+      return null;
     }
   }
 

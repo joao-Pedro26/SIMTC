@@ -67,6 +67,7 @@ class AuthRepository extends ChangeNotifier {
         return Failure(Exception('perfil não permitido'), _roleNotAllowed);
       }
 
+      await _session.saveUser(user);
       _currentUser = user;
       notifyListeners();
       return Success(user);
@@ -80,6 +81,13 @@ class AuthRepository extends ChangeNotifier {
   }
 
   /// Tenta retomar a sessão salva na abertura do app.
+  ///
+  /// Sem rede, entra com o último perfil que o servidor confirmou (decisão de
+  /// 27/09/2026): o consultor abre o app no pátio, sem sinal, e chega à agenda
+  /// e aos rascunhos em cache. A sessão não é conferida agora — a primeira
+  /// chamada com rede faz isso (401 → renovação → `handleSessionExpired`,
+  /// como em qualquer momento do uso). Erro de servidor com rede não entra
+  /// offline: aí o problema não é o sinal.
   Future<Result<AuthUser>> restoreSession() async {
     final bool hasTokens;
     try {
@@ -105,12 +113,22 @@ class AuthRepository extends ChangeNotifier {
         return Failure(Exception('perfil não permitido'), _roleNotAllowed);
       }
 
+      await _session.saveUser(user);
       _currentUser = user;
       notifyListeners();
       return Success(user);
     } on ApiException catch (error) {
+      if (error.isNetworkError) {
+        final saved = await _session.readSavedUser();
+        if (saved != null) {
+          _currentUser = saved;
+          notifyListeners();
+          return Success(saved);
+        }
+        return Failure(error, error.message);
+      }
       if (error.statusCode == 401) await _session.clear();
-      return Failure(error, error.isNetworkError ? error.message : _sessionEnded);
+      return Failure(error, _sessionEnded);
     }
   }
 

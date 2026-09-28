@@ -66,6 +66,8 @@ void main() {
     when(() => storage.readKeepSignedIn()).thenAnswer((_) async => true);
     when(() => storage.readAccess()).thenAnswer((_) async => null);
     when(() => storage.readRefresh()).thenAnswer((_) async => null);
+    when(() => storage.persistUser(any())).thenAnswer((_) async {});
+    when(() => storage.readUser()).thenAnswer((_) async => null);
   });
 
   tearDown(() async {
@@ -239,6 +241,133 @@ void main() {
 
     expect(result, isA<Success<AuthUser>>());
     expect(repository.currentUser!.name, 'Carla');
+  });
+
+  group('entrada offline com o perfil salvo', () {
+    const semRede = ApiException(
+      message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+      isNetworkError: true,
+    );
+
+    void stubSavedTokens() {
+      when(() => storage.readAccess()).thenAnswer((_) async => accessToken);
+      when(() => storage.readRefresh()).thenAnswer((_) async => 'refresh-1');
+    }
+
+    test('login com "manter conectado" guarda o perfil no aparelho', () async {
+      stubLogin(token: fakeJwt({'sub': 'user-1', 'consultantId': 'consultant-9'}));
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+
+      await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: true);
+
+      final saved = verify(() => storage.persistUser(captureAny())).captured.single as String;
+      final user = AuthUser.fromJson(jsonDecode(saved) as Map<String, dynamic>)!;
+      expect(user.name, 'Carla');
+      expect(user.role, AppUserRole.consultant);
+      expect(user.consultantId, 'consultant-9');
+    });
+
+    test('sem "manter conectado", o perfil não vai para o aparelho', () async {
+      stubLogin(token: fakeJwt({'sub': 'user-1'}));
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+
+      await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: false);
+
+      verifyNever(() => storage.persistUser(any()));
+    });
+
+    test(
+        'sem rede na abertura, com sessão e perfil salvos, entra com o último '
+        'perfil e mantém os tokens', () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(semRede);
+      const salvo = AuthUser(
+        id: 'user-1',
+        name: 'Carla',
+        email: 'c@s.com',
+        role: AppUserRole.consultant,
+        consultantId: 'consultant-9',
+      );
+      when(() => storage.readUser()).thenAnswer((_) async => jsonEncode(salvo.toJson()));
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Success<AuthUser>>());
+      expect(repository.isAuthenticated, isTrue);
+      expect(repository.currentUser!.name, 'Carla');
+      expect(repository.currentUser!.consultantId, 'consultant-9');
+      verifyNever(() => storage.clear());
+      expect(await session.readAccessToken(), accessToken,
+          reason: 'quando a rede voltar, é este token que o servidor confere');
+    });
+
+    test('sem rede na abertura e sem perfil salvo, continua indo para o login',
+        () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(semRede);
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect((result as Failure<AuthUser>).message, contains('Sem conexão'));
+      expect(repository.isAuthenticated, isFalse);
+    });
+
+    test('401 na abertura encerra a sessão mesmo com perfil salvo', () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+          const ApiException(message: 'Não autorizado', statusCode: 401));
+      when(() => storage.readUser()).thenAnswer((_) async => jsonEncode(const AuthUser(
+            id: 'user-1',
+            name: 'Carla',
+            email: 'c@s.com',
+            role: AppUserRole.consultant,
+          ).toJson()));
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect(repository.isAuthenticated, isFalse);
+      verify(() => storage.clear()).called(1);
+    });
+
+    test('erro do servidor que não é falta de rede não entra offline', () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(
+          const ApiException(message: 'Erro interno', statusCode: 500));
+      when(() => storage.readUser()).thenAnswer((_) async => jsonEncode(const AuthUser(
+            id: 'user-1',
+            name: 'Carla',
+            email: 'c@s.com',
+            role: AppUserRole.consultant,
+          ).toJson()));
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect(repository.isAuthenticated, isFalse);
+    });
+
+    test('perfil salvo ilegível não derruba a abertura: vai para o login', () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(semRede);
+      when(() => storage.readUser()).thenAnswer((_) async => '{não é json');
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect(repository.isAuthenticated, isFalse);
+    });
+
+    test('abertura com rede atualiza o perfil salvo', () async {
+      stubSavedTokens();
+      stubMe({'id': 'user-1', 'name': 'Carla Mendes', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+
+      await repository.restoreSession();
+
+      final saved = verify(() => storage.persistUser(captureAny())).captured.single as String;
+      expect(AuthUser.fromJson(jsonDecode(saved) as Map<String, dynamic>)!.name, 'Carla Mendes');
+    });
   });
 
   test('logout limpa a sessão mesmo se a API falhar', () async {

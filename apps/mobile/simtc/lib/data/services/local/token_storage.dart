@@ -16,6 +16,7 @@ class TokenStorage {
   static const String _accessKey = 'auth.accessToken';
   static const String _refreshKey = 'auth.refreshToken';
   static const String _keepSignedInKey = 'auth.keepSignedIn';
+  static const String _userKey = 'auth.user';
 
   Future<String?> readAccess() => _storage.read(key: _accessKey);
 
@@ -29,9 +30,17 @@ class TokenStorage {
     await _storage.write(key: _refreshKey, value: refreshToken);
   }
 
+  /// Último perfil que o servidor confirmou, em JSON — é o que permite abrir
+  /// o app sem rede. Segue a mesma regra dos tokens: só existe com "manter
+  /// conectado" e some junto com eles em [clear].
+  Future<String?> readUser() => _storage.read(key: _userKey);
+
+  Future<void> persistUser(String json) => _storage.write(key: _userKey, value: json);
+
   Future<void> clear() async {
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);
+    await _storage.delete(key: _userKey);
   }
 
   /// Padrão: manter conectado (app de campo, usado várias vezes por dia).
