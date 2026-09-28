@@ -466,13 +466,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  /// Para onde a linha leva. O checklist (Fase 4) e o resultado (Fase 5)
-  /// ainda são uma tela provisória — as rotas já são as definitivas.
+  /// Para onde a linha leva: o checklist (Fase 4) ou o resultado — este ainda
+  /// é uma tela provisória, até a Fase 5. O checklist lê o nome do banco, por
+  /// isso não recebe `extra`.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
       return () => context.push(
             AppRoutes.participantChecklist(widget.sessionId, participant.id),
-            extra: participant.name,
           );
     }
     if (_viewModel.opensResult(participant)) {

@@ -5,8 +5,9 @@ import '../theme/app_icons.dart';
 import '../theme/app_spacing.dart';
 
 /// Indicador de avaliações esperando envio, no canto do cabeçalho da Home e
-/// do detalhe da sessão. Fica sem badge até a Fase 4 criar a fila local; já
-/// existe para o consultor aprender onde olhar — e para a Fase 4 mudar um
+/// do detalhe da sessão. A fila local já existe (Fase 4), mas o badge com a
+/// contagem vem com o envio, na Fase 5 (decisão de 27/09/2026); o indicador
+/// já existe para o consultor aprender onde olhar — e para a Fase 5 mudar um
 /// lugar só.
 class SyncStatusIndicator extends StatelessWidget {
   const SyncStatusIndicator({super.key});

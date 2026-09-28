@@ -95,10 +95,12 @@ abstract final class AppColors {
   static const Color noteMFill = Color(0xFFE63946);
   static const Color noteMSelectedInk = Color(0xFF3C0805);
 
-  /// Selo de score por faixa (spec "5a"): ≥85% reaproveita `successBg`/
-  /// `successInk`; 70–84% e <70% reaproveitam `notePmBg`/`notePmInk` e
-  /// `noteMBg`/`noteMInk` acima — não por coincidência, a spec usa os mesmos
-  /// tons da severidade PM/M para as faixas média/baixa do score.
+  // Selo de score por faixa (spec "5a"): ≥85% reaproveita `successBg`/
+  // `successInk`; 70–84% e <70% reaproveitam `notePmBg`/`notePmInk` e
+  // `noteMBg`/`noteMInk` acima — a spec usa os mesmos tons da severidade PM/M
+  // para as faixas média/baixa do score, então não há token próprio de faixa.
+
+  /// Fundo do chip do código da categoria fechada (spec "5a").
   static const Color categoryChipBg = Color(0xFFEEF4F5);
 
   /// Cabeçalho da categoria aberta no acordeão do checklist (quadro "1b").
