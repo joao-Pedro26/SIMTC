@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'data/repositories/auth_repository.dart';
 import 'ui/auth/login_screen.dart';
+import 'ui/checklist/checklist_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
 import 'ui/evaluation/evaluation_placeholder_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
@@ -18,7 +19,7 @@ abstract final class AppRoutes {
   /// Detalhe da sessão (tela 1.4).
   static String sessionDetail(String sessionId) => '/sessions/$sessionId';
 
-  /// Checklist do participante (Fase 4) — por ora, uma tela provisória.
+  /// Checklist do participante (Fase 4).
   static String participantChecklist(String sessionId, String participantId) =>
       '/sessions/$sessionId/participants/$participantId/checklist';
 
@@ -60,9 +61,9 @@ GoRouter createRouter(
         routes: [
           GoRoute(
             path: 'participants/:participantId/checklist',
-            builder: (context, state) => EvaluationPlaceholderScreen(
-              kind: EvaluationPlaceholderKind.checklist,
-              participantName: state.extra as String?,
+            builder: (context, state) => ChecklistScreen(
+              sessionId: state.pathParameters['sessionId']!,
+              participantId: state.pathParameters['participantId']!,
             ),
           ),
           GoRoute(

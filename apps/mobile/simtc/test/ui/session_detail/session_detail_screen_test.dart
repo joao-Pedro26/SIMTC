@@ -8,11 +8,15 @@ import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
+import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
+import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
+import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/evaluation/evaluation_placeholder_screen.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
@@ -22,6 +26,11 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
 
+class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
+
+class _MockAssessmentCatalogRepository extends Mock
+    implements AssessmentCatalogRepository {}
+
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockConnectivity extends Mock implements Connectivity {}
@@ -29,6 +38,8 @@ class _MockConnectivity extends Mock implements Connectivity {}
 void main() {
   late _MockSessionRepository sessions;
   late _MockParticipantRepository participants;
+  late _MockAssessmentRepository assessments;
+  late _MockAssessmentCatalogRepository catalog;
   late _MockAuthRepository auth;
   late ConnectivityService connectivity;
   late StreamController<TrainingSession?> sessionStream;
@@ -89,6 +100,8 @@ void main() {
   setUp(() {
     sessions = _MockSessionRepository();
     participants = _MockParticipantRepository();
+    assessments = _MockAssessmentRepository();
+    catalog = _MockAssessmentCatalogRepository();
     auth = _MockAuthRepository();
     connectivity = ConnectivityService();
     sessionStream = StreamController<TrainingSession?>.broadcast();
@@ -102,6 +115,27 @@ void main() {
         .thenAnswer((_) async => const Success(0));
     when(() => auth.currentUser).thenReturn(consultora);
     when(() => auth.isAuthenticated).thenReturn(true);
+    when(() => catalog.loadCatalog()).thenAnswer((_) async => const []);
+    when(() => assessments.openDraft(
+          trainingParticipantId: any(named: 'trainingParticipantId'),
+          sessionId: any(named: 'sessionId'),
+        )).thenAnswer((invocation) async {
+      final now = DateTime(2026, 9, 25, 10);
+      return LocalAssessment(
+        id: 'assess-1',
+        trainingParticipantId:
+            invocation.namedArguments[#trainingParticipantId] as String,
+        sessionId: invocation.namedArguments[#sessionId] as String,
+        date: now,
+        startTime: now,
+        syncStatus: LocalSyncStatus.draft,
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+    });
+    when(() => assessments.watchItems(any()))
+        .thenAnswer((_) => const Stream.empty());
   });
 
   tearDown(() {
@@ -115,6 +149,8 @@ void main() {
       providers: [
         Provider<SessionRepository>.value(value: sessions),
         Provider<ParticipantRepository>.value(value: participants),
+        Provider<AssessmentRepository>.value(value: assessments),
+        Provider<AssessmentCatalogRepository>.value(value: catalog),
         ChangeNotifierProvider<AuthRepository>.value(value: auth),
         ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
       ],
@@ -338,20 +374,18 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('o meu participante abre o checklist (provisório)',
+    testWidgets('o meu participante abre o checklist de verdade',
         (tester) async {
-      await showWithRouter(tester, [
-        participant('1', 'Ana Paula Ribeiro',
-            status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu'),
-      ]);
+      final ana = participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      when(() => participants.watchParticipant('1'))
+          .thenAnswer((_) => Stream.value(ana));
+      await showWithRouter(tester, [ana]);
 
       await tester.tap(find.text('Ana Paula Ribeiro'));
       await tester.pumpAndSettle();
 
-      final screen = tester.widget<EvaluationPlaceholderScreen>(
-        find.byType(EvaluationPlaceholderScreen),
-      );
-      expect(screen.kind, EvaluationPlaceholderKind.checklist);
+      expect(find.byType(ChecklistScreen), findsOneWidget);
       expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
     });
 

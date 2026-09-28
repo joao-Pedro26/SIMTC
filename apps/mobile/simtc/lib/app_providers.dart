@@ -3,6 +3,7 @@ import 'package:provider/single_child_widget.dart';
 
 import 'config/app_config.dart';
 import 'data/repositories/assessment_catalog_repository.dart';
+import 'data/repositories/assessment_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/participant_repository.dart';
 import 'data/repositories/session_repository.dart';
@@ -27,6 +28,7 @@ class AppDependencies {
     required this.sessionRepository,
     required this.participantRepository,
     required this.catalogRepository,
+    required this.assessmentRepository,
     required this.connectivityService,
   });
 
@@ -63,6 +65,7 @@ class AppDependencies {
       apiClient: apiClient,
       database: database,
     );
+    final assessmentRepository = AssessmentRepository(database: database);
 
     return AppDependencies._(
       database: database,
@@ -73,6 +76,7 @@ class AppDependencies {
       sessionRepository: sessionRepository,
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
+      assessmentRepository: assessmentRepository,
       connectivityService: ConnectivityService()..initialize(),
     );
   }
@@ -85,6 +89,7 @@ class AppDependencies {
   final SessionRepository sessionRepository;
   final ParticipantRepository participantRepository;
   final AssessmentCatalogRepository catalogRepository;
+  final AssessmentRepository assessmentRepository;
   final ConnectivityService connectivityService;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
@@ -100,6 +105,7 @@ class AppDependencies {
         Provider<SessionRepository>.value(value: sessionRepository),
         Provider<ParticipantRepository>.value(value: participantRepository),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
+        Provider<AssessmentRepository>.value(value: assessmentRepository),
         ChangeNotifierProvider<ConnectivityService>.value(
           value: connectivityService,
         ),
