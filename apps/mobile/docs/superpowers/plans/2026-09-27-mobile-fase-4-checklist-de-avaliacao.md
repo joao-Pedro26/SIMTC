@@ -26,6 +26,11 @@ Em 27/09/2026, ao preparar este plano:
 
 6. **Cronômetro na linha "Avaliando · você" e badge da fila no indicador de sincronização vão para a Fase 5.** A Fase 3 tinha deixado os dois para a Fase 4 (decisão 13 e pendências), mas o desenho aprovado não os incluiu; o usuário escolheu levá-los para a Fase 5, junto com a fila que de fato envia.
 
+Em 27/09/2026, depois da revisão final do branch (ver "Correções da revisão final", antes da Task 7):
+
+7. **Entrar offline com o perfil salvo.** A revisão achou que, fechado à força (ou com o celular reiniciado) sem sinal, o app abria no Login — que exige rede — porque `restoreSession()` (Fase 1) sempre confere a sessão no `GET /auth/me`. Com sessão salva ("manter conectado"), se essa checagem falhar **por falta de rede**, o app entra com o último perfil que o servidor confirmou, guardado no armazenamento seguro junto com os tokens (e apagado com eles). A sessão é conferida na primeira chamada com rede: 401 → renovação → `handleSessionExpired`, como em qualquer momento do uso. 401 e erro de servidor continuam indo para o login. Risco aceito: um usuário desativado no painel continua vendo o que já estava baixado até o aparelho ficar online.
+8. **Rolar até a categoria aberta.** Abrir a próxima categoria fecha a de cima; a lista encolhia e o cabeçalho da recém-aberta ficava acima da tela. Agora a lista rola até ele, com a mesma animação da Home (300 ms, `easeInOut`).
+
 ### Ajustes feitos ao preparar o plano (revisar junto com o plano)
 
 A validação na cópia descartável e a conferência pixel a pixel com o quadro `1b` levaram a estes ajustes — **nenhum muda regra de negócio aprovada**, mas cada um é uma escolha que o usuário deve conferir:
@@ -3528,6 +3533,16 @@ git commit -m "feat(mobile): tela de checklist de avaliacao offline"
 
 ---
 
+## Correções da revisão final
+
+Executadas depois das Tasks 1–6, numa rodada só de correção (código pré-validado numa cópia do app e reencenado sobre o HEAD, 275 → 284 → 287 testes):
+
+1. **Abertura sem rede com o último perfil salvo** (decisão 7) — `AuthUser.toJson`/`fromJson`; `TokenStorage` com a chave `auth.user` (apagada em `clear()`); `AuthSession.saveUser` (só com "manter conectado") e `readSavedUser` (nunca lança); `AuthRepository.restoreSession` entra com o perfil salvo quando o `/auth/me` falha por rede. Commit `fix(mobile): abre o app sem rede com o ultimo perfil salvo`.
+2. **Rolagem até a categoria aberta** (decisão 8), mais: um teste que prova que o cronômetro avisa a tela a cada tick (o `elapsedLabel` é calculado na leitura); `hasCatalog` passa a olhar as seções (catálogo só com itens sem id conta como sem catálogo); o nome do participante com a altura de linha do canvas (`AppTypography.checklistParticipantName`, 16/1.25). Commit `fix(mobile): rola ate a categoria aberta e fecha lacunas do checklist`.
+3. **Comentários desatualizados** — o das faixas de score estava sobre `categoryChipBg`; o detalhe da sessão ainda chamava o checklist de provisório e passava um `extra` que ele não lê mais; o `SyncStatusIndicator` ainda prometia o badge na Fase 4. Commit `chore(mobile): atualiza comentarios e tira o extra do checklist`.
+
+---
+
 ## Task 7: Validação no aparelho físico
 
 Esta task é o portão da fase: sem ela, a Fase 5 não é planejada (decisão do usuário, registrada em 17/09/2026). É o roteiro que só o usuário pode rodar.
@@ -3535,7 +3550,7 @@ Esta task é o portão da fase: sem ela, a Fase 5 não é planejada (decisão do
 **Files:** nenhum arquivo de código.
 
 **Interfaces:**
-- Consumes: o app inteiro, montado pelas Tasks 1–6.
+- Consumes: o app inteiro, montado pelas Tasks 1–6 e pelas correções da revisão final.
 - Produces: o aval do usuário para planejar a Fase 5.
 
 - [ ] **Step 1: Subir o backend e liberar a porta para o aparelho**
@@ -3559,15 +3574,18 @@ Preparação: com rede, abra na Home uma sessão "Em andamento" e atribua a voc�
 Checklist:
 - [ ] tocar em "Avaliando · você" abre o checklist de verdade (não mais a tela provisória), com o nome do participante, o cronômetro contando e "salvo";
 - [ ] a primeira categoria já vem aberta; as outras aparecem fechadas, com "N itens"; tocar numa fechada abre ela e fecha a anterior; tocar na aberta fecha;
+- [ ] com a primeira categoria aberta, role até a próxima (fechada, logo abaixo) e toque nela: a lista vai até o cabeçalho da recém-aberta — ela começa na primeira infração, sem deixar o consultor no meio;
 - [ ] o número de cada infração é o item da ficha — confira com o catálogo no painel web;
 - [ ] tocar em B, PM ou M marca (o botão fica cheio); tocar em outro troca; tocar no mesmo desmarca;
 - [ ] com uma nota escolhida, aparece embaixo a observação dela (para as notas que o admin cadastrou com observação);
 - [ ] o selo da categoria e o % geral mudam na hora — por exemplo, numa categoria com 6 infrações, uma PM e uma B dão 86,7%;
 - [ ] "X de Y categorias revisadas" conta as categorias com pelo menos uma marcação.
 
-Offline (o critério da fase):
-- [ ] ative o modo avião **antes** de abrir o segundo participante; abra o checklist dele e marque B/PM/M em várias categorias — aparece a faixa "Sem conexão — as marcações continuam sendo salvas no aparelho." e tudo funciona;
-- [ ] ainda em modo avião, feche o app à força (recentes → deslizar) e abra de novo; volte ao mesmo participante: o rascunho reaparece exatamente como estava, e o cronômetro continua contando desde o início (não zera).
+Offline (o critério da fase) — **corte a rede de verdade**: via USB, o modo avião não derruba o `adb reverse`, e o app continuaria alcançando o backend do PC (README, "Testes offline"). Ative o modo avião, confira que o Wi-Fi também desligou e rode `adb -s <ID_DO_APARELHO> reverse --remove tcp:3001`. Deixe "Manter conectado" como estava no login (marcado — é o padrão).
+- [ ] abra o checklist do segundo participante e marque B/PM/M em várias categorias — aparece a faixa "Sem conexão — as marcações continuam sendo salvas no aparelho." e tudo funciona;
+- [ ] ainda sem rede, feche o app à força (recentes → deslizar) e abra de novo: ele vai **direto para a Home**, sem pedir login, com a agenda em cache e o aviso de sem conexão;
+- [ ] volte ao mesmo participante: o rascunho reaparece exatamente como estava, e o cronômetro continua contando desde o início (não zera);
+- [ ] para voltar a ficar online, recrie o redirecionamento (`adb -s <ID_DO_APARELHO> reverse tcp:3001 tcp:3001`) e desligue o modo avião: a Home volta a atualizar sozinha.
 
 Finalizar:
 - [ ] com alguma categoria sem marcação, "Finalizar avaliação" pergunta ("N categorias estão sem nenhuma infração marcada…"); "Cancelar" fica na tela; "Finalizar" volta para o detalhe da sessão;
@@ -3579,6 +3597,8 @@ Regressões:
 - [ ] um participante concluído continua abrindo a tela provisória "Resultado".
 
 **Não verificável neste aparelho, e por quê:** "sem catálogo no aparelho, aviso e sem 'Finalizar'" depende de o catálogo nunca ter descido, o que não acontece num aparelho que já abriu a Home com rede. Fica coberto pelos testes das Tasks 5 e 6.
+
+**Observação para o campo:** com a regra da decisão 2 (revisada = pelo menos uma infração marcada), um participante que não cometeu nenhuma infração aparece como "0 de N categorias revisadas", com a barra vazia, e o "Finalizar avaliação" sempre pergunta. É a regra aprovada funcionando; se isso atrapalhar no campo, é para rever junto com a Fase 5.
 
 - [ ] **Step 4: Registrar o resultado**
 
@@ -3596,6 +3616,21 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5. Se algo
 | 5 | Marcações órfãs (nota ou infração removida do catálogo depois da marcação) ficam no banco: o envio precisa ignorá-las, senão o backend recebe um `infractionNoteId` que não existe mais. |
 | 5 | Reabrir um participante já finalizado reabre o checklist (o status no servidor só muda com o envio). Decidir, com o Resumo/Resultado da Fase 5, o que esse toque deve abrir. |
 | 5 | O cronômetro e a duração enviada (`endTime − startTime`) contam desde a criação do rascunho, inclusive o tempo com o app fechado. Confirmar com o usuário se é isso que o painel deve mostrar. |
+| 5 | Estados de erro do checklist: uma falha de escrita local (disco cheio, por exemplo) em `init`, `toggleNote` ou `finish` não mostra mensagem — o `init` ficaria no skeleton para sempre, e o `finish` só não voltaria para o detalhe. Nada se perde. |
+| 5 | Reavaliação: `openDraft` retoma a linha do participante em qualquer status, inclusive `synced`. O "Reavaliar" precisa começar um rascunho novo — senão reabre as marcações e o `startTime` da avaliação anterior. |
+| 5 | Rascunhos não são separados por consultor (a chave é só o `trainingParticipantId`) e sobrevivem ao logout: num aparelho compartilhado, se o participante mudar de consultor, o novo herdaria o rascunho do anterior. |
+| 5 | Formato do `date` (data de calendário, meia-noite local) no payload do `POST /practical-assessments/sync`. |
+| 5 | Sessão aberta sem rede usa o perfil guardado (decisão 7): nome, papel ou consultor alterados no painel só aparecem na próxima abertura com rede. |
+| 5 — **prioridade** | `api_client.dart` trata **qualquer** falha da renovação do token (timeout, conexão caída) como sessão expirada e leva ao Login, que exige rede. Com a entrada offline (decisão 7), "voltar com sinal fraco e token vencido" fica comum no campo: o consultor seria deslogado até ter sinal bom (os rascunhos sobrevivem). Direção: expirar só com 401/403 do `/auth/refresh`; erro de rede mantém a sessão e falha só a chamada. O envio da Fase 5 vai passar por esse caminho o tempo todo. |
+| 5 | Endurecer a entrada offline: exigir que o `id` do perfil salvo seja o `sub` do JWT (ou apagar `auth.user` em `AuthSession.start()`). Numa sequência muito improvável — abertura anterior falhou sem 401, outro usuário entra e uma escrita falha entre `start()` e `saveUser` — os tokens de um usuário ficariam com o perfil de outro. |
+| 5 | A abertura com rede grava o perfil (`saveUser`) sem tratar erro do armazenamento: uma falha rara da keystore ali manda para o login naquela abertura. Tornar a gravação do perfil tolerante a falha. |
+| 5 | Uma falha `DioExceptionType.unknown` sem resposta conta como erro de rede, então também leva à entrada offline — mesmo estado "não conferido até a próxima chamada" do risco aceito na decisão 7. |
 | 8 | O toque no cabeçalho da categoria aberta e nos botões B/PM/M não mostra ripple (mesma causa da pendência da Fase 3: `Container` com cor por cima do `InkWell`). As linhas fechadas mostram, porque não têm fundo próprio. |
+| 8 | O "salvo" do cabeçalho é estático — não reflete uma escrita que falhou (os botões, sim: só mostram o que foi gravado). |
+| 8 | A tela inteira reconstrói a cada tick do cronômetro, e `buildChecklistSections` roda algumas vezes por build — barato no tamanho real do catálogo. Se crescer: isolar o rótulo do cronômetro num widget e guardar as seções na VM. |
+| 8 | Botões B/PM/M sem `Semantics(selected: …)` para leitores de tela; "0 de 1 categorias revisadas" no plural (só aparece com catálogo de uma categoria); uma nota fora de B/PM/M iria para a frente da ordem e ganharia as cores do M (o backend só tem B/PM/M). |
+| 8 | O aviso de hit-test do `tap()` em `test/ui/sessions/sessions_screen_test.dart` (Fase 3) aparece na suíte inteira. |
+| 8 | Com rede "conectada mas sem dados", a entrada offline só acontece depois do timeout do `ApiClient` (15 s de conexão / 20 s de resposta), com a splash na tela o tempo todo. Considerar um timeout menor só para a checagem da abertura. |
+| — | Testes que ficaram de fora, de baixo risco: sessão em cache com `date` nulo no `openDraft`; `unmark` numa infração nunca marcada; bordas exatas do selo (70 e 84,9); ausência da faixa offline nos testes com rede; o teste da rolagem compara com as bordas da tela (0 e 915), não com a área da lista — uma regressão parcial, com o cabeçalho escondido atrás do cabeçalho fixo, passaria. |
 | — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` (mais recente) usa 15/20. Atualizar a spec no Claude Design. |
 | — | As pendências da Fase 3 que não eram da Fase 4 continuam valendo — ver o fim do plano da Fase 3. |
