@@ -3600,9 +3600,11 @@ Regressões:
 
 **Observação para o campo:** com a regra da decisão 2 (revisada = pelo menos uma infração marcada), um participante que não cometeu nenhuma infração aparece como "0 de N categorias revisadas", com a barra vazia, e o "Finalizar avaliação" sempre pergunta. É a regra aprovada funcionando; se isso atrapalhar no campo, é para rever junto com a Fase 5.
 
-- [ ] **Step 4: Registrar o resultado**
+- [x] **Step 4: Registrar o resultado**
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
+
+**Validado em 29/09/2026, no aparelho físico, pelo usuário — roteiro completo, incluindo a entrada offline depois de fechar o app à força e a rolagem até a categoria aberta (correções da revisão final).**
 
 ---
 
