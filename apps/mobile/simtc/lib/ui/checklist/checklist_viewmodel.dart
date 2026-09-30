@@ -15,8 +15,8 @@ import 'checklist_sections.dart';
 /// O catálogo é lido uma vez (`loadCatalog`, sem stream — não muda durante a
 /// avaliação); as marcações, sim, vêm de um stream, porque `toggleNote`
 /// escreve no banco e a tela precisa reagir à própria escrita. Nada aqui fala
-/// com o backend: a avaliação só é gravada no aparelho, e a fila de envio é de
-/// uma fase futura.
+/// com o backend: a avaliação só é gravada no aparelho. Quem a põe na fila de
+/// envio é o "Confirmar" da tela 1.6 (Fase 5A).
 class ChecklistViewModel extends ChangeNotifier {
   ChecklistViewModel({
     required this.sessionId,
@@ -59,15 +59,10 @@ class ChecklistViewModel extends ChangeNotifier {
   List<CatalogCategory> _catalog = const [];
   List<LocalAssessmentItem> _items = const [];
   String? _expandedCategoryId;
-  bool _finished = false;
 
   bool get isLoading => _loading;
   SessionParticipant? get participant => _participant;
   String? get expandedCategoryId => _expandedCategoryId;
-
-  /// Uma vez `true`, a tela navega de volta ao detalhe da sessão — regra
-  /// decidida com o usuário em 26/09/2026: finalizar marca local e volta.
-  bool get isFinished => _finished;
 
   List<ChecklistCategory> get sections =>
       buildChecklistSections(_catalog, _items);
@@ -76,16 +71,11 @@ class ChecklistViewModel extends ChangeNotifier {
 
   int get reviewedCount => sections.where((s) => s.isReviewed).length;
   int get totalCategories => sections.length;
-  int get unreviewedCount => totalCategories - reviewedCount;
-
-  /// Há categoria sem nenhuma infração marcada — só então o "Finalizar
-  /// avaliação" pede confirmação (roteiro da Fase 4).
-  bool get hasUnreviewedCategories => unreviewedCount > 0;
 
   /// O catálogo nunca chegou a este aparelho (a descida junto com a Home
   /// falhou) — ou só tem itens sem id, que as seções descartam. Sem seção
-  /// não há o que avaliar, e finalizar uma avaliação sem categoria nenhuma
-  /// daria 100%, "Aprovado".
+  /// não há o que avaliar, e confirmar uma avaliação sem categoria nenhuma
+  /// daria 100%, "Aprovado": a tela nem oferece o "Finalizar avaliação".
   bool get hasCatalog => sections.isNotEmpty;
 
   /// "00:12:34" desde o início da avaliação — `00:00:00` antes de o rascunho
@@ -138,6 +128,14 @@ class ChecklistViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Abre a categoria (fechando a que estava aberta) sem alternar: é a volta
+  /// da tela 1.6, que abre o checklist na categoria que o consultor tocou.
+  void expandCategory(String categoryId) {
+    if (_expandedCategoryId == categoryId) return;
+    _expandedCategoryId = categoryId;
+    notifyListeners();
+  }
+
   /// Aperta um dos 3 botões de nota. O mesmo botão já selecionado desmarca a
   /// infração (nenhuma nota); um botão diferente troca a nota.
   ///
@@ -164,19 +162,6 @@ class ChecklistViewModel extends ChangeNotifier {
             infractionId: infractionId,
             infractionNoteId: noteId,
           );
-    notifyListeners();
-  }
-
-  /// Finaliza a avaliação: grava local e sinaliza a volta para o detalhe.
-  /// Sem catálogo, não finaliza — a tela nem mostra o botão, e esta guarda
-  /// garante que uma avaliação vazia nunca entre na fila de envio.
-  Future<void> finish() async {
-    final assessmentId = _assessmentId;
-    if (assessmentId == null || _finished || !hasCatalog) return;
-
-    await _assessmentRepository.finish(assessmentId);
-    _ticker?.cancel();
-    _finished = true;
     notifyListeners();
   }
 

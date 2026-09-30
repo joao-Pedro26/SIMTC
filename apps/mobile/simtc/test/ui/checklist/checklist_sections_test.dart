@@ -247,6 +247,33 @@ void main() {
       expect(sections[0].isReviewed, isTrue);
       expect(sections[1].isReviewed, isFalse);
     });
+
+    test('markedCount conta só as infrações com nota marcada', () {
+      final catalog = [
+        CatalogCategory(
+          id: 'cat-1',
+          code: 'CV',
+          name: 'Controle do Veículo',
+          order: 1,
+          infractions: [
+            infraction('inf-1', order: 1, notes: [note('note-b-1', 'B', 1)]),
+            infraction('inf-2', order: 2, notes: [note('note-b-2', 'B', 1)]),
+            infraction('inf-3', order: 3, notes: [note('note-b-3', 'B', 1)]),
+          ],
+        ),
+      ];
+      final items = [item('inf-1', 'note-b-1'), item('inf-3', 'note-b-3')];
+
+      final sections = buildChecklistSections(catalog, items);
+
+      expect(sections.single.markedCount, 2);
+    });
+  });
+
+  test('infractionCountLabel conta as marcações da categoria na tela 1.6', () {
+    expect(infractionCountLabel(0), 'sem infração');
+    expect(infractionCountLabel(1), '1 infração');
+    expect(infractionCountLabel(3), '3 infrações');
   });
 
   group('overallScoreOf', () {

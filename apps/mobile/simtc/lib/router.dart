@@ -9,6 +9,7 @@ import 'ui/evaluation/evaluation_placeholder_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
 import 'ui/splash/splash_screen.dart';
+import 'ui/summary/summary_screen.dart';
 
 abstract final class AppRoutes {
   static const String splash = '/';
@@ -22,6 +23,10 @@ abstract final class AppRoutes {
   /// Checklist do participante (Fase 4).
   static String participantChecklist(String sessionId, String participantId) =>
       '/sessions/$sessionId/participants/$participantId/checklist';
+
+  /// "Conferir e finalizar" (tela 1.6, Fase 5A), aberta pelo checklist.
+  static String participantSummary(String sessionId, String participantId) =>
+      '/sessions/$sessionId/participants/$participantId/summary';
 
   /// Resultado do participante (Fase 5) — por ora, uma tela provisória.
   static String participantResult(String sessionId, String participantId) =>
@@ -63,6 +68,12 @@ GoRouter createRouter(
             path: 'participants/:participantId/checklist',
             builder: (context, state) => ChecklistScreen(
               sessionId: state.pathParameters['sessionId']!,
+              participantId: state.pathParameters['participantId']!,
+            ),
+          ),
+          GoRoute(
+            path: 'participants/:participantId/summary',
+            builder: (context, state) => SummaryScreen(
               participantId: state.pathParameters['participantId']!,
             ),
           ),

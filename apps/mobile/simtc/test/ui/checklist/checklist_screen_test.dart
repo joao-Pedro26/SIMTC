@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
@@ -13,7 +14,9 @@ import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
+import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
@@ -137,26 +140,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// O checklist empilhado sobre uma tela de origem — para ver a volta.
+  /// O checklist empilhado sobre uma tela de origem, com as rotas reais do
+  /// checklist e da conferência — o "Finalizar avaliação" navega pelo
+  /// go_router.
   Future<void> pumpOverOrigin(WidgetTester tester) async {
-    await tester.pumpWidget(withProviders(
-      MaterialApp(
-        home: Builder(
-          builder: (context) => Center(
-            child: ElevatedButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      const ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
-                ),
-              ),
-              child: const Text('abrir'),
-            ),
-          ),
+    final router = GoRouter(
+      initialLocation: '/origem',
+      routes: [
+        GoRoute(
+          path: '/origem',
+          builder: (context, state) => const Scaffold(body: Text('origem')),
         ),
-      ),
-    ));
-    await tester.tap(find.text('abrir'));
+        GoRoute(
+          path: AppRoutes.participantChecklist('sess-1', 'tp-1'),
+          builder: (context, state) =>
+              const ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+        ),
+        GoRoute(
+          path: AppRoutes.participantSummary('sess-1', 'tp-1'),
+          builder: (context, state) => const SummaryScreen(participantId: 'tp-1'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(withProviders(MaterialApp.router(routerConfig: router)));
+    router.push(AppRoutes.participantChecklist('sess-1', 'tp-1'));
     await tester.pumpAndSettle();
   }
 
@@ -322,56 +330,70 @@ void main() {
   });
 
   testWidgets(
-      'finalizar com categoria sem marcação pergunta e, ao confirmar, grava e '
-      'volta para a tela anterior', (tester) async {
+      '"Finalizar avaliação" abre a conferência sem diálogo, mesmo com '
+      'categoria sem marcação, e ainda não põe nada na fila', (tester) async {
     await pumpOverOrigin(tester);
 
     await tester.tap(find.text('Finalizar avaliação'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Finalizar avaliação?'), findsOneWidget);
-    expect(
-      find.text('1 categoria está sem nenhuma infração marcada e conta como '
-          '100% no cálculo. Finalizar assim mesmo?'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Finalizar'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ChecklistScreen), findsNothing);
-    expect(find.text('abrir'), findsOneWidget);
-    final row = await db.select(db.localAssessments).getSingle();
-    expect(row.syncStatus, LocalSyncStatus.pendingSync);
-    expect(row.endTime, isNotNull);
-  });
-
-  testWidgets('cancelar o diálogo não finaliza nem sai da tela', (tester) async {
-    await pumpScreen(tester);
-
-    await tester.tap(find.text('Finalizar avaliação'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancelar'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ChecklistScreen), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(SummaryScreen), findsOneWidget);
     final row = await db.select(db.localAssessments).getSingle();
     expect(row.syncStatus, LocalSyncStatus.draft);
   });
 
-  testWidgets('com todas as categorias revisadas, finaliza sem perguntar',
-      (tester) async {
+  testWidgets(
+      '"Confirmar" na conferência põe na fila e fecha o checklist junto, '
+      'de volta à tela de origem', (tester) async {
     await pumpOverOrigin(tester);
     await tester.tap(find.text('PM'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Finalizar avaliação'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar'));
+    await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(SummaryScreen), findsNothing);
     expect(find.byType(ChecklistScreen), findsNothing);
+    expect(find.text('origem'), findsOneWidget);
     final row = await db.select(db.localAssessments).getSingle();
     expect(row.syncStatus, LocalSyncStatus.pendingSync);
+    expect(row.endTime, isNotNull);
+    expect(row.participantName, 'Ana Paula Ribeiro');
+  });
+
+  testWidgets('voltar da conferência sem confirmar deixa o rascunho como estava',
+      (tester) async {
+    await pumpOverOrigin(tester);
+    await tester.tap(find.text('Finalizar avaliação'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SummaryScreen), findsNothing);
+    expect(find.byType(ChecklistScreen), findsOneWidget);
+    final row = await db.select(db.localAssessments).getSingle();
+    expect(row.syncStatus, LocalSyncStatus.draft);
+  });
+
+  testWidgets(
+      'tocar numa categoria da conferência volta ao checklist com ela aberta',
+      (tester) async {
+    await addSecondCategory();
+    await pumpOverOrigin(tester);
+    expect(find.text('Excesso de velocidade'), findsOneWidget);
+
+    await tester.tap(find.text('Finalizar avaliação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Respeito às Regras'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SummaryScreen), findsNothing);
+    expect(find.text('Infração da ficha, item 3'), findsOneWidget);
+    expect(find.text('Excesso de velocidade'), findsNothing);
   });
 
   testWidgets('sem catálogo no aparelho, avisa e não oferece "Finalizar"',

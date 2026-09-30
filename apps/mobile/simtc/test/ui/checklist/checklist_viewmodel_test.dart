@@ -156,8 +156,6 @@ void main() {
       expect(vm.sections.single.infractions.single.selectedNoteId, 'note-m');
       expect(vm.sections.single.score, 0);
       expect(vm.reviewedCount, 1);
-      expect(vm.unreviewedCount, 0);
-      expect(vm.hasUnreviewedCategories, isFalse);
     });
 
     test('apertar a mesma nota de novo desmarca a infração', () async {
@@ -172,8 +170,7 @@ void main() {
 
       expect(vm.sections.single.infractions.single.selectedNoteId, isNull);
       expect(vm.sections.single.score, 100);
-      expect(vm.unreviewedCount, 1);
-      expect(vm.hasUnreviewedCategories, isTrue);
+      expect(vm.reviewedCount, 0);
     });
   });
 
@@ -239,45 +236,44 @@ void main() {
     });
   });
 
-  group('finish', () {
-    test('marca local, sinaliza isFinished e para o cronômetro', () async {
+  group('expandCategory', () {
+    test('abre a categoria pedida sem alternar — abrir a já aberta não fecha',
+        () async {
       await seedParticipant();
       await seedCatalog();
-      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+      await db.into(db.assessmentCategories).insert(
+            AssessmentCategoriesCompanion.insert(
+              id: 'cat-2',
+              code: 'RR',
+              name: 'Respeito às Regras',
+              order: 2,
+            ),
+          );
+      final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
 
-      await vm.finish();
+      vm.expandCategory('cat-2');
+      expect(vm.expandedCategoryId, 'cat-2');
 
-      expect(vm.isFinished, isTrue);
-      final row = await db.select(db.localAssessments).getSingle();
-      expect(row.syncStatus, LocalSyncStatus.pendingSync);
-      expect(row.endTime, isNotNull);
-
-      var notifications = 0;
-      vm.addListener(() => notifications++);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(notifications, 0, reason: 'sem cronômetro, ninguém notifica mais');
+      vm.expandCategory('cat-2');
+      expect(vm.expandedCategoryId, 'cat-2');
     });
+  });
 
-    test('sem catálogo no aparelho, não finaliza — uma avaliação vazia daria 100%',
-        () async {
+  group('hasCatalog', () {
+    test('sem catálogo no aparelho, não há o que avaliar', () async {
       await seedParticipant();
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
 
       expect(vm.hasCatalog, isFalse);
-      await vm.finish();
-
-      expect(vm.isFinished, isFalse);
-      final row = await db.select(db.localAssessments).getSingle();
-      expect(row.syncStatus, LocalSyncStatus.draft);
     });
 
     test(
         'catálogo só com categoria sem id vale como sem catálogo — nada a '
-        'avaliar, então também não finaliza', () async {
+        'avaliar', () async {
       await seedParticipant();
       await db.into(db.assessmentCategories).insert(
             AssessmentCategoriesCompanion.insert(
@@ -292,9 +288,6 @@ void main() {
       await vm.init();
 
       expect(vm.hasCatalog, isFalse);
-      await vm.finish();
-
-      expect(vm.isFinished, isFalse);
     });
   });
 

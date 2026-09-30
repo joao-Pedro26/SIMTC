@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/repositories/assessment_catalog_repository.dart';
@@ -6,6 +7,8 @@ import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../router.dart';
+import '../core/score_labels.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -14,6 +17,8 @@ import '../core/widgets/app_buttons.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
+import '../summary/summary_screen.dart';
+import 'checklist_badges.dart';
 import 'checklist_sections.dart';
 import 'checklist_viewmodel.dart';
 
@@ -47,8 +52,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     catalogRepository: context.read<AssessmentCatalogRepository>(),
   )..init();
 
-  bool _poppedForFinish = false;
-
   /// Cabeçalho da categoria aberta — há no máximo uma, então uma chave basta.
   final GlobalKey _openHeaderKey = GlobalKey();
 
@@ -62,17 +65,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: _viewModel,
-      builder: (context, _) {
-        // "Marca local e volta pro detalhe" (decisão de 26/09/2026): uma vez
-        // finalizada, a tela sai sozinha.
-        if (_viewModel.isFinished && !_poppedForFinish) {
-          _poppedForFinish = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) Navigator.of(context).maybePop();
-          });
-        }
-        return _buildScaffold(context);
-      },
+      builder: (context, _) => _buildScaffold(context),
     );
   }
 
@@ -190,7 +183,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             ),
             const SizedBox(width: AppSpacing.sm),
             Text(
-              _percentLabel(_viewModel.overallScore),
+              percentLabel(_viewModel.overallScore),
               style: AppTypography.checklistProgressValue,
             ),
           ],
@@ -280,11 +273,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ),
         child: Row(
           children: [
-            _CodeChip(
-              code: category.code,
-              background: AppColors.categoryChipBg,
-              ink: AppColors.primaryDark,
-            ),
+            CategoryCodeChip(code: category.code),
             const SizedBox(width: AppSpacing.sm + 2),
             Expanded(
               child: Text(
@@ -323,9 +312,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// Abrir uma categoria fecha a que estava aberta; se ela ficava acima, a
   /// lista encolhe e o cabeçalho da recém-aberta sairia da tela. A lista rola
   /// até ele (decisão de 27/09/2026) — o consultor começa sempre pela
-  /// primeira infração.
+  /// primeira infração. Serve também para a volta da tela 1.6.
   void _openCategory(String categoryId) {
-    _viewModel.toggleCategory(categoryId);
+    _viewModel.expandCategory(categoryId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final header = _openHeaderKey.currentContext;
       if (header == null) return;
@@ -350,7 +339,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ),
         child: Row(
           children: [
-            _CodeChip(
+            CategoryCodeChip(
               code: category.code,
               background: AppColors.primary,
               ink: AppColors.surface,
@@ -365,7 +354,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ),
             ),
             const SizedBox(width: AppSpacing.sm + 2),
-            _ScoreBadge(score: category.score),
+            ScoreBadge(score: category.score),
             const SizedBox(width: AppSpacing.sm + 2),
             const Icon(AppIcons.expandLess, size: 22, color: AppColors.text3),
           ],
@@ -444,98 +433,30 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         label: 'Finalizar avaliação',
         icon: AppIcons.finish,
         size: AppCtaSize.large,
-        onPressed: _finish,
+        onPressed: _openSummary,
       ),
     );
   }
 
-  /// Roteiro da Fase 4: só pergunta quando há categoria sem nenhuma infração
-  /// marcada — com todas revisadas, finaliza direto.
-  Future<void> _finish() async {
-    if (_viewModel.hasUnreviewedCategories) {
-      final confirmed = await _confirmUnreviewed();
-      if (confirmed != true || !mounted) return;
+  /// "Finalizar avaliação" abre a conferência (tela 1.6), sem o diálogo das
+  /// categorias sem marcação da Fase 4: a 1.6 mostra cada categoria com o %
+  /// antes do "Confirmar" (decisão de 29/09/2026). Quem põe na fila é o
+  /// "Confirmar" de lá; daqui, só se decide para onde voltar.
+  Future<void> _openSummary() async {
+    final exit = await context.push<SummaryExit>(
+      AppRoutes.participantSummary(widget.sessionId, widget.participantId),
+    );
+    if (!mounted) return;
+
+    switch (exit) {
+      case SummaryConfirmed():
+        // Confirmada: o checklist sai também, de volta ao detalhe da sessão.
+        await Navigator.of(context).maybePop();
+      case SummaryReviewCategory(:final categoryId):
+        _openCategory(categoryId);
+      case null:
+        break;
     }
-    await _viewModel.finish();
-  }
-
-  Future<bool?> _confirmUnreviewed() {
-    final pending = _viewModel.unreviewedCount;
-    final message = pending == 1
-        ? '1 categoria está sem nenhuma infração marcada e conta como 100% '
-            'no cálculo. Finalizar assim mesmo?'
-        : '$pending categorias estão sem nenhuma infração marcada e contam '
-            'como 100% no cálculo. Finalizar assim mesmo?';
-
-    return showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Finalizar avaliação?'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Finalizar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "86,7%" — uma casa, vírgula decimal, como no canvas.
-String _percentLabel(double score) =>
-    '${score.toStringAsFixed(1).replaceAll('.', ',')}%';
-
-class _CodeChip extends StatelessWidget {
-  const _CodeChip({required this.code, required this.background, required this.ink});
-
-  final String code;
-  final Color background;
-  final Color ink;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm - 1,
-        vertical: AppSpacing.xs - 1,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppRadius.sm - 2),
-      ),
-      child: Text(code, style: AppTypography.categoryCode.copyWith(color: ink)),
-    );
-  }
-}
-
-class _ScoreBadge extends StatelessWidget {
-  const _ScoreBadge({required this.score});
-
-  final double score;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = scoreBadgeColorsFor(score);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm - 1,
-        vertical: AppSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: colors.bg,
-        borderRadius: BorderRadius.circular(AppRadius.sm - 2),
-      ),
-      child: Text(
-        _percentLabel(score),
-        style: AppTypography.scoreBadge.copyWith(color: colors.ink),
-      ),
-    );
   }
 }
 

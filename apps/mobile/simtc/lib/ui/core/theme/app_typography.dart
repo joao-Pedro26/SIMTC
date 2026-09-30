@@ -186,6 +186,28 @@ abstract final class AppTypography {
   static TextStyle get noteComment =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.45, color: AppColors.noteCommentInk);
 
+  // ─── Conferir e finalizar (quadro "2e" do canvas) ─────────────────────────
+
+  /// "Pontuação final", acima do número
+  static TextStyle get summaryScoreLabel =>
+      _inter(size: 13, weight: FontWeight.w500, height: 1.2, color: AppColors.text3);
+
+  /// O % geral em destaque ("86,7%")
+  static TextStyle get summaryScore =>
+      _inter(size: 40, weight: FontWeight.w800, height: 1, letterSpacing: -0.8);
+
+  /// Pílula do resultado, ao lado do % ("Aprovado")
+  static TextStyle get resultPill =>
+      _inter(size: 12.5, weight: FontWeight.w600, height: 1.2);
+
+  /// "Ana Paula Ribeiro · 3 infrações · mínimo para aprovação 70%."
+  static TextStyle get summaryDetail =>
+      _inter(size: 13, weight: FontWeight.w400, height: 1.45, color: AppColors.text3);
+
+  /// "Por categoria"
+  static TextStyle get summarySectionTitle =>
+      _inter(size: 13, weight: FontWeight.w600, height: 1.2, color: AppColors.text3);
+
   /// Campo de senha mascarado
   static TextStyle get passwordDots =>
       _mono(size: 18, weight: FontWeight.w600, height: 1.3, letterSpacing: 2.5);

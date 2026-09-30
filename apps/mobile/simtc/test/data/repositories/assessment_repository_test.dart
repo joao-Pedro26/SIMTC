@@ -234,31 +234,6 @@ void main() {
     });
   });
 
-  group('finish', () {
-    test('grava endTime e põe em pendingSync', () async {
-      final assessmentId = (await open('tp-1')).id;
-
-      await repository.finish(assessmentId);
-
-      final saved = await db.select(db.localAssessments).getSingle();
-      expect(saved.syncStatus, LocalSyncStatus.pendingSync);
-      expect(saved.endTime, isNotNull);
-    });
-
-    test(
-        'reabrir o checklist de um participante já finalizado retoma a mesma '
-        'avaliação, sem estourar a chave única', () async {
-      final assessmentId = (await open('tp-1')).id;
-      await repository.finish(assessmentId);
-
-      final reopened = await open('tp-1');
-
-      expect(reopened.id, assessmentId);
-      expect(reopened.syncStatus, LocalSyncStatus.pendingSync);
-      expect(await db.select(db.localAssessments).get(), hasLength(1));
-    });
-  });
-
   group('confirm', () {
     test('grava endTime, o nome e o % da tela 1.6 e põe na fila', () async {
       final assessment = await open('tp-1');

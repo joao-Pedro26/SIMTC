@@ -74,10 +74,13 @@ class ChecklistCategory {
   final double score;
 
   /// Regra decidida com o usuário em 26/09/2026: uma categoria conta como
-  /// "revisada" (não pendente, para o aviso do "Finalizar avaliação") quando
-  /// tem pelo menos uma infração marcada — não precisa marcar as demais como
-  /// "sem infração" para contar.
+  /// "revisada" (para o "X de Y categorias revisadas") quando tem pelo menos
+  /// uma infração marcada — não precisa marcar as demais como "sem infração"
+  /// para contar.
   bool get isReviewed => infractions.any((i) => i.isMarked);
+
+  /// Quantas infrações da categoria têm nota marcada.
+  int get markedCount => infractions.where((i) => i.isMarked).length;
 }
 
 /// Monta as seções do acordeão a partir do catálogo e das marcações
@@ -175,3 +178,11 @@ double overallScoreOf(List<ChecklistCategory> sections) {
   if (score >= 70) return (bg: AppColors.notePmBg, ink: AppColors.notePmInk);
   return (bg: AppColors.noteMBg, ink: AppColors.noteMInk);
 }
+
+/// "sem infração", "1 infração", "3 infrações" — o que foi marcado numa
+/// categoria, na tela 1.6.
+String infractionCountLabel(int count) => switch (count) {
+      0 => 'sem infração',
+      1 => '1 infração',
+      _ => '$count infrações',
+    };
