@@ -89,6 +89,30 @@ void main() {
   tearDown(() => db.close());
 
   group('syncSession', () {
+    test(
+        'o participantsSyncedAt é a hora em que o GET foi pedido, não a da '
+        'escrita', () async {
+      await seedSession();
+      final reads = [
+        DateTime(2026, 9, 30, 8, 12, 10),
+        DateTime(2026, 9, 30, 8, 12, 50),
+      ];
+      var next = 0;
+      repository = ParticipantRepository(
+        apiClient: api,
+        database: db,
+        now: () => reads[next < reads.length - 1 ? next++ : next],
+      );
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson([participantJson('tp-1')])),
+      );
+
+      await repository.syncSession('sess-1');
+
+      final session = await db.select(db.sessions).getSingle();
+      expect(session.participantsSyncedAt, DateTime(2026, 9, 30, 8, 12, 10));
+    });
+
     test('grava os participantes com o CPF mascarado e a avaliação', () async {
       await seedSession();
       when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(

@@ -110,6 +110,12 @@ class AssessmentSyncService extends ChangeNotifier {
   /// baixar a mesma sessão duas vezes ao mesmo tempo.
   final Set<String> _refreshingSessions = {};
 
+  /// Sessões aceitas de novo (outro participante confirmado depois) enquanto
+  /// o download delas estava em voo. Esse download pode ter sido pedido antes
+  /// do segundo envio: o sucesso dele não tira a sessão de [_sessionsToRefresh],
+  /// e ela é baixada de novo assim que ele termina.
+  final Set<String> _reacceptedInFlight = {};
+
   /// Liga em [_follow], antes de assinar a fila daquele usuário; [_onQueue]
   /// desliga ao consumir a primeira emissão. Só nela o que já está em `error`
   /// também dispara envio — nas seguintes, só item `pendingSync` novo.
@@ -157,6 +163,7 @@ class AssessmentSyncService extends ChangeNotifier {
     _lastSyncedAt = null;
     _firstQueueEmission = false;
     _sessionsToRefresh.clear();
+    _reacceptedInFlight.clear();
     notifyListeners();
 
     if (userId != null) unawaited(_follow(userId));
@@ -284,6 +291,7 @@ class AssessmentSyncService extends ChangeNotifier {
         if (results[a.id] == null) a.sessionId,
     };
     if (accepted.isNotEmpty) {
+      _reacceptedInFlight.addAll(accepted.intersection(_refreshingSessions));
       _sessionsToRefresh.addAll(accepted);
       unawaited(_refreshPendingSessions());
     }
@@ -292,24 +300,35 @@ class AssessmentSyncService extends ChangeNotifier {
   /// Tenta de novo, um de cada vez, o download das sessões de
   /// [_sessionsToRefresh] que não estão sendo baixadas agora. Com sucesso, a
   /// sessão sai do conjunto; com falha ou exceção, fica para a próxima
-  /// chamada — nunca duas rodadas baixando a mesma sessão ao mesmo tempo.
+  /// chamada — nunca duas rodadas baixando a mesma sessão ao mesmo tempo. Uma
+  /// sessão aceita de novo durante o download dela ([_reacceptedInFlight])
+  /// não sai do conjunto por esse download e é baixada de novo, sozinha, assim
+  /// que ele termina.
   Future<void> _refreshPendingSessions() async {
     final targets = _sessionsToRefresh.difference(_refreshingSessions);
     if (targets.isEmpty) return;
 
     _refreshingSessions.addAll(targets);
+    var again = false;
     try {
       for (final sessionId in targets) {
+        var succeeded = false;
         try {
           final result = await _participants.syncSession(sessionId);
-          if (result case Success()) _sessionsToRefresh.remove(sessionId);
+          succeeded = result is Success;
         } catch (_) {
           // Fica em _sessionsToRefresh: a próxima rodada tenta de novo.
+        }
+        if (_reacceptedInFlight.remove(sessionId)) {
+          again = true;
+        } else if (succeeded) {
+          _sessionsToRefresh.remove(sessionId);
         }
       }
     } finally {
       _refreshingSessions.removeAll(targets);
     }
+    if (again && !_disposed) unawaited(_refreshPendingSessions());
   }
 
   /// `{trainingParticipantId: nulo se aceita, ou o motivo}`, da resposta do

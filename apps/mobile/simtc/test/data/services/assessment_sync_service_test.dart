@@ -411,6 +411,40 @@ void main() {
       verify(() => participants.syncSession('sess-1')).called(2);
     });
 
+    test(
+        'sessão aceita de novo durante o download em voo é baixada de novo '
+        'sozinha, sem dois downloads ao mesmo tempo', () async {
+      final calls = <Completer<Result<int>>>[];
+      var inFlight = 0;
+      var maxInFlight = 0;
+      when(() => participants.syncSession('sess-1')).thenAnswer((_) {
+        final completer = Completer<Result<int>>();
+        calls.add(completer);
+        inFlight++;
+        if (inFlight > maxInFlight) maxInFlight = inFlight;
+        return completer.future.whenComplete(() => inFlight--);
+      });
+      startService();
+
+      final a = await confirmed('tp-1');
+      await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+      await until(() => calls.length == 1);
+
+      // Com o primeiro download em voo, outro participante da mesma sessão é
+      // confirmado e aceito.
+      final b = await confirmed('tp-2');
+      await until(() async => await statusOf(b.id) == LocalSyncStatus.synced);
+      expect(calls, hasLength(1), reason: 'a sessão já está sendo baixada');
+
+      calls[0].complete(const Success(1));
+
+      await until(() => calls.length == 2);
+      calls[1].complete(const Success(1));
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(calls, hasLength(2), reason: 'sem laço de retentativa');
+      expect(maxInFlight, 1);
+    });
+
     test('um download bem-sucedido não é repetido no gatilho seguinte', () async {
       final sync = startService();
 

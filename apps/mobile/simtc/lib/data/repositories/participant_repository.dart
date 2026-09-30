@@ -18,11 +18,14 @@ class ParticipantRepository {
   ParticipantRepository({
     required ApiClient apiClient,
     required AppDatabase database,
+    DateTime Function()? now,
   })  : _api = apiClient,
-        _db = database;
+        _db = database,
+        _now = now ?? DateTime.now;
 
   final ApiClient _api;
   final AppDatabase _db;
+  final DateTime Function() _now;
 
   static const String _assignPath = '/practical-assessments/assign';
 
@@ -57,7 +60,13 @@ class ParticipantRepository {
 
   /// Baixa `GET /training-sessions/:id` e regrava a sessão e os participantes
   /// dela numa transação só. Devolve quantos participantes ficaram.
+  ///
+  /// O `participantsSyncedAt` é a hora em que o GET foi **pedido**, não a da
+  /// escrita: os dados valem a partir de quando foram pedidos. Um GET
+  /// respondido antes de um envio aceito, mas gravado depois, não pode parecer
+  /// posterior a ele (a linha "Enviada" do detalhe compara os dois horários).
   Future<Result<int>> syncSession(String sessionId) async {
+    final requestedAt = _now();
     try {
       final response =
           await _api.get<Map<String, dynamic>>('/training-sessions/$sessionId');
@@ -80,7 +89,7 @@ class ParticipantRepository {
           .where((p) => p.id.isNotEmpty)
           .toList(growable: false);
 
-      await _write(session, participants);
+      await _write(session, participants, requestedAt);
       return Success(participants.length);
     } on ApiException catch (error) {
       // 403 (consultor saiu da sessão) e 404 (sessão apagada) têm mensagem
@@ -96,8 +105,8 @@ class ParticipantRepository {
   Future<void> _write(
     TrainingSession session,
     List<SessionParticipant> participants,
+    DateTime now,
   ) {
-    final now = DateTime.now();
     final assessable = participants
         .where((p) => p.participationType == ParticipationType.teoricaEPratica)
         .toList(growable: false);
