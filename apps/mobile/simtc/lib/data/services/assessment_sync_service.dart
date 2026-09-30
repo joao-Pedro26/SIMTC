@@ -23,8 +23,11 @@ abstract final class SendFailure {
 ///
 /// Um só para o app inteiro, criado no `AppDependencies`: o envio acontece de
 /// qualquer tela. Quando envia (decisão de 29/09/2026):
-/// - entra avaliação nova na fila — o "Confirmar" da tela 1.6, ou as que já
-///   estavam no aparelho quando o consultor entra;
+/// - depois do login, ou quando o app abre com sessão salva — a primeira
+///   leitura da fila daquele usuário, com o que já estiver nela, `pendingSync`
+///   ou `error` (uma falha de uma execução anterior não fica esperando o
+///   timer da retentativa, que não sobrevive ao processo morrer);
+/// - entra avaliação nova na fila depois disso — o "Confirmar" da tela 1.6;
 /// - a rede volta (`ConnectivityService.onReconnected`);
 /// - o app volta do segundo plano, e nos botões da aba Sincronizar
 ///   ([syncNow]);
@@ -90,6 +93,11 @@ class AssessmentSyncService extends ChangeNotifier {
   Future<void>? _running;
   bool _again = false;
 
+  /// Liga em [_follow], antes de assinar a fila daquele usuário; [_onQueue]
+  /// desliga ao consumir a primeira emissão. Só nela o que já está em `error`
+  /// também dispara envio — nas seguintes, só item `pendingSync` novo.
+  bool _firstQueueEmission = false;
+
   List<LocalAssessment> _queue = const [];
   Set<String> _sendingIds = const {};
   DateTime? _lastSyncedAt;
@@ -130,6 +138,7 @@ class AssessmentSyncService extends ChangeNotifier {
     _lastSyncedSubscription?.cancel();
     _queue = const [];
     _lastSyncedAt = null;
+    _firstQueueEmission = false;
     notifyListeners();
 
     if (userId != null) unawaited(_follow(userId));
@@ -139,6 +148,7 @@ class AssessmentSyncService extends ChangeNotifier {
     await _assessments.claimUnowned(userId);
     if (_disposed || _userId != userId) return;
 
+    _firstQueueEmission = true;
     _queueSubscription = _assessments.watchQueue(userId).listen(_onQueue);
     _lastSyncedSubscription =
         _assessments.watchLastSyncedAt(userId).listen((at) {
@@ -151,9 +161,17 @@ class AssessmentSyncService extends ChangeNotifier {
     _queue = queue;
     notifyListeners();
 
-    // Entrou avaliação nova (o "Confirmar", ou já estava no aparelho quando o
-    // consultor entrou): envia. As que falharam esperam a próxima tentativa —
-    // reenviar a cada mudança da fila seria tentar de novo sem espera nenhuma.
+    // Primeira leitura da fila deste usuário (login, ou app abrindo com
+    // sessão salva): envia o que já estiver nela, pendente ou em erro de uma
+    // execução anterior — o timer da retentativa não sobrevive ao processo
+    // morrer. Da segunda emissão em diante, só item pendente novo dispara
+    // envio — reenviar a cada mudança da fila tentaria de novo sem esperar.
+    if (_firstQueueEmission) {
+      _firstQueueEmission = false;
+      if (queue.isNotEmpty) unawaited(syncNow());
+      return;
+    }
+
     final hasNew = queue.any((a) =>
         a.syncStatus == LocalSyncStatus.pendingSync && !_sendingIds.contains(a.id));
     if (hasNew) unawaited(syncNow());

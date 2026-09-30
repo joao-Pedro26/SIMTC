@@ -308,6 +308,22 @@ void main() {
   });
 
   test(
+      'avaliação que ficou em erro numa execução anterior sai sozinha ao '
+      'entrar de novo', () async {
+    final a = await confirmed('tp-1');
+    await assessments.saveSendResults(
+      {a.id: SendFailure.noConnection},
+      at: DateTime(2026, 9, 29, 8),
+    );
+    expect(await statusOf(a.id), LocalSyncStatus.error);
+
+    startService();
+
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+    expect(sent, hasLength(1));
+  });
+
+  test(
       'um envio por vez: o que entra no meio do envio sai num segundo envio, '
       'logo depois', () async {
     final gate = Completer<void>();
