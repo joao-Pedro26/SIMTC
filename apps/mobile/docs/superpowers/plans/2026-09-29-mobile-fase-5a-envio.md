@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fechar o ciclo avaliar → confirmar → enviar: o "Finalizar avaliação" abre a tela 1.6 "Conferir e finalizar", o "Confirmar" põe a avaliação numa fila no aparelho, e um serviço único a envia sozinho ao `POST /practical-assessments/sync` — com rede na hora ou quando a rede voltar —, com a fila visível na linha do participante, no badge do cabeçalho e da navbar, e na aba "Sincronizar" (1.9).
+**Goal:** Fechar o ciclo avaliar → confirmar → enviar: o "Finalizar avaliação" abre a tela 1.6 "Conferir e finalizar", o "Confirmar" põe a avaliação numa fila no aparelho, e um serviço único a envia sozinho ao `POST /practical-assessments/sync` — com rede na hora ou quando a rede voltar —, com a fila visível na linha do participante, no badge do cabeçalho e da navbar, e na aba "Sincronizar" (1.9). E a avaliação só começa num toque explícito em "Iniciar avaliação": abrir um participante sem querer não grava nada.
 
 **Architecture:** A tela continua lendo só do banco local. O `AssessmentRepository` ganha a fila (confirmar, ler a fila do dono, montar o corpo do envio, gravar o resultado de cada envio numa transação), e a tabela `LocalAssessments` ganha dono, nome e % (esquema v4). O novo `AssessmentSyncService` — um só para o app, como o `ConnectivityService` — observa a fila do usuário logado no banco: entrou avaliação nova, envia; a rede voltou, o app voltou do segundo plano ou um botão pediu, envia; falhou, tenta de novo com espera crescente. A 1.6 só grava, sem conhecer o serviço. Junto, a renovação do token deixa de deslogar quando falta rede — o envio passa por ela o tempo todo.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `brainstorm-implementacao-mobile.md` → "Fase 5 — Resumo + Sincronização automática" (a fase foi dividida: esta é a 5A, "Envio"; a 5B é o Resultado); canvas `apps/mobile/docs/design/SIMTC-Mobile.dc.html`, quadros `2e` "1.6 Conferir e finalizar" (linhas 1126–1169), `2h` "1.9 Sincronizar" (1259–1323), o indicador do cabeçalho em `2c` (linha 775) e a linha do participante em `1e` (905–925); contrato do envio em `apps/backend/src/practical-assessments/practical-assessments.service.ts` (`syncFromMobile`) e o formato que o painel web manda em `apps/web/src/features/training-sessions/assessment-drawer.tsx`; pendências da Fase 4 na última seção de `2026-09-27-mobile-fase-4-checklist-de-avaliacao.md`. O desenho aprovado em 29/09/2026 está em "Decisões tomadas com o usuário" — a trilha mobile não usa doc de spec separado, o plano é o documento.
 
-**Validação prévia:** todo o código deste plano foi escrito e rodado numa cópia descartável do app antes de o plano ser fechado, e depois as tasks foram **reencenadas em ordem** numa segunda cópia limpa (HEAD `b34c63d`): em cada task, os testes falharam antes da implementação pelo motivo descrito no passo "Esperado", e cada checkpoint bateu o número de testes — **287 → 296 → 310 → 323 → 337 → 348 → 353 → 368**, com `flutter analyze` sem issues em todos. Os blocos de código foram gerados dessa cópia por um script que confere cada "Substituir / por" contra o estado deixado pela task anterior, e um segundo script aplicou o plano inteiro, como um executor faria, e conferiu o resultado arquivo a arquivo, task a task — o que está aqui é, byte a byte, o código que passou.
+**Validação prévia:** todo o código deste plano foi escrito e rodado numa cópia descartável do app antes de o plano ser fechado, e depois as tasks foram **reencenadas em ordem** numa segunda cópia limpa (HEAD `b34c63d`): em cada task, os testes falharam antes da implementação pelo motivo descrito no passo "Esperado", e cada checkpoint bateu o número de testes — **287 → 296 → 310 → 323 → 337 → 348 → 353 → 368 → 379**, com `flutter analyze` sem issues em todos. Os blocos de código foram gerados dessa cópia por um script que confere cada "Substituir / por" contra o estado deixado pela task anterior, e um segundo script aplicou o plano inteiro, como um executor faria, e conferiu o resultado arquivo a arquivo, task a task — o que está aqui é, byte a byte, o código que passou.
 
 ## Decisões tomadas com o usuário
 
@@ -20,7 +20,7 @@ Em 29/09/2026, no brainstorm da fase:
 2. **Aba Sincronizar como no canvas: envio automático + botões.** O envio é sempre automático; "Sincronizar agora" (desabilitado sem rede) e "Tentar novamente" (no item com erro) só adiantam a próxima tentativa. O brainstorm da fase dizia "sem botão manual" — vale o canvas.
 3. **Linha do participante depois do "Confirmar": chip "Na fila".** Chip cinza "Na fila" (a mesma pílula da aba) com "86,7% · aguardando envio"; se o envio falhou, chip vermelho "Erro no envio" com "62,0% · falhou às 07:58". A linha não abre mais o checklist: avaliação confirmada não é editada. Quando o servidor aceita, a sessão é baixada de novo e a linha vira Aprovado/Reavaliar com o % do servidor. O canvas não tem esse estado.
 4. **1.6 adaptada ao cálculo real.** Sem "6 pontos descontados de 45" (o score é a média dos % das categorias, não uma conta de pontos): a linha é "Nome · N infrações · mínimo para aprovação 70%."; cada categoria mostra o selo de % do checklist e "sem infração"/"1 infração"/"N infrações"; tocar numa categoria volta ao checklist com ela aberta; o ícone do "Confirmar" é um check (o `draw` do canvas era da etapa de assinatura, que saiu em 20/09).
-5. **Duração = relógio corrido,** da primeira abertura do checklist até o "Confirmar", inclusive com o app fechado — é o que o cronômetro já mostra e o mesmo critério do painel web.
+5. **Duração = relógio corrido,** do início da avaliação até o "Confirmar", inclusive com o app fechado — é o que o cronômetro mostra e o mesmo critério do painel web. O início era a primeira abertura do checklist; com a decisão 10, passou a ser o toque em "Iniciar avaliação".
 6. **Cada avaliação guarda o dono.** O backend atribui a avaliação ao dono do token que a envia; sem dono, num aparelho compartilhado, a fila de um consultor sairia no nome de outro. A fila só envia — e a aba só mostra — as do usuário logado. As que a Fase 4 deixou no aparelho ficam com o primeiro usuário que entrar.
 7. **Desenho aprovado, parte 1 (dados, envio e sessão):**
    - **Renovação do token:** só uma resposta 4xx do `/auth/refresh` encerra a sessão. Sem rede, tempo esgotado ou 5xx mantêm a sessão, e a chamada original falha como erro de rede, não como 401. `AuthSession.start()` apaga o perfil salvo antes de gravar os tokens novos; falhar ao gravar o perfil não manda mais para o login. (Resolve a pendência prioritária e duas outras da Fase 4.)
@@ -39,6 +39,14 @@ Em 29/09/2026, no brainstorm da fase:
    - **Reenvio:** é seguro, porque o backend atualiza o registro pelo `trainingParticipantId`.
    - **Sessão recusada:** a fila espera o dono entrar de novo.
    - **Falha ao gravar o "Confirmar":** mensagem na própria 1.6, que continua aberta.
+
+Em 29/09/2026, depois do plano pronto, a pedido do usuário:
+
+10. **A avaliação só começa no "Iniciar avaliação".** Um consultor pode atribuir vários participantes de uma vez e abrir um checklist sem querer — e abrir já gravava o rascunho e ligava o cronômetro. Agora:
+    - **O botão fica dentro do checklist.** Sem avaliação iniciada, a tela mostra o nome, "⏱ não iniciada", "A avaliação ainda não começou. O cronômetro começa quando você tocar em 'Iniciar avaliação'." e o botão "Iniciar avaliação" (56dp, laranja, ▶) no lugar da lista. O toque grava o início e mostra o checklist com a primeira categoria aberta e o cronômetro do zero. Abrir sem querer e voltar não deixa rastro. Sem catálogo, não há botão. O canvas não tem este estado.
+    - **Iniciar é definitivo:** não há "cancelar início".
+    - **Rascunhos que já estão no aparelho** (a Fase 4 criava ao abrir) contam como iniciados, com o horário que já têm.
+    - **No plano,** entrou como Task 8, a última de código, para não reescrever as Tasks 1–7 já validadas. O `openDraft` continua criando o rascunho, com as regras de dono e reavaliação da Task 2, mas só o "Iniciar" o chama; o novo `findCurrent` só lê. A validação no aparelho passou a ser a Task 9.
 
 ### Ajustes feitos ao preparar o plano (revisar junto com o plano)
 
@@ -93,7 +101,9 @@ Os cinco casos que o desenho implica, que um consultor real vai encontrar, e ond
 2. **Voltar para o sinal fraco com o token vencido** → a renovação falha por rede e o consultor **não** é deslogado; a próxima chamada com rede renova. Preso em: o grupo `renovação sem resposta do servidor mantém a sessão` (Task 1).
 3. **Aparelho compartilhado** → a avaliação de outro consultor não sai no nome de quem está logado, e o rascunho de outro não é reaproveitado. Preso em: `avaliação de outro consultor não sai no nome de quem está logado` (Task 3) e `rascunho de outro consultor não é reaproveitado…` (Task 2).
 4. **O backend recusa um item do lote** (participante removido da sessão, nota apagada) → só ele fica com "Erro · recusada pelo servidor"; os outros saem da fila. Preso em: `o backend recusando um item deixa só ele na fila, com o motivo` (Task 3).
-5. **O catálogo mudou depois da marcação** → a marcação órfã não vai no envio (o backend recusaria o lote inteiro daquele participante por chave estrangeira). Preso em: `manda o formato do painel web: … só as notas que existem no catálogo, na infração marcada` (Task 2).
+5. **Abrir um participante sem querer** (vários atribuídos de uma vez) → nada é gravado e a duração não começa; voltar não deixa rastro. Preso em: `abrir só lê: … um participante aberto sem querer não começa` e `abrir sem querer e voltar não deixa rastro` (Task 8).
+
+O catálogo mudado depois da marcação (a marcação órfã não vai no envio) também tem teste: `manda o formato do painel web: … só as notas que existem no catálogo, na infração marcada` (Task 2).
 
 ## Estado herdado (ponto de partida)
 
@@ -148,21 +158,21 @@ Já existe e **deve ser reaproveitado, não recriado**:
 | `lib/data/services/local/token_storage.dart` | 1 | `deleteUser()` |
 | `lib/data/services/auth_session.dart` | 1 | `start()` apaga o perfil; `saveUser` nunca lança |
 | `lib/data/services/local/tables.dart`, `app_database.dart` (+ `.g.dart`) | 2 | v4: `ownerUserId`, `participantName`, `score` |
-| `lib/data/repositories/assessment_repository.dart` | 2, 4 | fila; `openDraft` com dono; (4) sai `finish` |
+| `lib/data/repositories/assessment_repository.dart` | 2, 4, 8 | fila; `openDraft` com dono; (4) sai `finish`; (8) `findCurrent` |
 | `lib/data/services/api/api_exception.dart` | 3 | `isTimeout` |
 | `lib/app_providers.dart`, `lib/app.dart` | 3 | o serviço de envio; envio na volta do segundo plano |
-| `lib/ui/checklist/checklist_viewmodel.dart` | 2, 4, 5 | dono; (4) sai `finish`, entra `expandCategory`; (5) `stopwatchLabel` |
-| `lib/ui/checklist/checklist_screen.dart` | 2, 4 | dono; (4) "Finalizar" abre a 1.6, sem diálogo |
+| `lib/ui/checklist/checklist_viewmodel.dart` | 2, 4, 5, 8 | dono; (4) sai `finish`, entra `expandCategory`; (5) `stopwatchLabel`; (8) `init` só lê, `start()` |
+| `lib/ui/checklist/checklist_screen.dart` | 2, 4, 8 | dono; (4) "Finalizar" abre a 1.6, sem diálogo; (8) estado "não iniciada" e o "Iniciar avaliação" |
 | `lib/ui/checklist/checklist_sections.dart` | 4 | `markedCount`, `infractionCountLabel` |
 | `lib/router.dart` | 4, 7 | rota da 1.6; (7) aba `/sync` |
 | `lib/ui/core/theme/app_typography.dart` | 4, 6, 7 | estilos da 1.6, do badge e da aba |
-| `lib/ui/core/theme/app_icons.dart` | 5, 7 | `sendFailed`, `retry` |
+| `lib/ui/core/theme/app_icons.dart` | 5, 7, 8 | `sendFailed`, `retry`, `startEvaluation` |
 | `lib/ui/core/date_labels.dart` | 5 | `clockLabel`, `atLabel`, `stopwatchLabel` |
 | `lib/ui/session_detail/participant_filter.dart`, `participant_row.dart`, `session_detail_viewmodel.dart` | 5 | `LocalProgress`, `queueMetaFor`, `liveMeta`, avaliações do aparelho |
 | `lib/ui/session_detail/session_detail_screen.dart` | 5, 7 | chip "Na fila"/"Erro no envio", cronômetro; (7) toque no indicador |
 | `lib/ui/core/widgets/sync_status_indicator.dart` | 6, 7 | badge da fila; (7) toque |
 | `lib/ui/sessions/sessions_screen.dart` | 6, 7 | badge na navbar; (7) aba e toque no indicador |
-| testes existentes | 1–7 | ver cada task |
+| testes existentes | 1–8 | ver cada task |
 
 ---
 
@@ -1351,20 +1361,16 @@ por:
 Substituir (4 de 6):
 
 ```dart
-          raw.execute(_sessionsV2);
           raw.execute(_participantsV1);
           raw.execute('''
-            INSERT INTO sessions (id, company_name, course_name, city, state, status,
 ```
 
 por:
 
 ```dart
-          raw.execute(_sessionsV2);
           raw.execute(_participantsV1);
           raw.execute(_localAssessmentsV3);
           raw.execute('''
-            INSERT INTO sessions (id, company_name, course_name, city, state, status,
 ```
 
 Substituir (5 de 6):
@@ -5164,21 +5170,17 @@ por:
 Substituir (9 de 12):
 
 ```dart
-        child: Row(
           children: [
             _CodeChip(
               code: category.code,
-              background: AppColors.primary,
 ```
 
 por:
 
 ```dart
-        child: Row(
           children: [
             CategoryCodeChip(
               code: category.code,
-              background: AppColors.primary,
 ```
 
 Substituir (10 de 12):
@@ -7640,25 +7642,13 @@ por:
 Substituir (3 de 4):
 
 ```dart
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('ver-mais-hojeOutras')),
-        300,
-        scrollable: scrollable,
       );
       await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
-      await tester.pump();
-    }
-
-    // Volta pro topo sem passar por `_onChipTap` — só a preparação do
 ```
 
 por:
 
 ```dart
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('ver-mais-hojeOutras')),
-        300,
-        scrollable: scrollable,
       );
       // `scrollUntilVisible` para com o botão só entrando pela borda de
       // baixo: o centro dele ficava atrás da navbar, e o toque caía em
@@ -7667,10 +7657,6 @@ por:
       await tester.ensureVisible(find.byKey(const ValueKey('ver-mais-hojeOutras')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
-      await tester.pump();
-    }
-
-    // Volta pro topo sem passar por `_onChipTap` — só a preparação do
 ```
 
 Substituir (4 de 4):
@@ -8426,14 +8412,1071 @@ git commit -m "feat(mobile): aba sincronizar com a fila de envio"
 
 ---
 
-## Task 8: Validação no aparelho físico
+## Task 8: "Iniciar avaliação" — o checklist só começa no toque
+
+Pedido do usuário depois do plano pronto (decisão 10): um consultor pode atribuir vários participantes de uma vez e abrir um checklist sem querer, e abrir já gravava o rascunho e ligava o cronômetro. Agora o checklist abre só lendo, e o início é o toque em "Iniciar avaliação". A task vem por último para não reescrever as Tasks 1–7: o `openDraft` continua criando o rascunho com as regras de dono e reavaliação da Task 2, mas só o "Iniciar" o chama; o novo `findCurrent` só lê.
+
+As marcações de uma avaliação já iniciada continuam chegando pelo stream antes do catálogo, como na Fase 4: reabrir o checklist mostra as marcações de cara.
+
+**Files:**
+- Modify: `lib/data/repositories/assessment_repository.dart` — `findCurrent`; o `openDraft` devolve a avaliação em andamento sem recomeçar
+- Modify: `lib/ui/checklist/checklist_viewmodel.dart` — `init` só lê; `start()`, `isStarted`, `isStarting`
+- Modify: `lib/ui/checklist/checklist_screen.dart` — o estado "não iniciada" e o botão
+- Modify: `lib/ui/core/theme/app_icons.dart` — `startEvaluation`
+- Test: `test/data/repositories/assessment_repository_test.dart`, `test/ui/checklist/checklist_viewmodel_test.dart`, `test/ui/checklist/checklist_screen_test.dart`
+- Test: `test/ui/session_detail/session_detail_screen_test.dart` — o checklist aberto pela rota real agora pede o `findCurrent`, não o `openDraft`
+
+**Interfaces:**
+- Consumes: `AssessmentRepository.openDraft` e as regras de dono e reavaliação (Task 2); `ChecklistViewModel.expandCategory` (Task 4); `stopwatchLabel` (Task 5).
+- Produces:
+  - `Future<LocalAssessment?> findCurrent({required String trainingParticipantId, required String ownerUserId})` — nula quando não iniciada: sem linha, avaliação já enviada ou rascunho de outro consultor; a da fila é sempre devolvida; o rascunho sem dono passa a ser de quem abriu. Não apaga nada.
+  - `openDraft` devolve a avaliação em andamento (via `findCurrent`) em vez de recomeçar.
+  - `ChecklistViewModel`: `init()` não grava; `Future<void> start()` (recusa sem catálogo e não recomeça); `bool get isStarted`; `bool get isStarting`.
+  - `AppIcons.startEvaluation`.
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+Em `test/data/repositories/assessment_repository_test.dart`:
+
+Substituir:
+
+```dart
+      expect(byOther.syncStatus, LocalSyncStatus.pendingSync);
+    });
+```
+
+por:
+
+```dart
+      expect(byOther.syncStatus, LocalSyncStatus.pendingSync);
+    });
+  });
+
+  group('findCurrent', () {
+    Future<LocalAssessment?> current(String participantId, {String owner = 'user-1'}) {
+      return repository.findCurrent(trainingParticipantId: participantId, ownerUserId: owner);
+    }
+
+    test('sem nada iniciado, é nula e não grava nada — abrir o checklist só lê',
+        () async {
+      expect(await current('tp-1'), isNull);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test('devolve a avaliação em andamento do próprio dono', () async {
+      final started = await open('tp-1');
+
+      final found = await current('tp-1');
+
+      expect(found?.id, started.id);
+      expect(found?.startTime, started.startTime);
+    });
+
+    test(
+        'avaliação já enviada e rascunho de outro consultor contam como não '
+        'iniciada — e nada é apagado só por abrir', () async {
+      final sent = await open('tp-1');
+      await repository.confirm(sent.id, participantName: 'A', score: 90);
+      await repository.saveSendResults({sent.id: null}, at: DateTime(2026, 9, 29, 9));
+      final theirs = await open('tp-2', owner: 'user-2');
+
+      expect(await current('tp-1'), isNull);
+      expect(await current('tp-2'), isNull);
+      expect((await row(sent.id)).syncStatus, LocalSyncStatus.synced);
+      expect((await row(theirs.id)).ownerUserId, 'user-2');
+    });
+
+    test('avaliação na fila é devolvida, mesmo de outro consultor', () async {
+      final queued = await open('tp-1', owner: 'user-2');
+      await repository.confirm(queued.id, participantName: 'A', score: 90);
+
+      expect((await current('tp-1'))?.id, queued.id);
+    });
+
+    test('rascunho sem dono passa a ser de quem abriu', () async {
+      final legacy = await open('tp-1');
+      await write(legacy.id, const LocalAssessmentsCompanion(ownerUserId: Value(null)));
+
+      final found = await current('tp-1');
+
+      expect(found?.id, legacy.id);
+      expect(found?.ownerUserId, 'user-1');
+      expect((await row(legacy.id)).ownerUserId, 'user-1');
+    });
+```
+
+Em `test/ui/checklist/checklist_viewmodel_test.dart`:
+
+Substituir (1 de 15):
+
+```dart
+
+  group('init', () {
+    test('carrega o participante, o catálogo e sai de loading', () async {
+      await seedParticipant();
+```
+
+por:
+
+```dart
+
+  group('init e start', () {
+    test(
+        'abrir só lê: carrega o participante e o catálogo, sem gravar nada — '
+        'um participante aberto sem querer não começa', () async {
+      await seedParticipant();
+```
+
+Substituir (2 de 15):
+
+```dart
+      expect(vm.isLoading, isFalse);
+      expect(vm.participant?.name, 'Carlos Eduardo Nunes');
+      expect(vm.sections, hasLength(1));
+      expect(vm.sections.single.infractions, hasLength(1));
+      expect(vm.expandedCategoryId, 'cat-1', reason: 'abre com a primeira categoria aberta');
+    });
+
+    test('retomar o checklist reabre o mesmo rascunho, sem perder marcações', () async {
+      await seedParticipant();
+```
+
+por:
+
+```dart
+      expect(vm.isLoading, isFalse);
+      expect(vm.isStarted, isFalse);
+      expect(vm.participant?.name, 'Carlos Eduardo Nunes');
+      expect(vm.sections, hasLength(1));
+      expect(vm.expandedCategoryId, isNull);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test(
+        '"Iniciar avaliação" grava o início agora, abre a primeira categoria e '
+        'liga o cronômetro', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+      addTearDown(vm.dispose);
+      await vm.init();
+      final before = DateTime.now();
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isStarting, isFalse);
+      expect(vm.expandedCategoryId, 'cat-1', reason: 'abre com a primeira categoria aberta');
+      final row = await db.select(db.localAssessments).getSingle();
+      expect(row.ownerUserId, 'user-1');
+      expect(row.syncStatus, LocalSyncStatus.draft);
+      // O banco guarda segundos: o início é o toque, com essa precisão.
+      expect(row.startTime.isBefore(before.subtract(const Duration(seconds: 1))), isFalse);
+
+      var notifications = 0;
+      vm.addListener(() => notifications++);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(notifications, greaterThan(0), reason: 'o cronômetro está correndo');
+    });
+
+    test('um segundo toque em "Iniciar" não recomeça a avaliação', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+      final first = await db.select(db.localAssessments).getSingle();
+
+      await vm.start();
+
+      final again = await db.select(db.localAssessments).getSingle();
+      expect(again.id, first.id);
+      expect(again.startTime, first.startTime);
+    });
+
+    test(
+        'reabrir uma avaliação iniciada volta direto ao checklist, com as '
+        'marcações', () async {
+      await seedParticipant();
+```
+
+Substituir (3 de 15):
+
+```dart
+      await first.init();
+      await first.toggleNote('inf-1', 'note-pm');
+```
+
+por:
+
+```dart
+      await first.init();
+      await first.start();
+      await first.toggleNote('inf-1', 'note-pm');
+```
+
+Substituir (4 de 15):
+
+```dart
+
+      expect(second.sections.single.infractions.single.selectedNoteId, 'note-pm');
+```
+
+por:
+
+```dart
+
+      expect(second.isStarted, isTrue);
+      expect(second.expandedCategoryId, 'cat-1');
+      expect(second.sections.single.infractions.single.selectedNoteId, 'note-pm');
+```
+
+Substituir (5 de 15):
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.toggleNote('inf-1', 'note-m');
+```
+
+por:
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      await vm.toggleNote('inf-1', 'note-m');
+```
+
+Substituir (6 de 15):
+
+```dart
+      await vm.init();
+      await vm.toggleNote('inf-1', 'note-b');
+```
+
+por:
+
+```dart
+      await vm.init();
+      await vm.start();
+      await vm.toggleNote('inf-1', 'note-b');
+```
+
+Substituir (7 de 15):
+
+```dart
+      await vm.init();
+      expect(vm.expandedCategoryId, 'cat-1');
+```
+
+por:
+
+```dart
+      await vm.init();
+      await vm.start();
+      expect(vm.expandedCategoryId, 'cat-1');
+```
+
+Substituir (8 de 15):
+
+```dart
+      await seedCatalog();
+      // `openDraft` grava `startTime` com o relógio real — a base do relógio
+      // falso precisa ser próxima do "agora" de verdade, senão a diferença
+```
+
+por:
+
+```dart
+      await seedCatalog();
+      // O "Iniciar" grava `startTime` com o relógio real — a base do relógio
+      // falso precisa ser próxima do "agora" de verdade, senão a diferença
+```
+
+Substituir (9 de 15):
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      expect(vm.elapsedLabel, '00:00:00');
+```
+
+por:
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.elapsedLabel, '00:00:00', reason: 'antes do "Iniciar"');
+      await vm.start();
+
+      expect(vm.elapsedLabel, '00:00:00');
+```
+
+Substituir (10 de 15):
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      var notifications = 0;
+```
+
+por:
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      var notifications = 0;
+```
+
+Substituir (11 de 15):
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.expandCategory('cat-2');
+```
+
+por:
+
+```dart
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      vm.expandCategory('cat-2');
+```
+
+Substituir (12 de 15):
+
+```dart
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      expect(vm.hasCatalog, isFalse);
+    });
+
+    test(
+```
+
+por:
+
+```dart
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      expect(vm.hasCatalog, isFalse);
+      expect(vm.isStarted, isFalse, reason: 'sem catálogo, o "Iniciar" não grava');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test(
+```
+
+Substituir (13 de 15):
+
+```dart
+      await vm.init();
+
+      expect(vm.hasCatalog, isFalse);
+    });
+```
+
+por:
+
+```dart
+      await vm.init();
+      await vm.start();
+
+      expect(vm.hasCatalog, isFalse);
+      expect(vm.isStarted, isFalse, reason: 'sem catálogo, o "Iniciar" não grava');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+```
+
+Substituir (14 de 15):
+
+```dart
+    await vm.init();
+    expect(vm.isLoading, isFalse, reason: 'o init terminou e ligou o cronômetro');
+```
+
+por:
+
+```dart
+    await vm.init();
+    await vm.start();
+    expect(vm.isStarted, isTrue, reason: 'o "Iniciar" ligou o cronômetro');
+```
+
+Substituir (15 de 15):
+
+```dart
+    final vm = buildViewModel();
+    await vm.init();
+
+    final pending = vm.toggleNote('inf-1', 'note-b');
+```
+
+por:
+
+```dart
+    final vm = buildViewModel();
+    await vm.init();
+    await vm.start();
+
+    final pending = vm.toggleNote('inf-1', 'note-b');
+```
+
+Em `test/ui/checklist/checklist_screen_test.dart`:
+
+Substituir (1 de 3):
+
+```dart
+
+  Future<void> pumpScreen(WidgetTester tester) async {
+    await tester.pumpWidget(withProviders(
+```
+
+por:
+
+```dart
+
+  /// A avaliação já iniciada, como se o consultor tivesse tocado em "Iniciar
+  /// avaliação" antes — o caminho da maioria dos testes.
+  Future<void> startEvaluation() {
+    return assessmentRepository.openDraft(
+      trainingParticipantId: 'tp-1',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+    );
+  }
+
+  Future<void> pumpScreen(WidgetTester tester, {bool started = true}) async {
+    if (started) await startEvaluation();
+    await tester.pumpWidget(withProviders(
+```
+
+Substituir (2 de 3):
+
+```dart
+  /// go_router.
+  Future<void> pumpOverOrigin(WidgetTester tester) async {
+    final router = GoRouter(
+```
+
+por:
+
+```dart
+  /// go_router.
+  Future<void> pumpOverOrigin(WidgetTester tester, {bool started = true}) async {
+    if (started) await startEvaluation();
+    final router = GoRouter(
+```
+
+Substituir (3 de 3):
+
+```dart
+  });
+}
+```
+
+por:
+
+```dart
+  });
+
+  group('antes do "Iniciar avaliação"', () {
+    testWidgets(
+        'mostra o nome, "não iniciada" e o botão — sem a lista, sem "salvo" '
+        'e sem gravar nada', (tester) async {
+      await pumpScreen(tester, started: false);
+
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+      expect(find.text('não iniciada'), findsOneWidget);
+      expect(find.byKey(const Key('checklist-not-started')), findsOneWidget);
+      expect(find.text('A avaliação ainda não começou.'), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsOneWidget);
+      expect(find.text('Excesso de velocidade'), findsNothing);
+      expect(find.text('salvo'), findsNothing);
+      expect(find.textContaining('categorias revisadas'), findsNothing);
+      expect(find.text('Finalizar avaliação'), findsNothing);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    testWidgets('abrir sem querer e voltar não deixa rastro', (tester) async {
+      await pumpOverOrigin(tester, started: false);
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('origem'), findsOneWidget);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    testWidgets(
+        '"Iniciar avaliação" grava o início e mostra o checklist, com o '
+        'cronômetro do zero', (tester) async {
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.text('Iniciar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excesso de velocidade'), findsOneWidget);
+      expect(find.textContaining('00:00:0'), findsOneWidget);
+      expect(find.text('salvo'), findsOneWidget);
+      expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
+      expect(find.text('Finalizar avaliação'), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+      final row = await db.select(db.localAssessments).getSingle();
+      expect(row.syncStatus, LocalSyncStatus.draft);
+    });
+
+    testWidgets('sem catálogo no aparelho, nem dá para iniciar', (tester) async {
+      await db.delete(db.infractionNotes).go();
+      await db.delete(db.infractions).go();
+      await db.delete(db.assessmentCategories).go();
+
+      await pumpScreen(tester, started: false);
+
+      expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+    });
+  });
+}
+```
+
+Em `test/ui/session_detail/session_detail_screen_test.dart`:
+
+Substituir:
+
+```dart
+    when(() => catalog.loadCatalog()).thenAnswer((_) async => const []);
+    when(() => assessments.openDraft(
+          trainingParticipantId: any(named: 'trainingParticipantId'),
+          sessionId: any(named: 'sessionId'),
+          ownerUserId: any(named: 'ownerUserId'),
+        )).thenAnswer((invocation) async {
+      final now = DateTime(2026, 9, 25, 10);
+      return LocalAssessment(
+        id: 'assess-1',
+        trainingParticipantId:
+            invocation.namedArguments[#trainingParticipantId] as String,
+        sessionId: invocation.namedArguments[#sessionId] as String,
+        date: now,
+        startTime: now,
+        syncStatus: LocalSyncStatus.draft,
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+    });
+    when(() => assessments.watchItems(any()))
+        .thenAnswer((_) => const Stream.empty());
+  });
+```
+
+por:
+
+```dart
+    when(() => catalog.loadCatalog()).thenAnswer((_) async => const []);
+    // O checklist abre sem avaliação iniciada: só lê, nada é gravado.
+    when(() => assessments.findCurrent(
+          trainingParticipantId: any(named: 'trainingParticipantId'),
+          ownerUserId: any(named: 'ownerUserId'),
+        )).thenAnswer((_) async => null);
+  });
+```
+
+- [ ] **Step 2: Rodar e confirmar que falham**
+
+Run: `flutter test test/data/repositories/assessment_repository_test.dart test/ui/checklist/ test/ui/session_detail/session_detail_screen_test.dart`
+Esperado: `assessment_repository_test.dart`, `checklist_viewmodel_test.dart` e `session_detail_screen_test.dart` não compilam (`The method 'findCurrent' isn't defined for the type 'AssessmentRepository'`, `The getter 'isStarted' isn't defined for the type 'ChecklistViewModel'`, `The method 'start' isn't defined…`); no `checklist_screen_test.dart`, falham os 3 testes do grupo "antes do 'Iniciar avaliação'" que dependem do botão — hoje abrir já grava e mostra a lista. "sem catálogo no aparelho, nem dá para iniciar" já passa: sem catálogo nunca houve botão.
+
+- [ ] **Step 3: Implementar**
+
+Em `lib/data/repositories/assessment_repository.dart`:
+
+Substituir (1 de 4):
+
+```dart
+
+  /// Abre o rascunho da avaliação do participante para [ownerUserId].
+  ///
+  /// Retoma o que já existe (`trainingParticipantId` é chave única) em vez de
+  /// recriar — o consultor pode ter saído do checklist e voltado. Dois casos
+  /// começam um rascunho novo no lugar da linha antiga (decisão de
+  /// 29/09/2026):
+  /// - a avaliação já foi enviada (`synced`): é uma reavaliação — inclusive
+```
+
+por:
+
+```dart
+
+  /// A avaliação em andamento de [ownerUserId] para o participante, ou nula
+  /// se ela ainda não foi iniciada — o checklist abre sem gravar nada e mostra
+  /// o "Iniciar avaliação" (decisão de 29/09/2026).
+  ///
+  /// Dois casos contam como não iniciada, mesmo com uma linha no banco, porque
+  /// o "Iniciar" começa um rascunho novo no lugar dela (ver [openDraft]):
+  /// - a avaliação já foi enviada (`synced`): é uma reavaliação — inclusive
+```
+
+Substituir (2 de 4):
+
+```dart
+  ///
+  /// Uma avaliação na fila (`pendingSync`/`error`) nunca é zerada aqui: ela é
+  /// de alguém que confirmou e só espera o envio. Um rascunho sem dono (de
+  /// antes da Fase 5A) passa a ser de [ownerUserId], com as marcações.
+  ///
+```
+
+por:
+
+```dart
+  ///
+  /// Uma avaliação na fila (`pendingSync`/`error`) é sempre devolvida: ela é
+  /// de alguém que confirmou e só espera o envio. Um rascunho sem dono (de
+  /// antes da Fase 5A) passa a ser de [ownerUserId], com as marcações.
+  Future<LocalAssessment?> findCurrent({
+    required String trainingParticipantId,
+    required String ownerUserId,
+  }) async {
+    final existing = await findByParticipant(trainingParticipantId);
+    if (existing == null || _startsOver(existing, ownerUserId)) return null;
+    if (existing.ownerUserId != null) return existing;
+    await (_db.update(_db.localAssessments)
+          ..where((t) => t.id.equals(existing.id)))
+        .write(LocalAssessmentsCompanion(ownerUserId: Value(ownerUserId)));
+    return existing.copyWith(ownerUserId: Value(ownerUserId));
+  }
+
+  /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
+  /// agora — o cronômetro e a duração enviada contam a partir daqui. Se a
+  /// avaliação já está em andamento ([findCurrent]), devolve a mesma, sem
+  /// recomeçar: um segundo toque não zera o cronômetro.
+  ///
+```
+
+Substituir (3 de 4):
+
+```dart
+  }) async {
+    final existing = await findByParticipant(trainingParticipantId);
+    if (existing != null && !_startsOver(existing, ownerUserId)) {
+      if (existing.ownerUserId != null) return existing;
+      await (_db.update(_db.localAssessments)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(LocalAssessmentsCompanion(ownerUserId: Value(ownerUserId)));
+      return existing.copyWith(ownerUserId: Value(ownerUserId));
+    }
+
+    final session = await (_db.select(_db.sessions)
+```
+
+por:
+
+```dart
+  }) async {
+    final current = await findCurrent(
+      trainingParticipantId: trainingParticipantId,
+      ownerUserId: ownerUserId,
+    );
+    if (current != null) return current;
+
+    final existing = await findByParticipant(trainingParticipantId);
+    final session = await (_db.select(_db.sessions)
+```
+
+Substituir (4 de 4):
+
+```dart
+
+  /// Ver [openDraft]: avaliação já enviada, ou rascunho de outro consultor.
+  static bool _startsOver(LocalAssessment existing, String ownerUserId) {
+```
+
+por:
+
+```dart
+
+  /// Ver [findCurrent]: avaliação já enviada, ou rascunho de outro consultor.
+  static bool _startsOver(LocalAssessment existing, String ownerUserId) {
+```
+
+Em `lib/ui/checklist/checklist_viewmodel.dart`:
+
+Substituir (1 de 6):
+
+```dart
+  bool _loading = true;
+  String? _assessmentId;
+```
+
+por:
+
+```dart
+  bool _loading = true;
+  bool _starting = false;
+  String? _assessmentId;
+```
+
+Substituir (2 de 6):
+
+```dart
+  String? get expandedCategoryId => _expandedCategoryId;
+```
+
+por:
+
+```dart
+  String? get expandedCategoryId => _expandedCategoryId;
+
+  /// A avaliação começou: há rascunho, cronômetro e marcações. Antes disso,
+  /// a tela mostra só o "Iniciar avaliação" — abrir um participante sem
+  /// querer não grava nada (decisão de 29/09/2026).
+  bool get isStarted => _assessmentId != null;
+
+  /// O "Iniciar avaliação" está gravando.
+  bool get isStarting => _starting;
+```
+
+Substituir (3 de 6):
+
+```dart
+
+  /// "00:12:34" desde o início da avaliação — `00:00:00` antes de o rascunho
+  /// abrir.
+  String get elapsedLabel {
+```
+
+por:
+
+```dart
+
+  /// "00:12:34" desde o "Iniciar avaliação" — `00:00:00` antes dele.
+  String get elapsedLabel {
+```
+
+Substituir (4 de 6):
+
+```dart
+
+  Future<void> init() async {
+    final assessment = await _assessmentRepository.openDraft(
+      trainingParticipantId: participantId,
+      sessionId: sessionId,
+      ownerUserId: ownerUserId,
+    );
+    if (_disposed) return;
+
+    _assessmentId = assessment.id;
+    _startTime = assessment.startTime;
+
+    _participantSubscription ??=
+```
+
+por:
+
+```dart
+
+  /// Só lê: a avaliação em andamento, se houver, e o catálogo. Nada é gravado
+  /// até o "Iniciar avaliação" ([start]).
+  Future<void> init() async {
+    _participantSubscription ??=
+```
+
+Substituir (5 de 6):
+
+```dart
+      notifyListeners();
+    });
+
+    _itemsSubscription ??=
+```
+
+por:
+
+```dart
+      notifyListeners();
+    });
+
+    final current = await _assessmentRepository.findCurrent(
+      trainingParticipantId: participantId,
+      ownerUserId: ownerUserId,
+    );
+    if (_disposed) return;
+    // As marcações primeiro: o stream as entrega enquanto o catálogo carrega,
+    // e a tela já abre com elas.
+    if (current != null) _attach(current);
+
+    _catalog = await _catalogRepository.loadCatalog();
+    if (_disposed) return;
+    if (current != null) _openFirstCategory();
+
+    _loading = false;
+    notifyListeners();
+  }
+
+  /// "Iniciar avaliação": grava o início agora e mostra o checklist. Sem
+  /// catálogo não inicia — não há o que avaliar, e a tela nem mostra o botão.
+  Future<void> start() async {
+    if (isStarted || _starting || !hasCatalog) return;
+
+    _starting = true;
+    notifyListeners();
+    try {
+      final assessment = await _assessmentRepository.openDraft(
+        trainingParticipantId: participantId,
+        sessionId: sessionId,
+        ownerUserId: ownerUserId,
+      );
+      if (_disposed) return;
+      _attach(assessment);
+      _openFirstCategory();
+    } finally {
+      _starting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Liga a tela à avaliação em andamento: as marcações e o cronômetro.
+  void _attach(LocalAssessment assessment) {
+    _assessmentId = assessment.id;
+    _startTime = assessment.startTime;
+
+    _itemsSubscription ??=
+```
+
+Substituir (6 de 6):
+
+```dart
+
+    _catalog = await _catalogRepository.loadCatalog();
+    if (_disposed) return;
+
+    // Como no canvas: a tela sempre abre com a primeira categoria aberta.
+    final sections = this.sections;
+    _expandedCategoryId = sections.isEmpty ? null : sections.first.id;
+
+    _ticker ??= Timer.periodic(tickInterval, (_) => notifyListeners());
+
+    _loading = false;
+    notifyListeners();
+  }
+```
+
+por:
+
+```dart
+
+    _ticker ??= Timer.periodic(tickInterval, (_) => notifyListeners());
+  }
+
+  /// Como no canvas: o checklist começa com a primeira categoria aberta.
+  void _openFirstCategory() {
+    final sections = this.sections;
+    _expandedCategoryId = sections.isEmpty ? null : sections.first.id;
+  }
+```
+
+Em `lib/ui/core/theme/app_icons.dart`:
+
+Substituir:
+
+```dart
+  static const IconData retry = Icons.refresh;
+}
+```
+
+por:
+
+```dart
+  static const IconData retry = Icons.refresh;
+
+  /// "Iniciar avaliação" do checklist (Fase 5A — não está no canvas).
+  static const IconData startEvaluation = Icons.play_arrow_rounded;
+}
+```
+
+Em `lib/ui/checklist/checklist_screen.dart`:
+
+Substituir (1 de 5):
+
+```dart
+          ),
+          if (!_viewModel.isLoading && _viewModel.hasCatalog)
+            Padding(
+```
+
+por:
+
+```dart
+          ),
+          if (!_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted)
+            Padding(
+```
+
+Substituir (2 de 5):
+
+```dart
+  Widget _buildTimerRow() {
+    return Row(
+```
+
+por:
+
+```dart
+  Widget _buildTimerRow() {
+    if (!_viewModel.isLoading && !_viewModel.isStarted) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(AppIcons.timer, size: 14, color: AppColors.text3),
+          const SizedBox(width: AppSpacing.xs),
+          Text('não iniciada', style: AppTypography.meta),
+        ],
+      );
+    }
+
+    return Row(
+```
+
+Substituir (3 de 5):
+
+```dart
+
+    // Como no canvas: a categoria aberta é um bloco próprio, e as fechadas
+```
+
+por:
+
+```dart
+
+    if (!_viewModel.isStarted) return _buildNotStarted();
+
+    // Como no canvas: a categoria aberta é um bloco próprio, e as fechadas
+```
+
+Substituir (4 de 5):
+
+```dart
+        ],
+      ],
+    );
+  }
+```
+
+por:
+
+```dart
+        ],
+      ],
+    );
+  }
+
+  /// Antes do "Iniciar avaliação" (decisão de 29/09/2026): o consultor pode ter
+  /// aberto o participante sem querer — nada foi gravado, e voltar não deixa
+  /// rastro. O canvas não tem este estado.
+  Widget _buildNotStarted() {
+    return Padding(
+      key: const Key('checklist-not-started'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.huge,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      child: Column(
+        children: [
+          const Icon(AppIcons.timer, size: 40, color: AppColors.textMuted),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'A avaliação ainda não começou.',
+            style: AppTypography.cardTitle,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'O cronômetro começa quando você tocar em "Iniciar avaliação".',
+            style: AppTypography.meta,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+```
+
+Substituir (5 de 5):
+
+```dart
+      ),
+      child: AppCtaButton(
+        label: 'Finalizar avaliação',
+        icon: AppIcons.finish,
+        size: AppCtaSize.large,
+        onPressed: _openSummary,
+      ),
+    );
+```
+
+por:
+
+```dart
+      ),
+      child: _viewModel.isStarted
+          ? AppCtaButton(
+              label: 'Finalizar avaliação',
+              icon: AppIcons.finish,
+              size: AppCtaSize.large,
+              onPressed: _openSummary,
+            )
+          : AppCtaButton(
+              label: 'Iniciar avaliação',
+              icon: AppIcons.startEvaluation,
+              size: AppCtaSize.large,
+              isLoading: _viewModel.isStarting,
+              onPressed: _viewModel.start,
+            ),
+    );
+```
+
+- [ ] **Step 4: Rodar tudo**
+
+Run: `flutter analyze && flutter test`
+Esperado: `No issues found!` e **379 testes passando**.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/data/repositories/assessment_repository.dart lib/ui/checklist/checklist_viewmodel.dart lib/ui/checklist/checklist_screen.dart lib/ui/core/theme/app_icons.dart test/data/repositories/assessment_repository_test.dart test/ui/checklist/checklist_viewmodel_test.dart test/ui/checklist/checklist_screen_test.dart test/ui/session_detail/session_detail_screen_test.dart
+git commit -m "feat(mobile): botao iniciar avaliacao antes de gravar o inicio"
+```
+
+---
+
+## Task 9: Validação no aparelho físico
 
 Esta task é o portão da fase: sem ela, a Fase 5B não é planejada (decisão do usuário, registrada em 17/09/2026). É o roteiro que só o usuário pode rodar.
 
 **Files:** nenhum arquivo de código.
 
 **Interfaces:**
-- Consumes: o app inteiro, montado pelas Tasks 1–7.
+- Consumes: o app inteiro, montado pelas Tasks 1–8.
 - Produces: o aval do usuário para planejar a Fase 5B.
 
 - [ ] **Step 1: Subir o backend e liberar a porta para o aparelho**
@@ -8452,14 +9495,19 @@ Sem `--dart-define`. **Instale por cima, sem desinstalar**: a migração v3→v4
 
 Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos três participantes atribuídos a você ("Atribuir a mim").
 
+Iniciar avaliação:
+- [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou." e o botão "Iniciar avaliação" — **sem a lista**;
+- [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** cronômetro — nada foi gravado;
+- [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, o cronômetro em 00:00:00 e "salvo";
+- [ ] marque algumas notas e volte: a linha agora mostra o cronômetro correndo ("00:03:12"); abrir de novo vai direto ao checklist, com as marcações.
+
 Conferir e finalizar (1.6):
-- [ ] no checklist de um participante, marque algumas notas; a linha dele no detalhe mostra o cronômetro correndo ("00:03:12");
 - [ ] "Finalizar avaliação" abre "Conferir e finalizar" **sem diálogo**, com a "Pontuação final" igual ao % do checklist, a pílula "Aprovado" (ou "Necessita reavaliação" abaixo de 70%), a linha "Nome · N infrações · mínimo para aprovação 70%." e cada categoria com "sem infração"/"N infrações" e o selo de %;
 - [ ] tocar numa categoria volta ao checklist com ela aberta; o "←" volta ao checklist sem mudar nada;
 - [ ] "Confirmar" (com rede) volta ao detalhe da sessão; em segundos a linha vira "Aprovado · N%"/"Reavaliar · N%" sozinha, e a avaliação aparece no painel web (ou em `GET /api/practical-assessments/by-participant/<id>`), com a duração coerente com o cronômetro.
 
 Offline — **corte a rede de verdade** (via USB o modo avião não derruba o `adb reverse`): modo avião, confira que o Wi-Fi desligou e rode `adb -s <ID_DO_APARELHO> reverse --remove tcp:3001`.
-- [ ] avalie o segundo participante e confirme: a linha mostra o chip "Na fila" com "N,N% · aguardando envio" e **não abre** mais o checklist; o indicador do cabeçalho mostra a nuvem riscada com o badge "1", e a aba "Sincronizar" da navbar também;
+- [ ] inicie, avalie e confirme o segundo participante (o "Iniciar" funciona sem rede): a linha mostra o chip "Na fila" com "N,N% · aguardando envio" e **não abre** mais o checklist; o indicador do cabeçalho mostra a nuvem riscada com o badge "1", e a aba "Sincronizar" da navbar também;
 - [ ] tocar no indicador abre a aba: "1 avaliação na fila" no cartão âmbar, o item em "Pendentes" com "Na fila" e "Avaliação prática · N,N% · HH:MM", e "Sincronizar agora" desabilitado com "Disponível quando houver conexão";
 - [ ] feche o app à força e abra de novo, ainda sem rede: ele entra direto (Fase 4), e a avaliação continua "Na fila";
 - [ ] **sem tocar em nada**, volte a ficar online — primeiro `adb -s <ID_DO_APARELHO> reverse tcp:3001 tcp:3001`, depois desligue o modo avião: a fila esvazia sozinha, o badge some, a linha vira Aprovado/Reavaliar e "Última sincronização hoje HH:MM" aparece na aba.
@@ -8473,7 +9521,7 @@ Sessão e navegação:
 - [ ] (se der para esperar o token vencer com o app aberto e sem rede) voltar ao sinal não pede login.
 
 Regressões:
-- [ ] o checklist continua abrindo com a primeira categoria aberta, rolando até a categoria tocada, e marcando B/PM/M;
+- [ ] depois do "Iniciar", o checklist continua abrindo com a primeira categoria aberta, rolando até a categoria tocada, e marcando B/PM/M;
 - [ ] "Atribuir a mim" e o participante concluído (tela provisória "Resultado") continuam como antes.
 
 **Não verificável neste aparelho, e por quê:** o aparelho compartilhado (outro consultor entrando com a fila de alguém) e a recusa do backend a um item só dependem de um segundo usuário ou de apagar dados no banco — ficam cobertos pelos testes das Tasks 2 e 3.
@@ -8491,7 +9539,8 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | Fase | Pendência |
 |---|---|
 | 5B | Tela 1.8 Resultado no lugar da provisória, "Reavaliar" (chama `assign` antes de abrir o checklist — o `openDraft` já começa um rascunho novo sobre uma avaliação enviada) e "Próximo participante". Depois do "Confirmar", decidir se a 1.6 leva ao Resultado em vez de voltar ao detalhe. |
-| 5B | Logo depois de um envio aceito, até a sessão ser baixada de novo, a linha volta por um instante a "Avaliando · você"; um toque nessa janela abre um rascunho novo (a avaliação enviada é `synced`). Com o Resultado, o toque pode ir para ele. |
+| 5B | Logo depois de um envio aceito, até a sessão ser baixada de novo, a linha volta por um instante a "Avaliando · você"; um toque nessa janela abre o checklist "não iniciada" (a avaliação enviada é `synced`), e um "Iniciar" ali começaria uma avaliação nova. Com o Resultado, o toque pode ir para ele. |
+| 5B | Os rascunhos que a Fase 4 criou ao abrir o checklist (inclusive os abertos sem querer) contam como iniciados, com o horário antigo. Se aparecer um rascunho vazio e antigo em campo, decidir se o "Iniciar" pode zerá-lo. |
 | 5B | "Última sincronização" é o último envio aceito ainda no aparelho: uma reavaliação apaga a linha enviada, e o horário pode voltar para um envio anterior. |
 | 5B | Um item que o servidor sempre recusa (participante removido da sessão, nota apagada no painel) fica como "Erro" para sempre, tentando de 10 em 10 minutos com o app aberto. Decidir se o consultor pode descartar. |
 | 5B | Uma avaliação na fila de outro consultor, para um participante que agora está com você (reatribuído no painel), é devolvida como está pelo `openDraft` — você veria e editaria as marcações dele. Caso raro (aparelho compartilhado + reatribuição antes do envio). |
@@ -8504,4 +9553,4 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | 8 | O toque no cabeçalho da categoria aberta e nos botões B/PM/M não mostra ripple; o "salvo" do cabeçalho do checklist é estático. |
 | 8 | Botões B/PM/M sem `Semantics(selected: …)`; "0 de 1 categorias revisadas" no plural. |
 | 8 | Aparelho compartilhado: os rascunhos e a fila de outro consultor ficam no aparelho (invisíveis para quem entrou) até o dono entrar de novo. Limpar ou avisar, se isso aparecer em campo. |
-| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura". Atualizar no Claude Design. |
+| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; o estado "não iniciada" do checklist, a pílula "Enviando", o chip "Na fila" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |
