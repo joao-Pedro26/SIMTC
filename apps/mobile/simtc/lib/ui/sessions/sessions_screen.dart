@@ -6,6 +6,7 @@ import '../../data/models/training_session.dart';
 import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/session_repository.dart';
+import '../../data/services/assessment_sync_service.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
@@ -511,12 +512,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   Widget _buildNavBar(BuildContext context) {
+    // O mesmo número do indicador do cabeçalho: a fila de envio.
+    final queued = context.watch<AssessmentSyncService?>()?.queue.length ?? 0;
+
     return PillNavBar(
       currentIndex: 0,
-      items: const [
-        PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
-        PillNavItem(icon: AppIcons.sync, label: 'Sincronizar'),
-        PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
+      items: [
+        const PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
+        PillNavItem(icon: AppIcons.sync, label: 'Sincronizar', badgeCount: queued),
+        const PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
       ],
       onSelect: (index) {
         if (index == 0) return;

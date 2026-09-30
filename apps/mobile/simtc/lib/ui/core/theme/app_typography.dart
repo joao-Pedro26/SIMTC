@@ -114,6 +114,10 @@ abstract final class AppTypography {
   static TextStyle get navLabel =>
       _inter(size: 10, weight: FontWeight.w600, height: 1);
 
+  /// Número do badge da fila no indicador do cabeçalho (canvas "2c")
+  static TextStyle get headerBadge =>
+      _inter(size: 9, weight: FontWeight.w700, height: 1, color: AppColors.surface);
+
   /// Texto de botão principal
   static TextStyle get button =>
       _inter(size: 16, weight: FontWeight.w700, height: 1.2, color: AppColors.surface);

@@ -12,6 +12,7 @@ import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
+import 'package:simtc/data/services/assessment_sync_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
@@ -20,6 +21,8 @@ import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/utils/result.dart';
+
+import '../../support/fake_assessment_sync_service.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
@@ -80,7 +83,7 @@ void main() {
     connectivity.dispose();
   });
 
-  Future<void> pump(WidgetTester tester) {
+  Future<void> pump(WidgetTester tester, {AssessmentSyncService? sync}) {
     return tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -88,6 +91,8 @@ void main() {
           Provider<AssessmentCatalogRepository>.value(value: catalog),
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+          if (sync != null)
+            ChangeNotifierProvider<AssessmentSyncService>.value(value: sync),
         ],
         child: const MaterialApp(home: SessionsScreen()),
       ),
@@ -96,6 +101,21 @@ void main() {
 
   String titleText(WidgetTester tester) =>
       tester.widget<Text>(find.byKey(const Key('sessions-title'))).data!;
+
+  testWidgets(
+      'a fila de envio aparece no badge da aba Sincronizar e no indicador do '
+      'cabeçalho', (tester) async {
+    await pump(
+      tester,
+      sync: FakeAssessmentSyncService(
+        queue: [queuedAssessment('1'), queuedAssessment('2'), queuedAssessment('3')],
+      ),
+    );
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    expect(find.text('3'), findsNWidgets(2), reason: 'navbar e cabeçalho');
+  });
 
   testWidgets('mostra skeleton antes da primeira leitura do cache',
       (tester) async {
