@@ -48,6 +48,28 @@ Em 29/09/2026, depois do plano pronto, a pedido do usuário:
     - **Rascunhos que já estão no aparelho** (a Fase 4 criava ao abrir) contam como iniciados, com o horário que já têm.
     - **No plano,** entrou como Task 8, a última de código, para não reescrever as Tasks 1–7 já validadas. O `openDraft` continua criando o rascunho, com as regras de dono e reavaliação da Task 2, mas só o "Iniciar" o chama; o novo `findCurrent` só lê. A validação no aparelho passou a ser a Task 9.
 
+Em 30/09/2026, na revisão final da execução:
+
+11. **A linha "Enviada" até a sessão ser baixada de novo.** Depois de um envio aceito, o cache do servidor continua mostrando o participante como "Avaliando · você" até a sessão ser baixada de novo. Se esse download falhar (sinal fraco logo depois do envio, 5xx, aparelho offline), a janela não tem prazo. Nela, um toque abria o checklist "não iniciada", e um "Iniciar" sobrescreveria no servidor a avaliação já aceita, inclusive de um participante aprovado. O plano tinha isso como pendência da 5B, achando que durava "um instante". Agora:
+    - A linha mostra o chip **"Enviada"** (azul, nuvem com check) e "86,7% · enviada às 08:12".
+    - O toque não abre nada até a sessão ser baixada depois do envio (o `participantsSyncedAt` da sessão passa a ser posterior ao `lastAttemptAt` da avaliação). Aí volta a valer o status do servidor, e uma reatribuição pelo painel para reavaliar volta a funcionar.
+    - O serviço tenta de novo o download que falhou no próximo gatilho, mesmo com a fila vazia.
+    - Uma sessão aceita de novo enquanto é baixada é baixada outra vez.
+    - O `participantsSyncedAt` passou a ser a hora do pedido, não a da gravação.
+    - O canvas não tem este estado.
+
+### Desvios na execução (30/09/2026)
+
+A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1–8 saíram iguais ao plano. Os desvios foram:
+
+**Task 3, correção `54101cb`.** A revisão da task achou que uma avaliação em "Erro" de uma execução anterior nunca voltava a sair sozinha: o timer da nova tentativa não sobrevive ao app morrer, e na abertura já online não há "rede voltou". O primeiro ajuste abaixo ("As que falharam só voltam a sair na próxima tentativa") estava errado para esse caso. Agora, a primeira leitura da fila depois do login ou da abertura com sessão salva envia tudo o que estiver nela, pendente ou em erro. Isso trouxe 1 teste a mais: os "Esperado" das Tasks 4–8 ficaram 1 acima do escrito (338, 349, 354, 369, 380).
+
+**Revisão final, decisão 11.** Commits `ec00c13` e `dee920d`, com 14 testes a mais. Na mesma correção:
+- o comentário e o nome de teste do cronômetro passaram a dizer "desde o 'Iniciar avaliação'";
+- o "Confirmar" grava o nome nulo, e não vazio, quando o participante não está no cache, para a entrada do dono completar depois.
+
+**Fim da execução:** **394 testes passando** e `flutter analyze` sem issues.
+
 ### Ajustes feitos ao preparar o plano (revisar junto com o plano)
 
 A validação na cópia descartável levou a estes ajustes — **nenhum muda regra de negócio aprovada**, mas cada um é uma escolha que o usuário deve conferir:
@@ -9493,7 +9515,7 @@ Sem `--dart-define`. **Instale por cima, sem desinstalar**: a migração v3→v4
 
 - [ ] **Step 3: Percorrer o roteiro de aceite**
 
-Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos três participantes atribuídos a você ("Atribuir a mim").
+Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos quatro participantes atribuídos a você ("Atribuir a mim").
 
 Iniciar avaliação:
 - [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou." e o botão "Iniciar avaliação" — **sem a lista**;
@@ -9504,7 +9526,8 @@ Iniciar avaliação:
 Conferir e finalizar (1.6):
 - [ ] "Finalizar avaliação" abre "Conferir e finalizar" **sem diálogo**, com a "Pontuação final" igual ao % do checklist, a pílula "Aprovado" (ou "Necessita reavaliação" abaixo de 70%), a linha "Nome · N infrações · mínimo para aprovação 70%." e cada categoria com "sem infração"/"N infrações" e o selo de %;
 - [ ] tocar numa categoria volta ao checklist com ela aberta; o "←" volta ao checklist sem mudar nada;
-- [ ] "Confirmar" (com rede) volta ao detalhe da sessão; em segundos a linha vira "Aprovado · N%"/"Reavaliar · N%" sozinha, e a avaliação aparece no painel web (ou em `GET /api/practical-assessments/by-participant/<id>`), com a duração coerente com o cronômetro.
+- [ ] "Confirmar" (com rede) volta ao detalhe da sessão; em segundos a linha vira "Aprovado · N%"/"Reavaliar · N%" sozinha, e a avaliação aparece no painel web (ou em `GET /api/practical-assessments/by-participant/<id>`), com a duração coerente com o cronômetro;
+- [ ] nesse caminho a linha **nunca** volta a "Avaliando · você" depois do envio. Entre "Na fila" e "Aprovado"/"Reavaliar" pode aparecer por um instante o chip azul "Enviada", com "N,N% · enviada às HH:MM"; enquanto ele estiver lá, tocar na linha não abre nada (decisão 11).
 
 Offline — **corte a rede de verdade** (via USB o modo avião não derruba o `adb reverse`): modo avião, confira que o Wi-Fi desligou e rode `adb -s <ID_DO_APARELHO> reverse --remove tcp:3001`.
 - [ ] inicie, avalie e confirme o segundo participante (o "Iniciar" funciona sem rede): a linha mostra o chip "Na fila" com "N,N% · aguardando envio" e **não abre** mais o checklist; o indicador do cabeçalho mostra a nuvem riscada com o badge "1", e a aba "Sincronizar" da navbar também;
@@ -9514,7 +9537,8 @@ Offline — **corte a rede de verdade** (via USB o modo avião não derruba o `a
 
 Erro e "Tentar novamente" — com rede, mas com o backend parado (`Ctrl+C` no terminal do `npm run start:dev`):
 - [ ] confirme o terceiro participante: em segundos, a linha mostra "Erro no envio" com "N,N% · falhou às HH:MM", e na aba o item aparece com "Erro", "Falhou às HH:MM · sem conexão" e o botão "Tentar novamente";
-- [ ] suba o backend de novo e toque em "Tentar novamente" (ou "Sincronizar agora"): o item passa por "Enviando" e sai da fila.
+- [ ] suba o backend de novo, feche o app à força e abra de novo **sem tocar em nada**: o item em erro sai sozinho da fila. A primeira leitura da fila, na abertura, envia também o que ficou em erro (correção `54101cb`);
+- [ ] pare o backend de novo e confirme o quarto participante até aparecer "Erro no envio". Suba o backend e toque em "Tentar novamente" (ou "Sincronizar agora"): o item passa por "Enviando" e sai da fila.
 
 Sessão e navegação:
 - [ ] na aba, "Sessões" na navbar volta para a Home, e o voltar do Android também (o app não fecha); "Perfil" continua com "Disponível em breve.";
@@ -9524,7 +9548,7 @@ Regressões:
 - [ ] depois do "Iniciar", o checklist continua abrindo com a primeira categoria aberta, rolando até a categoria tocada, e marcando B/PM/M;
 - [ ] "Atribuir a mim" e o participante concluído (tela provisória "Resultado") continuam como antes.
 
-**Não verificável neste aparelho, e por quê:** o aparelho compartilhado (outro consultor entrando com a fila de alguém) e a recusa do backend a um item só dependem de um segundo usuário ou de apagar dados no banco — ficam cobertos pelos testes das Tasks 2 e 3.
+**Não verificável neste aparelho, e por quê:** o aparelho compartilhado (outro consultor entrando com a fila de alguém) e a recusa do backend a um item só dependem de um segundo usuário ou de apagar dados no banco — ficam cobertos pelos testes das Tasks 2 e 3. A linha "Enviada" parada (o download da sessão falhando logo depois de um envio aceito) exigiria derrubar a rede entre o envio e o download; fica coberta pelos testes do serviço e do detalhe (decisão 11).
 
 - [ ] **Step 4: Registrar o resultado**
 
@@ -9534,12 +9558,15 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5B. Se alg
 
 ## Pendências levadas para as fases seguintes
 
-Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslogava sem rede (prioridade), perfil salvo com tokens de outro usuário, `saveUser` que derrubava a abertura, cronômetro na linha "Avaliando · você", badge da fila, "Finalizar" que gravava direto, marcações órfãs no envio, reabrir participante já finalizado, duração enviada, rascunhos por consultor, reavaliação reabrindo o rascunho antigo, formato do `date`, aviso de hit-test dos testes da Home.
+Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslogava sem rede (prioridade), perfil salvo com tokens de outro usuário, `saveUser` que derrubava a abertura, cronômetro na linha "Avaliando · você", badge da fila, "Finalizar" que gravava direto, marcações órfãs no envio, reabrir participante já finalizado, duração enviada, rascunhos por consultor, reavaliação reabrindo o rascunho antigo, formato do `date`, aviso de hit-test dos testes da Home, a linha que voltava a "Avaliando · você" depois do envio aceito (decisão 11).
 
 | Fase | Pendência |
 |---|---|
 | 5B | Tela 1.8 Resultado no lugar da provisória, "Reavaliar" (chama `assign` antes de abrir o checklist — o `openDraft` já começa um rascunho novo sobre uma avaliação enviada) e "Próximo participante". Depois do "Confirmar", decidir se a 1.6 leva ao Resultado em vez de voltar ao detalhe. |
-| 5B | Logo depois de um envio aceito, até a sessão ser baixada de novo, a linha volta por um instante a "Avaliando · você"; um toque nessa janela abre o checklist "não iniciada" (a avaliação enviada é `synced`), e um "Iniciar" ali começaria uma avaliação nova. Com o Resultado, o toque pode ir para ele. |
+| 5B | Com o Resultado, o toque na linha "Enviada" (decisão 11) pode ir para ele em vez de não abrir nada. |
+| 5B | Com a avaliação na fila, só a linha do detalhe impede abrir o checklist. Se ele for aberto por outro caminho (hoje não há), a avaliação confirmada fica editável. Deixar o checklist somente leitura quando a avaliação não for rascunho. |
+| 5B | No serviço de envio: <ul><li>um erro ao entrar (`claimUnowned` ou o stream da fila) não é tratado: a fila não é seguida e a aba diz "Tudo o que você confirmou já chegou ao servidor";</li><li>o `syncNow` devolve o envio no ar antes da rodada repetida;</li><li>`retryDelays` vazio quebra (falta um `assert`);</li><li>todo 401, inclusive depois de uma renovação bem-sucedida, deixa os itens "Na fila" até o próximo gatilho.</li></ul> Tratar junto com a troca de usuário no meio do envio (dois `_follow` no ar, sem nova checagem do usuário antes do POST), que só importa quando houver "Sair" na interface. |
+| Backend | `syncOne` apaga os itens e depois atualiza a avaliação fora de uma transação: um reenvio que falhe no meio deixa uma avaliação aceita sem itens. |
 | 5B | Os rascunhos que a Fase 4 criou ao abrir o checklist (inclusive os abertos sem querer) contam como iniciados, com o horário antigo. Se aparecer um rascunho vazio e antigo em campo, decidir se o "Iniciar" pode zerá-lo. |
 | 5B | "Última sincronização" é o último envio aceito ainda no aparelho: uma reavaliação apaga a linha enviada, e o horário pode voltar para um envio anterior. |
 | 5B | Um item que o servidor sempre recusa (participante removido da sessão, nota apagada no painel) fica como "Erro" para sempre, tentando de 10 em 10 minutos com o app aberto. Decidir se o consultor pode descartar. |
@@ -9548,9 +9575,11 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | 5 | Sessão aberta sem rede usa o perfil guardado (decisão 7 da Fase 4): nome, papel ou consultor alterados no painel só aparecem na próxima abertura com rede. |
 | 5 | Uma falha `DioExceptionType.unknown` sem resposta conta como erro de rede — também entra offline e, no envio, vira "sem conexão". |
 | 8 | Trocar de aba recria a tela: voltar para Sessões baixa a agenda de novo. Se pesar, manter as abas vivas (`StatefulShellRoute`). |
-| 8 | Estados de erro do checklist: uma falha de escrita local em `init` ou `toggleNote` não mostra mensagem (a da 1.6 mostra). |
+| 8 | Estados de erro do checklist: uma falha de escrita local em `init`, `toggleNote` ou no "Iniciar avaliação" não mostra mensagem (a da 1.6 mostra; no "Iniciar", o botão volta a ficar ativo). |
+| 8 | `AuthSession.start()`: uma falha da keystore no `deleteUser` derruba o login, como já acontecia com o `setKeepSignedIn`. |
+| 8 | Acabamento: <ul><li>faltam testes da virada da meia-noite nos rótulos de horário, do toque direto no indicador e da aba offline com a fila vazia;</li><li>a pluralização "N avaliações na fila" está em dois lugares;</li><li>o `atLabel` calcula `_isToday` duas vezes;</li><li>o `claimUnowned` faz uma consulta por linha sem dono;</li><li>o `saveSendResults` ignora em silêncio um id que sumiu;</li><li>o badge do indicador usa tamanhos soltos (16/2), como o da navbar (18/2);</li><li>a 1.6 não tem estado vazio próprio, porque o rodapé do checklist só existe com catálogo;</li><li>os testes do serviço usam esperas curtas em tempo real.</li></ul> |
 | 8 | Com rede "conectada mas sem dados", a entrada offline só acontece depois do timeout do `ApiClient` (15 s / 20 s); o envio também espera esse tempo antes de marcar "tempo esgotado". |
 | 8 | O toque no cabeçalho da categoria aberta e nos botões B/PM/M não mostra ripple; o "salvo" do cabeçalho do checklist é estático. |
 | 8 | Botões B/PM/M sem `Semantics(selected: …)`; "0 de 1 categorias revisadas" no plural. |
 | 8 | Aparelho compartilhado: os rascunhos e a fila de outro consultor ficam no aparelho (invisíveis para quem entrou) até o dono entrar de novo. Limpar ou avisar, se isso aparecer em campo. |
-| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; o estado "não iniciada" do checklist, a pílula "Enviando", o chip "Na fila" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |
+| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; o estado "não iniciada" do checklist, a pílula "Enviando", os chips "Na fila" e "Enviada" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |
