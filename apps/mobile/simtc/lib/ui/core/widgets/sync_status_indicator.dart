@@ -17,39 +17,47 @@ import '../theme/app_typography.dart';
 /// Lê o `AssessmentSyncService` e o `ConnectivityService` do app. Sem eles
 /// (a galeria do DS, testes de outros widgets), mostra a fila vazia.
 class SyncStatusIndicator extends StatelessWidget {
-  const SyncStatusIndicator({super.key});
+  const SyncStatusIndicator({super.key, this.onTap});
+
+  /// A tela decide para onde o toque leva — hoje, a aba Sincronizar.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final count = context.watch<AssessmentSyncService?>()?.queue.length ?? 0;
     final isOffline = context.watch<ConnectivityService?>()?.isOffline ?? false;
 
-    if (count == 0) {
-      return const SizedBox(
-        width: AppSpacing.touchTarget,
-        height: AppSpacing.touchTarget,
-        child: Icon(AppIcons.syncDone, color: AppColors.text3),
-      );
-    }
+    final Widget content = count == 0
+        ? const Icon(AppIcons.syncDone, color: AppColors.text3)
+        : Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                isOffline ? AppIcons.offline : AppIcons.sync,
+                color: AppColors.warningInk,
+              ),
+              Positioned(
+                top: AppSpacing.xs + 2,
+                right: AppSpacing.xs + 1,
+                child: _CountBadge(count),
+              ),
+            ],
+          );
 
     return Semantics(
-      label: count == 1 ? '1 avaliação na fila' : '$count avaliações na fila',
-      child: SizedBox(
-        width: AppSpacing.touchTarget,
-        height: AppSpacing.touchTarget,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(
-              isOffline ? AppIcons.offline : AppIcons.sync,
-              color: AppColors.warningInk,
-            ),
-            Positioned(
-              top: AppSpacing.xs + 2,
-              right: AppSpacing.xs + 1,
-              child: _CountBadge(count),
-            ),
-          ],
+      button: onTap != null,
+      label: count == 0
+          ? 'Nenhuma avaliação na fila'
+          : count == 1
+              ? '1 avaliação na fila'
+              : '$count avaliações na fila',
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: AppSpacing.touchTarget,
+          height: AppSpacing.touchTarget,
+          child: content,
         ),
       ),
     );

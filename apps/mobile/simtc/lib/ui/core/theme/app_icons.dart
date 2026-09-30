@@ -46,4 +46,7 @@ abstract final class AppIcons {
 
   /// Fila de envio (Fase 5A): o último envio falhou ("error" no canvas "2h").
   static const IconData sendFailed = Icons.error_outline;
+
+  /// "Tentar novamente" de um item da fila (canvas "2h").
+  static const IconData retry = Icons.refresh;
 }

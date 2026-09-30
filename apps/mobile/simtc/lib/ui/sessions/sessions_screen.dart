@@ -278,7 +278,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 semanticLabel: 'SIM Treinamentos',
               ),
               const Spacer(),
-              const SyncStatusIndicator(),
+              SyncStatusIndicator(onTap: () => context.go(AppRoutes.sync)),
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
@@ -523,10 +523,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
         const PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
       ],
       onSelect: (index) {
-        if (index == 0) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Disponível em breve.')),
-        );
+        if (index == 1) context.go(AppRoutes.sync);
+        if (index == 2) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Disponível em breve.')),
+          );
+        }
       },
     );
   }

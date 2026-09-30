@@ -52,6 +52,14 @@ abstract final class AppTypography {
   static TextStyle get screenTitle =>
       _inter(size: 22, weight: FontWeight.w700, height: 1.2, letterSpacing: -0.22);
 
+  /// Linha abaixo do título de uma aba ("Última sincronização hoje 07:12")
+  static TextStyle get screenSubtitle =>
+      _inter(size: 13, weight: FontWeight.w400, height: 1.2, color: AppColors.text3);
+
+  /// Título do cartão âmbar da fila sem rede ("3 avaliações na fila")
+  static TextStyle get queueNoticeTitle =>
+      _inter(size: 16, weight: FontWeight.w600, height: 1.25, color: AppColors.noteCommentInk);
+
   /// Título da Home ("Minhas sessões" / "Sessões") — maior que o
   /// `screenTitle`, ajustado no aparelho em 24/09/2026.
   static TextStyle get homeTitle =>

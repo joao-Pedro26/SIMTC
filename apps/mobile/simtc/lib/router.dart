@@ -10,12 +10,16 @@ import 'ui/session_detail/session_detail_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
 import 'ui/splash/splash_screen.dart';
 import 'ui/summary/summary_screen.dart';
+import 'ui/sync/sync_screen.dart';
 
 abstract final class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String home = '/home';
   static const String designSystem = '/ds';
+
+  /// Aba "Sincronizar" (tela 1.9, Fase 5A).
+  static const String sync = '/sync';
 
   /// Detalhe da sessão (tela 1.4).
   static String sessionDetail(String sessionId) => '/sessions/$sessionId';
@@ -57,6 +61,10 @@ GoRouter createRouter(
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const SessionsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.sync,
+        builder: (context, state) => const SyncScreen(),
       ),
       GoRoute(
         path: '/sessions/:sessionId',

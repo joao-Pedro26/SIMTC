@@ -18,8 +18,10 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
+import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
+import 'package:simtc/ui/sync/sync_screen.dart';
 import 'package:simtc/utils/result.dart';
 
 import '../../support/fake_assessment_sync_service.dart';
@@ -591,6 +593,12 @@ void main() {
         300,
         scrollable: scrollable,
       );
+      // `scrollUntilVisible` para com o botão só entrando pela borda de
+      // baixo: o centro dele ficava atrás da navbar, e o toque caía em
+      // "Sincronizar" (o aviso de hit-test da Fase 3). Com a aba navegando
+      // de verdade (Fase 5A), esse toque errado quebra o teste.
+      await tester.ensureVisible(find.byKey(const ValueKey('ver-mais-hojeOutras')));
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
       await tester.pump();
     }
@@ -796,6 +804,12 @@ void main() {
         300,
         scrollable: scrollable,
       );
+      // `scrollUntilVisible` para com o botão só entrando pela borda de
+      // baixo: o centro dele ficava atrás da navbar, e o toque caía em
+      // "Sincronizar" (o aviso de hit-test da Fase 3). Com a aba navegando
+      // de verdade (Fase 5A), esse toque errado quebra o teste.
+      await tester.ensureVisible(find.byKey(const ValueKey('ver-mais-hojeOutras')));
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('ver-mais-hojeOutras')));
       await tester.pump();
     }
@@ -980,4 +994,57 @@ void main() {
     expect(detail.sessionId, 'sess-1');
   });
 
+  testWidgets(
+      '"Sincronizar" na navbar e o indicador do cabeçalho abrem a aba, e '
+      '"Sessões" volta', (tester) async {
+    when(() => auth.isAuthenticated).thenReturn(true);
+    final router = createRouter(auth, initialLocation: AppRoutes.home);
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<SessionRepository>.value(value: repository),
+          Provider<AssessmentCatalogRepository>.value(value: catalog),
+          ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+          ChangeNotifierProvider<AssessmentSyncService>.value(
+            value: FakeAssessmentSyncService(queue: [queuedAssessment('1')]),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.tap(find.text('Sincronizar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SyncScreen), findsOneWidget);
+
+    // A Home volta com o skeleton animado até a lista chegar de novo: um
+    // `pumpAndSettle` aqui não assentaria nunca.
+    await tester.tap(find.text('Sessões'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SessionsScreen), findsOneWidget);
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.tap(find.byType(SyncStatusIndicator));
+    await tester.pumpAndSettle();
+    expect(find.byType(SyncScreen), findsOneWidget);
+  });
+
+  testWidgets('"Perfil" continua avisando que chega numa próxima versão',
+      (tester) async {
+    await pump(tester);
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.tap(find.text('Perfil'));
+    await tester.pump();
+
+    expect(find.text('Disponível em breve.'), findsOneWidget);
+  });
 }

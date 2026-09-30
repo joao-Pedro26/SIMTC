@@ -94,9 +94,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const AppTopBar(
+            AppTopBar(
               title: 'Detalhe da sessão',
-              trailing: SyncStatusIndicator(),
+              trailing: SyncStatusIndicator(
+                onTap: () => context.go(AppRoutes.sync),
+              ),
             ),
             ConnectivityBanner(
               isOffline: isOffline,
