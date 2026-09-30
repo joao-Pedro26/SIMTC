@@ -68,6 +68,7 @@ void main() {
     when(() => storage.readRefresh()).thenAnswer((_) async => null);
     when(() => storage.persistUser(any())).thenAnswer((_) async {});
     when(() => storage.readUser()).thenAnswer((_) async => null);
+    when(() => storage.deleteUser()).thenAnswer((_) async {});
   });
 
   tearDown(() async {
@@ -274,6 +275,53 @@ void main() {
       await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: false);
 
       verifyNever(() => storage.persistUser(any()));
+    });
+
+    test(
+        'login apaga o perfil do login anterior antes de gravar os tokens '
+        'novos', () async {
+      stubLogin(token: fakeJwt({'sub': 'user-2'}));
+      stubMe({'id': 'user-2', 'name': 'Bruno', 'email': 'b@s.com', 'role': 'CONSULTANT'});
+
+      await repository.login(email: 'b@s.com', password: '123456', keepSignedIn: true);
+
+      verifyInOrder([
+        () => storage.deleteUser(),
+        () => storage.persist(
+              accessToken: any(named: 'accessToken'),
+              refreshToken: any(named: 'refreshToken'),
+            ),
+        () => storage.persistUser(any()),
+      ]);
+    });
+
+    test('falha ao gravar o perfil não impede o login', () async {
+      stubLogin(token: fakeJwt({'sub': 'user-1'}));
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+      when(() => storage.persistUser(any()))
+          .thenThrow(PlatformException(code: 'keystore'));
+
+      final result = await repository.login(
+        email: 'c@s.com',
+        password: '123456',
+        keepSignedIn: true,
+      );
+
+      expect(result, isA<Success<AuthUser>>());
+      expect(repository.isAuthenticated, isTrue);
+    });
+
+    test('falha ao gravar o perfil na abertura com rede não manda para o login',
+        () async {
+      stubSavedTokens();
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+      when(() => storage.persistUser(any()))
+          .thenThrow(PlatformException(code: 'keystore'));
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Success<AuthUser>>());
+      expect(repository.isAuthenticated, isTrue);
     });
 
     test(

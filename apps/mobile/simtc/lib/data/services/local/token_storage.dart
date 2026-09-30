@@ -37,6 +37,10 @@ class TokenStorage {
 
   Future<void> persistUser(String json) => _storage.write(key: _userKey, value: json);
 
+  /// Apaga só o perfil salvo, sem mexer nos tokens — um login novo não herda
+  /// o perfil de quem entrou antes (ver `AuthSession.start`).
+  Future<void> deleteUser() => _storage.delete(key: _userKey);
+
   Future<void> clear() async {
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);

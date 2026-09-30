@@ -9,10 +9,17 @@ import 'package:simtc/data/services/api/api_exception.dart';
 
 /// Resposta programada para o adaptador falso.
 class _Reply {
-  const _Reply(this.statusCode, [this.body = const <String, dynamic>{}]);
+  const _Reply(this.statusCode, [this.body = const <String, dynamic>{}])
+      : networkError = null;
+
+  /// A requisição falha sem chegar a ter resposta (sem rede, tempo esgotado).
+  const _Reply.network(DioExceptionType this.networkError)
+      : statusCode = 0,
+        body = const <String, dynamic>{};
 
   final int statusCode;
   final Map<String, dynamic> body;
+  final DioExceptionType? networkError;
 }
 
 /// Corpo JSON pronto, no formato que o Dio espera do adaptador.
@@ -48,6 +55,9 @@ class _FakeAdapter implements HttpClientAdapter {
     }
 
     final reply = replies.removeAt(0);
+    if (reply.networkError != null) {
+      throw DioException(requestOptions: options, type: reply.networkError!);
+    }
     return _json(reply.statusCode, reply.body);
   }
 
@@ -186,6 +196,95 @@ void main() {
     );
     expect(sessionExpiredCalls, 1);
     expect(adapter.requests, hasLength(2));
+  });
+
+  group('renovação sem resposta do servidor mantém a sessão', () {
+    test(
+        'sem rede na renovação, a chamada falha como falta de conexão e a '
+        'sessão continua', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply.network(DioExceptionType.connectionError),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.isNetworkError, 'isNetworkError', isTrue)
+              .having((e) => e.statusCode, 'statusCode', isNull),
+        ),
+      );
+      expect(sessionExpiredCalls, 0);
+      expect(renewedTokens, isEmpty);
+      expect(adapter.requests.map((r) => r.path).toList(),
+          ['/training-sessions', '/auth/refresh'],
+          reason: 'sem token novo, a chamada original não é repetida');
+    });
+
+    test('tempo esgotado na renovação também mantém a sessão', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply.network(DioExceptionType.receiveTimeout),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.isNetworkError, 'isNetworkError', isTrue)),
+      );
+      expect(sessionExpiredCalls, 0);
+    });
+
+    test(
+        'servidor fora do ar (5xx) na renovação mantém a sessão e mostra o '
+        'erro do servidor', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply(503, {'message': 'Service Unavailable'}),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 503)),
+      );
+      expect(sessionExpiredCalls, 0);
+    });
+
+    test('qualquer 4xx na renovação encerra a sessão, não só o 401', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply(403, {'message': 'Forbidden'}),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+      expect(sessionExpiredCalls, 1);
+    });
+
+    test(
+        'depois de uma renovação que falhou sem rede, a próxima chamada tenta '
+        'renovar de novo', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply.network(DioExceptionType.connectionError),
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply(200, {'accessToken': 'token-novo', 'refreshToken': 'refresh-2'}),
+        const _Reply(200, {'ok': true}),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(isA<ApiException>()),
+      );
+      final response = await client.get<Map<String, dynamic>>('/training-sessions');
+
+      expect(response.statusCode, 200);
+      expect(renewedTokens, ['token-novo']);
+      expect(sessionExpiredCalls, 0);
+    });
   });
 
   test('a rota de refresh não leva Authorization', () async {

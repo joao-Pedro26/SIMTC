@@ -42,7 +42,7 @@ class ApiClient {
   static const String refreshPath = '/auth/refresh';
 
   /// Refresh em andamento — chamadas paralelas esperam o mesmo resultado.
-  Future<String?>? _pendingRefresh;
+  Future<_Refresh>? _pendingRefresh;
 
   Dio get dio => _dio;
 
@@ -73,9 +73,14 @@ class ApiClient {
       return;
     }
 
-    final newToken = await _refreshToken();
+    final refresh = await _refreshToken();
+    final newToken = refresh.accessToken;
     if (newToken == null) {
-      handler.next(error);
+      // Sessão encerrada pelo servidor: segue o 401 original. Renovação que
+      // não chegou a ser respondida (sem rede, tempo esgotado, 5xx): segue o
+      // erro dela — quem chamou vê "sem conexão", não "não autorizado", e a
+      // sessão continua valendo.
+      handler.next(refresh.failure ?? error);
       return;
     }
 
@@ -90,19 +95,20 @@ class ApiClient {
     }
   }
 
-  /// Renova o par de tokens. Devolve o access token novo, ou null se a sessão
-  /// acabou (aí o app precisa mandar o usuário para o login).
-  Future<String?> _refreshToken() {
+  /// Renova o par de tokens. Devolve o access token novo, a sessão encerrada
+  /// (aí o app precisa mandar o usuário para o login) ou a falha que impediu
+  /// a renovação sem encerrar a sessão.
+  Future<_Refresh> _refreshToken() {
     return _pendingRefresh ??= _performRefresh().whenComplete(() {
       _pendingRefresh = null;
     });
   }
 
-  Future<String?> _performRefresh() async {
+  Future<_Refresh> _performRefresh() async {
     final refreshToken = await readRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
       await onSessionExpired();
-      return null;
+      return const _Refresh.expired();
     }
 
     try {
@@ -116,14 +122,23 @@ class ApiClient {
 
       if (accessToken == null || newRefreshToken == null) {
         await onSessionExpired();
-        return null;
+        return const _Refresh.expired();
       }
 
       await onTokensRenewed(accessToken, newRefreshToken);
-      return accessToken;
-    } on DioException {
-      await onSessionExpired();
-      return null;
+      return _Refresh.renewed(accessToken);
+    } on DioException catch (refreshError) {
+      // Só o servidor recusando o refresh token (4xx) encerra a sessão
+      // (decisão de 29/09/2026). Sem rede, tempo esgotado ou servidor fora do
+      // ar (5xx), o token pode continuar valendo: a chamada falha agora e a
+      // próxima com rede tenta renovar de novo. Antes, qualquer falha aqui
+      // deslogava — e o login exige rede.
+      final status = refreshError.response?.statusCode;
+      if (status != null && status >= 400 && status < 500) {
+        await onSessionExpired();
+        return const _Refresh.expired();
+      }
+      return _Refresh.failed(refreshError);
     }
   }
 
@@ -153,4 +168,20 @@ class ApiClient {
       throw ApiException.fromDio(error);
     }
   }
+}
+
+/// Desfecho de uma renovação de token.
+class _Refresh {
+  const _Refresh.renewed(String this.accessToken) : failure = null;
+  const _Refresh.expired()
+      : accessToken = null,
+        failure = null;
+  const _Refresh.failed(DioException this.failure) : accessToken = null;
+
+  /// O access token novo — nulo quando não renovou.
+  final String? accessToken;
+
+  /// Por que não renovou sem a sessão ter acabado (sem rede, 5xx). Nulo
+  /// quando renovou ou quando o servidor encerrou a sessão.
+  final DioException? failure;
 }

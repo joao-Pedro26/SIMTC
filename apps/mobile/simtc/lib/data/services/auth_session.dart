@@ -48,6 +48,10 @@ class AuthSession {
   }) async {
     _keepSignedIn = keepSignedIn;
     await _storage.setKeepSignedIn(keepSignedIn);
+    // O perfil salvo é do login anterior. Apagá-lo antes de gravar os tokens
+    // novos garante que um par de tokens nunca fique com o perfil de outra
+    // pessoa — nem se o app morrer antes do `saveUser` deste login.
+    await _storage.deleteUser();
     await updateTokens(accessToken, refreshToken);
   }
 
@@ -62,9 +66,18 @@ class AuthSession {
 
   /// Guarda o perfil que o servidor acabou de confirmar — só com "manter
   /// conectado", a mesma regra dos tokens.
+  ///
+  /// Nunca lança: sem o perfil, a única perda é a próxima abertura sem rede
+  /// ir para o login. Derrubar o login (ou a abertura com rede) por causa
+  /// dele seria pior — e a keystore do Android pode falhar sem aviso, como no
+  /// `restoreFromStorage`.
   Future<void> saveUser(AuthUser user) async {
     if (!_keepSignedIn) return;
-    await _storage.persistUser(jsonEncode(user.toJson()));
+    try {
+      await _storage.persistUser(jsonEncode(user.toJson()));
+    } catch (_) {
+      // Ver acima: segue sem o perfil salvo.
+    }
   }
 
   /// O último perfil guardado, ou null. Nunca lança: um perfil ilegível

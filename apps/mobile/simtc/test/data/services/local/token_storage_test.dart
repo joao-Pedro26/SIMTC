@@ -19,4 +19,16 @@ void main() {
     verify(() => secure.delete(key: 'auth.refreshToken')).called(1);
     verify(() => secure.delete(key: 'auth.user')).called(1);
   });
+
+  test('deleteUser apaga só o perfil salvo, sem mexer nos tokens', () async {
+    final secure = _MockSecureStorage();
+    when(() => secure.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+    final storage = TokenStorage(storage: secure);
+
+    await storage.deleteUser();
+
+    verify(() => secure.delete(key: 'auth.user')).called(1);
+    verifyNever(() => secure.delete(key: 'auth.accessToken'));
+    verifyNever(() => secure.delete(key: 'auth.refreshToken'));
+  });
 }
