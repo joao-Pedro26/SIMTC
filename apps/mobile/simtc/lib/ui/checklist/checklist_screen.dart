@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../core/theme/app_colors.dart';
@@ -39,6 +40,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   late final ChecklistViewModel _viewModel = ChecklistViewModel(
     sessionId: widget.sessionId,
     participantId: widget.participantId,
+    // A rota só abre com sessão (redirecionamento do `router.dart`).
+    ownerUserId: context.read<AuthRepository>().currentUser!.id,
     assessmentRepository: context.read<AssessmentRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     catalogRepository: context.read<AssessmentCatalogRepository>(),

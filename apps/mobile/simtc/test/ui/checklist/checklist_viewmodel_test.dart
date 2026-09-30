@@ -100,6 +100,7 @@ void main() {
     return ChecklistViewModel(
       sessionId: 'sess-1',
       participantId: 'tp-1',
+      ownerUserId: 'user-1',
       assessmentRepository: assessmentRepository,
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,

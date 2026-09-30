@@ -138,6 +138,21 @@ class LocalAssessments extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// `AuthUser.id` de quem fez a avaliação (decisão de 29/09/2026). O backend
+  /// atribui a avaliação ao dono do token que a envia, então a fila só pode
+  /// sair no nome de quem a preencheu. Nulo nas avaliações de antes da Fase
+  /// 5A — ficam com o primeiro usuário que entrar
+  /// (`AssessmentRepository.claimUnowned`).
+  TextColumn get ownerUserId => text().nullable()();
+
+  /// Nome do participante no "Confirmar": a aba Sincronizar mostra a fila
+  /// mesmo depois que um logout apaga o cache de participantes.
+  TextColumn get participantName => text().nullable()();
+
+  /// % geral no "Confirmar" — o que a tela 1.6 mostrou. A linha "Na fila" e
+  /// a aba Sincronizar mostram sem recalcular.
+  RealColumn get score => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 

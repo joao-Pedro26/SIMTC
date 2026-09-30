@@ -27,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
           // estouraria "duplicate column name" e o app não abriria o banco
           // nunca mais. Uma transação só para todos os passos torna a
           // migração tudo-ou-nada — inclusive para quem pula do esquema 1
-          // direto para o 3.
+          // direto para o atual.
           await transaction(() async {
             if (from < 2) {
               // Fase 2: contagens de participantes no card da Home. São cache
@@ -63,6 +63,17 @@ class AppDatabase extends _$AppDatabase {
                 participants.assessedByConsultantId,
               );
               await m.addColumn(participants, participants.assessedAt);
+            }
+            if (from < 4) {
+              // Fase 5A: dono, nome do participante e % de cada avaliação
+              // local. Anuláveis: as avaliações da Fase 4 que já estão no
+              // aparelho ficam com o primeiro usuário que entrar.
+              await m.addColumn(localAssessments, localAssessments.ownerUserId);
+              await m.addColumn(
+                localAssessments,
+                localAssessments.participantName,
+              );
+              await m.addColumn(localAssessments, localAssessments.score);
             }
           });
         },

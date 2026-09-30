@@ -21,6 +21,7 @@ class ChecklistViewModel extends ChangeNotifier {
   ChecklistViewModel({
     required this.sessionId,
     required this.participantId,
+    required this.ownerUserId,
     required AssessmentRepository assessmentRepository,
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
@@ -33,6 +34,9 @@ class ChecklistViewModel extends ChangeNotifier {
 
   final String sessionId;
   final String participantId;
+
+  /// `AuthUser.id` do consultor logado — o dono do rascunho.
+  final String ownerUserId;
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
@@ -96,6 +100,7 @@ class ChecklistViewModel extends ChangeNotifier {
     final assessment = await _assessmentRepository.openDraft(
       trainingParticipantId: participantId,
       sessionId: sessionId,
+      ownerUserId: ownerUserId,
     );
     if (_disposed) return;
 

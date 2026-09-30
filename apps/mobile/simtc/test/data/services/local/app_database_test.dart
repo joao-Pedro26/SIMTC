@@ -142,6 +142,27 @@ const String _participantsV1 = '''
   )
 ''';
 
+/// A tabela `local_assessments` como a Fase 1 a criou — nenhuma migração
+/// mexeu nela até a Fase 5A (esquema 4).
+const String _localAssessmentsV3 = '''
+  CREATE TABLE IF NOT EXISTS local_assessments (
+    id TEXT NOT NULL,
+    training_participant_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    date INTEGER NOT NULL,
+    start_time INTEGER NOT NULL,
+    end_time INTEGER NULL,
+    sync_status TEXT NOT NULL,
+    last_error TEXT NULL,
+    last_attempt_at INTEGER NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (training_participant_id)
+  )
+''';
+
 void main() {
   late AppDatabase db;
 
@@ -267,10 +288,12 @@ void main() {
         file,
         setup: (raw) {
           // O banco como a Fase 1 o criou: todas as tabelas existem (a Fase 1
-          // criou o esquema inteiro), mas `sessions` ainda sem as contagens e
-          // `participants` sem as colunas da Fase 3.
+          // criou o esquema inteiro), mas `sessions` ainda sem as contagens,
+          // `participants` sem as colunas da Fase 3 e `local_assessments` sem
+          // as da Fase 5A.
           raw.execute(_sessionsV1);
           raw.execute(_participantsV1);
+          raw.execute(_localAssessmentsV3);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status, cached_at)
             VALUES ('sess-antiga', 'Bracell Celulose', 'Direção Preventiva',
@@ -298,7 +321,7 @@ void main() {
   });
 
   test(
-      'migra do esquema 2 para o 3 mantendo sessões e participantes já '
+      'migra do esquema 2 para o atual mantendo sessões e participantes já '
       'cacheados', () async {
     final directory = Directory.systemTemp.createTempSync('simtc_migracao_v3');
     final file = File('${directory.path}/simtc.sqlite');
@@ -309,6 +332,7 @@ void main() {
         setup: (raw) {
           raw.execute(_sessionsV2);
           raw.execute(_participantsV1);
+          raw.execute(_localAssessmentsV3);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status,
                                   total_participants, assessable_participants,
@@ -360,9 +384,10 @@ void main() {
 
     /// Abre o `AppDatabase` real — o getter `migration` de produção, sem
     /// nenhuma sobrescrita — sobre um `DatabaseDelegate` que derruba a 2ª
-    /// instrução `ALTER TABLE` (a partir do esquema 1 a migração faz sete:
-    /// três da Fase 2 e quatro da Fase 3). A 1ª tem sucesso, a 2ª nunca chega
-    /// ao SQLite. A abertura (`select`) dispara a migração de forma preguiçosa.
+    /// instrução `ALTER TABLE` (a partir do esquema 1 a migração faz dez:
+    /// três da Fase 2, quatro da Fase 3 e três da Fase 5A). A 1ª tem sucesso,
+    /// a 2ª nunca chega ao SQLite. A abertura (`select`) dispara a migração de
+    /// forma preguiçosa.
     Future<Object> openAndCaptureError() async {
       final realDelegate = NativeDatabase(file, setup: rawSetup()).delegate;
       final executor =
@@ -440,5 +465,83 @@ void main() {
     expect('$secondError', contains('interrompida de propósito'),
         reason: 'sem a transação, a 2ª tentativa quebraria com "duplicate '
             'column name: responsible_consultant_id"');
+  });
+
+  test(
+      'migra do esquema 3 para o 4 mantendo as avaliações locais — as da Fase '
+      '4 ficam sem dono até alguém entrar', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_v4');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          raw.execute(_localAssessmentsV3);
+          raw.execute('''
+            INSERT INTO local_assessments (id, training_participant_id, session_id,
+                                           date, start_time, end_time, sync_status,
+                                           attempt_count, created_at, updated_at)
+            VALUES ('la-1', 'tp-1', 'sess-1', 1758600000, 1758610000, 1758611000,
+                    'pendingSync', 0, 1758610000, 1758611000)
+          ''');
+          raw.execute('PRAGMA user_version = 3');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    final row = await migrated.select(migrated.localAssessments).getSingle();
+
+    expect(row.trainingParticipantId, 'tp-1');
+    expect(row.syncStatus, LocalSyncStatus.pendingSync);
+    expect(row.endTime, DateTime.fromMillisecondsSinceEpoch(1758611000 * 1000));
+    expect(row.ownerUserId, isNull);
+    expect(row.participantName, isNull);
+    expect(row.score, isNull);
+  });
+
+  test(
+      'a migração 3→4 também é atômica: uma falha na última coluna desfaz as '
+      'anteriores', () async {
+    final directory =
+        Directory.systemTemp.createTempSync('simtc_migracao_v4_atomica');
+    final file = File('${directory.path}/simtc.sqlite');
+    addTearDown(() => directory.deleteSync(recursive: true));
+
+    DatabaseSetup rawSetup() => (raw) {
+          raw.execute(_localAssessmentsV3);
+          raw.execute('PRAGMA user_version = 3');
+        };
+
+    /// A migração 3→4 faz três `ALTER TABLE` em `local_assessments`. Derrubar
+    /// o 3º deixa as duas primeiras colunas já criadas — só a transação de
+    /// `onUpgrade` impede que elas fiquem.
+    Future<Object> openAndCaptureError() async {
+      final realDelegate = NativeDatabase(file, setup: rawSetup()).delegate;
+      final executor =
+          DelegatedDatabase(_FailOnNthAlterTableDelegate(realDelegate, 3));
+      final db = AppDatabase(executor);
+      try {
+        await db.select(db.localAssessments).get();
+        fail('esperava que a migração falhasse de propósito');
+      } catch (error) {
+        return error;
+      } finally {
+        await db.close();
+      }
+    }
+
+    final firstError = await openAndCaptureError();
+    expect('$firstError', contains('interrompida de propósito'));
+
+    final secondError = await openAndCaptureError();
+    expect('$secondError', contains('interrompida de propósito'),
+        reason: 'sem a transação, a 2ª tentativa quebraria com "duplicate '
+            'column name: owner_user_id"');
   });
 }

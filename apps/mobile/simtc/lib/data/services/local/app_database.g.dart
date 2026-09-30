@@ -2443,6 +2443,23 @@ class $LocalAssessmentsTable extends LocalAssessments
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _ownerUserIdMeta =
+      const VerificationMeta('ownerUserId');
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+      'owner_user_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _participantNameMeta =
+      const VerificationMeta('participantName');
+  @override
+  late final GeneratedColumn<String> participantName = GeneratedColumn<String>(
+      'participant_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _scoreMeta = const VerificationMeta('score');
+  @override
+  late final GeneratedColumn<double> score = GeneratedColumn<double>(
+      'score', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2456,7 +2473,10 @@ class $LocalAssessmentsTable extends LocalAssessments
         lastAttemptAt,
         attemptCount,
         createdAt,
-        updatedAt
+        updatedAt,
+        ownerUserId,
+        participantName,
+        score
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2531,6 +2551,22 @@ class $LocalAssessmentsTable extends LocalAssessments
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+          _ownerUserIdMeta,
+          ownerUserId.isAcceptableOrUnknown(
+              data['owner_user_id']!, _ownerUserIdMeta));
+    }
+    if (data.containsKey('participant_name')) {
+      context.handle(
+          _participantNameMeta,
+          participantName.isAcceptableOrUnknown(
+              data['participant_name']!, _participantNameMeta));
+    }
+    if (data.containsKey('score')) {
+      context.handle(
+          _scoreMeta, score.isAcceptableOrUnknown(data['score']!, _scoreMeta));
+    }
     return context;
   }
 
@@ -2570,6 +2606,12 @@ class $LocalAssessmentsTable extends LocalAssessments
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      ownerUserId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}owner_user_id']),
+      participantName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}participant_name']),
+      score: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}score']),
     );
   }
 
@@ -2601,6 +2643,21 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
   final int attemptCount;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// `AuthUser.id` de quem fez a avaliação (decisão de 29/09/2026). O backend
+  /// atribui a avaliação ao dono do token que a envia, então a fila só pode
+  /// sair no nome de quem a preencheu. Nulo nas avaliações de antes da Fase
+  /// 5A — ficam com o primeiro usuário que entrar
+  /// (`AssessmentRepository.claimUnowned`).
+  final String? ownerUserId;
+
+  /// Nome do participante no "Confirmar": a aba Sincronizar mostra a fila
+  /// mesmo depois que um logout apaga o cache de participantes.
+  final String? participantName;
+
+  /// % geral no "Confirmar" — o que a tela 1.6 mostrou. A linha "Na fila" e
+  /// a aba Sincronizar mostram sem recalcular.
+  final double? score;
   const LocalAssessment(
       {required this.id,
       required this.trainingParticipantId,
@@ -2613,7 +2670,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       this.lastAttemptAt,
       required this.attemptCount,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      this.ownerUserId,
+      this.participantName,
+      this.score});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2638,6 +2698,15 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
     map['attempt_count'] = Variable<int>(attemptCount);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || ownerUserId != null) {
+      map['owner_user_id'] = Variable<String>(ownerUserId);
+    }
+    if (!nullToAbsent || participantName != null) {
+      map['participant_name'] = Variable<String>(participantName);
+    }
+    if (!nullToAbsent || score != null) {
+      map['score'] = Variable<double>(score);
+    }
     return map;
   }
 
@@ -2661,6 +2730,14 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       attemptCount: Value(attemptCount),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      ownerUserId: ownerUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerUserId),
+      participantName: participantName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(participantName),
+      score:
+          score == null && nullToAbsent ? const Value.absent() : Value(score),
     );
   }
 
@@ -2682,6 +2759,9 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       attemptCount: serializer.fromJson<int>(json['attemptCount']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      ownerUserId: serializer.fromJson<String?>(json['ownerUserId']),
+      participantName: serializer.fromJson<String?>(json['participantName']),
+      score: serializer.fromJson<double?>(json['score']),
     );
   }
   @override
@@ -2701,6 +2781,9 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       'attemptCount': serializer.toJson<int>(attemptCount),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'ownerUserId': serializer.toJson<String?>(ownerUserId),
+      'participantName': serializer.toJson<String?>(participantName),
+      'score': serializer.toJson<double?>(score),
     };
   }
 
@@ -2716,7 +2799,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           Value<DateTime?> lastAttemptAt = const Value.absent(),
           int? attemptCount,
           DateTime? createdAt,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          Value<String?> ownerUserId = const Value.absent(),
+          Value<String?> participantName = const Value.absent(),
+          Value<double?> score = const Value.absent()}) =>
       LocalAssessment(
         id: id ?? this.id,
         trainingParticipantId:
@@ -2732,6 +2818,11 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
         attemptCount: attemptCount ?? this.attemptCount,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        ownerUserId: ownerUserId.present ? ownerUserId.value : this.ownerUserId,
+        participantName: participantName.present
+            ? participantName.value
+            : this.participantName,
+        score: score.present ? score.value : this.score,
       );
   LocalAssessment copyWithCompanion(LocalAssessmentsCompanion data) {
     return LocalAssessment(
@@ -2754,6 +2845,12 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           : this.attemptCount,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      ownerUserId:
+          data.ownerUserId.present ? data.ownerUserId.value : this.ownerUserId,
+      participantName: data.participantName.present
+          ? data.participantName.value
+          : this.participantName,
+      score: data.score.present ? data.score.value : this.score,
     );
   }
 
@@ -2771,7 +2868,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('attemptCount: $attemptCount, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('participantName: $participantName, ')
+          ..write('score: $score')
           ..write(')'))
         .toString();
   }
@@ -2789,7 +2889,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
       lastAttemptAt,
       attemptCount,
       createdAt,
-      updatedAt);
+      updatedAt,
+      ownerUserId,
+      participantName,
+      score);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2805,7 +2908,10 @@ class LocalAssessment extends DataClass implements Insertable<LocalAssessment> {
           other.lastAttemptAt == this.lastAttemptAt &&
           other.attemptCount == this.attemptCount &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.ownerUserId == this.ownerUserId &&
+          other.participantName == this.participantName &&
+          other.score == this.score);
 }
 
 class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
@@ -2821,6 +2927,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
   final Value<int> attemptCount;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> ownerUserId;
+  final Value<String?> participantName;
+  final Value<double?> score;
   final Value<int> rowid;
   const LocalAssessmentsCompanion({
     this.id = const Value.absent(),
@@ -2835,6 +2944,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     this.attemptCount = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
+    this.participantName = const Value.absent(),
+    this.score = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalAssessmentsCompanion.insert({
@@ -2850,6 +2962,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     this.attemptCount = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.ownerUserId = const Value.absent(),
+    this.participantName = const Value.absent(),
+    this.score = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         trainingParticipantId = Value(trainingParticipantId),
@@ -2872,6 +2987,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     Expression<int>? attemptCount,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? ownerUserId,
+    Expression<String>? participantName,
+    Expression<double>? score,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2888,6 +3006,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       if (attemptCount != null) 'attempt_count': attemptCount,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (participantName != null) 'participant_name': participantName,
+      if (score != null) 'score': score,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2905,6 +3026,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       Value<int>? attemptCount,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
+      Value<String?>? ownerUserId,
+      Value<String?>? participantName,
+      Value<double?>? score,
       Value<int>? rowid}) {
     return LocalAssessmentsCompanion(
       id: id ?? this.id,
@@ -2920,6 +3044,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
       attemptCount: attemptCount ?? this.attemptCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      participantName: participantName ?? this.participantName,
+      score: score ?? this.score,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2965,6 +3092,15 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (participantName.present) {
+      map['participant_name'] = Variable<String>(participantName.value);
+    }
+    if (score.present) {
+      map['score'] = Variable<double>(score.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2986,6 +3122,9 @@ class LocalAssessmentsCompanion extends UpdateCompanion<LocalAssessment> {
           ..write('attemptCount: $attemptCount, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('participantName: $participantName, ')
+          ..write('score: $score, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5062,6 +5201,9 @@ typedef $$LocalAssessmentsTableCreateCompanionBuilder
   Value<int> attemptCount,
   required DateTime createdAt,
   required DateTime updatedAt,
+  Value<String?> ownerUserId,
+  Value<String?> participantName,
+  Value<double?> score,
   Value<int> rowid,
 });
 typedef $$LocalAssessmentsTableUpdateCompanionBuilder
@@ -5078,6 +5220,9 @@ typedef $$LocalAssessmentsTableUpdateCompanionBuilder
   Value<int> attemptCount,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> ownerUserId,
+  Value<String?> participantName,
+  Value<double?> score,
   Value<int> rowid,
 });
 
@@ -5155,6 +5300,16 @@ class $$LocalAssessmentsTableFilterComposer
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+      column: $table.ownerUserId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get participantName => $composableBuilder(
+      column: $table.participantName,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get score => $composableBuilder(
+      column: $table.score, builder: (column) => ColumnFilters(column));
+
   Expression<bool> localAssessmentItemsRefs(
       Expression<bool> Function($$LocalAssessmentItemsTableFilterComposer f)
           f) {
@@ -5225,6 +5380,16 @@ class $$LocalAssessmentsTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+      column: $table.ownerUserId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get participantName => $composableBuilder(
+      column: $table.participantName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get score => $composableBuilder(
+      column: $table.score, builder: (column) => ColumnOrderings(column));
 }
 
 class $$LocalAssessmentsTableAnnotationComposer
@@ -5272,6 +5437,15 @@ class $$LocalAssessmentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+      column: $table.ownerUserId, builder: (column) => column);
+
+  GeneratedColumn<String> get participantName => $composableBuilder(
+      column: $table.participantName, builder: (column) => column);
+
+  GeneratedColumn<double> get score =>
+      $composableBuilder(column: $table.score, builder: (column) => column);
 
   Expression<T> localAssessmentItemsRefs<T extends Object>(
       Expression<T> Function($$LocalAssessmentItemsTableAnnotationComposer a)
@@ -5333,6 +5507,9 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             Value<int> attemptCount = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> ownerUserId = const Value.absent(),
+            Value<String?> participantName = const Value.absent(),
+            Value<double?> score = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               LocalAssessmentsCompanion(
@@ -5348,6 +5525,9 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             attemptCount: attemptCount,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            ownerUserId: ownerUserId,
+            participantName: participantName,
+            score: score,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5363,6 +5543,9 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             Value<int> attemptCount = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
+            Value<String?> ownerUserId = const Value.absent(),
+            Value<String?> participantName = const Value.absent(),
+            Value<double?> score = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               LocalAssessmentsCompanion.insert(
@@ -5378,6 +5561,9 @@ class $$LocalAssessmentsTableTableManager extends RootTableManager<
             attemptCount: attemptCount,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            ownerUserId: ownerUserId,
+            participantName: participantName,
+            score: score,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

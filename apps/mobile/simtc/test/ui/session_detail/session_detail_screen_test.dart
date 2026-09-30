@@ -119,6 +119,7 @@ void main() {
     when(() => assessments.openDraft(
           trainingParticipantId: any(named: 'trainingParticipantId'),
           sessionId: any(named: 'sessionId'),
+          ownerUserId: any(named: 'ownerUserId'),
         )).thenAnswer((invocation) async {
       final now = DateTime(2026, 9, 25, 10);
       return LocalAssessment(

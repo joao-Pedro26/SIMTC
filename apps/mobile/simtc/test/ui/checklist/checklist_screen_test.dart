@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
+import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
+import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
@@ -15,10 +17,13 @@ import 'package:simtc/ui/checklist/checklist_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
 class _MockConnectivity extends Mock implements Connectivity {}
 
 void main() {
   late _MockApiClient api;
+  late _MockAuthRepository auth;
   late AppDatabase db;
   late AssessmentRepository assessmentRepository;
   late ParticipantRepository participantRepository;
@@ -29,6 +34,14 @@ void main() {
 
   setUp(() async {
     api = _MockApiClient();
+    auth = _MockAuthRepository();
+    when(() => auth.currentUser).thenReturn(const AuthUser(
+      id: 'user-1',
+      name: 'Carla Souza',
+      email: 'carla@simtc.com.br',
+      role: AppUserRole.consultant,
+      consultantId: 'c-eu',
+    ));
     // Ao cancelar um stream, o drift adia o fechamento com um `Timer` de
     // duração zero. Dentro do relógio falso do `testWidgets`, esse timer
     // nasce no dispose da tela (no fim do teste) e nunca roda: o teste
@@ -108,6 +121,7 @@ void main() {
         Provider<AssessmentRepository>.value(value: assessmentRepository),
         Provider<ParticipantRepository>.value(value: participantRepository),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
+        ChangeNotifierProvider<AuthRepository>.value(value: auth),
         ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
       ],
       child: child,
