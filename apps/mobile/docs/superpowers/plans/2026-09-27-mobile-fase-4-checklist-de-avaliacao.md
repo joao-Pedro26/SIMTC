@@ -3604,7 +3604,7 @@ Regressões:
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
 
-**Validado em 29/09/2026, no aparelho físico, pelo usuário — roteiro completo, incluindo a entrada offline depois de fechar o app à força e a rolagem até a categoria aberta (correções da revisão final).**
+**Validado em 29/09/2026, no aparelho físico, pelo usuário — roteiro completo, incluindo a entrada offline depois de fechar o app à força e a rolagem até a categoria aberta (correções da revisão final). Aval dado para planejar a Fase 5, dividida em 5A (Envio) e 5B (Resultado) no mesmo dia; as pendências marcadas "5" acima seguem no plano da 5A (`2026-09-29-mobile-fase-5a-envio.md`).**
 
 ---
 
