@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../../utils/result.dart';
 import '../repositories/assessment_repository.dart';
 import '../repositories/participant_repository.dart';
 import 'api/api_client.dart';
@@ -37,6 +38,12 @@ abstract final class SendFailure {
 /// O backend responde 201 mesmo recusando itens, então o resultado é lido
 /// item a item. Reenviar é seguro: o backend atualiza o registro do
 /// participante em vez de criar outro.
+///
+/// Depois de um envio aceito, a sessão é baixada de novo, para a linha do
+/// participante sair de "comigo" no cache (revisão de 30/09/2026). Se esse
+/// download falhar, a sessão fica pendente em [_sessionsToRefresh], e
+/// qualquer novo [syncNow] — mesmo com a fila vazia — tenta baixá-la de novo,
+/// uma sessão de cada vez.
 class AssessmentSyncService extends ChangeNotifier {
   AssessmentSyncService({
     required ApiClient apiClient,
@@ -93,6 +100,16 @@ class AssessmentSyncService extends ChangeNotifier {
   Future<void>? _running;
   bool _again = false;
 
+  /// Sessões com envio aceito que ainda esperam ser baixadas de novo — porque
+  /// o download de pós-envio ainda não rodou ou a tentativa anterior falhou.
+  /// Enquanto uma sessão está aqui, a linha do participante mostra "Enviada"
+  /// em vez do status do servidor (revisão de 30/09/2026).
+  final Set<String> _sessionsToRefresh = {};
+
+  /// Sessões de [_sessionsToRefresh] cujo download está em voo agora — evita
+  /// baixar a mesma sessão duas vezes ao mesmo tempo.
+  final Set<String> _refreshingSessions = {};
+
   /// Liga em [_follow], antes de assinar a fila daquele usuário; [_onQueue]
   /// desliga ao consumir a primeira emissão. Só nela o que já está em `error`
   /// também dispara envio — nas seguintes, só item `pendingSync` novo.
@@ -139,6 +156,7 @@ class AssessmentSyncService extends ChangeNotifier {
     _queue = const [];
     _lastSyncedAt = null;
     _firstQueueEmission = false;
+    _sessionsToRefresh.clear();
     notifyListeners();
 
     if (userId != null) unawaited(_follow(userId));
@@ -215,6 +233,11 @@ class AssessmentSyncService extends ChangeNotifier {
     final userId = _userId;
     if (userId == null || _connectivity.isOffline) return;
 
+    // Antes de mais nada, tenta de novo o download de pós-envio que ficou
+    // pendente de uma rodada anterior — mesmo que esta não tenha nada para
+    // enviar (revisão de 30/09/2026): é o "próximo gatilho" da retentativa.
+    unawaited(_refreshPendingSessions());
+
     _retryTimer?.cancel();
     final batch = await _assessments.loadQueue(userId);
     if (batch.isEmpty) {
@@ -253,14 +276,39 @@ class AssessmentSyncService extends ChangeNotifier {
       _failures = 0;
     }
 
-    // O backend recalcula o score e muda o status do participante: baixa de
-    // novo as sessões afetadas, para a linha virar Aprovado/Reavaliar.
-    final sessions = {
+    // O backend recalcula o score e muda o status do participante: as
+    // sessões aceitas entram no conjunto de quem precisa ser baixado de novo,
+    // para a linha virar Aprovado/Reavaliar (chip "Enviada" até lá).
+    final accepted = {
       for (final a in batch)
         if (results[a.id] == null) a.sessionId,
     };
-    for (final sessionId in sessions) {
-      unawaited(_participants.syncSession(sessionId));
+    if (accepted.isNotEmpty) {
+      _sessionsToRefresh.addAll(accepted);
+      unawaited(_refreshPendingSessions());
+    }
+  }
+
+  /// Tenta de novo, um de cada vez, o download das sessões de
+  /// [_sessionsToRefresh] que não estão sendo baixadas agora. Com sucesso, a
+  /// sessão sai do conjunto; com falha ou exceção, fica para a próxima
+  /// chamada — nunca duas rodadas baixando a mesma sessão ao mesmo tempo.
+  Future<void> _refreshPendingSessions() async {
+    final targets = _sessionsToRefresh.difference(_refreshingSessions);
+    if (targets.isEmpty) return;
+
+    _refreshingSessions.addAll(targets);
+    try {
+      for (final sessionId in targets) {
+        try {
+          final result = await _participants.syncSession(sessionId);
+          if (result case Success()) _sessionsToRefresh.remove(sessionId);
+        } catch (_) {
+          // Fica em _sessionsToRefresh: a próxima rodada tenta de novo.
+        }
+      }
+    } finally {
+      _refreshingSessions.removeAll(targets);
     }
   }
 

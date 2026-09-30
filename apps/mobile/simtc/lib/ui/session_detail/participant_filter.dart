@@ -205,31 +205,56 @@ enum LocalProgress {
 
   /// O último envio falhou: chip "Erro no envio".
   failed,
+
+  /// Enviada e aceita, mas a sessão ainda não foi baixada de novo: chip
+  /// "Enviada". Depois do download, vale o status do servidor.
+  sent,
 }
 
 /// Só vale para a linha "comigo" — depois do envio, quem manda é o status
-/// que o servidor devolve (Aprovado/Reavaliar), e uma avaliação já enviada
-/// não muda nada na linha.
+/// que o servidor devolve (Aprovado/Reavaliar). Entre o envio aceito e o
+/// próximo download dos participantes, porém, o cache do servidor ainda
+/// mostra o participante comigo (revisão de 30/09/2026): [participantsSyncedAt]
+/// decide se esse download já aconteceu depois do envio (`sent` some, vale o
+/// servidor) ou não (`sent` continua).
 LocalProgress? localProgressOf(
   ParticipantSituation situation,
   LocalAssessment? local,
+  DateTime? participantsSyncedAt,
 ) {
   if (situation != ParticipantSituation.mine || local == null) return null;
   return switch (local.syncStatus) {
     LocalSyncStatus.draft => LocalProgress.draft,
     LocalSyncStatus.pendingSync => LocalProgress.queued,
     LocalSyncStatus.error => LocalProgress.failed,
-    LocalSyncStatus.synced => null,
+    LocalSyncStatus.synced => _sentOrNull(local, participantsSyncedAt),
   };
 }
 
-/// "86,7% · aguardando envio" ou "62,0% · falhou às 07:58", da linha na fila.
-/// As avaliações de antes da Fase 5A não guardaram o %: vai só o texto.
+/// `sent` enquanto a sessão não foi baixada de novo depois do último envio;
+/// nula assim que o download passa a ser posterior a ele — aí quem manda é o
+/// status do servidor. Sem `lastAttemptAt` (não acontece: `saveSendResults`
+/// sempre grava) não dá para comparar, e a linha segue o servidor.
+LocalProgress? _sentOrNull(LocalAssessment local, DateTime? participantsSyncedAt) {
+  final lastAttempt = local.lastAttemptAt;
+  if (lastAttempt == null) return null;
+  final aindaNaoBaixou =
+      participantsSyncedAt == null || participantsSyncedAt.isBefore(lastAttempt);
+  return aindaNaoBaixou ? LocalProgress.sent : null;
+}
+
+/// "86,7% · aguardando envio", "62,0% · falhou às 07:58" ou "86,7% · enviada
+/// às 08:12", da linha na fila. As avaliações de antes da Fase 5A não
+/// guardaram o %: vai só o texto.
 String queueMetaFor(LocalAssessment local, DateTime now) {
   final lastAttempt = local.lastAttemptAt;
-  final status = local.syncStatus == LocalSyncStatus.error && lastAttempt != null
-      ? 'falhou ${atLabel(lastAttempt, now)}'
-      : 'aguardando envio';
+  final status = switch (local.syncStatus) {
+    LocalSyncStatus.error when lastAttempt != null =>
+      'falhou ${atLabel(lastAttempt, now)}',
+    LocalSyncStatus.synced when lastAttempt != null =>
+      'enviada ${atLabel(lastAttempt, now)}',
+    _ => 'aguardando envio',
+  };
   final score = local.score;
   return score == null ? status : '${percentLabel(score)} · $status';
 }

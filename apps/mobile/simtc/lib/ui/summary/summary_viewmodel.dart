@@ -111,7 +111,7 @@ class SummaryViewModel extends ChangeNotifier {
     try {
       await _assessmentRepository.confirm(
         assessment.id,
-        participantName: _participant?.name ?? '',
+        participantName: _participant?.name,
         score: overallScore,
       );
       _confirmed = true;

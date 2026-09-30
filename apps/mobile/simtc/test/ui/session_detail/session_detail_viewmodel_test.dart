@@ -94,7 +94,11 @@ void main() {
   }
 
   /// Avaliação deste aparelho, do jeito que o `AssessmentRepository` guarda.
-  LocalAssessment local(String participantId, LocalSyncStatus status) {
+  LocalAssessment local(
+    String participantId,
+    LocalSyncStatus status, {
+    DateTime? lastAttemptAt,
+  }) {
     final at = DateTime(2026, 9, 23, 13);
     return LocalAssessment(
       id: 'local-$participantId',
@@ -107,6 +111,7 @@ void main() {
       createdAt: at,
       updatedAt: at,
       ownerUserId: 'u1',
+      lastAttemptAt: lastAttemptAt,
     );
   }
 
@@ -342,6 +347,50 @@ void main() {
         withSession: session(status: SessionStatus.emAndamento, responsible: 'c-eu'),
       );
       expect(jaIniciada.canStartSession, isFalse);
+    });
+  });
+
+  group('linha "comigo" depois do envio aceito (revisão de 30/09/2026)', () {
+    test(
+        'sem download novo depois do envio, a linha mostra "Enviada" e não '
+        'abre mais o checklist', () async {
+      final meu =
+          participant('m', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final vm = await ready(
+        withSession: session(participantsSyncedAt: DateTime(2026, 9, 23, 8)),
+        withParticipants: [meu],
+      );
+
+      localStream.add([
+        local('m', LocalSyncStatus.synced, lastAttemptAt: DateTime(2026, 9, 23, 13)),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(vm.localProgressFor(meu), LocalProgress.sent);
+      expect(vm.opensChecklist(meu), isFalse);
+    });
+
+    test(
+        'depois que a sessão é baixada de novo, a linha volta a valer o '
+        'status do servidor', () async {
+      final meu =
+          participant('m', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final vm = await ready(
+        withSession: session(participantsSyncedAt: DateTime(2026, 9, 23, 8)),
+        withParticipants: [meu],
+      );
+
+      localStream.add([
+        local('m', LocalSyncStatus.synced, lastAttemptAt: DateTime(2026, 9, 23, 13)),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      expect(vm.localProgressFor(meu), LocalProgress.sent);
+
+      // A sessão é regravada com um download posterior ao envio.
+      sessionStream.add(session(participantsSyncedAt: DateTime(2026, 9, 23, 14)));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(vm.localProgressFor(meu), isNull);
     });
   });
 

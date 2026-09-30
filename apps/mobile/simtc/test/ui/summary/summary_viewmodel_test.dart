@@ -18,7 +18,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
   @override
   Future<void> confirm(
     String localAssessmentId, {
-    required String participantName,
+    required String? participantName,
     required double score,
   }) =>
       Future.error(Exception('disco cheio'));
@@ -210,6 +210,38 @@ void main() {
           ..where((t) => t.id.equals(draft.id)))
         .getSingle();
     expect(row.syncStatus, LocalSyncStatus.draft);
+  });
+
+  test(
+      'participante fora do cache: confirmar grava o nome nulo, não vazio '
+      '(revisão de 30/09/2026 — claimUnowned só preenche quando é nulo)',
+      () async {
+    final draft = await assessmentRepository.openDraft(
+      trainingParticipantId: 'tp-fora-do-cache',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+    );
+    await assessmentRepository.mark(
+      localAssessmentId: draft.id,
+      infractionId: 'inf-1',
+      infractionNoteId: 'inf-1-PM',
+    );
+    final vm = SummaryViewModel(
+      participantId: 'tp-fora-do-cache',
+      assessmentRepository: assessmentRepository,
+      participantRepository: participantRepository,
+      catalogRepository: catalogRepository,
+    );
+    addTearDown(vm.dispose);
+    await vm.init();
+    expect(vm.participant, isNull, reason: 'o participante não está no cache');
+
+    await vm.confirm();
+
+    final row = await (db.select(db.localAssessments)
+          ..where((t) => t.id.equals(draft.id)))
+        .getSingle();
+    expect(row.participantName, isNull);
   });
 
   test(

@@ -454,22 +454,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final situation = _viewModel.situationFor(participant);
     final local = _viewModel.localAssessmentFor(participant.id);
     final progress = _viewModel.localProgressFor(participant);
-    final inQueue =
-        progress == LocalProgress.queued || progress == LocalProgress.failed;
+    final showsLocal = progress == LocalProgress.queued ||
+        progress == LocalProgress.failed ||
+        progress == LocalProgress.sent;
 
     return ParticipantRow(
       key: ValueKey('participante-${participant.id}'),
       name: participant.name,
       maskedCpf: participant.maskedCpf,
-      chip: inQueue
+      chip: showsLocal
           ? _buildQueueChip(progress!)
           : _buildSituationChip(participant, situation),
-      meta: inQueue
+      meta: showsLocal
           ? queueMetaFor(local!, _viewModel.now)
           : assessedAtLabelFor(participant, situation, _viewModel.now),
-      // O cronômetro do rascunho, como no canvas "1e" — conta desde a
-      // primeira abertura do checklist (relógio corrido, decisão de
-      // 29/09/2026).
+      // O cronômetro do rascunho, como no canvas "1e" — conta desde o
+      // "Iniciar avaliação" (relógio corrido, decisão de 29/09/2026).
       liveMeta: progress == LocalProgress.draft
           ? ElapsedClock(
               start: local!.startTime,
@@ -491,7 +491,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   /// Para onde a linha leva: o checklist (Fase 4) ou o resultado — este ainda
   /// é uma tela provisória, até a Fase 5B. O checklist lê o nome do banco, por
-  /// isso não recebe `extra`. Na fila, a linha não leva a lugar nenhum.
+  /// isso não recebe `extra`. Na fila ou enviada, a linha não leva a lugar
+  /// nenhum.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
       return () => context.push(
@@ -543,21 +544,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  /// Confirmada e esperando o servidor (decisão de 29/09/2026): a mesma
-  /// pílula "Na fila" da aba Sincronizar, ou "Erro no envio" se o último
-  /// envio falhou. O canvas não tem este estado.
+  /// Confirmada e esperando o servidor, ou já aceita mas a sessão ainda não
+  /// foi baixada de novo (decisão de 29/09/2026 e revisão de 30/09/2026): a
+  /// mesma pílula "Na fila" da aba Sincronizar, "Erro no envio" se o último
+  /// envio falhou, ou "Enviada" se já foi aceita. O canvas não tem estes
+  /// estados. (O rascunho nunca chega aqui: mostra o cronômetro, não a fila.)
   Widget _buildQueueChip(LocalProgress progress) {
-    return progress == LocalProgress.failed
-        ? const StatusChip(
-            label: 'Erro no envio',
-            icon: AppIcons.sendFailed,
-            tone: StatusTone.danger,
-          )
-        : const StatusChip(
-            label: 'Na fila',
-            icon: AppIcons.pending,
-            tone: StatusTone.neutral,
-          );
+    return switch (progress) {
+      LocalProgress.failed => const StatusChip(
+          label: 'Erro no envio',
+          icon: AppIcons.sendFailed,
+          tone: StatusTone.danger,
+        ),
+      LocalProgress.sent => const StatusChip(
+          label: 'Enviada',
+          icon: AppIcons.syncDone,
+          tone: StatusTone.info,
+        ),
+      LocalProgress.draft || LocalProgress.queued => const StatusChip(
+          label: 'Na fila',
+          icon: AppIcons.pending,
+          tone: StatusTone.neutral,
+        ),
+    };
   }
 
   Widget _buildSkeleton() {

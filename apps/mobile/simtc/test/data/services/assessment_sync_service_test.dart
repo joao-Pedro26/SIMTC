@@ -376,4 +376,76 @@ void main() {
     expect(sync.queue, isEmpty);
     expect(sync.lastSyncedAt, isNull);
   });
+
+  group('download de pós-envio que falha (revisão de 30/09/2026)', () {
+    /// Controla, uma a uma, as respostas do `syncSession` mockado — para
+    /// separar cada tentativa de download sem depender de tempo real.
+    List<Completer<Result<int>>> gateDownloads() {
+      final calls = <Completer<Result<int>>>[];
+      when(() => participants.syncSession('sess-1')).thenAnswer((_) {
+        final completer = Completer<Result<int>>();
+        calls.add(completer);
+        return completer.future;
+      });
+      return calls;
+    }
+
+    test(
+        'falhando, o download é tentado de novo no próximo syncNow, mesmo com '
+        'a fila vazia', () async {
+      final calls = gateDownloads();
+      final sync = startService();
+
+      final a = await confirmed('tp-1');
+      await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+      await until(() => calls.length == 1);
+      calls[0].complete(Failure(Exception('sem rede'), 'sem rede'));
+      await until(() => sync.queue.isEmpty);
+
+      await sync.syncNow();
+      await until(() => calls.length == 2);
+
+      calls[1].complete(const Success(1));
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => participants.syncSession('sess-1')).called(2);
+    });
+
+    test('um download bem-sucedido não é repetido no gatilho seguinte', () async {
+      final sync = startService();
+
+      final a = await confirmed('tp-1');
+      await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+      await until(() => sync.queue.isEmpty);
+      // Dá tempo do download de pós-envio (unawaited) terminar sozinho.
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      await sync.syncNow();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
+    test('trocar de usuário esquece as sessões que esperavam novo download',
+        () async {
+      final calls = gateDownloads();
+      final sync = startService();
+
+      final a = await confirmed('tp-1');
+      await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+      await until(() => calls.length == 1);
+      calls[0].complete(Failure(Exception('sem rede'), 'sem rede'));
+      await until(() => sync.queue.isEmpty);
+
+      user.value = null;
+      user.value = 'user-1';
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      await sync.syncNow();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(calls, hasLength(1),
+          reason: 'trocar de usuário esqueceu a sessão pendente');
+    });
+  });
 }

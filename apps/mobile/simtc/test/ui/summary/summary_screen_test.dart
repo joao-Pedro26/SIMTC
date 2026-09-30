@@ -20,7 +20,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
   @override
   Future<void> confirm(
     String localAssessmentId, {
-    required String participantName,
+    required String? participantName,
     required double score,
   }) =>
       Future.error(Exception('disco cheio'));

@@ -24,7 +24,8 @@ import 'participant_filter.dart';
 ///
 /// As avaliações deste aparelho (Fase 5A) vêm de outro stream: o rascunho
 /// põe o cronômetro na linha, e a avaliação confirmada troca o chip por
-/// "Na fila"/"Erro no envio" até o servidor responder.
+/// "Na fila"/"Erro no envio" até o servidor responder — e por "Enviada" até a
+/// sessão ser baixada de novo (revisão de 30/09/2026).
 class SessionDetailViewModel extends ChangeNotifier {
   SessionDetailViewModel({
     required this.sessionId,
@@ -169,17 +170,25 @@ class SessionDetailViewModel extends ChangeNotifier {
   LocalAssessment? localAssessmentFor(String participantId) =>
       _local[participantId];
 
-  /// Rascunho, na fila ou com erro de envio — só nas linhas "comigo".
+  /// Rascunho, na fila, com erro de envio ou já enviada (aguardando o
+  /// próximo download) — só nas linhas "comigo".
   LocalProgress? localProgressFor(SessionParticipant participant) =>
-      localProgressOf(situationFor(participant), _local[participant.id]);
+      localProgressOf(
+        situationFor(participant),
+        _local[participant.id],
+        _session?.participantsSyncedAt,
+      );
 
   /// Uma avaliação confirmada espera o envio e não é mais editada (decisão
-  /// de 29/09/2026): na fila ou com erro, a linha não abre o checklist.
+  /// de 29/09/2026): na fila, com erro ou já enviada, a linha não abre o
+  /// checklist.
   bool opensChecklist(SessionParticipant participant) {
     if (!evaluationOpen) return false;
     if (situationFor(participant) != ParticipantSituation.mine) return false;
     final progress = localProgressFor(participant);
-    return progress != LocalProgress.queued && progress != LocalProgress.failed;
+    return progress != LocalProgress.queued &&
+        progress != LocalProgress.failed &&
+        progress != LocalProgress.sent;
   }
 
   bool opensResult(SessionParticipant participant) {

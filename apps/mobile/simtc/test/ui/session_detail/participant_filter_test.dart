@@ -202,19 +202,71 @@ void main() {
       );
     }
 
-    test('só vale na linha "comigo", e a enviada não muda nada', () {
+    test('só vale na linha "comigo", e uma fila sem download pendente não muda nada',
+        () {
       const mine = ParticipantSituation.mine;
-      expect(localProgressOf(mine, local(LocalSyncStatus.draft)), LocalProgress.draft);
-      expect(localProgressOf(mine, local(LocalSyncStatus.pendingSync)),
+      expect(localProgressOf(mine, local(LocalSyncStatus.draft), null),
+          LocalProgress.draft);
+      expect(localProgressOf(mine, local(LocalSyncStatus.pendingSync), null),
           LocalProgress.queued);
-      expect(localProgressOf(mine, local(LocalSyncStatus.error)), LocalProgress.failed);
-      expect(localProgressOf(mine, local(LocalSyncStatus.synced)), isNull);
-      expect(localProgressOf(mine, null), isNull);
+      expect(localProgressOf(mine, local(LocalSyncStatus.error), null),
+          LocalProgress.failed);
+      expect(localProgressOf(mine, local(LocalSyncStatus.synced), null), isNull,
+          reason: 'synced sem lastAttemptAt não dá para comparar: vale o servidor');
+      expect(localProgressOf(mine, null, null), isNull);
       expect(
-        localProgressOf(ParticipantSituation.approved, local(LocalSyncStatus.pendingSync)),
+        localProgressOf(
+          ParticipantSituation.approved,
+          local(LocalSyncStatus.pendingSync),
+          null,
+        ),
         isNull,
         reason: 'o servidor já respondeu: vale o status dele',
       );
+    });
+
+    group('linha "comigo" depois do envio aceito (revisão de 30/09/2026)', () {
+      final enviadaEm = DateTime(2026, 9, 29, 8, 12);
+
+      LocalAssessment synced() =>
+          local(LocalSyncStatus.synced, lastAttemptAt: enviadaEm);
+
+      test('sem download depois do envio, a linha "comigo" mostra "Enviada"', () {
+        expect(
+          localProgressOf(ParticipantSituation.mine, synced(), null),
+          LocalProgress.sent,
+        );
+      });
+
+      test('download anterior ao envio ainda mostra "Enviada"', () {
+        expect(
+          localProgressOf(
+            ParticipantSituation.mine,
+            synced(),
+            enviadaEm.subtract(const Duration(minutes: 1)),
+          ),
+          LocalProgress.sent,
+        );
+      });
+
+      test('download posterior ao envio devolve o controle ao status do servidor',
+          () {
+        expect(
+          localProgressOf(
+            ParticipantSituation.mine,
+            synced(),
+            enviadaEm.add(const Duration(minutes: 1)),
+          ),
+          isNull,
+        );
+      });
+
+      test('fora da linha "comigo", nunca mostra "Enviada"', () {
+        expect(
+          localProgressOf(ParticipantSituation.approved, synced(), null),
+          isNull,
+        );
+      });
     });
 
     test('o meta da fila leva o % e o que está acontecendo', () {
@@ -231,6 +283,16 @@ void main() {
         queueMetaFor(local(LocalSyncStatus.pendingSync), agora),
         'aguardando envio',
         reason: 'as avaliações da Fase 4 não guardaram o %',
+      );
+    });
+
+    test('o meta de uma enviada mostra quando foi aceita', () {
+      expect(
+        queueMetaFor(
+          local(LocalSyncStatus.synced, score: 86.6667, lastAttemptAt: DateTime(2026, 9, 29, 8, 12)),
+          agora,
+        ),
+        '86,7% · enviada às 08:12',
       );
     });
   });

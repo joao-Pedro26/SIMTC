@@ -189,7 +189,7 @@ class AssessmentRepository {
   /// `AssessmentSyncService`, que observa a fila.
   Future<void> confirm(
     String localAssessmentId, {
-    required String participantName,
+    required String? participantName,
     required double score,
   }) {
     final now = DateTime.now();

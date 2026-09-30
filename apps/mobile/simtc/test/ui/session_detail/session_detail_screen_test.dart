@@ -379,7 +379,8 @@ void main() {
     ParticipantRow row(WidgetTester tester) =>
         tester.widget<ParticipantRow>(find.byKey(const ValueKey('participante-1')));
 
-    testWidgets('o rascunho mostra o cronômetro, contando desde a primeira abertura',
+    testWidgets(
+        'o rascunho mostra o cronômetro, contando desde o "Iniciar avaliação"',
         (tester) async {
       final start = DateTime.now().subtract(const Duration(minutes: 12, seconds: 41));
 
@@ -428,6 +429,30 @@ void main() {
 
       expect(find.text('Erro no envio'), findsOneWidget);
       expect(find.text('62,0% · falhou às 07:58'), findsOneWidget);
+      expect(row(tester).onTap, isNull);
+    });
+
+    testWidgets(
+        'enviada e aceita, mas a sessão ainda não foi baixada de novo: chip '
+        '"Enviada" e a linha não abre mais nada', (tester) async {
+      final now = DateTime.now();
+
+      await show(
+        tester,
+        withParticipants: [minha()],
+        withLocal: [
+          local(
+            '1',
+            LocalSyncStatus.synced,
+            score: 86.6667,
+            lastAttemptAt: DateTime(now.year, now.month, now.day, 8, 12),
+          ),
+        ],
+      );
+
+      expect(find.text('Enviada'), findsOneWidget);
+      expect(find.text('86,7% · enviada às 08:12'), findsOneWidget);
+      expect(find.text('Avaliando · você'), findsNothing);
       expect(row(tester).onTap, isNull);
     });
   });
