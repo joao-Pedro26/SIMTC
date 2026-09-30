@@ -19,6 +19,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/evaluation/evaluation_placeholder_screen.dart';
+import 'package:simtc/ui/session_detail/participant_row.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/utils/result.dart';
 
@@ -44,6 +45,7 @@ void main() {
   late ConnectivityService connectivity;
   late StreamController<TrainingSession?> sessionStream;
   late StreamController<List<SessionParticipant>> participantsStream;
+  late StreamController<List<LocalAssessment>> localStream;
 
   const consultora = AuthUser(
     id: 'u1',
@@ -106,11 +108,14 @@ void main() {
     connectivity = ConnectivityService();
     sessionStream = StreamController<TrainingSession?>.broadcast();
     participantsStream = StreamController<List<SessionParticipant>>.broadcast();
+    localStream = StreamController<List<LocalAssessment>>.broadcast();
 
     when(() => sessions.watchSession('sess-1'))
         .thenAnswer((_) => sessionStream.stream);
     when(() => participants.watchBySession('sess-1'))
         .thenAnswer((_) => participantsStream.stream);
+    when(() => assessments.watchSessionAssessments('sess-1', 'u1'))
+        .thenAnswer((_) => localStream.stream);
     when(() => participants.syncSession('sess-1'))
         .thenAnswer((_) async => const Success(0));
     when(() => auth.currentUser).thenReturn(consultora);
@@ -142,6 +147,7 @@ void main() {
   tearDown(() {
     sessionStream.close();
     participantsStream.close();
+    localStream.close();
     connectivity.dispose();
   });
 
@@ -171,6 +177,7 @@ void main() {
     WidgetTester tester, {
     TrainingSession? withSession,
     List<SessionParticipant> withParticipants = const [],
+    List<LocalAssessment> withLocal = const [],
   }) async {
     tallScreen(tester);
     await tester.pumpWidget(
@@ -180,7 +187,33 @@ void main() {
     );
     sessionStream.add(withSession ?? session());
     participantsStream.add(withParticipants);
+    localStream.add(withLocal);
     await tester.pump();
+  }
+
+  /// Avaliação deste aparelho, do jeito que o `AssessmentRepository` guarda.
+  LocalAssessment local(
+    String participantId,
+    LocalSyncStatus status, {
+    DateTime? startTime,
+    double? score,
+    DateTime? lastAttemptAt,
+  }) {
+    final at = startTime ?? DateTime.now();
+    return LocalAssessment(
+      id: 'local-$participantId',
+      trainingParticipantId: participantId,
+      sessionId: 'sess-1',
+      date: at,
+      startTime: at,
+      syncStatus: status,
+      attemptCount: 0,
+      createdAt: at,
+      updatedAt: at,
+      ownerUserId: 'u1',
+      score: score,
+      lastAttemptAt: lastAttemptAt,
+    );
   }
 
   Future<void> goOffline() async {
@@ -353,6 +386,66 @@ void main() {
 
     expect(find.text('Juliana Freitas Costa'), findsOneWidget);
     expect(find.text('Carlos Eduardo Nunes'), findsNothing);
+  });
+
+  group('avaliação deste aparelho na linha "comigo"', () {
+    SessionParticipant minha() => participant('1', 'Ana Paula Ribeiro',
+        status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+
+    ParticipantRow row(WidgetTester tester) =>
+        tester.widget<ParticipantRow>(find.byKey(const ValueKey('participante-1')));
+
+    testWidgets('o rascunho mostra o cronômetro, contando desde a primeira abertura',
+        (tester) async {
+      final start = DateTime.now().subtract(const Duration(minutes: 12, seconds: 41));
+
+      await show(
+        tester,
+        withParticipants: [minha()],
+        withLocal: [local('1', LocalSyncStatus.draft, startTime: start)],
+      );
+
+      expect(find.text('Avaliando · você'), findsOneWidget);
+      expect(find.textContaining('00:12:4'), findsOneWidget);
+      expect(row(tester).onTap, isNotNull, reason: 'o rascunho abre o checklist');
+    });
+
+    testWidgets(
+        'na fila: chip "Na fila", o % e "aguardando envio" — e a linha não '
+        'abre mais o checklist', (tester) async {
+      await show(
+        tester,
+        withParticipants: [minha()],
+        withLocal: [local('1', LocalSyncStatus.pendingSync, score: 86.6667)],
+      );
+
+      expect(find.text('Na fila'), findsOneWidget);
+      expect(find.text('86,7% · aguardando envio'), findsOneWidget);
+      expect(find.text('Avaliando · você'), findsNothing);
+      expect(row(tester).onTap, isNull);
+    });
+
+    testWidgets('com erro no envio: chip "Erro no envio" e quando falhou',
+        (tester) async {
+      final now = DateTime.now();
+
+      await show(
+        tester,
+        withParticipants: [minha()],
+        withLocal: [
+          local(
+            '1',
+            LocalSyncStatus.error,
+            score: 62,
+            lastAttemptAt: DateTime(now.year, now.month, now.day, 7, 58),
+          ),
+        ],
+      );
+
+      expect(find.text('Erro no envio'), findsOneWidget);
+      expect(find.text('62,0% · falhou às 07:58'), findsOneWidget);
+      expect(row(tester).onTap, isNull);
+    });
   });
 
   group('navegação pelas rotas reais', () {

@@ -43,4 +43,7 @@ abstract final class AppIcons {
   static const IconData expandMore = Icons.expand_more;
   static const IconData expandLess = Icons.expand_less;
   static const IconData finish = Icons.task_alt;
+
+  /// Fila de envio (Fase 5A): o último envio falhou ("error" no canvas "2h").
+  static const IconData sendFailed = Icons.error_outline;
 }

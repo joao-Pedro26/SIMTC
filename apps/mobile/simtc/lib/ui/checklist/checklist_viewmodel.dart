@@ -8,6 +8,7 @@ import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/services/local/app_database.dart';
+import '../core/date_labels.dart';
 import 'checklist_sections.dart';
 
 /// Estado da tela do checklist (Fase 4).
@@ -83,7 +84,7 @@ class ChecklistViewModel extends ChangeNotifier {
   String get elapsedLabel {
     final start = _startTime;
     if (start == null) return '00:00:00';
-    return _formatElapsed(_now().difference(start));
+    return stopwatchLabel(_now().difference(start));
   }
 
   Future<void> init() async {
@@ -178,12 +179,4 @@ class ChecklistViewModel extends ChangeNotifier {
     _itemsSubscription?.cancel();
     super.dispose();
   }
-}
-
-String _formatElapsed(Duration elapsed) {
-  final total = elapsed.isNegative ? Duration.zero : elapsed;
-  final hours = total.inHours.toString().padLeft(2, '0');
-  final minutes = (total.inMinutes % 60).toString().padLeft(2, '0');
-  final seconds = (total.inSeconds % 60).toString().padLeft(2, '0');
-  return '$hours:$minutes:$seconds';
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/session_participant.dart';
 import '../../data/models/training_session.dart';
+import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
@@ -18,6 +19,7 @@ import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
+import '../core/widgets/elapsed_clock.dart';
 import '../core/widgets/filter_chip_bar.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
@@ -43,6 +45,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     sessionId: widget.sessionId,
     sessionRepository: context.read<SessionRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
+    assessmentRepository: context.read<AssessmentRepository>(),
     connectivity: context.read<ConnectivityService>(),
     currentUser: context.read<AuthRepository>().currentUser,
   )..init();
@@ -447,13 +450,31 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   Widget _buildParticipant(SessionParticipant participant, bool isOffline) {
     final situation = _viewModel.situationFor(participant);
+    final local = _viewModel.localAssessmentFor(participant.id);
+    final progress = _viewModel.localProgressFor(participant);
+    final inQueue =
+        progress == LocalProgress.queued || progress == LocalProgress.failed;
 
     return ParticipantRow(
       key: ValueKey('participante-${participant.id}'),
       name: participant.name,
       maskedCpf: participant.maskedCpf,
-      chip: _buildSituationChip(participant, situation),
-      meta: assessedAtLabelFor(participant, situation, _viewModel.now),
+      chip: inQueue
+          ? _buildQueueChip(progress!)
+          : _buildSituationChip(participant, situation),
+      meta: inQueue
+          ? queueMetaFor(local!, _viewModel.now)
+          : assessedAtLabelFor(participant, situation, _viewModel.now),
+      // O cronômetro do rascunho, como no canvas "1e" — conta desde a
+      // primeira abertura do checklist (relógio corrido, decisão de
+      // 29/09/2026).
+      liveMeta: progress == LocalProgress.draft
+          ? ElapsedClock(
+              start: local!.startTime,
+              clock: () => _viewModel.now,
+              style: AppTypography.meta,
+            )
+          : null,
       blockedNote: blockedNoteFor(participant, situation),
       muted: situation == ParticipantSituation.other,
       accentColor: situation == ParticipantSituation.mine
@@ -467,8 +488,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   /// Para onde a linha leva: o checklist (Fase 4) ou o resultado — este ainda
-  /// é uma tela provisória, até a Fase 5. O checklist lê o nome do banco, por
-  /// isso não recebe `extra`.
+  /// é uma tela provisória, até a Fase 5B. O checklist lê o nome do banco, por
+  /// isso não recebe `extra`. Na fila, a linha não leva a lugar nenhum.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
       return () => context.push(
@@ -518,6 +539,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       tone: tone,
       dashedBorder: situation == ParticipantSituation.other,
     );
+  }
+
+  /// Confirmada e esperando o servidor (decisão de 29/09/2026): a mesma
+  /// pílula "Na fila" da aba Sincronizar, ou "Erro no envio" se o último
+  /// envio falhou. O canvas não tem este estado.
+  Widget _buildQueueChip(LocalProgress progress) {
+    return progress == LocalProgress.failed
+        ? const StatusChip(
+            label: 'Erro no envio',
+            icon: AppIcons.sendFailed,
+            tone: StatusTone.danger,
+          )
+        : const StatusChip(
+            label: 'Na fila',
+            icon: AppIcons.pending,
+            tone: StatusTone.neutral,
+          );
   }
 
   Widget _buildSkeleton() {

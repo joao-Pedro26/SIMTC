@@ -1,5 +1,7 @@
 import '../../data/models/session_participant.dart';
+import '../../data/services/local/app_database.dart';
 import '../core/date_labels.dart';
+import '../core/score_labels.dart';
 
 /// Os quatro chips da tela 1.4. Aqui eles filtram de verdade (o canvas tem
 /// "Todos"), ao contrário dos chips da Home, que são âncoras de rolagem.
@@ -191,4 +193,43 @@ String? assessedAtLabelFor(
 ) {
   if (!_isConcluded(situation) || participant.assessedAt == null) return null;
   return momentLabel(participant.assessedAt!, now);
+}
+
+/// Onde está a avaliação deste aparelho numa linha "comigo" (Fase 5A).
+enum LocalProgress {
+  /// Rascunho aberto: a linha mostra o cronômetro.
+  draft,
+
+  /// Confirmada, esperando o envio: chip "Na fila".
+  queued,
+
+  /// O último envio falhou: chip "Erro no envio".
+  failed,
+}
+
+/// Só vale para a linha "comigo" — depois do envio, quem manda é o status
+/// que o servidor devolve (Aprovado/Reavaliar), e uma avaliação já enviada
+/// não muda nada na linha.
+LocalProgress? localProgressOf(
+  ParticipantSituation situation,
+  LocalAssessment? local,
+) {
+  if (situation != ParticipantSituation.mine || local == null) return null;
+  return switch (local.syncStatus) {
+    LocalSyncStatus.draft => LocalProgress.draft,
+    LocalSyncStatus.pendingSync => LocalProgress.queued,
+    LocalSyncStatus.error => LocalProgress.failed,
+    LocalSyncStatus.synced => null,
+  };
+}
+
+/// "86,7% · aguardando envio" ou "62,0% · falhou às 07:58", da linha na fila.
+/// As avaliações de antes da Fase 5A não guardaram o %: vai só o texto.
+String queueMetaFor(LocalAssessment local, DateTime now) {
+  final lastAttempt = local.lastAttemptAt;
+  final status = local.syncStatus == LocalSyncStatus.error && lastAttempt != null
+      ? 'falhou ${atLabel(lastAttempt, now)}'
+      : 'aguardando envio';
+  final score = local.score;
+  return score == null ? status : '${percentLabel(score)} · $status';
 }

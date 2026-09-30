@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/data/models/session_participant.dart';
+import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/ui/session_detail/participant_filter.dart';
 
 void main() {
@@ -175,6 +176,62 @@ void main() {
       expect(assessedAtLabelFor(avaliado, ParticipantSituation.approved, agora),
           'hoje 08:12');
       expect(assessedAtLabelFor(p('2'), ParticipantSituation.pending, agora), isNull);
+    });
+  });
+
+  group('avaliação deste aparelho', () {
+    final agora = DateTime(2026, 9, 29, 9);
+
+    LocalAssessment local(
+      LocalSyncStatus status, {
+      double? score,
+      DateTime? lastAttemptAt,
+    }) {
+      return LocalAssessment(
+        id: 'la-1',
+        trainingParticipantId: '1',
+        sessionId: 'sess-1',
+        date: DateTime(2026, 9, 29),
+        startTime: DateTime(2026, 9, 29, 8),
+        syncStatus: status,
+        attemptCount: 0,
+        createdAt: DateTime(2026, 9, 29, 8),
+        updatedAt: DateTime(2026, 9, 29, 8),
+        score: score,
+        lastAttemptAt: lastAttemptAt,
+      );
+    }
+
+    test('só vale na linha "comigo", e a enviada não muda nada', () {
+      const mine = ParticipantSituation.mine;
+      expect(localProgressOf(mine, local(LocalSyncStatus.draft)), LocalProgress.draft);
+      expect(localProgressOf(mine, local(LocalSyncStatus.pendingSync)),
+          LocalProgress.queued);
+      expect(localProgressOf(mine, local(LocalSyncStatus.error)), LocalProgress.failed);
+      expect(localProgressOf(mine, local(LocalSyncStatus.synced)), isNull);
+      expect(localProgressOf(mine, null), isNull);
+      expect(
+        localProgressOf(ParticipantSituation.approved, local(LocalSyncStatus.pendingSync)),
+        isNull,
+        reason: 'o servidor já respondeu: vale o status dele',
+      );
+    });
+
+    test('o meta da fila leva o % e o que está acontecendo', () {
+      expect(queueMetaFor(local(LocalSyncStatus.pendingSync, score: 86.6667), agora),
+          '86,7% · aguardando envio');
+      expect(
+        queueMetaFor(
+          local(LocalSyncStatus.error, score: 62, lastAttemptAt: DateTime(2026, 9, 29, 7, 58)),
+          agora,
+        ),
+        '62,0% · falhou às 07:58',
+      );
+      expect(
+        queueMetaFor(local(LocalSyncStatus.pendingSync), agora),
+        'aguardando envio',
+        reason: 'as avaliações da Fase 4 não guardaram o %',
+      );
     });
   });
 }

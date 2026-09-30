@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/auth_user.dart';
 import '../../data/models/session_participant.dart';
 import '../../data/models/training_session.dart';
+import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../data/services/local/app_database.dart';
 import '../../utils/result.dart';
 import 'participant_filter.dart';
 
@@ -19,16 +21,22 @@ import 'participant_filter.dart';
 /// atualiza. As regras de quem pode fazer o quê espelham o `getAction` do
 /// painel web (`session-management-drawer.tsx`): atribuir e abrir o checklist
 /// só com a sessão em andamento; o resultado abre sempre.
+///
+/// As avaliações deste aparelho (Fase 5A) vêm de outro stream: o rascunho
+/// põe o cronômetro na linha, e a avaliação confirmada troca o chip por
+/// "Na fila"/"Erro no envio" até o servidor responder.
 class SessionDetailViewModel extends ChangeNotifier {
   SessionDetailViewModel({
     required this.sessionId,
     required SessionRepository sessionRepository,
     required ParticipantRepository participantRepository,
+    required AssessmentRepository assessmentRepository,
     required ConnectivityService connectivity,
     required AuthUser? currentUser,
     DateTime Function()? now,
   })  : _sessionRepository = sessionRepository,
         _participantRepository = participantRepository,
+        _assessmentRepository = assessmentRepository,
         _connectivity = connectivity,
         _currentUser = currentUser,
         _now = now ?? DateTime.now;
@@ -36,6 +44,7 @@ class SessionDetailViewModel extends ChangeNotifier {
   final String sessionId;
   final SessionRepository _sessionRepository;
   final ParticipantRepository _participantRepository;
+  final AssessmentRepository _assessmentRepository;
   final ConnectivityService _connectivity;
   final AuthUser? _currentUser;
   final DateTime Function() _now;
@@ -49,10 +58,12 @@ class SessionDetailViewModel extends ChangeNotifier {
 
   StreamSubscription<TrainingSession?>? _sessionSubscription;
   StreamSubscription<List<SessionParticipant>>? _participantsSubscription;
+  StreamSubscription<List<LocalAssessment>>? _localSubscription;
   StreamSubscription<void>? _reconnectSubscription;
 
   TrainingSession? _session;
   List<SessionParticipant> _participants = const [];
+  Map<String, LocalAssessment> _local = const {};
   bool _sessionLoaded = false;
   bool _participantsLoaded = false;
   bool _isRefreshing = false;
@@ -153,8 +164,23 @@ class SessionDetailViewModel extends ChangeNotifier {
       hasConsultantProfile &&
       situationFor(participant) == ParticipantSituation.pending;
 
-  bool opensChecklist(SessionParticipant participant) =>
-      evaluationOpen && situationFor(participant) == ParticipantSituation.mine;
+  /// A avaliação deste aparelho para o participante — só as do consultor
+  /// logado.
+  LocalAssessment? localAssessmentFor(String participantId) =>
+      _local[participantId];
+
+  /// Rascunho, na fila ou com erro de envio — só nas linhas "comigo".
+  LocalProgress? localProgressFor(SessionParticipant participant) =>
+      localProgressOf(situationFor(participant), _local[participant.id]);
+
+  /// Uma avaliação confirmada espera o envio e não é mais editada (decisão
+  /// de 29/09/2026): na fila ou com erro, a linha não abre o checklist.
+  bool opensChecklist(SessionParticipant participant) {
+    if (!evaluationOpen) return false;
+    if (situationFor(participant) != ParticipantSituation.mine) return false;
+    final progress = localProgressFor(participant);
+    return progress != LocalProgress.queued && progress != LocalProgress.failed;
+  }
 
   bool opensResult(SessionParticipant participant) {
     final situation = situationFor(participant);
@@ -178,6 +204,16 @@ class SessionDetailViewModel extends ChangeNotifier {
       _participantsLoaded = true;
       notifyListeners();
     });
+
+    final ownerUserId = _currentUser?.id;
+    if (ownerUserId != null) {
+      _localSubscription ??= _assessmentRepository
+          .watchSessionAssessments(sessionId, ownerUserId)
+          .listen((rows) {
+        _local = {for (final row in rows) row.trainingParticipantId: row};
+        notifyListeners();
+      });
+    }
 
     _reconnectSubscription ??=
         _connectivity.onReconnected.listen((_) => refresh());
@@ -314,6 +350,7 @@ class SessionDetailViewModel extends ChangeNotifier {
     _disposed = true;
     _sessionSubscription?.cancel();
     _participantsSubscription?.cancel();
+    _localSubscription?.cancel();
     _reconnectSubscription?.cancel();
     super.dispose();
   }

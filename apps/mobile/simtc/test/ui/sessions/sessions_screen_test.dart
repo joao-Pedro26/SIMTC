@@ -8,10 +8,12 @@ import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
+import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
@@ -26,6 +28,8 @@ class _MockAuthRepository extends Mock implements AuthRepository {}
 class _MockCatalogRepository extends Mock implements AssessmentCatalogRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
+
+class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
 
 void main() {
   late _MockSessionRepository repository;
@@ -918,6 +922,7 @@ void main() {
 
   testWidgets('tocar no card abre o detalhe daquela sessão', (tester) async {
     final participants = _MockParticipantRepository();
+    final assessments = _MockAssessmentRepository();
     when(() => auth.isAuthenticated).thenReturn(true);
     when(() => repository.watchSession('sess-1'))
         .thenAnswer((_) => Stream.value(hoje()));
@@ -925,6 +930,8 @@ void main() {
         .thenAnswer((_) => Stream.value(const <SessionParticipant>[]));
     when(() => participants.syncSession('sess-1'))
         .thenAnswer((_) async => const Success(0));
+    when(() => assessments.watchSessionAssessments('sess-1', 'u1'))
+        .thenAnswer((_) => Stream.value(const <LocalAssessment>[]));
 
     final router = createRouter(auth, initialLocation: AppRoutes.home);
     addTearDown(router.dispose);
@@ -935,6 +942,7 @@ void main() {
           Provider<SessionRepository>.value(value: repository),
           Provider<AssessmentCatalogRepository>.value(value: catalog),
           Provider<ParticipantRepository>.value(value: participants),
+          Provider<AssessmentRepository>.value(value: assessments),
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
         ],
@@ -951,4 +959,5 @@ void main() {
         tester.widget<SessionDetailScreen>(find.byType(SessionDetailScreen));
     expect(detail.sessionId, 'sess-1');
   });
+
 }

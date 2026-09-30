@@ -27,6 +27,36 @@ String momentLabel(DateTime moment, DateTime now) {
   return local.year == now.year ? '$dia $hora' : '$dia ${local.year} $hora';
 }
 
+bool _isToday(DateTime moment, DateTime now) {
+  final local = moment.toLocal();
+  return local.year == now.year && local.month == now.month && local.day == now.day;
+}
+
+/// "08:41" se foi hoje; nos outros dias, como [momentLabel] ("28 set 08:41")
+/// — a hora do "Confirmar" na fila de envio.
+String clockLabel(DateTime moment, DateTime now) {
+  final local = moment.toLocal();
+  if (_isToday(moment, now)) return '${_dois(local.hour)}:${_dois(local.minute)}';
+  return momentLabel(moment, now);
+}
+
+/// "às 07:58" se foi hoje; "em 28 set 07:58" nos outros dias — o "falhou
+/// às 07:58" de um envio que não passou.
+String atLabel(DateTime moment, DateTime now) {
+  final clock = clockLabel(moment, now);
+  return _isToday(moment, now) ? 'às $clock' : 'em $clock';
+}
+
+/// "00:12:41" — o cronômetro da avaliação. Um intervalo negativo (o relógio
+/// do aparelho voltou) vale zero.
+String stopwatchLabel(Duration elapsed) {
+  final total = elapsed.isNegative ? Duration.zero : elapsed;
+  final hours = _dois(total.inHours);
+  final minutes = _dois(total.inMinutes % 60);
+  final seconds = _dois(total.inSeconds % 60);
+  return '$hours:$minutes:$seconds';
+}
+
 /// Texto da faixa de offline: sem conexão, o consultor precisa saber a idade
 /// do que está vendo — uma lista de ontem parece igualzinha a uma de agora.
 /// Nulo quando nunca houve sync (aí a faixa usa a mensagem padrão dela).

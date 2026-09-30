@@ -5,10 +5,12 @@ import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
+import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/ui/session_detail/participant_filter.dart';
 import 'package:simtc/ui/session_detail/session_detail_viewmodel.dart';
 import 'package:simtc/utils/result.dart';
@@ -16,6 +18,8 @@ import 'package:simtc/utils/result.dart';
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
+
+class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
 
 /// Conectividade de mentira: o serviço real conversa com o plugin de
 /// plataforma, que não existe num teste de unidade.
@@ -37,9 +41,11 @@ class _FakeConnectivity extends ConnectivityService {
 void main() {
   late _MockSessionRepository sessions;
   late _MockParticipantRepository participants;
+  late _MockAssessmentRepository assessments;
   late _FakeConnectivity connectivity;
   late StreamController<TrainingSession?> sessionStream;
   late StreamController<List<SessionParticipant>> participantsStream;
+  late StreamController<List<LocalAssessment>> localStream;
 
   const consultora = AuthUser(
     id: 'u1',
@@ -87,11 +93,29 @@ void main() {
     );
   }
 
+  /// Avaliação deste aparelho, do jeito que o `AssessmentRepository` guarda.
+  LocalAssessment local(String participantId, LocalSyncStatus status) {
+    final at = DateTime(2026, 9, 23, 13);
+    return LocalAssessment(
+      id: 'local-$participantId',
+      trainingParticipantId: participantId,
+      sessionId: 'sess-1',
+      date: DateTime(2026, 9, 23),
+      startTime: at,
+      syncStatus: status,
+      attemptCount: 0,
+      createdAt: at,
+      updatedAt: at,
+      ownerUserId: 'u1',
+    );
+  }
+
   SessionDetailViewModel build({AuthUser? user = consultora}) {
     return SessionDetailViewModel(
       sessionId: 'sess-1',
       sessionRepository: sessions,
       participantRepository: participants,
+      assessmentRepository: assessments,
       connectivity: connectivity,
       currentUser: user,
       now: () => DateTime(2026, 9, 23, 14),
@@ -114,9 +138,11 @@ void main() {
   setUp(() {
     sessions = _MockSessionRepository();
     participants = _MockParticipantRepository();
+    assessments = _MockAssessmentRepository();
     connectivity = _FakeConnectivity();
     sessionStream = StreamController<TrainingSession?>.broadcast();
     participantsStream = StreamController<List<SessionParticipant>>.broadcast();
+    localStream = StreamController<List<LocalAssessment>>.broadcast();
 
     when(() => sessions.watchSession('sess-1'))
         .thenAnswer((_) => sessionStream.stream);
@@ -124,11 +150,14 @@ void main() {
         .thenAnswer((_) => participantsStream.stream);
     when(() => participants.syncSession('sess-1'))
         .thenAnswer((_) async => const Success(0));
+    when(() => assessments.watchSessionAssessments('sess-1', any()))
+        .thenAnswer((_) => localStream.stream);
   });
 
   tearDown(() {
     sessionStream.close();
     participantsStream.close();
+    localStream.close();
     connectivity.dispose();
   });
 
@@ -227,6 +256,53 @@ void main() {
         withParticipants: [meu],
       );
       expect(concluida.opensChecklist(meu), isFalse);
+    });
+
+    test(
+        'a linha "comigo" sabe se a avaliação deste aparelho é rascunho, está '
+        'na fila ou falhou — e, confirmada, não abre mais o checklist',
+        () async {
+      final rascunho =
+          participant('r', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final fila =
+          participant('f', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final erro =
+          participant('e', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final vm = await ready(withParticipants: [rascunho, fila, erro]);
+
+      localStream.add([
+        local('r', LocalSyncStatus.draft),
+        local('f', LocalSyncStatus.pendingSync),
+        local('e', LocalSyncStatus.error),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(vm.localProgressFor(rascunho), LocalProgress.draft);
+      expect(vm.localProgressFor(fila), LocalProgress.queued);
+      expect(vm.localProgressFor(erro), LocalProgress.failed);
+      expect(vm.localAssessmentFor('f')?.id, 'local-f');
+      expect(vm.opensChecklist(rascunho), isTrue);
+      expect(vm.opensChecklist(fila), isFalse);
+      expect(vm.opensChecklist(erro), isFalse);
+    });
+
+    test(
+        'avaliação já enviada, ou numa linha que o servidor já não mostra '
+        'comigo, não muda a linha', () async {
+      final meu =
+          participant('m', status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final aprovado = participant('a', status: ParticipantStatus.aprovado);
+      final vm = await ready(withParticipants: [meu, aprovado]);
+
+      localStream.add([
+        local('m', LocalSyncStatus.synced),
+        local('a', LocalSyncStatus.pendingSync),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(vm.localProgressFor(meu), isNull);
+      expect(vm.localProgressFor(aprovado), isNull);
+      expect(vm.opensChecklist(meu), isTrue);
     });
 
     test('o resultado abre em qualquer status de sessão', () async {

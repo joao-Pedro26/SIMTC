@@ -18,6 +18,7 @@ class ParticipantRow extends StatelessWidget {
     required this.maskedCpf,
     required this.chip,
     this.meta,
+    this.liveMeta,
     this.blockedNote,
     this.action,
     this.onTap,
@@ -29,8 +30,13 @@ class ParticipantRow extends StatelessWidget {
   final String maskedCpf;
   final Widget chip;
 
-  /// "hoje 08:12" dos concluídos.
+  /// "hoje 08:12" dos concluídos, "86,7% · aguardando envio" de quem está na
+  /// fila.
   final String? meta;
+
+  /// Meta que se atualiza sozinho, no lugar de [meta] — o cronômetro do
+  /// rascunho ("00:12:41").
+  final Widget? liveMeta;
 
   /// Por que a linha não tem ação ("Em avaliação com outro consultor.").
   final String? blockedNote;
@@ -109,6 +115,9 @@ class ParticipantRow extends StatelessWidget {
         if (meta != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Text(meta!, style: AppTypography.meta),
+        ] else if (liveMeta != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          liveMeta!,
         ],
       ],
     );
