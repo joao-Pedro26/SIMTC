@@ -345,9 +345,31 @@ void main() {
       throwsA(
         isA<ApiException>()
             .having((e) => e.isNetworkError, 'isNetworkError', isTrue)
+            .having((e) => e.isTimeout, 'isTimeout', isFalse)
             .having((e) => e.statusCode, 'statusCode', isNull),
       ),
     );
+  });
+
+  test('tempo esgotado é falta de conexão com motivo próprio', () async {
+    for (final type in [
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.sendTimeout,
+      DioExceptionType.receiveTimeout,
+    ]) {
+      final client = buildClient([]);
+      adapter.throwNetworkError = type;
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.isNetworkError, 'isNetworkError', isTrue)
+              .having((e) => e.isTimeout, 'isTimeout', isTrue),
+        ),
+        reason: '$type',
+      );
+    }
   });
 
   test('dois 401 simultâneos compartilham uma única renovação', () async {

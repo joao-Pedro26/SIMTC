@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -22,8 +24,21 @@ class _SimtcAppState extends State<SimtcApp> {
       AppDependencies.create(database: widget.database);
   late final GoRouter _router = createRouter(_dependencies.authRepository);
 
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // O app voltou do segundo plano: a rede pode ter voltado enquanto ele
+    // estava parado, sem o aviso chegar — envia a fila (decisão de 29/09/2026).
+    _lifecycle = AppLifecycleListener(
+      onResume: () => unawaited(_dependencies.assessmentSyncService.syncNow()),
+    );
+  }
+
   @override
   void dispose() {
+    _lifecycle.dispose();
     _dependencies.dispose();
     super.dispose();
   }

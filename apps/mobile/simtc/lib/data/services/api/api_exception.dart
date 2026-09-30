@@ -9,11 +9,16 @@ class ApiException implements Exception {
     required this.message,
     this.statusCode,
     this.isNetworkError = false,
+    this.isTimeout = false,
   });
 
   final String message;
   final int? statusCode;
   final bool isNetworkError;
+
+  /// A resposta não chegou a tempo. Também é [isNetworkError]; a aba
+  /// Sincronizar mostra o motivo à parte ("tempo esgotado").
+  final bool isTimeout;
 
   static const String _networkMessage =
       'Sem conexão com o servidor. Verifique a internet e tente de novo.';
@@ -32,7 +37,18 @@ class ApiException implements Exception {
     };
 
     if (isNetwork) {
-      return const ApiException(message: _networkMessage, isNetworkError: true);
+      final isTimeout = switch (error.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout =>
+          true,
+        _ => false,
+      };
+      return ApiException(
+        message: _networkMessage,
+        isNetworkError: true,
+        isTimeout: isTimeout,
+      );
     }
 
     final response = error.response;

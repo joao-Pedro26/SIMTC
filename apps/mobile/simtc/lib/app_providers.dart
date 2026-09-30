@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
@@ -8,6 +10,7 @@ import 'data/repositories/auth_repository.dart';
 import 'data/repositories/participant_repository.dart';
 import 'data/repositories/session_repository.dart';
 import 'data/services/api/api_client.dart';
+import 'data/services/assessment_sync_service.dart';
 import 'data/services/auth_session.dart';
 import 'data/services/connectivity_service.dart';
 import 'data/services/local/app_database.dart';
@@ -30,6 +33,7 @@ class AppDependencies {
     required this.catalogRepository,
     required this.assessmentRepository,
     required this.connectivityService,
+    required this.assessmentSyncService,
   });
 
   factory AppDependencies.create({required AppDatabase database}) {
@@ -66,6 +70,21 @@ class AppDependencies {
       database: database,
     );
     final assessmentRepository = AssessmentRepository(database: database);
+    final connectivityService = ConnectivityService();
+    final assessmentSyncService = AssessmentSyncService(
+      apiClient: apiClient,
+      assessments: assessmentRepository,
+      participants: participantRepository,
+      connectivity: connectivityService,
+      authChanges: authRepository,
+      currentUserId: () => authRepository.currentUser?.id,
+    );
+    // O envio só começa depois da primeira leitura da conexão: antes dela o
+    // app acha que está online (o padrão), e abrir sem sinal marcaria a fila
+    // com erro em vez de deixá-la "Na fila".
+    unawaited(
+      connectivityService.initialize().whenComplete(assessmentSyncService.start),
+    );
 
     return AppDependencies._(
       database: database,
@@ -77,7 +96,8 @@ class AppDependencies {
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
       assessmentRepository: assessmentRepository,
-      connectivityService: ConnectivityService()..initialize(),
+      connectivityService: connectivityService,
+      assessmentSyncService: assessmentSyncService,
     );
   }
 
@@ -91,6 +111,7 @@ class AppDependencies {
   final AssessmentCatalogRepository catalogRepository;
   final AssessmentRepository assessmentRepository;
   final ConnectivityService connectivityService;
+  final AssessmentSyncService assessmentSyncService;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
   ///
@@ -109,9 +130,13 @@ class AppDependencies {
         ChangeNotifierProvider<ConnectivityService>.value(
           value: connectivityService,
         ),
+        ChangeNotifierProvider<AssessmentSyncService>.value(
+          value: assessmentSyncService,
+        ),
       ];
 
   void dispose() {
+    assessmentSyncService.dispose();
     connectivityService.dispose();
     authRepository.dispose();
     session.dispose();
