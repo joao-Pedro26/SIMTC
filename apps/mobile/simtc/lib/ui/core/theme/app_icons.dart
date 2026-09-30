@@ -49,4 +49,7 @@ abstract final class AppIcons {
 
   /// "Tentar novamente" de um item da fila (canvas "2h").
   static const IconData retry = Icons.refresh;
+
+  /// "Iniciar avaliação" do checklist (Fase 5A — não está no canvas).
+  static const IconData startEvaluation = Icons.play_arrow_rounded;
 }

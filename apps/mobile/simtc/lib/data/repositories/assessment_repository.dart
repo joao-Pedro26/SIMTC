@@ -21,20 +21,37 @@ class AssessmentRepository {
     LocalSyncStatus.error,
   ];
 
-  /// Abre o rascunho da avaliação do participante para [ownerUserId].
+  /// A avaliação em andamento de [ownerUserId] para o participante, ou nula
+  /// se ela ainda não foi iniciada — o checklist abre sem gravar nada e mostra
+  /// o "Iniciar avaliação" (decisão de 29/09/2026).
   ///
-  /// Retoma o que já existe (`trainingParticipantId` é chave única) em vez de
-  /// recriar — o consultor pode ter saído do checklist e voltado. Dois casos
-  /// começam um rascunho novo no lugar da linha antiga (decisão de
-  /// 29/09/2026):
+  /// Dois casos contam como não iniciada, mesmo com uma linha no banco, porque
+  /// o "Iniciar" começa um rascunho novo no lugar dela (ver [openDraft]):
   /// - a avaliação já foi enviada (`synced`): é uma reavaliação — inclusive
   ///   uma atribuição refeita pelo painel web;
   /// - o rascunho é de outro consultor: num aparelho compartilhado, quem
   ///   pegou o participante agora não herda as marcações de quem saiu.
   ///
-  /// Uma avaliação na fila (`pendingSync`/`error`) nunca é zerada aqui: ela é
+  /// Uma avaliação na fila (`pendingSync`/`error`) é sempre devolvida: ela é
   /// de alguém que confirmou e só espera o envio. Um rascunho sem dono (de
   /// antes da Fase 5A) passa a ser de [ownerUserId], com as marcações.
+  Future<LocalAssessment?> findCurrent({
+    required String trainingParticipantId,
+    required String ownerUserId,
+  }) async {
+    final existing = await findByParticipant(trainingParticipantId);
+    if (existing == null || _startsOver(existing, ownerUserId)) return null;
+    if (existing.ownerUserId != null) return existing;
+    await (_db.update(_db.localAssessments)
+          ..where((t) => t.id.equals(existing.id)))
+        .write(LocalAssessmentsCompanion(ownerUserId: Value(ownerUserId)));
+    return existing.copyWith(ownerUserId: Value(ownerUserId));
+  }
+
+  /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
+  /// agora — o cronômetro e a duração enviada contam a partir daqui. Se a
+  /// avaliação já está em andamento ([findCurrent]), devolve a mesma, sem
+  /// recomeçar: um segundo toque não zera o cronômetro.
   ///
   /// `date` é a data de calendário da sessão (como `TrainingSession.date`,
   /// meia-noite local); sessão sem data, ou fora do cache, usa a de hoje.
@@ -43,15 +60,13 @@ class AssessmentRepository {
     required String sessionId,
     required String ownerUserId,
   }) async {
-    final existing = await findByParticipant(trainingParticipantId);
-    if (existing != null && !_startsOver(existing, ownerUserId)) {
-      if (existing.ownerUserId != null) return existing;
-      await (_db.update(_db.localAssessments)
-            ..where((t) => t.id.equals(existing.id)))
-          .write(LocalAssessmentsCompanion(ownerUserId: Value(ownerUserId)));
-      return existing.copyWith(ownerUserId: Value(ownerUserId));
-    }
+    final current = await findCurrent(
+      trainingParticipantId: trainingParticipantId,
+      ownerUserId: ownerUserId,
+    );
+    if (current != null) return current;
 
+    final existing = await findByParticipant(trainingParticipantId);
     final session = await (_db.select(_db.sessions)
           ..where((t) => t.id.equals(sessionId)))
         .getSingleOrNull();
@@ -78,7 +93,7 @@ class AssessmentRepository {
         .getSingle();
   }
 
-  /// Ver [openDraft]: avaliação já enviada, ou rascunho de outro consultor.
+  /// Ver [findCurrent]: avaliação já enviada, ou rascunho de outro consultor.
   static bool _startsOver(LocalAssessment existing, String ownerUserId) {
     return switch (existing.syncStatus) {
       LocalSyncStatus.synced => true,

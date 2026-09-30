@@ -121,27 +121,11 @@ void main() {
     when(() => auth.currentUser).thenReturn(consultora);
     when(() => auth.isAuthenticated).thenReturn(true);
     when(() => catalog.loadCatalog()).thenAnswer((_) async => const []);
-    when(() => assessments.openDraft(
+    // O checklist abre sem avaliação iniciada: só lê, nada é gravado.
+    when(() => assessments.findCurrent(
           trainingParticipantId: any(named: 'trainingParticipantId'),
-          sessionId: any(named: 'sessionId'),
           ownerUserId: any(named: 'ownerUserId'),
-        )).thenAnswer((invocation) async {
-      final now = DateTime(2026, 9, 25, 10);
-      return LocalAssessment(
-        id: 'assess-1',
-        trainingParticipantId:
-            invocation.namedArguments[#trainingParticipantId] as String,
-        sessionId: invocation.namedArguments[#sessionId] as String,
-        date: now,
-        startTime: now,
-        syncStatus: LocalSyncStatus.draft,
-        attemptCount: 0,
-        createdAt: now,
-        updatedAt: now,
-      );
-    });
-    when(() => assessments.watchItems(any()))
-        .thenAnswer((_) => const Stream.empty());
+        )).thenAnswer((_) async => null);
   });
 
   tearDown(() {

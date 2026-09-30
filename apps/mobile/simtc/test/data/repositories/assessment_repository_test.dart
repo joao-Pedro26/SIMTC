@@ -163,6 +163,59 @@ void main() {
     });
   });
 
+  group('findCurrent', () {
+    Future<LocalAssessment?> current(String participantId, {String owner = 'user-1'}) {
+      return repository.findCurrent(trainingParticipantId: participantId, ownerUserId: owner);
+    }
+
+    test('sem nada iniciado, é nula e não grava nada — abrir o checklist só lê',
+        () async {
+      expect(await current('tp-1'), isNull);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test('devolve a avaliação em andamento do próprio dono', () async {
+      final started = await open('tp-1');
+
+      final found = await current('tp-1');
+
+      expect(found?.id, started.id);
+      expect(found?.startTime, started.startTime);
+    });
+
+    test(
+        'avaliação já enviada e rascunho de outro consultor contam como não '
+        'iniciada — e nada é apagado só por abrir', () async {
+      final sent = await open('tp-1');
+      await repository.confirm(sent.id, participantName: 'A', score: 90);
+      await repository.saveSendResults({sent.id: null}, at: DateTime(2026, 9, 29, 9));
+      final theirs = await open('tp-2', owner: 'user-2');
+
+      expect(await current('tp-1'), isNull);
+      expect(await current('tp-2'), isNull);
+      expect((await row(sent.id)).syncStatus, LocalSyncStatus.synced);
+      expect((await row(theirs.id)).ownerUserId, 'user-2');
+    });
+
+    test('avaliação na fila é devolvida, mesmo de outro consultor', () async {
+      final queued = await open('tp-1', owner: 'user-2');
+      await repository.confirm(queued.id, participantName: 'A', score: 90);
+
+      expect((await current('tp-1'))?.id, queued.id);
+    });
+
+    test('rascunho sem dono passa a ser de quem abriu', () async {
+      final legacy = await open('tp-1');
+      await write(legacy.id, const LocalAssessmentsCompanion(ownerUserId: Value(null)));
+
+      final found = await current('tp-1');
+
+      expect(found?.id, legacy.id);
+      expect(found?.ownerUserId, 'user-1');
+      expect((await row(legacy.id)).ownerUserId, 'user-1');
+    });
+  });
+
   group('mark / unmark / watchItems', () {
     test('marca uma infração e ela aparece em watchItems', () async {
       final assessmentId = (await open('tp-1')).id;

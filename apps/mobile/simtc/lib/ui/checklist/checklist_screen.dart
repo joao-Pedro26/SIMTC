@@ -133,7 +133,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ),
             ],
           ),
-          if (!_viewModel.isLoading && _viewModel.hasCatalog)
+          if (!_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted)
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.sm,
@@ -149,6 +149,17 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildTimerRow() {
+    if (!_viewModel.isLoading && !_viewModel.isStarted) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(AppIcons.timer, size: 14, color: AppColors.text3),
+          const SizedBox(width: AppSpacing.xs),
+          Text('não iniciada', style: AppTypography.meta),
+        ],
+      );
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -224,6 +235,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       );
     }
 
+    if (!_viewModel.isStarted) return _buildNotStarted();
+
     // Como no canvas: a categoria aberta é um bloco próprio, e as fechadas
     // antes e depois dela formam grupos — cada bloco com borda em cima e
     // embaixo, separados por 10.
@@ -245,6 +258,38 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           blocks[i],
         ],
       ],
+    );
+  }
+
+  /// Antes do "Iniciar avaliação" (decisão de 29/09/2026): o consultor pode ter
+  /// aberto o participante sem querer — nada foi gravado, e voltar não deixa
+  /// rastro. O canvas não tem este estado.
+  Widget _buildNotStarted() {
+    return Padding(
+      key: const Key('checklist-not-started'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.huge,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      child: Column(
+        children: [
+          const Icon(AppIcons.timer, size: 40, color: AppColors.textMuted),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'A avaliação ainda não começou.',
+            style: AppTypography.cardTitle,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'O cronômetro começa quando você tocar em "Iniciar avaliação".',
+            style: AppTypography.meta,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -429,12 +474,20 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         AppSpacing.lg,
         AppSpacing.lg,
       ),
-      child: AppCtaButton(
-        label: 'Finalizar avaliação',
-        icon: AppIcons.finish,
-        size: AppCtaSize.large,
-        onPressed: _openSummary,
-      ),
+      child: _viewModel.isStarted
+          ? AppCtaButton(
+              label: 'Finalizar avaliação',
+              icon: AppIcons.finish,
+              size: AppCtaSize.large,
+              onPressed: _openSummary,
+            )
+          : AppCtaButton(
+              label: 'Iniciar avaliação',
+              icon: AppIcons.startEvaluation,
+              size: AppCtaSize.large,
+              isLoading: _viewModel.isStarting,
+              onPressed: _viewModel.start,
+            ),
     );
   }
 

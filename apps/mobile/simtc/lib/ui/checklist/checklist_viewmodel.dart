@@ -54,6 +54,7 @@ class ChecklistViewModel extends ChangeNotifier {
 
   bool _disposed = false;
   bool _loading = true;
+  bool _starting = false;
   String? _assessmentId;
   DateTime? _startTime;
   SessionParticipant? _participant;
@@ -64,6 +65,14 @@ class ChecklistViewModel extends ChangeNotifier {
   bool get isLoading => _loading;
   SessionParticipant? get participant => _participant;
   String? get expandedCategoryId => _expandedCategoryId;
+
+  /// A avaliação começou: há rascunho, cronômetro e marcações. Antes disso,
+  /// a tela mostra só o "Iniciar avaliação" — abrir um participante sem
+  /// querer não grava nada (decisão de 29/09/2026).
+  bool get isStarted => _assessmentId != null;
+
+  /// O "Iniciar avaliação" está gravando.
+  bool get isStarting => _starting;
 
   List<ChecklistCategory> get sections =>
       buildChecklistSections(_catalog, _items);
@@ -79,30 +88,65 @@ class ChecklistViewModel extends ChangeNotifier {
   /// daria 100%, "Aprovado": a tela nem oferece o "Finalizar avaliação".
   bool get hasCatalog => sections.isNotEmpty;
 
-  /// "00:12:34" desde o início da avaliação — `00:00:00` antes de o rascunho
-  /// abrir.
+  /// "00:12:34" desde o "Iniciar avaliação" — `00:00:00` antes dele.
   String get elapsedLabel {
     final start = _startTime;
     if (start == null) return '00:00:00';
     return stopwatchLabel(_now().difference(start));
   }
 
+  /// Só lê: a avaliação em andamento, se houver, e o catálogo. Nada é gravado
+  /// até o "Iniciar avaliação" ([start]).
   Future<void> init() async {
-    final assessment = await _assessmentRepository.openDraft(
-      trainingParticipantId: participantId,
-      sessionId: sessionId,
-      ownerUserId: ownerUserId,
-    );
-    if (_disposed) return;
-
-    _assessmentId = assessment.id;
-    _startTime = assessment.startTime;
-
     _participantSubscription ??=
         _participantRepository.watchParticipant(participantId).listen((p) {
       _participant = p;
       notifyListeners();
     });
+
+    final current = await _assessmentRepository.findCurrent(
+      trainingParticipantId: participantId,
+      ownerUserId: ownerUserId,
+    );
+    if (_disposed) return;
+    // As marcações primeiro: o stream as entrega enquanto o catálogo carrega,
+    // e a tela já abre com elas.
+    if (current != null) _attach(current);
+
+    _catalog = await _catalogRepository.loadCatalog();
+    if (_disposed) return;
+    if (current != null) _openFirstCategory();
+
+    _loading = false;
+    notifyListeners();
+  }
+
+  /// "Iniciar avaliação": grava o início agora e mostra o checklist. Sem
+  /// catálogo não inicia — não há o que avaliar, e a tela nem mostra o botão.
+  Future<void> start() async {
+    if (isStarted || _starting || !hasCatalog) return;
+
+    _starting = true;
+    notifyListeners();
+    try {
+      final assessment = await _assessmentRepository.openDraft(
+        trainingParticipantId: participantId,
+        sessionId: sessionId,
+        ownerUserId: ownerUserId,
+      );
+      if (_disposed) return;
+      _attach(assessment);
+      _openFirstCategory();
+    } finally {
+      _starting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Liga a tela à avaliação em andamento: as marcações e o cronômetro.
+  void _attach(LocalAssessment assessment) {
+    _assessmentId = assessment.id;
+    _startTime = assessment.startTime;
 
     _itemsSubscription ??=
         _assessmentRepository.watchItems(assessment.id).listen((items) {
@@ -110,17 +154,13 @@ class ChecklistViewModel extends ChangeNotifier {
       notifyListeners();
     });
 
-    _catalog = await _catalogRepository.loadCatalog();
-    if (_disposed) return;
+    _ticker ??= Timer.periodic(tickInterval, (_) => notifyListeners());
+  }
 
-    // Como no canvas: a tela sempre abre com a primeira categoria aberta.
+  /// Como no canvas: o checklist começa com a primeira categoria aberta.
+  void _openFirstCategory() {
     final sections = this.sections;
     _expandedCategoryId = sections.isEmpty ? null : sections.first.id;
-
-    _ticker ??= Timer.periodic(tickInterval, (_) => notifyListeners());
-
-    _loading = false;
-    notifyListeners();
   }
 
   /// Acordeão de uma seção só — abrir outra fecha a anterior, como no canvas.

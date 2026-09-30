@@ -109,8 +109,10 @@ void main() {
     );
   }
 
-  group('init', () {
-    test('carrega o participante, o catálogo e sai de loading', () async {
+  group('init e start', () {
+    test(
+        'abrir só lê: carrega o participante e o catálogo, sem gravar nada — '
+        'um participante aberto sem querer não começa', () async {
       await seedParticipant();
       await seedCatalog();
       final vm = buildViewModel();
@@ -120,18 +122,65 @@ void main() {
       await vm.init();
 
       expect(vm.isLoading, isFalse);
+      expect(vm.isStarted, isFalse);
       expect(vm.participant?.name, 'Carlos Eduardo Nunes');
       expect(vm.sections, hasLength(1));
-      expect(vm.sections.single.infractions, hasLength(1));
-      expect(vm.expandedCategoryId, 'cat-1', reason: 'abre com a primeira categoria aberta');
+      expect(vm.expandedCategoryId, isNull);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
     });
 
-    test('retomar o checklist reabre o mesmo rascunho, sem perder marcações', () async {
+    test(
+        '"Iniciar avaliação" grava o início agora, abre a primeira categoria e '
+        'liga o cronômetro', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+      addTearDown(vm.dispose);
+      await vm.init();
+      final before = DateTime.now();
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isStarting, isFalse);
+      expect(vm.expandedCategoryId, 'cat-1', reason: 'abre com a primeira categoria aberta');
+      final row = await db.select(db.localAssessments).getSingle();
+      expect(row.ownerUserId, 'user-1');
+      expect(row.syncStatus, LocalSyncStatus.draft);
+      // O banco guarda segundos: o início é o toque, com essa precisão.
+      expect(row.startTime.isBefore(before.subtract(const Duration(seconds: 1))), isFalse);
+
+      var notifications = 0;
+      vm.addListener(() => notifications++);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(notifications, greaterThan(0), reason: 'o cronômetro está correndo');
+    });
+
+    test('um segundo toque em "Iniciar" não recomeça a avaliação', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+      final first = await db.select(db.localAssessments).getSingle();
+
+      await vm.start();
+
+      final again = await db.select(db.localAssessments).getSingle();
+      expect(again.id, first.id);
+      expect(again.startTime, first.startTime);
+    });
+
+    test(
+        'reabrir uma avaliação iniciada volta direto ao checklist, com as '
+        'marcações', () async {
       await seedParticipant();
       await seedCatalog();
 
       final first = buildViewModel();
       await first.init();
+      await first.start();
       await first.toggleNote('inf-1', 'note-pm');
       first.dispose();
 
@@ -139,6 +188,8 @@ void main() {
       addTearDown(second.dispose);
       await second.init();
 
+      expect(second.isStarted, isTrue);
+      expect(second.expandedCategoryId, 'cat-1');
       expect(second.sections.single.infractions.single.selectedNoteId, 'note-pm');
     });
   });
@@ -150,6 +201,7 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
 
       await vm.toggleNote('inf-1', 'note-m');
 
@@ -164,6 +216,7 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
       await vm.toggleNote('inf-1', 'note-b');
 
       await vm.toggleNote('inf-1', 'note-b');
@@ -189,6 +242,7 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
       expect(vm.expandedCategoryId, 'cat-1');
 
       vm.toggleCategory('cat-2');
@@ -203,13 +257,15 @@ void main() {
     test('avança conforme o relógio injetado, sem esperar tempo real', () async {
       await seedParticipant();
       await seedCatalog();
-      // `openDraft` grava `startTime` com o relógio real — a base do relógio
+      // O "Iniciar" grava `startTime` com o relógio real — a base do relógio
       // falso precisa ser próxima do "agora" de verdade, senão a diferença
       // fica negativa e o formato trava em zero.
       final clock = _MutableClock(DateTime.now());
       final vm = buildViewModel(now: clock.call, tickInterval: const Duration(milliseconds: 5));
       addTearDown(vm.dispose);
       await vm.init();
+      expect(vm.elapsedLabel, '00:00:00', reason: 'antes do "Iniciar"');
+      await vm.start();
 
       expect(vm.elapsedLabel, '00:00:00');
 
@@ -225,6 +281,7 @@ void main() {
       final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
 
       var notifications = 0;
       vm.addListener(() => notifications++);
@@ -252,6 +309,7 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
 
       vm.expandCategory('cat-2');
       expect(vm.expandedCategoryId, 'cat-2');
@@ -267,8 +325,11 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
 
       expect(vm.hasCatalog, isFalse);
+      expect(vm.isStarted, isFalse, reason: 'sem catálogo, o "Iniciar" não grava');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
     });
 
     test(
@@ -286,8 +347,11 @@ void main() {
       final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
+      await vm.start();
 
       expect(vm.hasCatalog, isFalse);
+      expect(vm.isStarted, isFalse, reason: 'sem catálogo, o "Iniciar" não grava');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
     });
   });
 
@@ -296,7 +360,8 @@ void main() {
     await seedCatalog();
     final vm = buildViewModel();
     await vm.init();
-    expect(vm.isLoading, isFalse, reason: 'o init terminou e ligou o cronômetro');
+    await vm.start();
+    expect(vm.isStarted, isTrue, reason: 'o "Iniciar" ligou o cronômetro');
 
     vm.dispose();
     // O `testWidgets` falha sozinho se terminar com um `Timer` pendente: um
@@ -309,6 +374,7 @@ void main() {
     await seedCatalog();
     final vm = buildViewModel();
     await vm.init();
+    await vm.start();
 
     final pending = vm.toggleNote('inf-1', 'note-b');
     vm.dispose();

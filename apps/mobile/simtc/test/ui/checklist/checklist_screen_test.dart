@@ -131,7 +131,18 @@ void main() {
     );
   }
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  /// A avaliação já iniciada, como se o consultor tivesse tocado em "Iniciar
+  /// avaliação" antes — o caminho da maioria dos testes.
+  Future<void> startEvaluation() {
+    return assessmentRepository.openDraft(
+      trainingParticipantId: 'tp-1',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+    );
+  }
+
+  Future<void> pumpScreen(WidgetTester tester, {bool started = true}) async {
+    if (started) await startEvaluation();
     await tester.pumpWidget(withProviders(
       const MaterialApp(
         home: ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
@@ -143,7 +154,8 @@ void main() {
   /// O checklist empilhado sobre uma tela de origem, com as rotas reais do
   /// checklist e da conferência — o "Finalizar avaliação" navega pelo
   /// go_router.
-  Future<void> pumpOverOrigin(WidgetTester tester) async {
+  Future<void> pumpOverOrigin(WidgetTester tester, {bool started = true}) async {
+    if (started) await startEvaluation();
     final router = GoRouter(
       initialLocation: '/origem',
       routes: [
@@ -407,5 +419,63 @@ void main() {
     expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
     expect(find.text('Finalizar avaliação'), findsNothing);
     expect(find.textContaining('categorias revisadas'), findsNothing);
+  });
+
+  group('antes do "Iniciar avaliação"', () {
+    testWidgets(
+        'mostra o nome, "não iniciada" e o botão — sem a lista, sem "salvo" '
+        'e sem gravar nada', (tester) async {
+      await pumpScreen(tester, started: false);
+
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+      expect(find.text('não iniciada'), findsOneWidget);
+      expect(find.byKey(const Key('checklist-not-started')), findsOneWidget);
+      expect(find.text('A avaliação ainda não começou.'), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsOneWidget);
+      expect(find.text('Excesso de velocidade'), findsNothing);
+      expect(find.text('salvo'), findsNothing);
+      expect(find.textContaining('categorias revisadas'), findsNothing);
+      expect(find.text('Finalizar avaliação'), findsNothing);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    testWidgets('abrir sem querer e voltar não deixa rastro', (tester) async {
+      await pumpOverOrigin(tester, started: false);
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('origem'), findsOneWidget);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    testWidgets(
+        '"Iniciar avaliação" grava o início e mostra o checklist, com o '
+        'cronômetro do zero', (tester) async {
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.text('Iniciar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excesso de velocidade'), findsOneWidget);
+      expect(find.textContaining('00:00:0'), findsOneWidget);
+      expect(find.text('salvo'), findsOneWidget);
+      expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
+      expect(find.text('Finalizar avaliação'), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+      final row = await db.select(db.localAssessments).getSingle();
+      expect(row.syncStatus, LocalSyncStatus.draft);
+    });
+
+    testWidgets('sem catálogo no aparelho, nem dá para iniciar', (tester) async {
+      await db.delete(db.infractionNotes).go();
+      await db.delete(db.infractions).go();
+      await db.delete(db.assessmentCategories).go();
+
+      await pumpScreen(tester, started: false);
+
+      expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+    });
   });
 }
