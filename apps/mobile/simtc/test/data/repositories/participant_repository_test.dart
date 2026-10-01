@@ -309,6 +309,27 @@ void main() {
     });
   });
 
+  group('findParticipant', () {
+    test('lê uma vez o participante do cache — nulo se não está no aparelho',
+        () async {
+      await seedSession();
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-1',
+              sessionId: 'sess-1',
+              name: 'Carlos Eduardo Nunes',
+              cpf: '187.443.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'PENDENTE',
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+
+      expect((await repository.findParticipant('tp-1'))?.name, 'Carlos Eduardo Nunes');
+      expect(await repository.findParticipant('tp-inexistente'), isNull);
+    });
+  });
+
   group('assign', () {
     const assignPath = '/practical-assessments/assign';
 

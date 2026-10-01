@@ -240,6 +240,82 @@ void main() {
     });
   });
 
+  group('um por vez', () {
+    Future<void> startOtherParticipant() async {
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      await assessmentRepository.openDraft(
+        trainingParticipantId: 'tp-2',
+        sessionId: 'sess-1',
+        ownerUserId: 'user-1',
+      );
+    }
+
+    test('com outro participante em andamento, não inicia e diz quem é',
+        () async {
+      await seedParticipant();
+      await seedCatalog();
+      await startOtherParticipant();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+
+      await vm.init();
+
+      expect(vm.isBlocked, isTrue);
+      expect(vm.blockingParticipantName, 'Marina Lopes');
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
+    });
+
+    test('quem já está em andamento não se bloqueia a si mesmo', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      final again = buildViewModel();
+      addTearDown(again.dispose);
+      await again.init();
+
+      expect(again.isStarted, isTrue);
+      expect(again.isBlocked, isFalse);
+    });
+
+    test('se outro começou depois de a tela abrir, o "Iniciar" é recusado e '
+        'a tela passa a avisar', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.isBlocked, isFalse);
+      await startOtherParticipant();
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.isBlocked, isTrue);
+      expect(vm.blockingParticipantName, 'Marina Lopes');
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
+    });
+  });
+
   group('startedText', () {
     test('diz quando a avaliação começou — nada antes do "Iniciar"', () async {
       await seedParticipant();

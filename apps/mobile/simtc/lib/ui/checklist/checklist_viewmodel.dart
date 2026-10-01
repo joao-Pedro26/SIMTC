@@ -55,6 +55,8 @@ class ChecklistViewModel extends ChangeNotifier {
   List<CatalogCategory> _catalog = const [];
   List<LocalAssessmentItem> _items = const [];
   String? _expandedCategoryId;
+  String? _blockingParticipantId;
+  String? _blockingName;
 
   bool get isLoading => _loading;
   SessionParticipant? get participant => _participant;
@@ -67,6 +69,15 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// O "Iniciar avaliação" está gravando.
   bool get isStarting => _starting;
+
+  /// Outro participante deste consultor está em andamento: só uma avaliação
+  /// por vez (decisão de 01/10/2026). A tela mostra o aviso e desabilita o
+  /// "Iniciar avaliação".
+  bool get isBlocked => !isStarted && _blockingParticipantId != null;
+
+  /// Nome de quem está em andamento, para o aviso; nulo se o participante
+  /// não está mais no aparelho.
+  String? get blockingParticipantName => isBlocked ? _blockingName : null;
 
   List<ChecklistCategory> get sections =>
       buildChecklistSections(_catalog, _items);
@@ -106,7 +117,19 @@ class ChecklistViewModel extends ChangeNotifier {
     if (_disposed) return;
     // As marcações primeiro: o stream as entrega enquanto o catálogo carrega,
     // e a tela já abre com elas.
-    if (current != null) _attach(current);
+    if (current != null) {
+      _attach(current);
+    } else {
+      final inProgress = await _assessmentRepository.findInProgressOther(
+        ownerUserId: ownerUserId,
+        exceptTrainingParticipantId: participantId,
+      );
+      if (_disposed) return;
+      if (inProgress != null) {
+        await _block(inProgress.trainingParticipantId);
+        if (_disposed) return;
+      }
+    }
 
     _catalog = await _catalogRepository.loadCatalog();
     if (_disposed) return;
@@ -119,7 +142,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// "Iniciar avaliação": grava o início agora e mostra o checklist. Sem
   /// catálogo não inicia — não há o que avaliar, e a tela nem mostra o botão.
   Future<void> start() async {
-    if (isStarted || _starting || !hasCatalog) return;
+    if (isStarted || _starting || isBlocked || !hasCatalog) return;
 
     _starting = true;
     notifyListeners();
@@ -132,10 +155,20 @@ class ChecklistViewModel extends ChangeNotifier {
       if (_disposed) return;
       _attach(assessment);
       _openFirstCategory();
+    } on EvaluationInProgressException catch (e) {
+      // Outro participante começou depois de a tela abrir.
+      await _block(e.trainingParticipantId);
     } finally {
       _starting = false;
       notifyListeners();
     }
+  }
+
+  /// Guarda quem está em andamento e o nome dele, para o aviso.
+  Future<void> _block(String blockingParticipantId) async {
+    _blockingParticipantId = blockingParticipantId;
+    final other = await _participantRepository.findParticipant(blockingParticipantId);
+    _blockingName = other?.name;
   }
 
   /// Liga a tela à avaliação em andamento: as marcações e a hora de início.

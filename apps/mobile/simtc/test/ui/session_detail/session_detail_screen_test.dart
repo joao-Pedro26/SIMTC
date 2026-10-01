@@ -127,6 +127,10 @@ void main() {
           trainingParticipantId: any(named: 'trainingParticipantId'),
           ownerUserId: any(named: 'ownerUserId'),
         )).thenAnswer((_) async => null);
+    when(() => assessments.findInProgressOther(
+          ownerUserId: any(named: 'ownerUserId'),
+          exceptTrainingParticipantId: any(named: 'exceptTrainingParticipantId'),
+        )).thenAnswer((_) async => null);
   });
 
   tearDown(() {

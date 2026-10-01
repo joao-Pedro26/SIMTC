@@ -17,6 +17,7 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
+import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -472,6 +473,45 @@ void main() {
 
       expect(find.text('Excesso de velocidade'), findsNothing,
           reason: 'antes do "Iniciar", a lista é só leitura');
+    });
+
+    testWidgets(
+        'com outro participante em andamento: aviso com o nome, "Iniciar" '
+        'desabilitado e nada gravado', (tester) async {
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      await assessmentRepository.openDraft(
+        trainingParticipantId: 'tp-2',
+        sessionId: 'sess-1',
+        ownerUserId: 'user-1',
+      );
+
+      await pumpScreen(tester, started: false);
+
+      expect(
+        find.text('Você já está avaliando Marina Lopes. Finalize essa '
+            'avaliação para iniciar outra.'),
+        findsOneWidget,
+      );
+      expect(find.text('O que será avaliado'), findsOneWidget,
+          reason: 'a lista continua à vista');
+      final button = tester.widget<AppCtaButton>(find.byType(AppCtaButton));
+      expect(button.onPressed, isNull);
+
+      await tester.tap(find.text('Iniciar avaliação'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
     });
 
     testWidgets('abrir sem querer e voltar não deixa rastro', (tester) async {

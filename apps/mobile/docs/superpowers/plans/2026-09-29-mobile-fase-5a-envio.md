@@ -72,6 +72,12 @@ Em 30/09/2026, depois da execução, a pedido do usuário:
 
 14. **A tela "não iniciada" segue o canvas novo (quadro 6a, export de 01/10/2026).** Além do aviso "A avaliação ainda não começou.", ela mostra "O que será avaliado": o total de itens à direita do título e, por categoria, o código, o nome e "N itens" — só leitura, sem abrir a lista. O canvas mostra "N pts" nas categorias e no título; o app não tem pontos (decisão 4), então a coluna não existe. O botão "Iniciar avaliação" continua no rodapé. O estado deixou de ser uma divergência do canvas.
 
+15. **Uma avaliação por vez.** O consultor não pode iniciar uma avaliação enquanto tiver outra iniciada e ainda não confirmada, em qualquer sessão do aparelho. Ele continua podendo atribuir vários participantes.
+    - Só o rascunho conta. Depois do "Confirmar" (na fila, com erro ou enviada), o consultor já pode iniciar a próxima.
+    - Na tela "não iniciada", o "Iniciar avaliação" fica desabilitado, com o aviso "Você já está avaliando Marina Lopes. Finalize essa avaliação para iniciar outra." (sem o nome, se o participante não estiver mais no aparelho). A lista "O que será avaliado" continua à vista.
+    - A regra também vale no `openDraft`, que lança `EvaluationInProgressException` sem gravar nada, para o caso de outro participante começar depois de a tela abrir.
+    - O rascunho de outro consultor, no mesmo aparelho, não bloqueia.
+
 ### Desvios na execução (30/09/2026)
 
 A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1–8 saíram iguais ao plano. Os desvios foram:
@@ -9534,6 +9540,7 @@ Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos quatr
 Iniciar avaliação:
 - [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou.", a lista "O que será avaliado" (código, nome e "N itens" de cada categoria, sem pontos e sem abrir ao tocar) e o botão "Iniciar avaliação" — **sem as infrações**;
 - [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** "Iniciada às…" — nada foi gravado;
+- [ ] com esse participante em andamento (ainda sem finalizar), abra outro participante seu: aparece o aviso "Você já está avaliando <nome>. Finalize essa avaliação para iniciar outra.", o "Iniciar avaliação" fica desabilitado e a lista "O que será avaliado" continua à vista; os outros continuam podendo ser atribuídos. Depois de finalizar o primeiro ("Confirmar"), o outro já pode ser iniciado;
 - [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, a hora "Iniciada às HH:MM" (sem nada correndo) e "salvo";
 - [ ] marque algumas notas: o topo mostra só o percentual e a barra, sem "categorias revisadas"; a barra começa cheia em 100,0% e esvazia conforme as infrações; abaixo de 70% ela fica vermelha. Volte: a linha agora mostra "Iniciada às HH:MM", com a mesma hora do checklist; abrir de novo vai direto ao checklist, com as marcações.
 
@@ -9581,7 +9588,7 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | 5B | Com a avaliação na fila, só a linha do detalhe impede abrir o checklist. Se ele for aberto por outro caminho (hoje não há), a avaliação confirmada fica editável. Deixar o checklist somente leitura quando a avaliação não for rascunho. |
 | 5B | No serviço de envio: <ul><li>um erro ao entrar (`claimUnowned` ou o stream da fila) não é tratado: a fila não é seguida e a aba diz "Tudo o que você confirmou já chegou ao servidor";</li><li>o `syncNow` devolve o envio no ar antes da rodada repetida;</li><li>`retryDelays` vazio quebra (falta um `assert`);</li><li>todo 401, inclusive depois de uma renovação bem-sucedida, deixa os itens "Na fila" até o próximo gatilho.</li></ul> Tratar junto com a troca de usuário no meio do envio (dois `_follow` no ar, sem nova checagem do usuário antes do POST), que só importa quando houver "Sair" na interface. |
 | Backend | `syncOne` apaga os itens e depois atualiza a avaliação fora de uma transação: um reenvio que falhe no meio deixa uma avaliação aceita sem itens. |
-| 5B | Os rascunhos que a Fase 4 criou ao abrir o checklist (inclusive os abertos sem querer) contam como iniciados, com o horário antigo. Se aparecer um rascunho vazio e antigo em campo, decidir se o "Iniciar" pode zerá-lo. |
+| 5B | Os rascunhos que a Fase 4 criou ao abrir o checklist (inclusive os abertos sem querer) contam como iniciados, com o horário antigo — e agora, com a decisão 15, bloqueiam o "Iniciar" de outro participante até serem finalizados (não há como descartar um rascunho). Se aparecer um rascunho vazio e antigo em campo, decidir se o "Iniciar" pode zerá-lo ou se o consultor pode descartá-lo. |
 | 5B | "Última sincronização" é o último envio aceito ainda no aparelho: uma reavaliação apaga a linha enviada, e o horário pode voltar para um envio anterior. |
 | 5B | Um item que o servidor sempre recusa (participante removido da sessão, nota apagada no painel) fica como "Erro" para sempre, tentando de 10 em 10 minutos com o app aberto. Decidir se o consultor pode descartar. |
 | 5B | Uma avaliação na fila de outro consultor, para um participante que agora está com você (reatribuído no painel), é devolvida como está pelo `openDraft` — você veria e editaria as marcações dele. Caso raro (aparelho compartilhado + reatribuição antes do envio). |

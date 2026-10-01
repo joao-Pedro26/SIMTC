@@ -3,6 +3,19 @@ import 'package:uuid/uuid.dart';
 
 import '../services/local/app_database.dart';
 
+/// O consultor já tem outra avaliação em andamento (rascunho iniciado e ainda
+/// não confirmado): só uma por vez (decisão de 01/10/2026).
+/// [trainingParticipantId] é o participante dessa avaliação em andamento.
+class EvaluationInProgressException implements Exception {
+  const EvaluationInProgressException(this.trainingParticipantId);
+
+  final String trainingParticipantId;
+
+  @override
+  String toString() =>
+      'EvaluationInProgressException(em andamento: $trainingParticipantId)';
+}
+
 /// A avaliação prática feita no aparelho: o rascunho do checklist (Fase 4) e
 /// a fila de envio (Fase 5A).
 ///
@@ -48,10 +61,31 @@ class AssessmentRepository {
     return existing.copyWith(ownerUserId: Value(ownerUserId));
   }
 
+  /// O rascunho que [ownerUserId] tem em andamento com outro participante que
+  /// não [exceptTrainingParticipantId] — iniciado e ainda não confirmado. Nulo
+  /// se não há. Avaliação confirmada (na fila ou enviada) não conta.
+  Future<LocalAssessment?> findInProgressOther({
+    required String ownerUserId,
+    required String exceptTrainingParticipantId,
+  }) {
+    return (_db.select(_db.localAssessments)
+          ..where((t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.syncStatus.equalsValue(LocalSyncStatus.draft) &
+              t.trainingParticipantId.equals(exceptTrainingParticipantId).not())
+          ..orderBy([(t) => OrderingTerm.asc(t.startTime)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
   /// agora — a hora de início mostrada e enviada vem daqui. Se a
   /// avaliação já está em andamento ([findCurrent]), devolve a mesma, sem
   /// recomeçar: um segundo toque não muda a hora de início.
+  ///
+  /// Só uma avaliação em andamento por consultor, em todas as sessões: se
+  /// [ownerUserId] já tem um rascunho com outro participante, lança
+  /// [EvaluationInProgressException] e não grava nada.
   ///
   /// `date` é a data de calendário da sessão (como `TrainingSession.date`,
   /// meia-noite local); sessão sem data, ou fora do cache, usa a de hoje.
@@ -73,6 +107,13 @@ class AssessmentRepository {
     final id = _uuid.v4();
     final now = DateTime.now();
     await _db.transaction(() async {
+      final inProgress = await findInProgressOther(
+        ownerUserId: ownerUserId,
+        exceptTrainingParticipantId: trainingParticipantId,
+      );
+      if (inProgress != null) {
+        throw EvaluationInProgressException(inProgress.trainingParticipantId);
+      }
       if (existing != null) await _delete(existing.id);
       await _db.into(_db.localAssessments).insert(
             LocalAssessmentsCompanion.insert(

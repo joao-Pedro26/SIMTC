@@ -58,6 +58,15 @@ class ParticipantRepository {
         );
   }
 
+  /// Uma leitura só do participante do cache; nulo se ele não estiver no
+  /// aparelho. Para quem precisa do valor agora, sem assinar o stream.
+  Future<SessionParticipant?> findParticipant(String participantId) async {
+    final row = await (_db.select(_db.participants)
+          ..where((t) => t.id.equals(participantId)))
+        .getSingleOrNull();
+    return row == null ? null : SessionParticipant.fromRow(row);
+  }
+
   /// Baixa `GET /training-sessions/:id` e regrava a sessão e os participantes
   /// dela numa transação só. Devolve quantos participantes ficaram.
   ///

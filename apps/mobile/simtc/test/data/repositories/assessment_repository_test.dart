@@ -32,6 +32,30 @@ void main() {
         .getSingle();
   }
 
+  /// Um rascunho direto no banco, sem a regra de um por vez: para os testes
+  /// que precisam de vários rascunhos do mesmo consultor ao mesmo tempo.
+  Future<LocalAssessment> insertDraft(
+    String participantId, {
+    String owner = 'user-1',
+    String sessionId = 'sess-1',
+  }) async {
+    final id = 'draft-$participantId-$owner';
+    await db.into(db.localAssessments).insert(
+          LocalAssessmentsCompanion.insert(
+            id: id,
+            trainingParticipantId: participantId,
+            sessionId: sessionId,
+            date: DateTime(2026, 9, 29),
+            startTime: DateTime(2026, 9, 29, 8),
+            syncStatus: LocalSyncStatus.draft,
+            createdAt: DateTime(2026, 9, 29, 8),
+            updatedAt: DateTime(2026, 9, 29, 8),
+            ownerUserId: Value(owner),
+          ),
+        );
+    return row(id);
+  }
+
   Future<void> write(String id, LocalAssessmentsCompanion changes) {
     return (db.update(db.localAssessments)..where((t) => t.id.equals(id)))
         .write(changes);
@@ -166,7 +190,7 @@ void main() {
   test('confirmar grava o fim pedido — e a hora do toque se nenhum for dado',
       () async {
     final a = await open('tp-1');
-    final b = await open('tp-2');
+    final b = await insertDraft('tp-2');
 
     await repository.confirm(a.id,
         participantName: 'A', score: 90, endTime: DateTime(2026, 9, 30, 8, 31));
@@ -178,6 +202,67 @@ void main() {
     };
     expect(rows[a.id], DateTime(2026, 9, 30, 8, 31));
     expect(rows[b.id], isNotNull);
+  });
+
+  group('um por vez', () {
+    Future<LocalAssessment?> other(String except, {String owner = 'user-1'}) {
+      return repository.findInProgressOther(
+        ownerUserId: owner,
+        exceptTrainingParticipantId: except,
+      );
+    }
+
+    test('acha o rascunho de outro participante do mesmo consultor', () async {
+      final a = await open('tp-1');
+
+      expect((await other('tp-2'))?.id, a.id);
+      expect(await other('tp-1'), isNull, reason: 'o próprio não conta');
+      expect(await other('tp-2', owner: 'user-2'), isNull,
+          reason: 'o rascunho é de outro consultor');
+    });
+
+    test('só o rascunho conta: confirmada, na fila ou enviada liberam', () async {
+      final a = await open('tp-1');
+      await repository.confirm(a.id, participantName: 'A', score: 90);
+      expect(await other('tp-2'), isNull, reason: 'na fila');
+
+      await repository.saveSendResults({a.id: null}, at: DateTime(2026, 9, 30, 9));
+      expect(await other('tp-2'), isNull, reason: 'enviada');
+    });
+
+    test('iniciar outro participante é recusado enquanto há um em andamento',
+        () async {
+      final a = await open('tp-1');
+
+      await expectLater(
+        open('tp-2'),
+        throwsA(isA<EvaluationInProgressException>()
+            .having((e) => e.trainingParticipantId, 'trainingParticipantId', 'tp-1')),
+      );
+
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.id), [a.id], reason: 'nada foi gravado');
+    });
+
+    test('reabrir o que está em andamento continua valendo, e confirmar libera '
+        'o próximo', () async {
+      final a = await open('tp-1');
+      expect((await open('tp-1')).id, a.id);
+
+      await repository.confirm(a.id, participantName: 'A', score: 90);
+      final next = await open('tp-2');
+
+      expect(next.trainingParticipantId, 'tp-2');
+      expect(next.syncStatus, LocalSyncStatus.draft);
+    });
+
+    test('o rascunho de outro consultor não bloqueia', () async {
+      await open('tp-1', owner: 'user-2');
+
+      final mine = await open('tp-2');
+
+      expect(mine.ownerUserId, 'user-1');
+    });
   });
 
   group('findCurrent', () {
@@ -286,7 +371,7 @@ void main() {
 
     test('marcações de avaliações diferentes não se misturam', () async {
       final a1 = (await open('tp-1')).id;
-      final a2 = (await open('tp-2')).id;
+      final a2 = (await insertDraft('tp-2')).id;
 
       await repository.mark(
         localAssessmentId: a1,
@@ -326,12 +411,12 @@ void main() {
     test(
         'só as confirmadas e ainda não aceitas do dono, na ordem do Confirmar',
         () async {
-      final draft = await open('tp-rascunho');
-      final first = await open('tp-1');
-      final failed = await open('tp-2');
-      final second = await open('tp-3');
-      final synced = await open('tp-4');
-      final others = await open('tp-5', owner: 'user-2');
+      final draft = await insertDraft('tp-rascunho');
+      final first = await insertDraft('tp-1');
+      final failed = await insertDraft('tp-2');
+      final second = await insertDraft('tp-3');
+      final synced = await insertDraft('tp-4');
+      final others = await insertDraft('tp-5', owner: 'user-2');
       for (final a in [first, failed, second, synced, others]) {
         await repository.confirm(a.id, participantName: 'P', score: 90);
       }
@@ -355,14 +440,10 @@ void main() {
     test('as avaliações de uma sessão são só as do dono, em qualquer situação',
         () async {
       final draft = await open('tp-1');
-      final queued = await open('tp-2');
+      final queued = await insertDraft('tp-2');
       await repository.confirm(queued.id, participantName: 'P', score: 90);
       await open('tp-3', owner: 'user-2');
-      await repository.openDraft(
-        trainingParticipantId: 'tp-4',
-        sessionId: 'outra-sessao',
-        ownerUserId: 'user-1',
-      );
+      await insertDraft('tp-4', sessionId: 'outra-sessao');
 
       final rows = await repository.watchSessionAssessments('sess-1', 'user-1').first;
 
@@ -489,7 +570,7 @@ void main() {
     test('cada avaliação leva só as próprias marcações', () async {
       await seedCatalog();
       final a1 = await open('tp-1');
-      final a2 = await open('tp-2');
+      final a2 = await insertDraft('tp-2');
       await repository.mark(
         localAssessmentId: a1.id,
         infractionId: 'inf-1',
@@ -519,7 +600,7 @@ void main() {
         'aceita sai da fila; recusada fica com o motivo — e cada envio conta '
         'uma tentativa', () async {
       final accepted = await open('tp-1');
-      final refused = await open('tp-2');
+      final refused = await insertDraft('tp-2');
       await repository.confirm(accepted.id, participantName: 'A', score: 90);
       await repository.confirm(refused.id, participantName: 'B', score: 60);
       final at = DateTime(2026, 9, 29, 9, 15);
@@ -545,9 +626,9 @@ void main() {
       expect(await repository.watchLastSyncedAt('user-1').first, isNull);
 
       final a = await open('tp-1');
-      final b = await open('tp-2');
+      final b = await insertDraft('tp-2');
       final c = await open('tp-3', owner: 'user-2');
-      final d = await open('tp-4');
+      final d = await insertDraft('tp-4');
       for (final x in [a, b, c, d]) {
         await repository.confirm(x.id, participantName: 'P', score: 90);
       }

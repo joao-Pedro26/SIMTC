@@ -537,14 +537,36 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               size: AppCtaSize.large,
               onPressed: _openSummary,
             )
-          : AppCtaButton(
-              label: 'Iniciar avaliação',
-              icon: AppIcons.startEvaluation,
-              size: AppCtaSize.large,
-              isLoading: _viewModel.isStarting,
-              onPressed: _viewModel.start,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_viewModel.isBlocked) ...[
+                  InlineNotice(
+                    icon: AppIcons.timer,
+                    tone: NoticeTone.warning,
+                    message: _blockedMessage(),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                AppCtaButton(
+                  label: 'Iniciar avaliação',
+                  icon: AppIcons.startEvaluation,
+                  size: AppCtaSize.large,
+                  isLoading: _viewModel.isStarting,
+                  onPressed: _viewModel.isBlocked ? null : _viewModel.start,
+                ),
+              ],
             ),
     );
+  }
+
+  /// Só uma avaliação por vez (decisão de 01/10/2026): o consultor precisa
+  /// finalizar a que está em andamento antes de iniciar outra.
+  String _blockedMessage() {
+    final name = _viewModel.blockingParticipantName;
+    final who = name == null ? 'com outra avaliação em andamento' : 'avaliando $name';
+    return 'Você já está $who. Finalize essa avaliação para iniciar outra.';
   }
 
   /// "Finalizar avaliação" abre a conferência (tela 1.6), sem o diálogo das
