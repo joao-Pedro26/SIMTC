@@ -8,6 +8,7 @@ import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/services/local/app_database.dart';
+import '../../utils/scoring.dart';
 import '../core/date_labels.dart';
 import 'checklist_sections.dart';
 
@@ -72,8 +73,9 @@ class ChecklistViewModel extends ChangeNotifier {
 
   double get overallScore => overallScoreOf(sections);
 
-  int get reviewedCount => sections.where((s) => s.isReviewed).length;
-  int get totalCategories => sections.length;
+  /// Mesmo corte do backend (`getApprovalStatus`): 70% ou mais. A barra do
+  /// topo muda de cor quando a nota cai abaixo dele.
+  bool get isApproved => getApprovalStatus(overallScore) == 'APROVADO';
 
   /// O catálogo nunca chegou a este aparelho (a descida junto com a Home
   /// falhou) — ou só tem itens sem id, que as seções descartam. Sem seção

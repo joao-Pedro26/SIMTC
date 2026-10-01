@@ -176,37 +176,26 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  /// A nota do participante: começa em 100% e cai a cada infração marcada.
+  /// A barra acompanha a nota (decisão de 30/09/2026) e fica vermelha abaixo
+  /// do corte de aprovação.
   Widget _buildProgress() {
-    final reviewed = _viewModel.reviewedCount;
-    final total = _viewModel.totalCategories;
+    final score = _viewModel.overallScore;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '$reviewed de $total categorias revisadas',
-                style: AppTypography.checklistProgress,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              percentLabel(_viewModel.overallScore),
-              style: AppTypography.checklistProgressValue,
-            ),
-          ],
-        ),
+        Text(percentLabel(score), style: AppTypography.checklistProgressValue),
         const SizedBox(height: AppSpacing.xs + 2),
         ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           child: LinearProgressIndicator(
-            value: total <= 0 ? 0 : reviewed / total,
+            value: (score / 100).clamp(0.0, 1.0),
             minHeight: 6,
             backgroundColor: AppColors.border,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _viewModel.isApproved ? AppColors.primary : AppColors.dangerInk,
+            ),
           ),
         ),
       ],

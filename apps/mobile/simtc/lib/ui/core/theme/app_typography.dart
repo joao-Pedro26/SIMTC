@@ -157,11 +157,7 @@ abstract final class AppTypography {
   static TextStyle get savedLabel =>
       _inter(size: 11.5, weight: FontWeight.w500, height: 1.2, color: AppColors.savedInk);
 
-  /// "1 de 4 categorias revisadas"
-  static TextStyle get checklistProgress =>
-      _inter(size: 12, weight: FontWeight.w500, height: 1.2, color: AppColors.text3);
-
-  /// Score geral ao lado do progresso ("86,7%")
+  /// Nota geral do participante, acima da barra ("86,7%")
   static TextStyle get checklistProgressValue =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryDark);
 

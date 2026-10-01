@@ -16,6 +16,7 @@ import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -23,6 +24,12 @@ class _MockApiClient extends Mock implements ApiClient {}
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockConnectivity extends Mock implements Connectivity {}
+
+LinearProgressIndicator scoreBar(WidgetTester tester) =>
+    tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+
+Color scoreBarColor(WidgetTester tester) =>
+    (scoreBar(tester).valueColor! as AlwaysStoppedAnimation<Color>).value;
 
 void main() {
   late _MockApiClient api;
@@ -223,7 +230,9 @@ void main() {
     expect(find.text('PM'), findsOneWidget);
     expect(find.text('M'), findsOneWidget);
     expect(find.text('salvo'), findsOneWidget);
-    expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
+    expect(find.textContaining('categorias revisadas'), findsNothing);
+    expect(scoreBar(tester).value, 1.0, reason: 'sem marcação, a nota é 100%');
+    expect(scoreBarColor(tester), AppColors.primary);
   });
 
   testWidgets('tocar na categoria aberta fecha, e a fechada mostra "N itens"',
@@ -310,7 +319,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('0,0%'), findsNWidgets(2), reason: 'selo da categoria e geral');
-    expect(find.text('1 de 1 categorias revisadas'), findsOneWidget);
+    expect(find.textContaining('categorias revisadas'), findsNothing);
+    expect(scoreBar(tester).value, 0.0, reason: 'a barra acompanha a nota');
+    expect(scoreBarColor(tester), AppColors.dangerInk,
+        reason: 'abaixo de 70% a barra avisa que não aprova');
   });
 
   testWidgets(
@@ -327,7 +339,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(pmComment), findsNothing);
     expect(find.text('100,0%'), findsNWidgets(2), reason: 'selo da categoria e geral');
-    expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
+    expect(scoreBar(tester).value, 1.0, reason: 'desmarcar devolve a nota');
   });
 
   testWidgets('sem conexão, a faixa avisa que as marcações continuam salvas',
@@ -418,7 +430,7 @@ void main() {
 
     expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
     expect(find.text('Finalizar avaliação'), findsNothing);
-    expect(find.textContaining('categorias revisadas'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
   group('antes do "Iniciar avaliação"', () {
@@ -434,7 +446,7 @@ void main() {
       expect(find.text('Iniciar avaliação'), findsOneWidget);
       expect(find.text('Excesso de velocidade'), findsNothing);
       expect(find.text('salvo'), findsNothing);
-      expect(find.textContaining('categorias revisadas'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(find.text('Finalizar avaliação'), findsNothing);
       expect(await db.select(db.localAssessments).get(), isEmpty);
     });
@@ -460,7 +472,7 @@ void main() {
       expect(find.text('Excesso de velocidade'), findsOneWidget);
       expect(find.textContaining('Iniciada às'), findsOneWidget);
       expect(find.text('salvo'), findsOneWidget);
-      expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
+      expect(scoreBar(tester).value, 1.0);
       expect(find.text('Finalizar avaliação'), findsOneWidget);
       expect(find.text('Iniciar avaliação'), findsNothing);
       final row = await db.select(db.localAssessments).getSingle();

@@ -73,12 +73,6 @@ class ChecklistCategory {
   /// 0–100, por `calculateCategoryScore` — 100 quando nada foi marcado.
   final double score;
 
-  /// Regra decidida com o usuário em 26/09/2026: uma categoria conta como
-  /// "revisada" (para o "X de Y categorias revisadas") quando tem pelo menos
-  /// uma infração marcada — não precisa marcar as demais como "sem infração"
-  /// para contar.
-  bool get isReviewed => infractions.any((i) => i.isMarked);
-
   /// Quantas infrações da categoria têm nota marcada.
   int get markedCount => infractions.where((i) => i.isMarked).length;
 }

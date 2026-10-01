@@ -68,6 +68,8 @@ Em 30/09/2026, depois da execução, a pedido do usuário:
     - **Banco:** nenhuma mudança de esquema, porque a coluna `endTime` já existia.
     - O canvas desenha o cronômetro e não tem a linha de início e fim da 1.6.
 
+13. **A barra do checklist é a nota do participante.** O "X de Y categorias revisadas" saiu do checklist: no topo ficam só o percentual ("100,0%") e a barra, que começa cheia e esvazia a cada infração marcada. Abaixo de 70% (o corte de aprovação) a barra fica vermelha. A tela 1.6 continua mostrando as categorias, cada uma com o seu selo de %. O canvas desenha a barra como progresso de categorias.
+
 ### Desvios na execução (30/09/2026)
 
 A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1–8 saíram iguais ao plano. Os desvios foram:
@@ -9531,7 +9533,7 @@ Iniciar avaliação:
 - [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou." e o botão "Iniciar avaliação" — **sem a lista**;
 - [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** "Iniciada às…" — nada foi gravado;
 - [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, a hora "Iniciada às HH:MM" (sem nada correndo) e "salvo";
-- [ ] marque algumas notas e volte: a linha agora mostra "Iniciada às HH:MM", com a mesma hora do checklist; abrir de novo vai direto ao checklist, com as marcações.
+- [ ] marque algumas notas: o topo mostra só o percentual e a barra, sem "categorias revisadas"; a barra começa cheia em 100,0% e esvazia conforme as infrações; abaixo de 70% ela fica vermelha. Volte: a linha agora mostra "Iniciada às HH:MM", com a mesma hora do checklist; abrir de novo vai direto ao checklist, com as marcações.
 
 Conferir e finalizar (1.6):
 - [ ] "Finalizar avaliação" abre "Conferir e finalizar" **sem diálogo**, com a "Pontuação final" igual ao % do checklist, a pílula "Aprovado" (ou "Necessita reavaliação" abaixo de 70%), a linha "Nome · N infrações · mínimo para aprovação 70%.", a linha "Início HH:MM · Fim HH:MM" (o início é o do checklist) e cada categoria com "sem infração"/"N infrações" e o selo de %;
@@ -9590,6 +9592,6 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | 8 | Acabamento: <ul><li>faltam testes da virada da meia-noite nos rótulos de horário, do toque direto no indicador e da aba offline com a fila vazia;</li><li>a pluralização "N avaliações na fila" está em dois lugares;</li><li>o `atLabel` calcula `_isToday` duas vezes;</li><li>o `claimUnowned` faz uma consulta por linha sem dono;</li><li>o `saveSendResults` ignora em silêncio um id que sumiu;</li><li>o badge do indicador usa tamanhos soltos (16/2), como o da navbar (18/2);</li><li>a 1.6 não tem estado vazio próprio, porque o rodapé do checklist só existe com catálogo;</li><li>os testes do serviço usam esperas curtas em tempo real.</li></ul> |
 | 8 | Com rede "conectada mas sem dados", a entrada offline só acontece depois do timeout do `ApiClient` (15 s / 20 s); o envio também espera esse tempo antes de marcar "tempo esgotado". |
 | 8 | O toque no cabeçalho da categoria aberta e nos botões B/PM/M não mostra ripple; o "salvo" do cabeçalho do checklist é estático. |
-| 8 | Botões B/PM/M sem `Semantics(selected: …)`; "0 de 1 categorias revisadas" no plural. |
+| 8 | Botões B/PM/M sem `Semantics(selected: …)`. |
 | 8 | Aparelho compartilhado: os rascunhos e a fila de outro consultor ficam no aparelho (invisíveis para quem entrou) até o dono entrar de novo. Limpar ou avisar, se isso aparecer em campo. |
 | — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; o estado "não iniciada" do checklist, a pílula "Enviando", os chips "Na fila" e "Enviada" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |

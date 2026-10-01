@@ -62,7 +62,6 @@ void main() {
 
       expect(sections, hasLength(1));
       expect(sections.single.score, 100);
-      expect(sections.single.isReviewed, isFalse);
       expect(sections.single.infractions.single.isMarked, isFalse);
     });
 
@@ -91,7 +90,6 @@ void main() {
       final sections = buildChecklistSections(catalog, items);
 
       expect(sections.single.score, closeTo(86.6666, 0.001));
-      expect(sections.single.isReviewed, isTrue);
     });
 
     test('a nota escolhida traz sua observação, e as demais infrações ficam sem', () {
@@ -190,7 +188,6 @@ void main() {
       final infraction1 = sections.single.infractions.single;
       expect(infraction1.selectedNoteId, isNull);
       expect(infraction1.isMarked, isFalse);
-      expect(sections.single.isReviewed, isFalse);
       expect(sections.single.score, 100);
     });
 
@@ -217,35 +214,6 @@ void main() {
       expect(sections.map((s) => s.id), ['cat-1']);
       expect(sections.single.infractions.map((i) => i.id), ['inf-1']);
       expect(sections.single.infractions.single.notes.map((n) => n.id), ['note-pm-1']);
-    });
-
-    test('duas categorias, uma revisada e outra não', () {
-      final catalog = [
-        CatalogCategory(
-          id: 'cat-1',
-          code: 'CV',
-          name: 'Controle do Veículo',
-          order: 1,
-          infractions: [
-            infraction('inf-1', order: 1, notes: [note('note-b-1', 'B', 1)]),
-          ],
-        ),
-        CatalogCategory(
-          id: 'cat-2',
-          code: 'TP',
-          name: 'Transporte',
-          order: 2,
-          infractions: [
-            infraction('inf-2', order: 1, notes: [note('note-b-2', 'B', 1)]),
-          ],
-        ),
-      ];
-      final items = [item('inf-1', 'note-b-1')];
-
-      final sections = buildChecklistSections(catalog, items);
-
-      expect(sections[0].isReviewed, isTrue);
-      expect(sections[1].isReviewed, isFalse);
     });
 
     test('markedCount conta só as infrações com nota marcada', () {

@@ -192,7 +192,8 @@ void main() {
 
       expect(vm.sections.single.infractions.single.selectedNoteId, 'note-m');
       expect(vm.sections.single.score, 0);
-      expect(vm.reviewedCount, 1);
+      expect(vm.overallScore, 0);
+      expect(vm.isApproved, isFalse);
     });
 
     test('apertar a mesma nota de novo desmarca a infração', () async {
@@ -208,7 +209,8 @@ void main() {
 
       expect(vm.sections.single.infractions.single.selectedNoteId, isNull);
       expect(vm.sections.single.score, 100);
-      expect(vm.reviewedCount, 0);
+      expect(vm.overallScore, 100);
+      expect(vm.isApproved, isTrue);
     });
   });
 
