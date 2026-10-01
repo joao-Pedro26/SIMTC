@@ -49,9 +49,9 @@ class AssessmentRepository {
   }
 
   /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
-  /// agora — o cronômetro e a duração enviada contam a partir daqui. Se a
+  /// agora — a hora de início mostrada e enviada vem daqui. Se a
   /// avaliação já está em andamento ([findCurrent]), devolve a mesma, sem
-  /// recomeçar: um segundo toque não zera o cronômetro.
+  /// recomeçar: um segundo toque não muda a hora de início.
   ///
   /// `date` é a data de calendário da sessão (como `TrainingSession.date`,
   /// meia-noite local); sessão sem data, ou fora do cache, usa a de hoje.
@@ -229,7 +229,7 @@ class AssessmentRepository {
   }
 
   /// As avaliações de [ownerUserId] numa sessão, em qualquer situação — o
-  /// detalhe da sessão mostra com elas o cronômetro do rascunho e o chip
+  /// detalhe da sessão mostra com elas a hora de início do rascunho e o chip
   /// "Na fila"/"Erro no envio".
   Stream<List<LocalAssessment>> watchSessionAssessments(
     String sessionId,

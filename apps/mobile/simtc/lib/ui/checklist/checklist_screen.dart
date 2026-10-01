@@ -284,7 +284,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'O cronômetro começa quando você tocar em "Iniciar avaliação".',
+            'A hora de início é registrada quando você tocar em "Iniciar avaliação".',
             style: AppTypography.meta,
             textAlign: TextAlign.center,
           ),

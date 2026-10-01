@@ -59,7 +59,7 @@ class ChecklistViewModel extends ChangeNotifier {
   SessionParticipant? get participant => _participant;
   String? get expandedCategoryId => _expandedCategoryId;
 
-  /// A avaliação começou: há rascunho, cronômetro e marcações. Antes disso,
+  /// A avaliação começou: há rascunho, hora de início e marcações. Antes disso,
   /// a tela mostra só o "Iniciar avaliação" — abrir um participante sem
   /// querer não grava nada (decisão de 29/09/2026).
   bool get isStarted => _assessmentId != null;

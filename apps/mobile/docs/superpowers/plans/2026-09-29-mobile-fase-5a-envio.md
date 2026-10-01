@@ -58,6 +58,16 @@ Em 30/09/2026, na revisão final da execução:
     - O `participantsSyncedAt` passou a ser a hora do pedido, não a da gravação.
     - O canvas não tem este estado.
 
+Em 30/09/2026, depois da execução, a pedido do usuário:
+
+12. **Sem cronômetro: só a hora de início e a de fim.** Isto substitui a parte "relógio corrido" da decisão 5 e o cronômetro da decisão 8.
+    - **Checklist:** o cabeçalho mostra "Iniciada às 08:12" (ou "Iniciada em 28 set 08:12"), sem nada correndo. O estado "não iniciada" diz que "a hora de início é registrada quando você tocar em 'Iniciar avaliação'".
+    - **Linha do participante:** o rascunho mostra "Iniciada às 08:12". O `ElapsedClock` e o `stopwatchLabel` saíram.
+    - **Tela 1.6:** ganha a linha "Início 08:12 · Fim 08:31". O fim é a hora em que a 1.6 abriu, e o "Confirmar" grava esse mesmo horário, mesmo que o toque venha depois. Abrir a 1.6 de novo recalcula o fim.
+    - **Envio:** o `endTime` enviado é esse fim, e o backend continua recebendo `startTime` e `endTime` no mesmo formato. A duração é fim − início, então fica alguns segundos menor que a do toque em "Confirmar".
+    - **Banco:** nenhuma mudança de esquema, porque a coluna `endTime` já existia.
+    - O canvas desenha o cronômetro e não tem a linha de início e fim da 1.6.
+
 ### Desvios na execução (30/09/2026)
 
 A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1–8 saíram iguais ao plano. Os desvios foram:
@@ -9519,14 +9529,14 @@ Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos quatr
 
 Iniciar avaliação:
 - [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou." e o botão "Iniciar avaliação" — **sem a lista**;
-- [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** cronômetro — nada foi gravado;
-- [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, o cronômetro em 00:00:00 e "salvo";
-- [ ] marque algumas notas e volte: a linha agora mostra o cronômetro correndo ("00:03:12"); abrir de novo vai direto ao checklist, com as marcações.
+- [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** "Iniciada às…" — nada foi gravado;
+- [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, a hora "Iniciada às HH:MM" (sem nada correndo) e "salvo";
+- [ ] marque algumas notas e volte: a linha agora mostra "Iniciada às HH:MM", com a mesma hora do checklist; abrir de novo vai direto ao checklist, com as marcações.
 
 Conferir e finalizar (1.6):
-- [ ] "Finalizar avaliação" abre "Conferir e finalizar" **sem diálogo**, com a "Pontuação final" igual ao % do checklist, a pílula "Aprovado" (ou "Necessita reavaliação" abaixo de 70%), a linha "Nome · N infrações · mínimo para aprovação 70%." e cada categoria com "sem infração"/"N infrações" e o selo de %;
-- [ ] tocar numa categoria volta ao checklist com ela aberta; o "←" volta ao checklist sem mudar nada;
-- [ ] "Confirmar" (com rede) volta ao detalhe da sessão; em segundos a linha vira "Aprovado · N%"/"Reavaliar · N%" sozinha, e a avaliação aparece no painel web (ou em `GET /api/practical-assessments/by-participant/<id>`), com a duração coerente com o cronômetro;
+- [ ] "Finalizar avaliação" abre "Conferir e finalizar" **sem diálogo**, com a "Pontuação final" igual ao % do checklist, a pílula "Aprovado" (ou "Necessita reavaliação" abaixo de 70%), a linha "Nome · N infrações · mínimo para aprovação 70%.", a linha "Início HH:MM · Fim HH:MM" (o início é o do checklist) e cada categoria com "sem infração"/"N infrações" e o selo de %;
+- [ ] tocar numa categoria volta ao checklist com ela aberta; o "←" volta ao checklist sem mudar nada; ao abrir a 1.6 de novo, o "Fim" é o horário de agora;
+- [ ] "Confirmar" (com rede) volta ao detalhe da sessão; em segundos a linha vira "Aprovado · N%"/"Reavaliar · N%" sozinha, e a avaliação aparece no painel web (ou em `GET /api/practical-assessments/by-participant/<id>`), com o início e o fim iguais aos da 1.6 (a hora do toque em "Confirmar" não entra: vale a hora em que a 1.6 abriu);
 - [ ] nesse caminho a linha **nunca** volta a "Avaliando · você" depois do envio. Entre "Na fila" e "Aprovado"/"Reavaliar" pode aparecer por um instante o chip azul "Enviada", com "N,N% · enviada às HH:MM"; enquanto ele estiver lá, tocar na linha não abre nada (decisão 11).
 
 Offline — **corte a rede de verdade** (via USB o modo avião não derruba o `adb reverse`): modo avião, confira que o Wi-Fi desligou e rode `adb -s <ID_DO_APARELHO> reverse --remove tcp:3001`.
@@ -9558,7 +9568,7 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5B. Se alg
 
 ## Pendências levadas para as fases seguintes
 
-Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslogava sem rede (prioridade), perfil salvo com tokens de outro usuário, `saveUser` que derrubava a abertura, cronômetro na linha "Avaliando · você", badge da fila, "Finalizar" que gravava direto, marcações órfãs no envio, reabrir participante já finalizado, duração enviada, rascunhos por consultor, reavaliação reabrindo o rascunho antigo, formato do `date`, aviso de hit-test dos testes da Home, a linha que voltava a "Avaliando · você" depois do envio aceito (decisão 11).
+Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslogava sem rede (prioridade), perfil salvo com tokens de outro usuário, `saveUser` que derrubava a abertura, hora de início na linha "Avaliando · você", badge da fila, "Finalizar" que gravava direto, marcações órfãs no envio, reabrir participante já finalizado, duração enviada, rascunhos por consultor, reavaliação reabrindo o rascunho antigo, formato do `date`, aviso de hit-test dos testes da Home, a linha que voltava a "Avaliando · você" depois do envio aceito (decisão 11).
 
 | Fase | Pendência |
 |---|---|

@@ -197,7 +197,7 @@ String? assessedAtLabelFor(
 
 /// Onde está a avaliação deste aparelho numa linha "comigo" (Fase 5A).
 enum LocalProgress {
-  /// Rascunho aberto: a linha mostra o cronômetro.
+  /// Rascunho aberto: a linha mostra a hora de início.
   draft,
 
   /// Confirmada, esperando o envio: chip "Na fila".

@@ -542,7 +542,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   /// foi baixada de novo (decisão de 29/09/2026 e revisão de 30/09/2026): a
   /// mesma pílula "Na fila" da aba Sincronizar, "Erro no envio" se o último
   /// envio falhou, ou "Enviada" se já foi aceita. O canvas não tem estes
-  /// estados. (O rascunho nunca chega aqui: mostra o cronômetro, não a fila.)
+  /// estados. (O rascunho nunca chega aqui: mostra a hora de início, não a fila.)
   Widget _buildQueueChip(LocalProgress progress) {
     return switch (progress) {
       LocalProgress.failed => const StatusChip(
