@@ -9571,7 +9571,9 @@ Regressões:
 
 **Não verificável neste aparelho, e por quê:** o aparelho compartilhado (outro consultor entrando com a fila de alguém) e a recusa do backend a um item só dependem de um segundo usuário ou de apagar dados no banco — ficam cobertos pelos testes das Tasks 2 e 3. A linha "Enviada" parada (o download da sessão falhando logo depois de um envio aceito) exigiria derrubar a rede entre o envio e o download; fica coberta pelos testes do serviço e do detalhe (decisão 11).
 
-- [ ] **Step 4: Registrar o resultado**
+- [x] **Step 4: Registrar o resultado**
+
+**Validado em 01/10/2026, no aparelho físico, pelo usuário. As decisões 12 a 15 (início e fim no lugar do cronômetro, barra da nota, tela de iniciar avaliação do canvas novo e uma avaliação por vez) entraram durante a validação, e o usuário a encerrou com "sem mudanças por agora". Aval dado para planejar a Fase 5B.**
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 5B. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
 
