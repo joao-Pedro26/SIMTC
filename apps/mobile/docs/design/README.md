@@ -2,22 +2,30 @@
 
 `SIMTC-Mobile.dc.html` é o canvas do projeto "Paleta e componentes do app móvel"
 do Claude Design (`claude.ai/design/p/e2d444d2-44d5-4519-a4d1-fb3e7bb8e588`),
-extraído em 24/09/2026 do export completo. São 3655 linhas e 39 quadros.
+extraído em 01/10/2026 do export completo. São 3836 linhas e 45 quadros.
 
 ## Como o arquivo está organizado
 
 | Linhas | Bloco | Conteúdo |
 |---|---|---|
-| 459–694 | Variante ADMIN | 1.11 Adicionar participante (465), 1.12 Dados do treinamento (544), 1.13 Consultores da sessão (619) |
-| 695–1378 | Celular (compact) | 1.1 Abertura (702), 1.2 Entrar (719), 1.3 Minhas sessões (767), 1.4 Detalhe consultor (863) e ADMIN (952), Checklist (1051), 1.6 Conferir e finalizar (1126), 1.8 Resultado (1180), 1.9 Sincronizar (1260), 1.10 Perfil (1328) |
-| 1379–3273 | Tablet | as mesmas telas em 1280×800 e 800×1280, mais dois quadros "Spec para dev" (3214 e 3245) |
-| 3274–3655 | Fundações e sistema de design | Contexto de uso, mapeamento para Material 3, escala tipográfica, paleta semântica e as decisões do designer |
+| 459–694 | Variante ADMIN | 1.11 Adicionar participante (464), 1.12 Dados do treinamento (543), 1.13 Consultores da sessão (618) |
+| 695–1438 | Celular (compact) | 1.1 Abertura (701), 1.2 Entrar (718), 1.3 Minhas sessões (766), 1.4 Detalhe consultor (862) e ADMIN (951), 1.4.1 Iniciar avaliação (1050), Checklist (1110), 1.6 Conferir e finalizar (1185), 1.8 Resultado (1239), 1.9 Sincronizar (1319), 1.10 Perfil (1387) |
+| 1439–3453 | Tablet | as mesmas telas em 1280×800 e 800×1280 (1.4.1 Iniciar avaliação em 1934 e 1995), mais dois quadros "Spec para dev" (3393 e 3424) |
+| 3454–3836 | Fundações e sistema de design | Contexto de uso, mapeamento para Material 3, escala tipográfica, paleta semântica e as decisões do designer |
 
 Cada quadro é um `div.dv-opt` com o rótulo da tela; as telas são HTML com estilo
 inline, então dá para ler medidas, cores e pesos de fonte direto do markup.
 Alguns quadros usam dados de um `<script type="text/x-dc">` no fim do arquivo
 (listas `statusChips`, `severity`, `typeScale`, `brand`, `CV`, `sessionsToday`,
 `sessionsWeek`).
+
+## O que mudou no export de 01/10/2026
+
+Em relação ao export de 24/09/2026, só entraram quadros novos (nenhum quadro existente mudou; os ids das imagens mudam a cada export):
+
+- **6a — 1.4.1 Iniciar avaliação · antes do checklist** (celular, linha 1050): o estado "não iniciada" do checklist, com o bloco "A avaliação ainda não começou.", a lista "O que será avaliado" (código, nome, itens e pontos de cada categoria) e o botão "Iniciar avaliação" no rodapé.
+- **6b e 6c** — a mesma tela no tablet, paisagem (1934) e retrato (1995).
+- Os textos de fluxo do celular e do tablet passaram a incluir o 6a e o 6b/6c.
 
 ## O que mudou no export de 24/09/2026
 
