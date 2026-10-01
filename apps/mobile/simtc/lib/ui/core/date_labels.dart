@@ -47,15 +47,11 @@ String atLabel(DateTime moment, DateTime now) {
   return _isToday(moment, now) ? 'às $clock' : 'em $clock';
 }
 
-/// "00:12:41" — o cronômetro da avaliação. Um intervalo negativo (o relógio
-/// do aparelho voltou) vale zero.
-String stopwatchLabel(Duration elapsed) {
-  final total = elapsed.isNegative ? Duration.zero : elapsed;
-  final hours = _dois(total.inHours);
-  final minutes = _dois(total.inMinutes % 60);
-  final seconds = _dois(total.inSeconds % 60);
-  return '$hours:$minutes:$seconds';
-}
+/// "Iniciada às 08:12" se foi hoje; "Iniciada em 28 set 08:12" nos outros
+/// dias — a hora do "Iniciar avaliação", que o app só registra (sem
+/// cronômetro, decisão de 30/09/2026).
+String startedLabel(DateTime start, DateTime now) =>
+    'Iniciada ${atLabel(start, now)}';
 
 /// Texto da faixa de offline: sem conexão, o consultor precisa saber a idade
 /// do que está vendo — uma lista de ontem parece igualzinha a uma de agora.

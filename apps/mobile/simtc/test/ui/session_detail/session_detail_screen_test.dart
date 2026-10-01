@@ -17,6 +17,7 @@ import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/evaluation/evaluation_placeholder_screen.dart';
 import 'package:simtc/ui/session_detail/participant_row.dart';
@@ -380,7 +381,8 @@ void main() {
         tester.widget<ParticipantRow>(find.byKey(const ValueKey('participante-1')));
 
     testWidgets(
-        'o rascunho mostra o cronômetro, contando desde o "Iniciar avaliação"',
+        'o rascunho mostra a hora em que a avaliação começou, no "Iniciar '
+        'avaliação"',
         (tester) async {
       final start = DateTime.now().subtract(const Duration(minutes: 12, seconds: 41));
 
@@ -391,7 +393,7 @@ void main() {
       );
 
       expect(find.text('Avaliando · você'), findsOneWidget);
-      expect(find.textContaining('00:12:4'), findsOneWidget);
+      expect(find.text(startedLabel(start, DateTime.now())), findsOneWidget);
       expect(row(tester).onTap, isNotNull, reason: 'o rascunho abre o checklist');
     });
 

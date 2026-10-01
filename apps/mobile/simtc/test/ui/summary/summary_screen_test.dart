@@ -22,6 +22,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? endTime,
   }) =>
       Future.error(Exception('disco cheio'));
 }
@@ -173,6 +174,10 @@ void main() {
 
     expect(find.text('Conferir e finalizar'), findsOneWidget);
     expect(find.text('Pontuação final'), findsOneWidget);
+    expect(
+      find.textContaining(RegExp(r'^Início \d\d:\d\d · Fim \d\d:\d\d$')),
+      findsOneWidget,
+    );
     expect(find.text('85,0%'), findsOneWidget);
     expect(find.text('Aprovado'), findsOneWidget);
     expect(

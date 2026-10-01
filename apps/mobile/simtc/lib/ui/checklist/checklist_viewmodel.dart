@@ -27,7 +27,6 @@ class ChecklistViewModel extends ChangeNotifier {
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
     DateTime Function()? now,
-    this.tickInterval = const Duration(seconds: 1),
   })  : _assessmentRepository = assessmentRepository,
         _participantRepository = participantRepository,
         _catalogRepository = catalogRepository,
@@ -43,14 +42,8 @@ class ChecklistViewModel extends ChangeNotifier {
   final AssessmentCatalogRepository _catalogRepository;
   final DateTime Function() _now;
 
-  /// Intervalo real do `Timer` do cronômetro — os testes passam um intervalo
-  /// bem curto e avançam um relógio próprio (`now`) entre os ticks, em vez de
-  /// usar `fake_async`: o `Timer` roda de verdade, só que rápido.
-  final Duration tickInterval;
-
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessmentItem>>? _itemsSubscription;
-  Timer? _ticker;
 
   bool _disposed = false;
   bool _loading = true;
@@ -88,11 +81,11 @@ class ChecklistViewModel extends ChangeNotifier {
   /// daria 100%, "Aprovado": a tela nem oferece o "Finalizar avaliação".
   bool get hasCatalog => sections.isNotEmpty;
 
-  /// "00:12:34" desde o "Iniciar avaliação" — `00:00:00` antes dele.
-  String get elapsedLabel {
+  /// "Iniciada às 08:12" — a hora do "Iniciar avaliação"; nula antes dele.
+  /// Não há cronômetro: o app só registra quando começou (30/09/2026).
+  String? get startedText {
     final start = _startTime;
-    if (start == null) return '00:00:00';
-    return stopwatchLabel(_now().difference(start));
+    return start == null ? null : startedLabel(start, _now());
   }
 
   /// Só lê: a avaliação em andamento, se houver, e o catálogo. Nada é gravado
@@ -143,7 +136,7 @@ class ChecklistViewModel extends ChangeNotifier {
     }
   }
 
-  /// Liga a tela à avaliação em andamento: as marcações e o cronômetro.
+  /// Liga a tela à avaliação em andamento: as marcações e a hora de início.
   void _attach(LocalAssessment assessment) {
     _assessmentId = assessment.id;
     _startTime = assessment.startTime;
@@ -153,8 +146,6 @@ class ChecklistViewModel extends ChangeNotifier {
       _items = items;
       notifyListeners();
     });
-
-    _ticker ??= Timer.periodic(tickInterval, (_) => notifyListeners());
   }
 
   /// Como no canvas: o checklist começa com a primeira categoria aberta.
@@ -214,7 +205,6 @@ class ChecklistViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _ticker?.cancel();
     _participantSubscription?.cancel();
     _itemsSubscription?.cancel();
     super.dispose();

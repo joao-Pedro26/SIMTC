@@ -161,6 +161,10 @@ class _SummaryScreenState extends State<SummaryScreen> {
           ),
           const SizedBox(height: AppSpacing.md + 2),
           Text(_detailLine(), style: AppTypography.summaryDetail),
+          if (_viewModel.timesLabel != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(_viewModel.timesLabel!, style: AppTypography.summaryDetail),
+          ],
         ],
       ),
     );

@@ -44,9 +44,8 @@ void main() {
     expect(atLabel(DateTime(2026, 9, 22, 7, 58), agora), 'em 22 set 07:58');
   });
 
-  test('stopwatchLabel é o cronômetro, e um intervalo negativo vale zero', () {
-    expect(stopwatchLabel(const Duration(minutes: 12, seconds: 41)), '00:12:41');
-    expect(stopwatchLabel(const Duration(hours: 1, minutes: 2, seconds: 3)), '01:02:03');
-    expect(stopwatchLabel(const Duration(seconds: -5)), '00:00:00');
+  test('startedLabel diz quando a avaliação começou', () {
+    expect(startedLabel(DateTime(2026, 9, 23, 8, 12), agora), 'Iniciada às 08:12');
+    expect(startedLabel(DateTime(2026, 9, 22, 8, 12), agora), 'Iniciada em 22 set 08:12');
   });
 }

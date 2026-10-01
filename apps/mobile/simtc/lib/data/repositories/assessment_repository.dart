@@ -184,20 +184,22 @@ class AssessmentRepository {
     return loadItems(localAssessmentId);
   }
 
-  /// "Confirmar" da tela 1.6: grava `endTime`, o nome do participante e o %
-  /// que a tela mostrou, e põe a avaliação na fila de envio. Quem sobe é o
+  /// "Confirmar" da tela 1.6: grava `endTime` (o fim que a tela mostrou, ou a
+  /// hora do toque se nenhum for dado), o nome do participante e o % que a
+  /// tela mostrou, e põe a avaliação na fila de envio. Quem sobe é o
   /// `AssessmentSyncService`, que observa a fila.
   Future<void> confirm(
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? endTime,
   }) {
     final now = DateTime.now();
     return (_db.update(_db.localAssessments)
           ..where((t) => t.id.equals(localAssessmentId)))
         .write(
       LocalAssessmentsCompanion(
-        endTime: Value(now),
+        endTime: Value(endTime ?? now),
         participantName: Value(participantName),
         score: Value(score),
         syncStatus: const Value(LocalSyncStatus.pendingSync),

@@ -165,7 +165,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       children: [
         const Icon(AppIcons.timer, size: 14, color: AppColors.text3),
         const SizedBox(width: AppSpacing.xs),
-        Text(_viewModel.elapsedLabel, style: AppTypography.code),
+        Text(_viewModel.startedText ?? '', style: AppTypography.meta),
         const SizedBox(width: AppSpacing.sm),
         Container(width: 1, height: 11, color: AppColors.borderStrong),
         const SizedBox(width: AppSpacing.sm),

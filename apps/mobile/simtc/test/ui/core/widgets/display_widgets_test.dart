@@ -4,7 +4,6 @@ import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
-import 'package:simtc/ui/core/widgets/elapsed_clock.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
@@ -250,20 +249,6 @@ void main() {
 
     await tester.tap(find.text('Perfil'));
     expect(selected, 2);
-  });
-
-  testWidgets('ElapsedClock avança sozinho a cada tick', (tester) async {
-    var now = DateTime(2026, 9, 29, 10, 12, 41);
-    await _pump(
-      tester,
-      ElapsedClock(start: DateTime(2026, 9, 29, 10), clock: () => now),
-    );
-    expect(find.text('00:12:41'), findsOneWidget);
-
-    now = now.add(const Duration(seconds: 1));
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('00:12:42'), findsOneWidget);
   });
 
   testWidgets('SkeletonListItem anima sem quebrar o layout', (tester) async {

@@ -163,6 +163,23 @@ void main() {
     });
   });
 
+  test('confirmar grava o fim pedido — e a hora do toque se nenhum for dado',
+      () async {
+    final a = await open('tp-1');
+    final b = await open('tp-2');
+
+    await repository.confirm(a.id,
+        participantName: 'A', score: 90, endTime: DateTime(2026, 9, 30, 8, 31));
+    await repository.confirm(b.id, participantName: 'B', score: 90);
+
+    final rows = {
+      for (final row in await db.select(db.localAssessments).get())
+        row.id: row.endTime,
+    };
+    expect(rows[a.id], DateTime(2026, 9, 30, 8, 31));
+    expect(rows[b.id], isNotNull);
+  });
+
   group('findCurrent', () {
     Future<LocalAssessment?> current(String participantId, {String owner = 'user-1'}) {
       return repository.findCurrent(trainingParticipantId: participantId, ownerUserId: owner);

@@ -19,7 +19,6 @@ import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
-import '../core/widgets/elapsed_clock.dart';
 import '../core/widgets/filter_chip_bar.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
@@ -465,18 +464,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       chip: showsLocal
           ? _buildQueueChip(progress!)
           : _buildSituationChip(participant, situation),
+      // O rascunho mostra só a hora do "Iniciar avaliação": o app não tem
+      // cronômetro, só registra início e fim (decisão de 30/09/2026).
       meta: showsLocal
           ? queueMetaFor(local!, _viewModel.now)
-          : assessedAtLabelFor(participant, situation, _viewModel.now),
-      // O cronômetro do rascunho, como no canvas "1e" — conta desde o
-      // "Iniciar avaliação" (relógio corrido, decisão de 29/09/2026).
-      liveMeta: progress == LocalProgress.draft
-          ? ElapsedClock(
-              start: local!.startTime,
-              clock: () => _viewModel.now,
-              style: AppTypography.meta,
-            )
-          : null,
+          : progress == LocalProgress.draft
+              ? startedLabel(local!.startTime, _viewModel.now)
+              : assessedAtLabelFor(participant, situation, _viewModel.now),
       blockedNote: blockedNoteFor(participant, situation),
       muted: situation == ParticipantSituation.other,
       accentColor: situation == ParticipantSituation.mine

@@ -9,6 +9,7 @@ import '../../data/repositories/participant_repository.dart';
 import '../../data/services/local/app_database.dart';
 import '../../utils/scoring.dart';
 import '../checklist/checklist_sections.dart';
+import '../core/date_labels.dart';
 
 /// Estado da tela 1.6 "Conferir e finalizar" (Fase 5A).
 ///
@@ -23,7 +24,9 @@ class SummaryViewModel extends ChangeNotifier {
     required AssessmentRepository assessmentRepository,
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
-  })  : _assessmentRepository = assessmentRepository,
+    DateTime Function()? now,
+  })  : _now = now ?? DateTime.now,
+        _assessmentRepository = assessmentRepository,
         _participantRepository = participantRepository,
         _catalogRepository = catalogRepository;
 
@@ -31,6 +34,7 @@ class SummaryViewModel extends ChangeNotifier {
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
+  final DateTime Function() _now;
 
   static const String _confirmFailed =
       'Não foi possível confirmar a avaliação. Tente de novo.';
@@ -45,11 +49,23 @@ class SummaryViewModel extends ChangeNotifier {
   LocalAssessment? _assessment;
   SessionParticipant? _participant;
   List<ChecklistCategory> _sections = const [];
+  DateTime? _endedAt;
 
   bool get isLoading => _loading;
   SessionParticipant? get participant => _participant;
   List<ChecklistCategory> get sections => _sections;
   double get overallScore => overallScoreOf(_sections);
+
+  /// "Início 08:12 · Fim 08:31": o fim é a hora em que a tela abriu, e é esse
+  /// mesmo horário que o "Confirmar" grava (decisão de 30/09/2026). Nulo sem
+  /// rascunho.
+  String? get timesLabel {
+    final start = _assessment?.startTime;
+    final end = _endedAt;
+    if (start == null || end == null) return null;
+    final now = _now();
+    return 'Início ${clockLabel(start, now)} · Fim ${clockLabel(end, now)}';
+  }
 
   /// Mesmo corte do backend (`getApprovalStatus`): 70% ou mais.
   bool get isApproved => getApprovalStatus(overallScore) == 'APROVADO';
@@ -89,6 +105,7 @@ class SummaryViewModel extends ChangeNotifier {
     _assessment = assessment;
 
     if (assessment != null) {
+      _endedAt = _now();
       final items = await _assessmentRepository.loadItems(assessment.id);
       final catalog = await _catalogRepository.loadCatalog();
       if (_disposed) return;
@@ -113,6 +130,7 @@ class SummaryViewModel extends ChangeNotifier {
         assessment.id,
         participantName: _participant?.name,
         score: overallScore,
+        endTime: _endedAt,
       );
       _confirmed = true;
     } catch (_) {

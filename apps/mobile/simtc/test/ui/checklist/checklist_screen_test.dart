@@ -450,15 +450,15 @@ void main() {
     });
 
     testWidgets(
-        '"Iniciar avaliação" grava o início e mostra o checklist, com o '
-        'cronômetro do zero', (tester) async {
+        '"Iniciar avaliação" grava o início e mostra o checklist, com a hora '
+        'em que começou', (tester) async {
       await pumpScreen(tester, started: false);
 
       await tester.tap(find.text('Iniciar avaliação'));
       await tester.pumpAndSettle();
 
       expect(find.text('Excesso de velocidade'), findsOneWidget);
-      expect(find.textContaining('00:00:0'), findsOneWidget);
+      expect(find.textContaining('Iniciada às'), findsOneWidget);
       expect(find.text('salvo'), findsOneWidget);
       expect(find.text('0 de 1 categorias revisadas'), findsOneWidget);
       expect(find.text('Finalizar avaliação'), findsOneWidget);

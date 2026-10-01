@@ -11,15 +11,6 @@ import 'package:simtc/ui/checklist/checklist_viewmodel.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
-/// Relógio mutável para o cronômetro nos testes: em vez de `fake_async`, o
-/// `Timer.periodic` roda de verdade (com um intervalo bem curto) e o teste
-/// avança este valor entre os ticks.
-class _MutableClock {
-  _MutableClock(this.value);
-  DateTime value;
-  DateTime call() => value;
-}
-
 void main() {
   late _MockApiClient api;
   late AppDatabase db;
@@ -96,7 +87,7 @@ void main() {
     }
   }
 
-  ChecklistViewModel buildViewModel({DateTime Function()? now, Duration? tickInterval}) {
+  ChecklistViewModel buildViewModel({DateTime Function()? now}) {
     return ChecklistViewModel(
       sessionId: 'sess-1',
       participantId: 'tp-1',
@@ -105,7 +96,6 @@ void main() {
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
       now: now,
-      tickInterval: tickInterval ?? const Duration(seconds: 1),
     );
   }
 
@@ -130,11 +120,11 @@ void main() {
     });
 
     test(
-        '"Iniciar avaliação" grava o início agora, abre a primeira categoria e '
-        'liga o cronômetro', () async {
+        '"Iniciar avaliação" grava o início agora e abre a primeira categoria',
+        () async {
       await seedParticipant();
       await seedCatalog();
-      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
+      final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
       final before = DateTime.now();
@@ -149,11 +139,6 @@ void main() {
       expect(row.syncStatus, LocalSyncStatus.draft);
       // O banco guarda segundos: o início é o toque, com essa precisão.
       expect(row.startTime.isBefore(before.subtract(const Duration(seconds: 1))), isFalse);
-
-      var notifications = 0;
-      vm.addListener(() => notifications++);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      expect(notifications, greaterThan(0), reason: 'o cronômetro está correndo');
     });
 
     test('um segundo toque em "Iniciar" não recomeça a avaliação', () async {
@@ -253,43 +238,18 @@ void main() {
     });
   });
 
-  group('elapsedLabel', () {
-    test('avança conforme o relógio injetado, sem esperar tempo real', () async {
+  group('startedText', () {
+    test('diz quando a avaliação começou — nada antes do "Iniciar"', () async {
       await seedParticipant();
       await seedCatalog();
-      // O "Iniciar" grava `startTime` com o relógio real — a base do relógio
-      // falso precisa ser próxima do "agora" de verdade, senão a diferença
-      // fica negativa e o formato trava em zero.
-      final clock = _MutableClock(DateTime.now());
-      final vm = buildViewModel(now: clock.call, tickInterval: const Duration(milliseconds: 5));
+      final vm = buildViewModel();
       addTearDown(vm.dispose);
       await vm.init();
-      expect(vm.elapsedLabel, '00:00:00', reason: 'antes do "Iniciar"');
+      expect(vm.startedText, isNull, reason: 'antes do "Iniciar"');
+
       await vm.start();
 
-      expect(vm.elapsedLabel, '00:00:00');
-
-      clock.value = clock.value.add(const Duration(hours: 1, minutes: 2, seconds: 3));
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-
-      expect(vm.elapsedLabel, '01:02:03');
-    });
-
-    test('o cronômetro avisa a tela a cada tick', () async {
-      await seedParticipant();
-      await seedCatalog();
-      final vm = buildViewModel(tickInterval: const Duration(milliseconds: 5));
-      addTearDown(vm.dispose);
-      await vm.init();
-      await vm.start();
-
-      var notifications = 0;
-      vm.addListener(() => notifications++);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-
-      expect(notifications, greaterThan(0),
-          reason: 'o elapsedLabel é calculado na leitura; sem o aviso do tick, '
-              'o cronômetro da tela ficaria parado');
+      expect(vm.startedText, matches(RegExp(r'^Iniciada às \d\d:\d\d$')));
     });
   });
 
@@ -353,19 +313,6 @@ void main() {
       expect(vm.isStarted, isFalse, reason: 'sem catálogo, o "Iniciar" não grava');
       expect(await db.select(db.localAssessments).get(), isEmpty);
     });
-  });
-
-  testWidgets('dispose cancela o cronômetro: nenhum timer fica pendente', (tester) async {
-    await seedParticipant();
-    await seedCatalog();
-    final vm = buildViewModel();
-    await vm.init();
-    await vm.start();
-    expect(vm.isStarted, isTrue, reason: 'o "Iniciar" ligou o cronômetro');
-
-    vm.dispose();
-    // O `testWidgets` falha sozinho se terminar com um `Timer` pendente: um
-    // `Timer.periodic` que o dispose esquecesse de cancelar ficaria aqui.
   });
 
   test('uma escrita que termina depois do dispose não notifica a tela morta',

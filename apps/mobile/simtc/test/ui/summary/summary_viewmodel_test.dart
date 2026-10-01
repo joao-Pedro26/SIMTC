@@ -20,6 +20,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? endTime,
   }) =>
       Future.error(Exception('disco cheio'));
 }
@@ -120,8 +121,12 @@ void main() {
     return draft;
   }
 
-  SummaryViewModel buildViewModel({AssessmentRepository? assessments}) {
+  SummaryViewModel buildViewModel({
+    AssessmentRepository? assessments,
+    DateTime Function()? now,
+  }) {
     return SummaryViewModel(
+      now: now,
       participantId: 'tp-1',
       assessmentRepository: assessments ?? assessmentRepository,
       participantRepository: participantRepository,
@@ -178,6 +183,29 @@ void main() {
     expect(row.endTime, isNotNull);
     expect(row.participantName, 'Ana Paula Ribeiro');
     expect(row.score, 85);
+  });
+
+  test(
+      'o fim é a hora em que a 1.6 abriu: o rótulo mostra início e fim, e o '
+      '"Confirmar" grava esse mesmo fim', () async {
+    final draft = await draftWith({'inf-1': 'inf-1-PM'});
+    await (db.update(db.localAssessments)..where((t) => t.id.equals(draft.id)))
+        .write(LocalAssessmentsCompanion(startTime: Value(DateTime(2026, 9, 30, 8, 12))));
+    var clock = DateTime(2026, 9, 30, 8, 31);
+    final vm = buildViewModel(now: () => clock);
+    addTearDown(vm.dispose);
+    await vm.init();
+
+    expect(vm.timesLabel, 'Início 08:12 · Fim 08:31');
+
+    clock = DateTime(2026, 9, 30, 9, 5); // o consultor demorou no "Confirmar"
+    await vm.confirm();
+
+    expect(vm.timesLabel, 'Início 08:12 · Fim 08:31', reason: 'o fim não anda');
+    final row = await (db.select(db.localAssessments)
+          ..where((t) => t.id.equals(draft.id)))
+        .getSingle();
+    expect(row.endTime, DateTime(2026, 9, 30, 8, 31));
   });
 
   test('sem rascunho, não há o que confirmar', () async {
