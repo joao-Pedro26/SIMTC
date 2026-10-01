@@ -451,6 +451,29 @@ void main() {
       expect(await db.select(db.localAssessments).get(), isEmpty);
     });
 
+    testWidgets(
+        'lista "O que será avaliado": o código, o nome e os itens de cada '
+        'categoria, sem abrir nada', (tester) async {
+      await addSecondCategory();
+      await pumpScreen(tester, started: false);
+
+      expect(find.text('O que será avaliado'), findsOneWidget);
+      expect(find.text('3 itens'), findsOneWidget, reason: 'o total, no título');
+      expect(find.text('CV'), findsOneWidget);
+      expect(find.text('Controle do Veículo'), findsOneWidget);
+      expect(find.text('1 item'), findsOneWidget);
+      expect(find.text('RR'), findsOneWidget);
+      expect(find.text('Respeito às Regras'), findsOneWidget);
+      expect(find.text('2 itens'), findsOneWidget);
+      expect(find.textContaining('pts'), findsNothing, reason: 'o app não tem pontos');
+
+      await tester.tap(find.text('Controle do Veículo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excesso de velocidade'), findsNothing,
+          reason: 'antes do "Iniciar", a lista é só leitura');
+    });
+
     testWidgets('abrir sem querer e voltar não deixa rastro', (tester) async {
       await pumpOverOrigin(tester, started: false);
 

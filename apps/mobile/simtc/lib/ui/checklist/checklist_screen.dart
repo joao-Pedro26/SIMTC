@@ -252,35 +252,104 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   /// Antes do "Iniciar avaliação" (decisão de 29/09/2026): o consultor pode ter
   /// aberto o participante sem querer — nada foi gravado, e voltar não deixa
-  /// rastro. O canvas não tem este estado.
+  /// rastro. Segue o quadro "6a" do canvas (1.4.1): o aviso, o que será
+  /// avaliado (só leitura, sem pontos — o app não tem pontos) e, no rodapé, o
+  /// botão.
   Widget _buildNotStarted() {
-    return Padding(
+    final sections = _viewModel.sections;
+    final items = sections.fold<int>(0, (sum, s) => sum + s.infractions.length);
+
+    return ListView(
       key: const Key('checklist-not-started'),
+      children: [
+        _buildNotStartedHero(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.lg,
+            AppSpacing.xl,
+            AppSpacing.sm + 2,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('O que será avaliado', style: AppTypography.sectionTitle),
+              Text(_itemsLabel(items), style: AppTypography.categoryCount),
+            ],
+          ),
+        ),
+        DecoratedBox(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border.symmetric(horizontal: BorderSide(color: AppColors.border)),
+          ),
+          child: Column(
+            children: [for (final category in sections) _buildPreviewCategory(category)],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotStartedHero() {
+    return Container(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.huge,
-        AppSpacing.xl,
-        AppSpacing.xl,
+        AppSpacing.xxl,
+        AppSpacing.xxxl,
+        AppSpacing.xxl,
+        AppSpacing.xxl + 4,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Column(
         children: [
           const Icon(AppIcons.timer, size: 40, color: AppColors.textMuted),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm + 6),
           Text(
             'A avaliação ainda não começou.',
-            style: AppTypography.cardTitle,
+            style: AppTypography.notStartedTitle,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'A hora de início é registrada quando você tocar em "Iniciar avaliação".',
-            style: AppTypography.meta,
+            style: AppTypography.notStartedBody,
             textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+
+  /// Uma categoria da lista "O que será avaliado": o código, o nome e quantos
+  /// itens tem. Só leitura — a lista abre depois do "Iniciar".
+  Widget _buildPreviewCategory(ChecklistCategory category) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
+      ),
+      child: Row(
+        children: [
+          CategoryCodeChip(code: category.code),
+          const SizedBox(width: AppSpacing.sm + 2),
+          Expanded(
+            child: Text(
+              category.name,
+              style: AppTypography.categoryName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm + 2),
+          Text(_itemsLabel(category.infractions.length), style: AppTypography.categoryCount),
+        ],
+      ),
+    );
+  }
+
+  String _itemsLabel(int count) => count == 1 ? '1 item' : '$count itens';
 
   Widget _buildCollapsedGroup(List<ChecklistCategory> categories) {
     return DecoratedBox(
@@ -295,8 +364,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildCollapsedCategory(ChecklistCategory category) {
-    final count = category.infractions.length;
-
     return InkWell(
       key: ValueKey('category-${category.id}'),
       onTap: () => _openCategory(category.id),
@@ -318,7 +385,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ),
             ),
             const SizedBox(width: AppSpacing.sm + 2),
-            Text(count == 1 ? '1 item' : '$count itens', style: AppTypography.categoryCount),
+            Text(_itemsLabel(category.infractions.length), style: AppTypography.categoryCount),
             const SizedBox(width: AppSpacing.sm + 2),
             const Icon(AppIcons.expandMore, size: 22, color: AppColors.text3),
           ],

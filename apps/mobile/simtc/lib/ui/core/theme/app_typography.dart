@@ -161,6 +161,14 @@ abstract final class AppTypography {
   static TextStyle get checklistProgressValue =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryDark);
 
+  /// "A avaliação ainda não começou." (quadro "6a")
+  static TextStyle get notStartedTitle =>
+      _inter(size: 17, weight: FontWeight.w700, height: 1.3);
+
+  /// Explicação sob o título da tela "não iniciada" (quadro "6a")
+  static TextStyle get notStartedBody =>
+      _inter(size: 13.5, weight: FontWeight.w400, height: 1.5, color: AppColors.text2);
+
   /// Código da categoria no chip do acordeão ("CV")
   static TextStyle get categoryCode =>
       _mono(size: 11, weight: FontWeight.w700, height: 1.2, letterSpacing: 0.44);

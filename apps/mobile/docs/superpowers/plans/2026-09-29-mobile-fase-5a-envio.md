@@ -70,6 +70,8 @@ Em 30/09/2026, depois da execução, a pedido do usuário:
 
 13. **A barra do checklist é a nota do participante.** O "X de Y categorias revisadas" saiu do checklist: no topo ficam só o percentual ("100,0%") e a barra, que começa cheia e esvazia a cada infração marcada. Abaixo de 70% (o corte de aprovação) a barra fica vermelha. A tela 1.6 continua mostrando as categorias, cada uma com o seu selo de %. O canvas desenha a barra como progresso de categorias.
 
+14. **A tela "não iniciada" segue o canvas novo (quadro 6a, export de 01/10/2026).** Além do aviso "A avaliação ainda não começou.", ela mostra "O que será avaliado": o total de itens à direita do título e, por categoria, o código, o nome e "N itens" — só leitura, sem abrir a lista. O canvas mostra "N pts" nas categorias e no título; o app não tem pontos (decisão 4), então a coluna não existe. O botão "Iniciar avaliação" continua no rodapé. O estado deixou de ser uma divergência do canvas.
+
 ### Desvios na execução (30/09/2026)
 
 A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1–8 saíram iguais ao plano. Os desvios foram:
@@ -9530,7 +9532,7 @@ Sem `--dart-define`. **Instale por cima, sem desinstalar**: a migração v3→v4
 Preparação, com rede: na Home, uma sessão "Em andamento" com pelo menos quatro participantes atribuídos a você ("Atribuir a mim").
 
 Iniciar avaliação:
-- [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou." e o botão "Iniciar avaliação" — **sem a lista**;
+- [ ] toque em "Avaliando · você" de um participante: o checklist abre com o nome, "⏱ não iniciada", "A avaliação ainda não começou.", a lista "O que será avaliado" (código, nome e "N itens" de cada categoria, sem pontos e sem abrir ao tocar) e o botão "Iniciar avaliação" — **sem as infrações**;
 - [ ] volte sem iniciar: a linha continua "Avaliando · você", **sem** "Iniciada às…" — nada foi gravado;
 - [ ] abra de novo e toque em "Iniciar avaliação": aparece o checklist com a primeira categoria aberta, a hora "Iniciada às HH:MM" (sem nada correndo) e "salvo";
 - [ ] marque algumas notas: o topo mostra só o percentual e a barra, sem "categorias revisadas"; a barra começa cheia em 100,0% e esvazia conforme as infrações; abaixo de 70% ela fica vermelha. Volte: a linha agora mostra "Iniciada às HH:MM", com a mesma hora do checklist; abrir de novo vai direto ao checklist, com as marcações.
@@ -9594,4 +9596,4 @@ Resolvidas nesta fase (saem da lista da Fase 4): renovação do token que deslog
 | 8 | O toque no cabeçalho da categoria aberta e nos botões B/PM/M não mostra ripple; o "salvo" do cabeçalho do checklist é estático. |
 | 8 | Botões B/PM/M sem `Semantics(selected: …)`. |
 | 8 | Aparelho compartilhado: os rascunhos e a fila de outro consultor ficam no aparelho (invisíveis para quem entrou) até o dono entrar de novo. Limpar ou avisar, se isso aparecer em campo. |
-| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; o estado "não iniciada" do checklist, a pílula "Enviando", os chips "Na fila" e "Enviada" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |
+| — | Canvas: a spec `4z` diz padding 14/16 na linha da infração, e o quadro `1b` usa 15/20; a 1.6 do canvas ainda tem a conta de pontos e o ícone de assinatura, e a 1.9 o "+ assinatura"; a pílula "Enviando", os chips "Na fila" e "Enviada" da linha e a fila vazia não estão desenhados. Atualizar no Claude Design. |
