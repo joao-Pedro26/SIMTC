@@ -373,6 +373,42 @@ class AssessmentRepository {
     });
   }
 
+  /// "Descartar avaliação" (decisão de 01/10/2026): apaga o rascunho e as
+  /// marcações — o participante volta a "não iniciada" e continua com quem
+  /// estava. Só apaga rascunho: devolve `false` (e não mexe em nada) se a
+  /// avaliação já foi confirmada ou não existe mais.
+  Future<bool> discardDraft(String localAssessmentId) {
+    return _discardWhere(
+      localAssessmentId,
+      (row) => row.syncStatus == LocalSyncStatus.draft,
+    );
+  }
+
+  /// "Descartar" da aba Sincronizar: apaga a avaliação que o envio deixou em
+  /// erro com o motivo [reason] — na prática, "recusada pelo servidor". Se no
+  /// meio do caminho ela foi reenviada e aceita, ou o motivo mudou, devolve
+  /// `false` e não apaga.
+  Future<bool> discardFailed(String localAssessmentId, {required String reason}) {
+    return _discardWhere(
+      localAssessmentId,
+      (row) => row.syncStatus == LocalSyncStatus.error && row.lastError == reason,
+    );
+  }
+
+  Future<bool> _discardWhere(
+    String localAssessmentId,
+    bool Function(LocalAssessment row) allowed,
+  ) {
+    return _db.transaction(() async {
+      final row = await (_db.select(_db.localAssessments)
+            ..where((t) => t.id.equals(localAssessmentId)))
+          .getSingleOrNull();
+      if (row == null || !allowed(row)) return false;
+      await _delete(localAssessmentId);
+      return true;
+    });
+  }
+
   /// Quando o último envio de [ownerUserId] foi aceito — o "Última
   /// sincronização" da aba Sincronizar. Nulo se nada foi aceito ainda.
   Stream<DateTime?> watchLastSyncedAt(String ownerUserId) {

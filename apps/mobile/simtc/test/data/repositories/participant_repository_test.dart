@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -420,6 +421,121 @@ void main() {
         result,
         isA<Failure<void>>().having((f) => f.message, 'message',
             'Não foi possível atribuir o participante. Tente de novo.'),
+      );
+    });
+  });
+
+  group('unassign', () {
+    const unassignPath = '/practical-assessments/unassign';
+
+    Future<void> seedMine({double? score}) async {
+      await seedSession();
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-1',
+              sessionId: 'sess-1',
+              name: 'Carlos Eduardo Nunes',
+              cpf: '187.443.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-1'),
+              assignedConsultantName: const Value('Carla Souza'),
+              score: Value(score),
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+    }
+
+    void answerOk() {
+      when(() => api.post<Map<String, dynamic>>(unassignPath,
+          data: any(named: 'data'))).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: unassignPath),
+          statusCode: 201,
+          data: {'unassigned': 1},
+        ),
+      );
+    }
+
+    test('libera no backend e já devolve a linha local a "Pendente"', () async {
+      await seedMine();
+      answerOk();
+
+      final result = await repository.unassign('tp-1');
+
+      expect(result.isSuccess, isTrue);
+      final sent = verify(() => api.post<Map<String, dynamic>>(unassignPath,
+          data: captureAny(named: 'data'))).captured.single;
+      expect(sent, {
+        'participantIds': ['tp-1'],
+      });
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, ParticipantStatus.pendente.wireValue);
+      expect(row.assignedConsultantId, isNull);
+      expect(row.assignedConsultantName, isNull);
+    });
+
+    test('numa reavaliação, a linha volta ao status da nota anterior', () async {
+      await seedMine(score: 62.5);
+      answerOk();
+
+      await repository.unassign('tp-1');
+
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, ParticipantStatus.necessitaReavaliacao.wireValue);
+      expect(row.score, 62.5);
+    });
+
+    test('409 devolve o motivo e não mexe na linha local', () async {
+      await seedMine();
+      when(() => api.post<Map<String, dynamic>>(unassignPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(
+          message: 'Um ou mais participantes não estão atribuídos a você',
+          statusCode: 409,
+        ),
+      );
+
+      final result = await repository.unassign('tp-1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having((f) => f.message, 'message',
+            'Um ou mais participantes não estão atribuídos a você'),
+      );
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'EM_AVALIACAO');
+      expect(row.assignedConsultantId, 'c-1');
+    });
+
+    test('sem rede, a mensagem de falta de conexão', () async {
+      await seedMine();
+      when(() => api.post<Map<String, dynamic>>(unassignPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+
+      final result = await repository.unassign('tp-1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having((f) => f.message, 'message', 'Sem conexão'),
+      );
+    });
+
+    test('erro inesperado do servidor vira uma mensagem genérica', () async {
+      await seedMine();
+      when(() => api.post<Map<String, dynamic>>(unassignPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Internal server error', statusCode: 500),
+      );
+
+      final result = await repository.unassign('tp-1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having((f) => f.message, 'message',
+            'Não foi possível desatribuir o participante. Tente de novo.'),
       );
     });
   });

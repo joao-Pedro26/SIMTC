@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../utils/result.dart';
+import '../../utils/scoring.dart';
 import '../models/session_participant.dart';
 import '../models/training_session.dart';
 import '../services/api/api_client.dart';
@@ -28,11 +29,14 @@ class ParticipantRepository {
   final DateTime Function() _now;
 
   static const String _assignPath = '/practical-assessments/assign';
+  static const String _unassignPath = '/practical-assessments/unassign';
 
   static const String _refreshFailed =
       'Não foi possível atualizar. Mostrando os dados já baixados.';
   static const String _assignFailed =
       'Não foi possível atribuir o participante. Tente de novo.';
+  static const String _unassignFailed =
+      'Não foi possível desatribuir o participante. Tente de novo.';
 
   /// Participantes da sessão em ordem de nome. A ordem de exibição (meus
   /// primeiro, somente teórica por último) é regra de tela e fica na
@@ -214,6 +218,55 @@ class ParticipantRepository {
     } catch (_) {
       // O backend já reservou — isso é o que importa. Se a escrita local
       // falhar, o re-sync que a tela dispara em seguida corrige a linha.
+    }
+    return const Success<void>(null);
+  }
+
+  /// "Desatribuir participante" (decisão de 01/10/2026): libera no backend
+  /// (`POST /practical-assessments/unassign`) o participante reservado para o
+  /// consultor logado.
+  ///
+  /// Precisa de conexão, como o [assign]. Com sucesso, a linha local muda na
+  /// hora pela mesma regra do backend: sem atribuição, e de volta ao status de
+  /// antes — "Pendente" se nunca foi avaliado, ou o da nota anterior numa
+  /// reavaliação.
+  Future<Result<void>> unassign(String participantId) async {
+    try {
+      await _api.post<Map<String, dynamic>>(
+        _unassignPath,
+        data: {
+          'participantIds': [participantId],
+        },
+      );
+    } on ApiException catch (error) {
+      // 409: "não estão atribuídos a você" (o painel passou o participante
+      // para outro consultor, por exemplo). Sem rede, a mensagem do
+      // `ApiException` já diz o que fazer.
+      final ownMessage = error.statusCode == 409 || error.isNetworkError;
+      return Failure(error, ownMessage ? error.message : _unassignFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _unassignFailed);
+    }
+
+    try {
+      final row = await (_db.select(_db.participants)
+            ..where((t) => t.id.equals(participantId)))
+          .getSingleOrNull();
+      final score = row?.score;
+      await (_db.update(_db.participants)
+            ..where((t) => t.id.equals(participantId)))
+          .write(
+        ParticipantsCompanion(
+          status: Value(score != null
+              ? getApprovalStatus(score)
+              : ParticipantStatus.pendente.wireValue),
+          assignedConsultantId: const Value(null),
+          assignedConsultantName: const Value(null),
+        ),
+      );
+    } catch (_) {
+      // O backend já liberou — isso é o que importa. O próximo sync da
+      // sessão corrige a linha.
     }
     return const Success<void>(null);
   }

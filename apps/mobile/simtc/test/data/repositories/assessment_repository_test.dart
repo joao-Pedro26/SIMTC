@@ -389,6 +389,67 @@ void main() {
     });
   });
 
+  group('descartar', () {
+    test(
+        'descartar o rascunho apaga a avaliação e as marcações — o participante '
+        'volta a "não iniciada"', () async {
+      final draft = await open('tp-1');
+      await repository.mark(
+        localAssessmentId: draft.id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-b',
+      );
+
+      final discarded = await repository.discardDraft(draft.id);
+
+      expect(discarded, isTrue);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+      expect(
+        await repository.findCurrent(trainingParticipantId: 'tp-1', ownerUserId: 'user-1'),
+        isNull,
+      );
+    });
+
+    test('avaliação confirmada não é rascunho: descartar não apaga nada', () async {
+      final queued = await open('tp-1');
+      await repository.confirm(queued.id, participantName: 'Ana', score: 90);
+
+      expect(await repository.discardDraft(queued.id), isFalse);
+      expect((await row(queued.id)).syncStatus, LocalSyncStatus.pendingSync);
+    });
+
+    test(
+        'descartar uma falha só apaga a avaliação em erro com o motivo pedido',
+        () async {
+      final refused = await open('tp-1');
+      await repository.confirm(refused.id, participantName: 'Ana', score: 90);
+      await repository.saveSendResults(
+        {refused.id: 'recusada pelo servidor'},
+        at: DateTime(2026, 9, 30, 9),
+      );
+      final queued = await insertDraft('tp-2');
+      await repository.confirm(queued.id, participantName: 'Bia', score: 90);
+
+      expect(
+        await repository.discardFailed(refused.id, reason: 'sem conexão'),
+        isFalse,
+        reason: 'outro motivo',
+      );
+      expect(
+        await repository.discardFailed(queued.id, reason: 'recusada pelo servidor'),
+        isFalse,
+        reason: 'na fila, sem erro',
+      );
+      expect(
+        await repository.discardFailed(refused.id, reason: 'recusada pelo servidor'),
+        isTrue,
+      );
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.id), [queued.id]);
+    });
+  });
+
   group('confirm', () {
     test('grava endTime, o nome e o % da tela 1.6 e põe na fila', () async {
       final assessment = await open('tp-1');
