@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { PracticalAssessmentsService } from 'src/practical-assessments/practical-assessments.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { StorageService } from 'src/storage/storage.service';
 import {
   calculateCategoryScore,
   calculateOverallScore,
@@ -17,12 +16,6 @@ const mockPrisma = {
   $transaction: jest.fn(),
 };
 
-const mockStorage = {
-  upload: jest.fn(),
-  delete: jest.fn(),
-  getSignedUrl: jest.fn(),
-};
-
 describe('PracticalAssessmentsService', () => {
   let service: PracticalAssessmentsService;
 
@@ -31,7 +24,6 @@ describe('PracticalAssessmentsService', () => {
       providers: [
         PracticalAssessmentsService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: StorageService, useValue: mockStorage },
       ],
     }).compile();
 
@@ -146,130 +138,6 @@ describe('PracticalAssessmentsService', () => {
     });
   });
 
-  // ─── Assinatura do participante ──────────────────────────────────────────
-
-  describe('uploadParticipantSignature', () => {
-    const png = Buffer.from('fake-png');
-    let nowSpy: jest.SpyInstance;
-
-    beforeEach(() => {
-      nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
-      mockStorage.upload.mockResolvedValue('https://ignorada.example/publica.png');
-      mockStorage.delete.mockResolvedValue(undefined);
-      mockStorage.getSignedUrl.mockResolvedValue('https://signed.example/assinatura.png');
-      mockPrisma.practicalAssessment.update.mockResolvedValue({});
-    });
-
-    afterEach(() => nowSpy.mockRestore());
-
-    it('lança NotFoundException se a avaliação não existe', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.uploadParticipantSignature('assess-x', png, 'image/png'),
-      ).rejects.toThrow(NotFoundException);
-      expect(mockStorage.upload).not.toHaveBeenCalled();
-    });
-
-    it('sobe no bucket signatures, salva só o path e devolve signed URL', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ participantSignatureUrl: null });
-
-      const result = await service.uploadParticipantSignature('assess-1', png, 'image/png');
-
-      expect(mockStorage.delete).not.toHaveBeenCalled();
-      expect(mockStorage.upload).toHaveBeenCalledWith(
-        'signatures',
-        'participants/assess-1/1700000000000.png',
-        png,
-        'image/png',
-      );
-      expect(mockPrisma.practicalAssessment.update).toHaveBeenCalledWith({
-        where: { id: 'assess-1' },
-        data: { participantSignatureUrl: 'participants/assess-1/1700000000000.png' },
-      });
-      expect(mockStorage.getSignedUrl).toHaveBeenCalledWith(
-        'signatures',
-        'participants/assess-1/1700000000000.png',
-        3600,
-      );
-      expect(result).toEqual({ signedUrl: 'https://signed.example/assinatura.png' });
-    });
-
-    it('apaga o arquivo anterior antes de subir o novo', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'participants/assess-1/1600000000000.png',
-      });
-
-      await service.uploadParticipantSignature('assess-1', png, 'image/png');
-
-      expect(mockStorage.delete).toHaveBeenCalledWith(
-        'signatures',
-        'participants/assess-1/1600000000000.png',
-      );
-      expect(mockStorage.delete.mock.invocationCallOrder[0]).toBeLessThan(
-        mockStorage.upload.mock.invocationCallOrder[0],
-      );
-    });
-
-    it('segue com o upload mesmo se apagar o arquivo anterior falhar', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'participants/assess-1/1600000000000.png',
-      });
-      mockStorage.delete.mockRejectedValueOnce(new Error('Object not found'));
-
-      await expect(
-        service.uploadParticipantSignature('assess-1', png, 'image/png'),
-      ).resolves.toEqual({ signedUrl: 'https://signed.example/assinatura.png' });
-      expect(mockStorage.upload).toHaveBeenCalled();
-    });
-
-    it('usa extensão .jpg para image/jpeg', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ participantSignatureUrl: null });
-
-      await service.uploadParticipantSignature('assess-1', png, 'image/jpeg');
-
-      expect(mockStorage.upload).toHaveBeenCalledWith(
-        'signatures',
-        'participants/assess-1/1700000000000.jpg',
-        png,
-        'image/jpeg',
-      );
-    });
-  });
-
-  describe('getParticipantSignatureSignedUrl', () => {
-    it('lança NotFoundException se a avaliação não existe', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
-
-      await expect(service.getParticipantSignatureSignedUrl('assess-x')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('retorna null se a avaliação não tem assinatura', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ participantSignatureUrl: null });
-
-      await expect(service.getParticipantSignatureSignedUrl('assess-1')).resolves.toBeNull();
-      expect(mockStorage.getSignedUrl).not.toHaveBeenCalled();
-    });
-
-    it('gera signed URL de 1h a partir do path salvo', async () => {
-      mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
-        participantSignatureUrl: 'participants/assess-1/1700000000000.png',
-      });
-      mockStorage.getSignedUrl.mockResolvedValue('https://signed.example/assinatura.png');
-
-      await expect(service.getParticipantSignatureSignedUrl('assess-1')).resolves.toEqual({
-        signedUrl: 'https://signed.example/assinatura.png',
-      });
-      expect(mockStorage.getSignedUrl).toHaveBeenCalledWith(
-        'signatures',
-        'participants/assess-1/1700000000000.png',
-        3600,
-      );
-    });
-  });
-
   // ─── syncFromMobile ──────────────────────────────────────────────────────
 
   describe('syncFromMobile', () => {
@@ -286,28 +154,28 @@ describe('PracticalAssessmentsService', () => {
       mockPrisma.$transaction.mockResolvedValue([]);
     });
 
-    it('devolve o assessmentId de cada avaliação sincronizada', async () => {
+    it('sincroniza uma avaliação nova com sucesso', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
       mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
 
       const result = await service.syncFromMobile([dto], 'consultant-1');
 
       expect(result).toEqual([
-        { trainingParticipantId: 'tp-1', status: 'fulfilled', assessmentId: 'assess-1' },
+        { trainingParticipantId: 'tp-1', status: 'fulfilled' },
       ]);
     });
 
-    it('devolve o assessmentId também na reavaliação (registro existente)', async () => {
+    it('sincroniza também na reavaliação (registro existente)', async () => {
       mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
       mockPrisma.assessmentItem.deleteMany.mockResolvedValue({ count: 2 });
       mockPrisma.practicalAssessment.update.mockResolvedValue({ id: 'assess-1', items: [] });
 
       const result = await service.syncFromMobile([dto], 'consultant-1');
 
-      expect(result[0]).toMatchObject({ status: 'fulfilled', assessmentId: 'assess-1' });
+      expect(result[0]).toMatchObject({ status: 'fulfilled' });
     });
 
-    it('não devolve assessmentId para item rejeitado', async () => {
+    it('devolve o erro para item rejeitado', async () => {
       mockPrisma.practicalAssessment.findUnique.mockRejectedValueOnce(new Error('falha no banco'));
 
       const result = await service.syncFromMobile([dto], 'consultant-1');
@@ -315,7 +183,6 @@ describe('PracticalAssessmentsService', () => {
       expect(result).toEqual([
         { trainingParticipantId: 'tp-1', status: 'rejected', error: 'falha no banco' },
       ]);
-      expect(result[0].assessmentId).toBeUndefined();
     });
   });
 });
