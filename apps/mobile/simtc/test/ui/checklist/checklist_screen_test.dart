@@ -421,6 +421,73 @@ void main() {
     expect(find.text('Excesso de velocidade'), findsNothing);
   });
 
+  testWidgets(
+      'menu ⋮ "Descartar avaliação" pede confirmação: "Cancelar" não muda '
+      'nada, "Descartar" volta a "não iniciada"', (tester) async {
+    await pumpScreen(tester);
+    await tester.tap(find.text('PM'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Descartar avaliação'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Descartar a avaliação?'), findsOneWidget);
+    expect(
+      find.text('As marcações e a hora de início de Ana Paula Ribeiro serão '
+          'apagadas. O participante continua com você.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text(pmComment), findsOneWidget, reason: 'nada mudou');
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Descartar avaliação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('não iniciada'), findsOneWidget);
+    expect(find.text('Iniciar avaliação'), findsOneWidget);
+    expect(find.text('Excesso de velocidade'), findsNothing);
+    expect(await db.select(db.localAssessments).get(), isEmpty);
+    expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+  });
+
+  testWidgets(
+      'avaliação já confirmada: as marcações à vista, sem mudar nota, sem '
+      '"Finalizar" e sem menu', (tester) async {
+    final draft = await assessmentRepository.openDraft(
+      trainingParticipantId: 'tp-1',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+    );
+    await assessmentRepository.mark(
+      localAssessmentId: draft.id,
+      infractionId: 'inf-1',
+      infractionNoteId: 'note-pm',
+    );
+    await assessmentRepository.confirm(draft.id, participantName: 'Ana', score: 88);
+
+    await pumpScreen(tester, started: false);
+
+    expect(find.text('Avaliação confirmada — não pode mais ser alterada.'),
+        findsOneWidget);
+    expect(find.text(pmComment), findsOneWidget, reason: 'a nota marcada aparece');
+    expect(find.text('Finalizar avaliação'), findsNothing);
+    expect(find.byKey(const Key('checklist-menu')), findsNothing);
+
+    await tester.tap(find.text('M'));
+    await tester.pumpAndSettle();
+
+    final item = await db.select(db.localAssessmentItems).getSingle();
+    expect(item.infractionNoteId, 'note-pm');
+  });
+
   testWidgets('sem catálogo no aparelho, avisa e não oferece "Finalizar"',
       (tester) async {
     await db.delete(db.infractionNotes).go();
@@ -498,8 +565,8 @@ void main() {
       await pumpScreen(tester, started: false);
 
       expect(
-        find.text('Você já está avaliando Marina Lopes. Finalize essa '
-            'avaliação para iniciar outra.'),
+        find.text('Você já está avaliando Marina Lopes. Finalize ou descarte '
+            'essa avaliação para iniciar outra.'),
         findsOneWidget,
       );
       expect(find.text('O que será avaliado'), findsOneWidget,
@@ -512,6 +579,13 @@ void main() {
 
       final rows = await db.select(db.localAssessments).get();
       expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
+    });
+
+    testWidgets('antes de iniciar, não há o que descartar: sem menu ⋮',
+        (tester) async {
+      await pumpScreen(tester, started: false);
+
+      expect(find.byKey(const Key('checklist-menu')), findsNothing);
     });
 
     testWidgets('abrir sem querer e voltar não deixa rastro', (tester) async {

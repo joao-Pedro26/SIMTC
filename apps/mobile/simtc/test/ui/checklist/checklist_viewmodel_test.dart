@@ -316,6 +316,69 @@ void main() {
     });
   });
 
+  group('descartar', () {
+    test(
+        'descartar apaga o rascunho e volta a "não iniciada" — e o "Iniciar" '
+        'volta a valer', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+      await vm.toggleNote('inf-1', 'note-m');
+      expect(vm.canDiscard, isTrue);
+
+      await vm.discard();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.canDiscard, isFalse);
+      expect(vm.startedText, isNull);
+      expect(vm.overallScore, 100, reason: 'as marcações saíram junto');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.overallScore, 100);
+    });
+
+    test(
+        'avaliação confirmada abre só para leitura: não muda nota nem é '
+        'descartada', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final draft = await assessmentRepository.openDraft(
+        trainingParticipantId: 'tp-1',
+        sessionId: 'sess-1',
+        ownerUserId: 'user-1',
+      );
+      await assessmentRepository.mark(
+        localAssessmentId: draft.id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-b',
+      );
+      await assessmentRepository.confirm(draft.id, participantName: 'Carlos', score: 96);
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+
+      await vm.init();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isConfirmed, isTrue);
+      expect(vm.canDiscard, isFalse);
+
+      await vm.toggleNote('inf-1', 'note-m');
+      await vm.discard();
+
+      final item = await db.select(db.localAssessmentItems).getSingle();
+      expect(item.infractionNoteId, 'note-b', reason: 'a nota não mudou');
+      final row = await db.select(db.localAssessments).getSingle();
+      expect(row.syncStatus, LocalSyncStatus.pendingSync);
+    });
+  });
+
   group('startedText', () {
     test('diz quando a avaliação começou — nada antes do "Iniciar"', () async {
       await seedParticipant();

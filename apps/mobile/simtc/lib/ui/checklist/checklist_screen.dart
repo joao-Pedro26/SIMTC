@@ -56,9 +56,29 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   final GlobalKey _openHeaderKey = GlobalKey();
 
   @override
+  void initState() {
+    super.initState();
+    _viewModel.addListener(_showMessageWhenItArrives);
+  }
+
+  @override
   void dispose() {
+    _viewModel.removeListener(_showMessageWhenItArrives);
     _viewModel.dispose();
     super.dispose();
+  }
+
+  /// Mesmo padrão do detalhe da sessão: o aviso é passageiro, e a mensagem é
+  /// limpa assim que é agendada.
+  void _showMessageWhenItArrives() {
+    final message = _viewModel.message;
+    if (message == null) return;
+    _viewModel.clearMessage();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    });
   }
 
   @override
@@ -83,7 +103,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               message: 'Sem conexão — as marcações continuam sendo salvas no aparelho.',
             ),
             Expanded(child: _buildBody()),
-            if (!_viewModel.isLoading && _viewModel.hasCatalog) _buildFooter(),
+            if (!_viewModel.isLoading && _viewModel.hasCatalog && !_viewModel.isConfirmed)
+              _buildFooter(),
           ],
         ),
       ),
@@ -131,6 +152,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   ],
                 ),
               ),
+              if (!_viewModel.isLoading && _viewModel.canDiscard) _buildMenu(),
             ],
           ),
           if (!_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted)
@@ -146,6 +168,55 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ],
       ),
     );
+  }
+
+  /// Menu ⋮ (decisão de 01/10/2026 — não está no canvas): "Descartar
+  /// avaliação", com a avaliação iniciada.
+  Widget _buildMenu() {
+    return SizedBox.square(
+      dimension: AppSpacing.touchTarget,
+      child: PopupMenuButton<_MenuAction>(
+        key: const Key('checklist-menu'),
+        tooltip: 'Mais opções',
+        icon: const Icon(AppIcons.more, color: AppColors.text),
+        onSelected: (action) => switch (action) {
+          _MenuAction.discard => _confirmDiscard(),
+        },
+        itemBuilder: (context) => [
+          if (_viewModel.canDiscard)
+            const PopupMenuItem(
+              value: _MenuAction.discard,
+              child: Text('Descartar avaliação'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDiscard() async {
+    final name = _viewModel.participant?.name ?? 'este participante';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Descartar a avaliação?'),
+        content: Text(
+          'As marcações e a hora de início de $name serão apagadas. O '
+          'participante continua com você.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await _viewModel.discard();
   }
 
   Widget _buildTimerRow() {
@@ -165,7 +236,16 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       children: [
         const Icon(AppIcons.timer, size: 14, color: AppColors.text3),
         const SizedBox(width: AppSpacing.xs),
-        Text(_viewModel.startedText ?? '', style: AppTypography.meta),
+        // Encolhe com reticências: com o menu ⋮ ao lado, "Iniciada em 28 set
+        // 08:12" não cabe inteiro num celular estreito.
+        Flexible(
+          child: Text(
+            _viewModel.startedText ?? '',
+            style: AppTypography.meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         const SizedBox(width: AppSpacing.sm),
         Container(width: 1, height: 11, color: AppColors.borderStrong),
         const SizedBox(width: AppSpacing.sm),
@@ -242,6 +322,16 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     return ListView(
       padding: const EdgeInsets.only(top: AppSpacing.md),
       children: [
+        // Só leitura (decisão de 01/10/2026): a avaliação confirmada espera o
+        // envio, e o que foi confirmado não muda mais.
+        if (_viewModel.isConfirmed)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.md),
+            child: InlineNotice(
+              icon: AppIcons.finish,
+              message: 'Avaliação confirmada — não pode mais ser alterada.',
+            ),
+          ),
         for (var i = 0; i < blocks.length; i++) ...[
           if (i > 0) const SizedBox(height: AppSpacing.sm + 2),
           blocks[i],
@@ -503,7 +593,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   child: _NoteButton(
                     note: infraction.notes[i],
                     selected: infraction.selectedNoteId == infraction.notes[i].id,
-                    onTap: () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
+                    onTap: _viewModel.isConfirmed
+                        ? null
+                        : () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
                   ),
                 ),
               ],
@@ -562,11 +654,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   /// Só uma avaliação por vez (decisão de 01/10/2026): o consultor precisa
-  /// finalizar a que está em andamento antes de iniciar outra.
+  /// finalizar ou descartar a que está em andamento antes de iniciar outra.
   String _blockedMessage() {
     final name = _viewModel.blockingParticipantName;
     final who = name == null ? 'com outra avaliação em andamento' : 'avaliando $name';
-    return 'Você já está $who. Finalize essa avaliação para iniciar outra.';
+    return 'Você já está $who. Finalize ou descarte essa avaliação para iniciar outra.';
   }
 
   /// "Finalizar avaliação" abre a conferência (tela 1.6), sem o diálogo das
@@ -591,14 +683,17 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 }
 
+/// O que o menu ⋮ do cabeçalho oferece.
+enum _MenuAction { discard }
+
 /// Um dos 3 botões B/PM/M (spec "4z"): raio 8, nunca pílula, para não se
-/// confundir com os chips de status.
+/// confundir com os chips de status. Sem [onTap], é só leitura.
 class _NoteButton extends StatelessWidget {
   const _NoteButton({required this.note, required this.selected, required this.onTap});
 
   final ChecklistNoteOption note;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   ({Color bg, Color border, Color ink}) get _colors => switch (note.noteType) {
         'B' => selected

@@ -43,14 +43,19 @@ class ChecklistViewModel extends ChangeNotifier {
   final AssessmentCatalogRepository _catalogRepository;
   final DateTime Function() _now;
 
+  static const String _discardFailed = 'Não foi possível descartar. Tente de novo.';
+
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessmentItem>>? _itemsSubscription;
 
   bool _disposed = false;
   bool _loading = true;
   bool _starting = false;
+  bool _discarding = false;
   String? _assessmentId;
   DateTime? _startTime;
+  LocalSyncStatus? _status;
+  String? _message;
   SessionParticipant? _participant;
   List<CatalogCategory> _catalog = const [];
   List<LocalAssessmentItem> _items = const [];
@@ -69,6 +74,22 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// O "Iniciar avaliação" está gravando.
   bool get isStarting => _starting;
+
+  /// A avaliação já foi confirmada (na fila ou com erro de envio): o checklist
+  /// mostra as marcações sem deixar mudar nada (decisão de 01/10/2026). O
+  /// detalhe da sessão abre o Resultado nesses casos; aqui só se chega por
+  /// outro caminho.
+  bool get isConfirmed => _status != null && _status != LocalSyncStatus.draft;
+
+  /// "Descartar avaliação" do menu ⋮: só com a avaliação iniciada e ainda em
+  /// rascunho.
+  bool get canDiscard => isStarted && !isConfirmed;
+
+  /// O "Descartar avaliação" está apagando.
+  bool get isDiscarding => _discarding;
+
+  /// Aviso passageiro para a tela (SnackBar); limpo por [clearMessage].
+  String? get message => _message;
 
   /// Outro participante deste consultor está em andamento: só uma avaliação
   /// por vez (decisão de 01/10/2026). A tela mostra o aviso e desabilita o
@@ -120,15 +141,8 @@ class ChecklistViewModel extends ChangeNotifier {
     if (current != null) {
       _attach(current);
     } else {
-      final inProgress = await _assessmentRepository.findInProgressOther(
-        ownerUserId: ownerUserId,
-        exceptTrainingParticipantId: participantId,
-      );
+      await _checkBlock();
       if (_disposed) return;
-      if (inProgress != null) {
-        await _block(inProgress.trainingParticipantId);
-        if (_disposed) return;
-      }
     }
 
     _catalog = await _catalogRepository.loadCatalog();
@@ -164,6 +178,50 @@ class ChecklistViewModel extends ChangeNotifier {
     }
   }
 
+  /// "Descartar avaliação" (decisão de 01/10/2026): apaga o rascunho e as
+  /// marcações, e a tela volta a "não iniciada" — o participante continua com
+  /// o consultor. A tela pede confirmação antes.
+  Future<void> discard() async {
+    final assessmentId = _assessmentId;
+    if (assessmentId == null || !canDiscard || _discarding) return;
+
+    _discarding = true;
+    notifyListeners();
+    try {
+      final discarded = await _assessmentRepository.discardDraft(assessmentId);
+      if (_disposed) return;
+      if (!discarded) {
+        _message = _discardFailed;
+        return;
+      }
+      _detach();
+      await _checkBlock();
+    } catch (_) {
+      _message = _discardFailed;
+    } finally {
+      _discarding = false;
+      notifyListeners();
+    }
+  }
+
+  void clearMessage() {
+    if (_message == null) return;
+    _message = null;
+    notifyListeners();
+  }
+
+  /// Só uma avaliação por vez: confere se outro participante do consultor
+  /// está em andamento, para o aviso e o "Iniciar" desabilitado.
+  Future<void> _checkBlock() async {
+    _blockingParticipantId = null;
+    _blockingName = null;
+    final inProgress = await _assessmentRepository.findInProgressOther(
+      ownerUserId: ownerUserId,
+      exceptTrainingParticipantId: participantId,
+    );
+    if (inProgress != null) await _block(inProgress.trainingParticipantId);
+  }
+
   /// Guarda quem está em andamento e o nome dele, para o aviso.
   Future<void> _block(String blockingParticipantId) async {
     _blockingParticipantId = blockingParticipantId;
@@ -175,12 +233,24 @@ class ChecklistViewModel extends ChangeNotifier {
   void _attach(LocalAssessment assessment) {
     _assessmentId = assessment.id;
     _startTime = assessment.startTime;
+    _status = assessment.syncStatus;
 
     _itemsSubscription ??=
         _assessmentRepository.watchItems(assessment.id).listen((items) {
       _items = items;
       notifyListeners();
     });
+  }
+
+  /// Desliga a tela da avaliação descartada: volta a "não iniciada".
+  void _detach() {
+    _itemsSubscription?.cancel();
+    _itemsSubscription = null;
+    _assessmentId = null;
+    _startTime = null;
+    _status = null;
+    _items = const [];
+    _expandedCategoryId = null;
   }
 
   /// Como no canvas: o checklist começa com a primeira categoria aberta.
@@ -212,7 +282,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// mostrar o botão pressionado na hora.
   Future<void> toggleNote(String infractionId, String noteId) async {
     final assessmentId = _assessmentId;
-    if (assessmentId == null) return;
+    if (assessmentId == null || isConfirmed) return;
 
     final current = _items
         .where((i) => i.infractionId == infractionId)

@@ -52,4 +52,7 @@ abstract final class AppIcons {
 
   /// "Iniciar avaliação" do checklist (Fase 5A — não está no canvas).
   static const IconData startEvaluation = Icons.play_arrow_rounded;
+
+  /// Menu ⋮ do cabeçalho do checklist (Fase 5B — não está no canvas).
+  static const IconData more = Icons.more_vert;
 }
