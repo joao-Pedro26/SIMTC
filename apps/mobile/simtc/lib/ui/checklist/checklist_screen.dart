@@ -47,6 +47,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     participantId: widget.participantId,
     // A rota só abre com sessão (redirecionamento do `router.dart`).
     ownerUserId: context.read<AuthRepository>().currentUser!.id,
+    consultantId: context.read<AuthRepository>().currentUser!.consultantId,
     assessmentRepository: context.read<AssessmentRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     catalogRepository: context.read<AssessmentCatalogRepository>(),
@@ -97,7 +98,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildHeader(context, isOffline),
             ConnectivityBanner(
               isOffline: isOffline,
               message: 'Sem conexão — as marcações continuam sendo salvas no aparelho.',
@@ -111,7 +112,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool isOffline) {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -152,7 +153,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   ],
                 ),
               ),
-              if (!_viewModel.isLoading && _viewModel.canDiscard) _buildMenu(),
+              if (!_viewModel.isLoading &&
+                  (_viewModel.canDiscard || _viewModel.canUnassign))
+                _buildMenu(isOffline),
             ],
           ),
           if (!_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted)
@@ -171,8 +174,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   /// Menu ⋮ (decisão de 01/10/2026 — não está no canvas): "Descartar
-  /// avaliação", com a avaliação iniciada.
-  Widget _buildMenu() {
+  /// avaliação", com a avaliação iniciada, e "Desatribuir participante", que
+  /// precisa de rede — offline, aparece desabilitado e diz por quê.
+  Widget _buildMenu(bool isOffline) {
     return SizedBox.square(
       dimension: AppSpacing.touchTarget,
       child: PopupMenuButton<_MenuAction>(
@@ -181,6 +185,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         icon: const Icon(AppIcons.more, color: AppColors.text),
         onSelected: (action) => switch (action) {
           _MenuAction.discard => _confirmDiscard(),
+          _MenuAction.unassign => _confirmUnassign(),
         },
         itemBuilder: (context) => [
           if (_viewModel.canDiscard)
@@ -188,9 +193,65 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               value: _MenuAction.discard,
               child: Text('Descartar avaliação'),
             ),
+          if (_viewModel.canUnassign)
+            PopupMenuItem(
+              value: _MenuAction.unassign,
+              enabled: !isOffline,
+              child: isOffline
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Desatribuir participante'),
+                        Text('Disponível quando houver conexão', style: AppTypography.meta),
+                      ],
+                    )
+                  : const Text('Desatribuir participante'),
+            ),
         ],
       ),
     );
+  }
+
+  /// Volta para "Pendente" ou, numa reavaliação, para "Necessita
+  /// reavaliação" — a mesma regra do backend.
+  Future<void> _confirmUnassign() async {
+    final participant = _viewModel.participant;
+    final name = participant?.name;
+    final status = participant?.hasPreviousAssessment == true
+        ? 'Necessita reavaliação'
+        : 'Pendente';
+    final discardNote =
+        _viewModel.isStarted ? ' A avaliação iniciada será descartada.' : '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(name == null ? 'Desatribuir o participante?' : 'Desatribuir $name?'),
+        content: Text(
+          '${name ?? 'O participante'} volta para "$status" e fica disponível '
+          'para outro consultor.$discardNote',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Desatribuir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final unassigned = await _viewModel.unassign();
+    if (!unassigned || !mounted) return;
+    // O SnackBar é do `ScaffoldMessenger` do app: continua na tela de baixo.
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Participante desatribuído.')));
+    await Navigator.of(context).maybePop();
   }
 
   Future<void> _confirmDiscard() async {
@@ -684,7 +745,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 }
 
 /// O que o menu ⋮ do cabeçalho oferece.
-enum _MenuAction { discard }
+enum _MenuAction { discard, unassign }
 
 /// Um dos 3 botões B/PM/M (spec "4z"): raio 8, nunca pílula, para não se
 /// confundir com os chips de status. Sem [onTap], é só leitura.

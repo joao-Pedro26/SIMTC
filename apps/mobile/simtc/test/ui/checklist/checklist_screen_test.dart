@@ -1,4 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -207,6 +208,12 @@ void main() {
             ),
           );
     }
+  }
+
+  /// O participante reservado para a consultora logada (`c-eu`).
+  Future<void> assignToMe() {
+    return (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+        .write(const ParticipantsCompanion(assignedConsultantId: Value('c-eu')));
   }
 
   Future<void> goOffline() async {
@@ -488,6 +495,57 @@ void main() {
     expect(item.infractionNoteId, 'note-pm');
   });
 
+  testWidgets(
+      '"Desatribuir participante" avisa que a avaliação iniciada será '
+      'descartada e, confirmado, fecha o checklist', (tester) async {
+    await assignToMe();
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/unassign',
+        data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/practical-assessments/unassign'),
+          statusCode: 201,
+          data: {'unassigned': 1},
+        ));
+    await pumpOverOrigin(tester);
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Desatribuir participante'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Desatribuir Ana Paula Ribeiro?'), findsOneWidget);
+    expect(
+      find.text('Ana Paula Ribeiro volta para "Pendente" e fica disponível para '
+          'outro consultor. A avaliação iniciada será descartada.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('origem'), findsOneWidget);
+    expect(find.text('Participante desatribuído.'), findsOneWidget);
+    expect(await db.select(db.localAssessments).get(), isEmpty);
+    final row = await db.select(db.participants).getSingle();
+    expect(row.status, 'PENDENTE');
+  });
+
+  testWidgets('sem rede, "Desatribuir participante" fica desabilitado',
+      (tester) async {
+    await assignToMe();
+    await goOffline();
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
+    final item = tester.widget<PopupMenuItem<Object?>>(find.ancestor(
+      of: find.text('Desatribuir participante'),
+      matching: find.byWidgetPredicate((w) => w is PopupMenuItem),
+    ));
+    expect(item.enabled, isFalse);
+  });
+
   testWidgets('sem catálogo no aparelho, avisa e não oferece "Finalizar"',
       (tester) async {
     await db.delete(db.infractionNotes).go();
@@ -581,8 +639,20 @@ void main() {
       expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
     });
 
-    testWidgets('antes de iniciar, não há o que descartar: sem menu ⋮',
-        (tester) async {
+    testWidgets(
+        'antes de iniciar, o menu ⋮ só tem "Desatribuir participante" — não '
+        'há o que descartar', (tester) async {
+      await assignToMe();
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.byKey(const Key('checklist-menu')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Desatribuir participante'), findsOneWidget);
+      expect(find.text('Descartar avaliação'), findsNothing);
+    });
+
+    testWidgets('de outro consultor, sem menu ⋮', (tester) async {
       await pumpScreen(tester, started: false);
 
       expect(find.byKey(const Key('checklist-menu')), findsNothing);

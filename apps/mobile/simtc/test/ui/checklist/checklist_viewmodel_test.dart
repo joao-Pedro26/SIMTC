@@ -1,4 +1,5 @@
-import 'package:drift/drift.dart' show DatabaseConnection;
+import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -6,6 +7,7 @@ import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
+import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/ui/checklist/checklist_viewmodel.dart';
 
@@ -87,11 +89,15 @@ void main() {
     }
   }
 
-  ChecklistViewModel buildViewModel({DateTime Function()? now}) {
+  ChecklistViewModel buildViewModel({
+    DateTime Function()? now,
+    String? consultantId = 'c-eu',
+  }) {
     return ChecklistViewModel(
       sessionId: 'sess-1',
       participantId: 'tp-1',
       ownerUserId: 'user-1',
+      consultantId: consultantId,
       assessmentRepository: assessmentRepository,
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
@@ -376,6 +382,92 @@ void main() {
       expect(item.infractionNoteId, 'note-b', reason: 'a nota não mudou');
       final row = await db.select(db.localAssessments).getSingle();
       expect(row.syncStatus, LocalSyncStatus.pendingSync);
+    });
+  });
+
+  group('desatribuir', () {
+    const unassignPath = '/practical-assessments/unassign';
+
+    Future<void> assignTo(String consultantId) {
+      return (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(ParticipantsCompanion(assignedConsultantId: Value(consultantId)));
+    }
+
+    test(
+        'desatribuir libera o participante no backend e apaga a avaliação '
+        'iniciada', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await assignTo('c-eu');
+      when(() => api.post<Map<String, dynamic>>(unassignPath, data: any(named: 'data')))
+          .thenAnswer((_) async => Response<Map<String, dynamic>>(
+                requestOptions: RequestOptions(path: unassignPath),
+                statusCode: 201,
+                data: {'unassigned': 1},
+              ));
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+      await vm.toggleNote('inf-1', 'note-b');
+      expect(vm.canUnassign, isTrue);
+
+      final unassigned = await vm.unassign();
+
+      expect(unassigned, isTrue);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'PENDENTE');
+      expect(row.assignedConsultantId, isNull);
+    });
+
+    test('só quem está com o participante pode desatribuir', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await assignTo('c-outro');
+      final ofOther = buildViewModel();
+      addTearDown(ofOther.dispose);
+      await ofOther.init();
+      expect(ofOther.canUnassign, isFalse, reason: 'está com outro consultor');
+
+      await assignTo('c-eu');
+      final noProfile = buildViewModel(consultantId: null);
+      addTearDown(noProfile.dispose);
+      await noProfile.init();
+      expect(noProfile.canUnassign, isFalse, reason: 'sem perfil de consultor');
+
+      final mine = buildViewModel();
+      addTearDown(mine.dispose);
+      await mine.init();
+      expect(mine.canUnassign, isTrue, reason: 'antes de iniciar também');
+    });
+
+    test(
+        'se o backend recusa, nada muda no aparelho, o motivo aparece e a '
+        'sessão é baixada de novo', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await assignTo('c-eu');
+      when(() => api.post<Map<String, dynamic>>(unassignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Um ou mais participantes não estão atribuídos a você',
+        statusCode: 409,
+      ));
+      when(() => api.get<Map<String, dynamic>>(any()))
+          .thenThrow(const ApiException(message: 'Sem conexão', isNetworkError: true));
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+
+      final unassigned = await vm.unassign();
+
+      expect(unassigned, isFalse);
+      expect(vm.message, 'Um ou mais participantes não estão atribuídos a você');
+      expect(vm.isStarted, isTrue);
+      expect(await db.select(db.localAssessments).get(), hasLength(1));
+      verify(() => api.get<Map<String, dynamic>>('/training-sessions/sess-1')).called(1);
     });
   });
 

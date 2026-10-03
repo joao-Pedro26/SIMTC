@@ -7,7 +7,9 @@ import '../../data/models/session_participant.dart';
 import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
+import '../../data/services/api/api_exception.dart';
 import '../../data/services/local/app_database.dart';
+import '../../utils/result.dart';
 import '../../utils/scoring.dart';
 import '../core/date_labels.dart';
 import 'checklist_sections.dart';
@@ -24,6 +26,7 @@ class ChecklistViewModel extends ChangeNotifier {
     required this.sessionId,
     required this.participantId,
     required this.ownerUserId,
+    required this.consultantId,
     required AssessmentRepository assessmentRepository,
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
@@ -38,12 +41,20 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// `AuthUser.id` do consultor logado — o dono do rascunho.
   final String ownerUserId;
+
+  /// `AuthUser.consultantId` do consultor logado — quem a reserva do
+  /// participante aponta. Nulo para um usuário sem perfil de consultor.
+  final String? consultantId;
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
   final DateTime Function() _now;
 
   static const String _discardFailed = 'Não foi possível descartar. Tente de novo.';
+  static const String _unassignFailed =
+      'Não foi possível desatribuir o participante. Tente de novo.';
+  static const String _draftNotDiscarded =
+      'Participante desatribuído, mas a avaliação iniciada não foi apagada do aparelho.';
 
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessmentItem>>? _itemsSubscription;
@@ -52,6 +63,7 @@ class ChecklistViewModel extends ChangeNotifier {
   bool _loading = true;
   bool _starting = false;
   bool _discarding = false;
+  bool _unassigning = false;
   String? _assessmentId;
   DateTime? _startTime;
   LocalSyncStatus? _status;
@@ -87,6 +99,20 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// O "Descartar avaliação" está apagando.
   bool get isDiscarding => _discarding;
+
+  /// "Desatribuir participante" do menu ⋮ (decisão de 01/10/2026): só quem
+  /// está com o participante, e só enquanto a avaliação não foi confirmada.
+  bool get canUnassign {
+    final participant = _participant;
+    return !isConfirmed &&
+        consultantId != null &&
+        participant != null &&
+        participant.status == ParticipantStatus.emAvaliacao &&
+        participant.assignedConsultantId == consultantId;
+  }
+
+  /// O "Desatribuir participante" está esperando o backend.
+  bool get isUnassigning => _unassigning;
 
   /// Aviso passageiro para a tela (SnackBar); limpo por [clearMessage].
   String? get message => _message;
@@ -200,6 +226,47 @@ class ChecklistViewModel extends ChangeNotifier {
       _message = _discardFailed;
     } finally {
       _discarding = false;
+      notifyListeners();
+    }
+  }
+
+  /// "Desatribuir participante": libera a reserva no backend e, se havia
+  /// avaliação iniciada, apaga o rascunho — só depois que o backend confirmou;
+  /// se ele recusar ou a rede falhar, nada muda no aparelho. Devolve `true`
+  /// quando o participante foi liberado: a tela fecha. A tela pede
+  /// confirmação antes, e só oferece com rede.
+  Future<bool> unassign() async {
+    if (!canUnassign || _unassigning) return false;
+
+    _unassigning = true;
+    notifyListeners();
+    try {
+      final result = await _participantRepository.unassign(participantId);
+      switch (result) {
+        case Failure(:final exception, :final message):
+          _message = message ?? _unassignFailed;
+          // Recusado (409): o painel passou o participante para outro
+          // consultor, por exemplo — baixar a sessão mostra quem está com ele.
+          if (exception is ApiException && exception.statusCode == 409) {
+            unawaited(_participantRepository.syncSession(sessionId));
+          }
+          return false;
+        case Success():
+          final assessmentId = _assessmentId;
+          if (assessmentId != null) {
+            try {
+              await _assessmentRepository.discardDraft(assessmentId);
+            } catch (_) {
+              _message = _draftNotDiscarded;
+            }
+          }
+          return true;
+      }
+    } catch (_) {
+      _message = _unassignFailed;
+      return false;
+    } finally {
+      _unassigning = false;
       notifyListeners();
     }
   }
