@@ -219,4 +219,44 @@ export class PracticalAssessmentsService {
 
     return { assigned: dto.participantIds.length };
   }
+
+  /**
+   * Libera participantes atribuídos ao consultor logado (o "Desatribuir" do
+   * app mobile). Só quem está com o participante pode liberá-lo; ele volta ao
+   * status de antes da atribuição: `PENDENTE` se nunca foi avaliado, ou o
+   * status da nota da avaliação anterior numa reavaliação.
+   */
+  async unassignParticipants(dto: AssignParticipantsDto, consultantIdFromJwt?: string, userId?: string) {
+    const consultantId = await this.resolveConsultantId(consultantIdFromJwt, userId);
+    const records = await this.prisma.trainingParticipant.findMany({
+      where: { id: { in: dto.participantIds } },
+      include: { assessment: { select: { score: true } } },
+    });
+
+    if (records.length !== dto.participantIds.length) {
+      throw new ConflictException('Um ou mais participantes não foram encontrados');
+    }
+
+    const notMine = records.filter(
+      (r) => r.status !== 'EM_AVALIACAO' || r.assignedConsultantId !== consultantId,
+    );
+    if (notMine.length > 0) {
+      throw new ConflictException('Um ou mais participantes não estão atribuídos a você');
+    }
+
+    await this.prisma.$transaction(
+      records.map((r) => {
+        const score = r.assessment?.score;
+        return this.prisma.trainingParticipant.update({
+          where: { id: r.id },
+          data: {
+            assignedConsultantId: null,
+            status: score != null ? getApprovalStatus(score) : 'PENDENTE',
+          },
+        });
+      }),
+    );
+
+    return { unassigned: records.length };
+  }
 }

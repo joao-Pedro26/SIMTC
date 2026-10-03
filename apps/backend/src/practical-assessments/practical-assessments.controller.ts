@@ -20,6 +20,12 @@ export class PracticalAssessmentsController {
     return this.service.assignParticipants(dto, user.consultantId, user.sub);
   }
 
+  @Post('unassign')
+  @ApiOperation({ summary: 'Libera participantes atribuídos ao consultor logado (voltam ao status anterior)' })
+  unassign(@Body() dto: AssignParticipantsDto, @CurrentUser() user: JwtPayload) {
+    return this.service.unassignParticipants(dto, user.consultantId, user.sub);
+  }
+
   @Post('sync')
   @ApiOperation({ summary: 'Salva avaliações (web ou sync offline do mobile)' })
   sync(@Body() dtos: SyncPracticalAssessmentDto[], @CurrentUser() user: JwtPayload) {

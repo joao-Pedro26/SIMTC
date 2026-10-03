@@ -138,6 +138,61 @@ describe('PracticalAssessmentsService', () => {
     });
   });
 
+  // ─── unassignParticipants ────────────────────────────────────────────────
+
+  describe('unassignParticipants', () => {
+    it('lança ConflictException se algum participante não existe', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
+      ]);
+      await expect(
+        service.unassignParticipants({ participantIds: ['tp-1', 'tp-2'] }, 'meu-consultor'),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('lança ConflictException se o participante não está em avaliação com quem pediu', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor', assessment: null },
+      ]);
+      await expect(
+        service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor'),
+      ).rejects.toThrow('Um ou mais participantes não estão atribuídos a você');
+
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'PENDENTE', assignedConsultantId: null, assessment: null },
+      ]);
+      await expect(
+        service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor'),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('libera a atribuição e devolve o status anterior: Pendente sem avaliação, o da nota numa reavaliação', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
+        { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: { score: 62.5 } },
+      ]);
+      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const result = await service.unassignParticipants(
+        { participantIds: ['tp-1', 'tp-2'] },
+        'meu-consultor',
+      );
+
+      expect(result).toEqual({ unassigned: 2 });
+      expect(mockPrisma.trainingParticipant.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['tp-1', 'tp-2'] } },
+        include: { assessment: { select: { score: true } } },
+      });
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
+        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } },
+        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NECESSITA_REAVALIACAO' } },
+      ]);
+    });
+  });
+
   // ─── syncFromMobile ──────────────────────────────────────────────────────
 
   describe('syncFromMobile', () => {
