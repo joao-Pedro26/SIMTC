@@ -734,8 +734,16 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
     switch (exit) {
       case SummaryConfirmed():
-        // Confirmada: o checklist sai também, de volta ao detalhe da sessão.
-        await Navigator.of(context).maybePop();
+        // Confirmada: o Resultado ("Avaliação concluída") toma o lugar do
+        // checklist, como no canvas — o X e o "Próximo participante" de lá
+        // voltam ao detalhe da sessão (decisão de 01/10/2026).
+        context.pushReplacement(
+          AppRoutes.participantResult(
+            widget.sessionId,
+            widget.participantId,
+            justConfirmed: true,
+          ),
+        );
       case SummaryReviewCategory(:final categoryId):
         _openCategory(categoryId);
       case null:

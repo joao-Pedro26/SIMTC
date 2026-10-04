@@ -483,9 +483,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  /// Para onde a linha leva: o checklist (Fase 4) ou o Resultado (Fase 5B).
-  /// Os dois leem o participante do banco, por isso não recebem `extra`. Na
-  /// fila ou enviada, a linha não leva a lugar nenhum.
+  /// Para onde a linha leva: o checklist (Fase 4) ou o Resultado (Fase 5B) —
+  /// também o da avaliação confirmada neste aparelho. Os dois leem o
+  /// participante do banco, por isso não recebem `extra`.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
       return () => context.push(

@@ -289,6 +289,11 @@ void main() {
       expect(vm.opensChecklist(rascunho), isTrue);
       expect(vm.opensChecklist(fila), isFalse);
       expect(vm.opensChecklist(erro), isFalse);
+      // Confirmada, a linha abre o Resultado, só para leitura (decisão de
+      // 01/10/2026).
+      expect(vm.opensResult(rascunho), isFalse);
+      expect(vm.opensResult(fila), isTrue);
+      expect(vm.opensResult(erro), isTrue);
     });
 
     test(
@@ -368,6 +373,7 @@ void main() {
 
       expect(vm.localProgressFor(meu), LocalProgress.sent);
       expect(vm.opensChecklist(meu), isFalse);
+      expect(vm.opensResult(meu), isTrue);
     });
 
     test(

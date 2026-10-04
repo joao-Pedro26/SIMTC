@@ -413,7 +413,7 @@ void main() {
       expect(find.text('Na fila'), findsOneWidget);
       expect(find.text('86,7% · aguardando envio'), findsOneWidget);
       expect(find.text('Avaliando · você'), findsNothing);
-      expect(row(tester).onTap, isNull);
+      expect(row(tester).onTap, isNotNull, reason: 'abre o Resultado');
     });
 
     testWidgets('com erro no envio: chip "Erro no envio" e quando falhou',
@@ -435,12 +435,12 @@ void main() {
 
       expect(find.text('Erro no envio'), findsOneWidget);
       expect(find.text('62,0% · falhou às 07:58'), findsOneWidget);
-      expect(row(tester).onTap, isNull);
+      expect(row(tester).onTap, isNotNull, reason: 'abre o Resultado');
     });
 
     testWidgets(
         'enviada e aceita, mas a sessão ainda não foi baixada de novo: chip '
-        '"Enviada" e a linha não abre mais nada', (tester) async {
+        '"Enviada", e a linha abre o Resultado', (tester) async {
       final now = DateTime.now();
 
       await show(
@@ -459,7 +459,7 @@ void main() {
       expect(find.text('Enviada'), findsOneWidget);
       expect(find.text('86,7% · enviada às 08:12'), findsOneWidget);
       expect(find.text('Avaliando · você'), findsNothing);
-      expect(row(tester).onTap, isNull);
+      expect(row(tester).onTap, isNotNull, reason: 'abre o Resultado');
     });
   });
 
@@ -516,6 +516,27 @@ void main() {
       expect(screen.justConfirmed, isFalse);
       expect(find.text('Avaliação concluída'), findsOneWidget);
       expect(find.text('86,0%'), findsOneWidget);
+    });
+
+    testWidgets('a linha "Na fila" abre o Resultado, só para leitura', (tester) async {
+      final ana = participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final queued = local('1', LocalSyncStatus.pendingSync, score: 86.6667);
+      when(() => participants.watchParticipant('1'))
+          .thenAnswer((_) => Stream.value(ana));
+      when(() => assessments.findByParticipant('1')).thenAnswer((_) async => queued);
+      when(() => assessments.loadItems(queued.id)).thenAnswer((_) async => const []);
+      await showWithRouter(tester, [ana]);
+      localStream.add([queued]);
+      await tester.pump();
+
+      await tester.tap(find.text('Ana Paula Ribeiro'));
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<ResultScreen>(find.byType(ResultScreen));
+      expect(screen.justConfirmed, isFalse);
+      expect(find.byType(ChecklistScreen), findsNothing);
+      expect(find.text('Avaliação concluída'), findsOneWidget);
     });
 
     testWidgets('pendente e de outro consultor não abrem nada', (tester) async {

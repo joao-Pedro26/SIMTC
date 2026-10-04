@@ -19,6 +19,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -180,6 +181,14 @@ void main() {
         GoRoute(
           path: AppRoutes.participantSummary('sess-1', 'tp-1'),
           builder: (context, state) => const SummaryScreen(participantId: 'tp-1'),
+        ),
+        GoRoute(
+          path: '/sessions/:sessionId/participants/:participantId/result',
+          builder: (context, state) => ResultScreen(
+            sessionId: state.pathParameters['sessionId']!,
+            participantId: state.pathParameters['participantId']!,
+            justConfirmed: state.uri.queryParameters['confirmada'] == '1',
+          ),
         ),
       ],
     );
@@ -376,8 +385,8 @@ void main() {
   });
 
   testWidgets(
-      '"Confirmar" na conferência põe na fila e fecha o checklist junto, '
-      'de volta à tela de origem', (tester) async {
+      '"Confirmar" na conferência põe na fila e troca o checklist pelo '
+      'Resultado; "Próximo participante" volta à tela de origem', (tester) async {
     await pumpOverOrigin(tester);
     await tester.tap(find.text('PM'));
     await tester.pumpAndSettle();
@@ -389,11 +398,20 @@ void main() {
 
     expect(find.byType(SummaryScreen), findsNothing);
     expect(find.byType(ChecklistScreen), findsNothing);
-    expect(find.text('origem'), findsOneWidget);
+    final result = tester.widget<ResultScreen>(find.byType(ResultScreen));
+    expect(result.justConfirmed, isTrue);
+    expect(find.text('Avaliação concluída'), findsOneWidget);
+    expect(find.text('Na fila de envio — sai sozinha quando houver conexão.'),
+        findsOneWidget);
     final row = await db.select(db.localAssessments).getSingle();
     expect(row.syncStatus, LocalSyncStatus.pendingSync);
     expect(row.endTime, isNotNull);
     expect(row.participantName, 'Ana Paula Ribeiro');
+
+    await tester.tap(find.text('Próximo participante'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('origem'), findsOneWidget);
   });
 
   testWidgets('voltar da conferência sem confirmar deixa o rascunho como estava',

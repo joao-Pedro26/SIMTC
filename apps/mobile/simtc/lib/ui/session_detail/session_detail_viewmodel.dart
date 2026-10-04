@@ -191,10 +191,19 @@ class SessionDetailViewModel extends ChangeNotifier {
         progress != LocalProgress.sent;
   }
 
+  /// Os concluídos no servidor, e a avaliação confirmada deste aparelho —
+  /// na fila, com erro ou enviada esperando o novo download: o Resultado, só
+  /// para leitura (decisão de 01/10/2026).
   bool opensResult(SessionParticipant participant) {
     final situation = situationFor(participant);
-    return situation == ParticipantSituation.approved ||
-        situation == ParticipantSituation.needsReview;
+    if (situation == ParticipantSituation.approved ||
+        situation == ParticipantSituation.needsReview) {
+      return true;
+    }
+    return switch (localProgressFor(participant)) {
+      LocalProgress.queued || LocalProgress.failed || LocalProgress.sent => true,
+      LocalProgress.draft || null => false,
+    };
   }
 
   /// Assina o cache e dispara o primeiro sync. Chamado uma vez pela tela.
