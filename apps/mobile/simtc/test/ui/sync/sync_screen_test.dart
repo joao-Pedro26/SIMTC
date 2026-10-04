@@ -137,6 +137,29 @@ void main() {
     expect(find.text('Descartar'), findsNothing);
   });
 
+  testWidgets(
+      'com um envio no ar, o "Descartar" do item recusado fica desabilitado',
+      (tester) async {
+    final refused = queuedAssessment(
+      '3',
+      participantName: 'Marcos Vinícius Alves',
+      status: LocalSyncStatus.error,
+      lastAttemptAt: DateTime(2026, 9, 29, 8, 5),
+      lastError: SendFailure.refused,
+    );
+    await pump(
+      tester,
+      queue: [queuedAssessment('1', participantName: 'Ana Paula Ribeiro'), refused],
+      sendingIds: {'local-1'},
+    );
+
+    expect(find.text('Enviando'), findsOneWidget);
+    final discard = tester.widget<OutlinedButton>(
+      find.ancestor(of: find.text('Descartar'), matching: find.byType(OutlinedButton)),
+    );
+    expect(discard.onPressed, isNull);
+  });
+
   AppCtaButton syncNowButton(WidgetTester tester) =>
       tester.widget<AppCtaButton>(find.byType(AppCtaButton));
 

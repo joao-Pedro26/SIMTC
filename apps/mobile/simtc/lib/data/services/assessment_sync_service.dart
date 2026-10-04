@@ -206,8 +206,11 @@ class AssessmentSyncService extends ChangeNotifier {
   /// aparelho a avaliação que o servidor recusou — só se ela ainda estiver
   /// recusada; uma reenviada e aceita no meio do caminho não é apagada, e
   /// falha de rede ou de servidor nunca é descartada (tenta de novo sozinha).
+  /// Com um envio no ar não apaga e devolve `false`: a linha só muda quando o
+  /// resultado chega, e o reenvio pode estar levando justo essa avaliação.
   /// A fila se atualiza pelo stream do banco.
-  Future<bool> discardRefused(String localAssessmentId) {
+  Future<bool> discardRefused(String localAssessmentId) async {
+    if (isSending) return false;
     return _assessments.discardFailed(localAssessmentId, reason: SendFailure.refused);
   }
 

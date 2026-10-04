@@ -361,6 +361,8 @@ void main() {
     final refused = await confirmed('tp-1');
     await until(() async => await statusOf(refused.id) == LocalSyncStatus.error);
     expect((await row(refused.id)).lastError, SendFailure.refused);
+    // O envio que recusou a avaliação ainda pode estar fechando a rodada.
+    await until(() => !sync.isSending);
 
     expect(await sync.discardRefused(refused.id), isTrue);
 
@@ -376,6 +378,41 @@ void main() {
 
     expect(await sync.discardRefused(failed.id), isFalse);
     expect(await statusOf(failed.id), LocalSyncStatus.error);
+  });
+
+  test(
+      '"Descartar" não apaga a avaliação enquanto há um envio no ar: o reenvio '
+      'pode estar levando justo ela', () async {
+    answer((_) => 'Participante removido da sessão');
+    final sync = startService();
+    final refused = await confirmed('tp-1');
+    await until(() async => await statusOf(refused.id) == LocalSyncStatus.error);
+    await until(() => !sync.isSending);
+
+    // O reenvio da recusada, com o servidor ainda sem responder.
+    final gate = Completer<void>();
+    when(() => api.post<List<dynamic>>(any(), data: any(named: 'data')))
+        .thenAnswer((invocation) async {
+      final payload = payloadOf(invocation);
+      sent.add(payload);
+      await gate.future;
+      return reply(payload, (_) => null);
+    });
+    unawaited(sync.syncNow());
+    await until(() => sent.length == 2);
+
+    expect(sync.isSending, isTrue);
+    expect((await row(refused.id)).lastError, SendFailure.refused,
+        reason: 'o banco ainda diz "recusada": só o resultado do envio muda a '
+            'linha');
+    expect(await sync.discardRefused(refused.id), isFalse);
+    expect(await db.select(db.localAssessments).get(), hasLength(1));
+    expect(await statusOf(refused.id), LocalSyncStatus.error);
+
+    gate.complete();
+
+    await until(() async => await statusOf(refused.id) == LocalSyncStatus.synced);
+    await until(() => !sync.isSending);
   });
 
   test('mostra à tela a última sincronização aceita', () async {
