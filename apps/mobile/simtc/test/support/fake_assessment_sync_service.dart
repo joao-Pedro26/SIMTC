@@ -40,6 +40,9 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
   /// Quantas vezes a tela pediu para enviar agora.
   int syncNowCalls = 0;
 
+  /// As avaliações que a tela pediu para descartar.
+  final List<String> discardCalls = [];
+
   @override
   List<LocalAssessment> get queue => _queue;
 
@@ -55,6 +58,17 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
 
   @override
   Future<void> syncNow() async => syncNowCalls++;
+
+  /// Descarta e tira da fila, como o stream do banco faria.
+  @override
+  Future<bool> discardRefused(String localAssessmentId) async {
+    discardCalls.add(localAssessmentId);
+    setQueue(
+      [for (final item in _queue) if (item.id != localAssessmentId) item],
+      sendingIds: _sendingIds,
+    );
+    return true;
+  }
 
   /// Troca a fila e avisa a tela, como o stream do banco faria.
   void setQueue(List<LocalAssessment> queue, {Set<String> sendingIds = const {}}) {

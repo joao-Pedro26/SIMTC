@@ -202,6 +202,15 @@ class AssessmentSyncService extends ChangeNotifier {
     if (hasNew) unawaited(syncNow());
   }
 
+  /// "Descartar" da aba Sincronizar (decisão de 01/10/2026): apaga do
+  /// aparelho a avaliação que o servidor recusou — só se ela ainda estiver
+  /// recusada; uma reenviada e aceita no meio do caminho não é apagada, e
+  /// falha de rede ou de servidor nunca é descartada (tenta de novo sozinha).
+  /// A fila se atualiza pelo stream do banco.
+  Future<bool> discardRefused(String localAssessmentId) {
+    return _assessments.discardFailed(localAssessmentId, reason: SendFailure.refused);
+  }
+
   /// Envia a fila agora, sem esperar a próxima tentativa. Sem rede, não tenta:
   /// a volta da rede chama de novo. Com um envio já no ar, repete no fim
   /// dele, para levar o que entrou na fila no meio do caminho.

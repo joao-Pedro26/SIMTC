@@ -354,6 +354,30 @@ void main() {
     await until(() => !sync.isSending);
   });
 
+  test('"Descartar" apaga a avaliação que o servidor recusou e tira da fila',
+      () async {
+    answer((_) => 'Participante removido da sessão');
+    final sync = startService();
+    final refused = await confirmed('tp-1');
+    await until(() async => await statusOf(refused.id) == LocalSyncStatus.error);
+    expect((await row(refused.id)).lastError, SendFailure.refused);
+
+    expect(await sync.discardRefused(refused.id), isTrue);
+
+    await until(() => sync.queue.isEmpty);
+    expect(await db.select(db.localAssessments).get(), isEmpty);
+  });
+
+  test('"Descartar" não apaga a avaliação que falhou por rede', () async {
+    failWith(semRede);
+    final sync = startService();
+    final failed = await confirmed('tp-1');
+    await until(() async => await statusOf(failed.id) == LocalSyncStatus.error);
+
+    expect(await sync.discardRefused(failed.id), isFalse);
+    expect(await statusOf(failed.id), LocalSyncStatus.error);
+  });
+
   test('mostra à tela a última sincronização aceita', () async {
     final sync = startService();
     expect(sync.lastSyncedAt, isNull);

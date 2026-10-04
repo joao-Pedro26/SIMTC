@@ -58,4 +58,8 @@ abstract final class AppIcons {
 
   /// Fechar o Resultado (canvas "2g").
   static const IconData close = Icons.close;
+
+  /// "Descartar" do item que o servidor recusou, na aba Sincronizar (Fase
+  /// 5B — não está no canvas).
+  static const IconData discard = Icons.delete_outline;
 }

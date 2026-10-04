@@ -19,9 +19,10 @@ import 'sync_queue_labels.dart';
 ///
 /// Mostra a fila de envio do consultor logado. O envio é automático; os
 /// botões "Sincronizar agora" e "Tentar novamente" só adiantam a próxima
-/// tentativa (decisão de 29/09/2026). Não tem ViewModel própria: o estado é
-/// todo do `AssessmentSyncService`, que o app inteiro compartilha, e as
-/// regras de texto estão em `sync_queue_labels.dart`.
+/// tentativa (decisão de 29/09/2026), e o "Descartar" tira da fila o que o
+/// servidor recusou (decisão de 01/10/2026). Não tem ViewModel própria: o
+/// estado é todo do `AssessmentSyncService`, que o app inteiro compartilha, e
+/// as regras de texto estão em `sync_queue_labels.dart`.
 class SyncScreen extends StatelessWidget {
   const SyncScreen({super.key, this.clock});
 
@@ -56,7 +57,7 @@ class SyncScreen extends StatelessWidget {
                     if (queue.isEmpty)
                       _buildEmpty()
                     else
-                      _buildQueue(sync, queue, isOffline, now),
+                      _buildQueue(context, sync, queue, isOffline, now),
                     _buildSyncNow(sync, queue, isOffline),
                   ],
                 ),
@@ -162,6 +163,7 @@ class SyncScreen extends StatelessWidget {
   }
 
   Widget _buildQueue(
+    BuildContext context,
     AssessmentSyncService sync,
     List<LocalAssessment> queue,
     bool isOffline,
@@ -186,7 +188,7 @@ class SyncScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final item in queue) _buildItem(sync, item, isOffline, now),
+              for (final item in queue) _buildItem(context, sync, item, isOffline, now),
             ],
           ),
         ),
@@ -195,6 +197,7 @@ class SyncScreen extends StatelessWidget {
   }
 
   Widget _buildItem(
+    BuildContext context,
     AssessmentSyncService sync,
     LocalAssessment item,
     bool isOffline,
@@ -237,12 +240,71 @@ class SyncScreen extends StatelessWidget {
           ),
           if (state == QueueItemState.failed) ...[
             const SizedBox(height: AppSpacing.sm + 2),
-            _RetryButton(
-              onPressed: isOffline || sync.isSending ? null : sync.syncNow,
-            ),
+            _buildFailedActions(context, sync, item, isOffline),
           ],
         ],
       ),
+    );
+  }
+
+  /// "Tentar novamente" e, só no que o servidor recusou, "Descartar" — falha
+  /// de rede ou de servidor continua tentando sozinha.
+  Widget _buildFailedActions(
+    BuildContext context,
+    AssessmentSyncService sync,
+    LocalAssessment item,
+    bool isOffline,
+  ) {
+    final retry = _RetryButton(
+      onPressed: isOffline || sync.isSending ? null : sync.syncNow,
+    );
+    if (item.lastError != SendFailure.refused) return retry;
+
+    return Row(
+      children: [
+        Expanded(child: retry),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _DiscardButton(
+            onPressed: sync.isSending ? null : () => _confirmDiscard(context, sync, item),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDiscard(
+    BuildContext context,
+    AssessmentSyncService sync,
+    LocalAssessment item,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Descartar a avaliação?'),
+        content: Text(
+          'A avaliação de ${queueItemTitle(item)} não foi aceita pelo servidor '
+          'e será apagada deste aparelho.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Descartar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final discarded = await sync.discardRefused(item.id);
+    if (discarded || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Não foi possível descartar. Tente de novo.')),
     );
   }
 
@@ -312,6 +374,36 @@ class SyncScreen extends StatelessWidget {
           );
         }
       },
+    );
+  }
+}
+
+/// "Descartar" de um item que o servidor recusou (decisão de 01/10/2026 — não
+/// está no canvas): o formato do "Tentar novamente", em vermelho.
+class _DiscardButton extends StatelessWidget {
+  const _DiscardButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AppSpacing.touchTarget,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(AppIcons.discard, size: 19),
+        label: const Text('Descartar'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.dangerInk,
+          disabledForegroundColor: AppColors.textMuted,
+          backgroundColor: AppColors.surface,
+          side: const BorderSide(color: AppColors.dangerBorder, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+          ),
+          textStyle: AppTypography.buttonCompact,
+        ),
+      ),
     );
   }
 }

@@ -94,6 +94,49 @@ void main() {
         ),
       ];
 
+  testWidgets(
+      'item recusado pelo servidor: "Descartar" pede confirmação e tira a '
+      'avaliação da fila', (tester) async {
+    final refused = queuedAssessment(
+      '3',
+      participantName: 'Marcos Vinícius Alves',
+      status: LocalSyncStatus.error,
+      lastAttemptAt: DateTime(2026, 9, 29, 8, 5),
+      lastError: SendFailure.refused,
+    );
+    await pump(tester, queue: [refused]);
+
+    expect(find.text('Tentar novamente'), findsOneWidget);
+    await tester.tap(find.text('Descartar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Descartar a avaliação?'), findsOneWidget);
+    expect(
+      find.text('A avaliação de Marcos Vinícius Alves não foi aceita pelo '
+          'servidor e será apagada deste aparelho.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(sync.discardCalls, isEmpty);
+
+    await tester.tap(find.text('Descartar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+    await tester.pumpAndSettle();
+
+    expect(sync.discardCalls, [refused.id]);
+    expect(find.text('Marcos Vinícius Alves'), findsNothing);
+  });
+
+  testWidgets('falha de rede ou de tempo não tem "Descartar": tenta sozinha',
+      (tester) async {
+    await pump(tester, queue: filaDoCanvas());
+
+    expect(find.text('Tentar novamente'), findsOneWidget);
+    expect(find.text('Descartar'), findsNothing);
+  });
+
   AppCtaButton syncNowButton(WidgetTester tester) =>
       tester.widget<AppCtaButton>(find.byType(AppCtaButton));
 
