@@ -224,6 +224,12 @@ abstract final class AppTypography {
   static TextStyle get summarySectionTitle =>
       _inter(size: 13, weight: FontWeight.w600, height: 1.2, color: AppColors.text3);
 
+  // ─── Resultado (quadro "2g" do canvas) ────────────────────────────────────
+
+  /// Nota da infração ("PM") no selo de cor cheia das infrações registradas
+  static TextStyle get resultNoteBadge =>
+      _inter(size: 10, weight: FontWeight.w700, height: 1, color: AppColors.surface);
+
   /// Campo de senha mascarado
   static TextStyle get passwordDots =>
       _mono(size: 18, weight: FontWeight.w600, height: 1.3, letterSpacing: 2.5);

@@ -5,17 +5,29 @@ import '../theme/app_icons.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
-/// Barra superior das telas empilhadas (detalhe da sessão e, nas próximas
-/// fases, checklist, resumo e resultado): voltar à esquerda, título
-/// centralizado e, opcionalmente, um atalho à direita.
+/// Barra superior das telas empilhadas (detalhe da sessão, resumo e
+/// resultado): voltar à esquerda, título centralizado e, opcionalmente, um
+/// atalho à direita.
 ///
 /// O lado direito sempre reserva o espaço de um alvo de toque, com ou sem
 /// atalho — é o que mantém o título no centro da tela.
 class AppTopBar extends StatelessWidget {
-  const AppTopBar({super.key, required this.title, this.trailing});
+  const AppTopBar({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.leadingIcon = AppIcons.back,
+    this.leadingIconSize = 30,
+    this.leadingTooltip = 'Voltar',
+  });
 
   final String title;
   final Widget? trailing;
+
+  /// O botão da esquerda: o voltar, ou o fechar do Resultado (canvas "2g").
+  final IconData leadingIcon;
+  final double leadingIconSize;
+  final String leadingTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +42,8 @@ class AppTopBar extends StatelessWidget {
           SizedBox.square(
             dimension: AppSpacing.touchTarget,
             child: IconButton(
-              tooltip: 'Voltar',
-              icon: const Icon(AppIcons.back, size: 30, color: AppColors.text),
+              tooltip: leadingTooltip,
+              icon: Icon(leadingIcon, size: leadingIconSize, color: AppColors.text),
               // `maybePop` funciona igual sob o go_router e num
               // `MaterialApp` simples de teste.
               onPressed: () => Navigator.of(context).maybePop(),

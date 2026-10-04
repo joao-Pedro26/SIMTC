@@ -6,13 +6,13 @@ import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../checklist/checklist_badges.dart';
 import '../checklist/checklist_sections.dart';
-import '../core/score_labels.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/final_score_block.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
 import 'summary_viewmodel.dart';
@@ -131,42 +131,10 @@ class _SummaryScreenState extends State<SummaryScreen> {
   }
 
   Widget _buildScore() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pontuação final', style: AppTypography.summaryScoreLabel),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      percentLabel(_viewModel.overallScore),
-                      style: AppTypography.summaryScore,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _ResultPill(approved: _viewModel.isApproved),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md + 2),
-          Text(_detailLine(), style: AppTypography.summaryDetail),
-          if (_viewModel.timesLabel != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(_viewModel.timesLabel!, style: AppTypography.summaryDetail),
-          ],
-        ],
-      ),
+    return FinalScoreBlock(
+      score: _viewModel.overallScore,
+      approved: _viewModel.isApproved,
+      details: [_detailLine(), if (_viewModel.timesLabel case final times?) times],
     );
   }
 
@@ -255,55 +223,6 @@ class _SummaryScreenState extends State<SummaryScreen> {
             isLoading: _viewModel.isConfirming,
             onPressed: _viewModel.canConfirm ? _viewModel.confirm : null,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "Aprovado" ou "Necessita reavaliação", ao lado do % — o corte de 70% do
-/// backend. As cores são as dos chips de status do detalhe da sessão.
-class _ResultPill extends StatelessWidget {
-  const _ResultPill({required this.approved});
-
-  final bool approved;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, icon, bg, border, ink) = approved
-        ? (
-            'Aprovado',
-            AppIcons.approved,
-            AppColors.successBg,
-            AppColors.successBorder,
-            AppColors.successInk,
-          )
-        : (
-            'Necessita reavaliação',
-            AppIcons.needsReview,
-            AppColors.dangerBg,
-            AppColors.dangerBorder,
-            AppColors.dangerInk,
-          );
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm + 2,
-        AppSpacing.xs + 2,
-        AppSpacing.md,
-        AppSpacing.xs + 2,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: border, width: 1.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: ink),
-          const SizedBox(width: AppSpacing.xs + 1),
-          Text(label, style: AppTypography.resultPill.copyWith(color: ink)),
         ],
       ),
     );

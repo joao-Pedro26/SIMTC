@@ -55,4 +55,7 @@ abstract final class AppIcons {
 
   /// Menu ⋮ do cabeçalho do checklist (Fase 5B — não está no canvas).
   static const IconData more = Icons.more_vert;
+
+  /// Fechar o Resultado (canvas "2g").
+  static const IconData close = Icons.close;
 }

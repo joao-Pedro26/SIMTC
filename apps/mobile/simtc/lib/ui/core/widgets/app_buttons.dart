@@ -151,6 +151,7 @@ class AppCtaButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.icon,
+    this.trailingIcon,
     this.size = AppCtaSize.compact,
   });
 
@@ -158,6 +159,9 @@ class AppCtaButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final IconData? icon;
+
+  /// Ícone depois do rótulo — o "›" do "Próximo participante" (canvas "2g").
+  final IconData? trailingIcon;
   final AppCtaSize size;
 
   bool get _large => size == AppCtaSize.large;
@@ -211,6 +215,10 @@ class AppCtaButton extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
         ],
         Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+        if (trailingIcon != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          Icon(trailingIcon, size: _large ? 25 : 21),
+        ],
       ],
     );
   }

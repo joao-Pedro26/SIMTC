@@ -5,7 +5,7 @@ import 'data/repositories/auth_repository.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/checklist/checklist_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
-import 'ui/evaluation/evaluation_placeholder_screen.dart';
+import 'ui/result/result_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
 import 'ui/splash/splash_screen.dart';
@@ -32,9 +32,16 @@ abstract final class AppRoutes {
   static String participantSummary(String sessionId, String participantId) =>
       '/sessions/$sessionId/participants/$participantId/summary';
 
-  /// Resultado do participante (Fase 5) — por ora, uma tela provisória.
-  static String participantResult(String sessionId, String participantId) =>
-      '/sessions/$sessionId/participants/$participantId/result';
+  /// Resultado do participante (tela 1.8, Fase 5B). [justConfirmed]: aberto
+  /// logo depois do "Confirmar" da tela 1.6 — o rodapé é o "Próximo
+  /// participante".
+  static String participantResult(
+    String sessionId,
+    String participantId, {
+    bool justConfirmed = false,
+  }) =>
+      '/sessions/$sessionId/participants/$participantId/result'
+      '${justConfirmed ? '?confirmada=1' : ''}';
 }
 
 /// Rotas do app. O redirecionamento observa o `AuthRepository`: entrar ou sair
@@ -87,9 +94,10 @@ GoRouter createRouter(
           ),
           GoRoute(
             path: 'participants/:participantId/result',
-            builder: (context, state) => EvaluationPlaceholderScreen(
-              kind: EvaluationPlaceholderKind.result,
-              participantName: state.extra as String?,
+            builder: (context, state) => ResultScreen(
+              sessionId: state.pathParameters['sessionId']!,
+              participantId: state.pathParameters['participantId']!,
+              justConfirmed: state.uri.queryParameters['confirmada'] == '1',
             ),
           ),
         ],

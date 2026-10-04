@@ -19,7 +19,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
-import 'package:simtc/ui/evaluation/evaluation_placeholder_screen.dart';
+import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/session_detail/participant_row.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/utils/result.dart';
@@ -498,19 +498,24 @@ void main() {
       expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
     });
 
-    testWidgets('um concluído abre o resultado (provisório)', (tester) async {
-      await showWithRouter(tester, [
-        participant('4', 'Juliana Freitas Costa',
-            status: ParticipantStatus.aprovado, score: 86),
-      ]);
+    testWidgets('um concluído abre o Resultado', (tester) async {
+      final juliana = participant('4', 'Juliana Freitas Costa',
+          status: ParticipantStatus.aprovado, score: 86);
+      when(() => participants.watchParticipant('4'))
+          .thenAnswer((_) => Stream.value(juliana));
+      when(() => participants.fetchAssessment('4'))
+          .thenAnswer((_) async => const Success(null));
+      when(() => assessments.findByParticipant('4')).thenAnswer((_) async => null);
+      await showWithRouter(tester, [juliana]);
 
       await tester.tap(find.text('Juliana Freitas Costa'));
       await tester.pumpAndSettle();
 
-      final screen = tester.widget<EvaluationPlaceholderScreen>(
-        find.byType(EvaluationPlaceholderScreen),
-      );
-      expect(screen.kind, EvaluationPlaceholderKind.result);
+      final screen = tester.widget<ResultScreen>(find.byType(ResultScreen));
+      expect(screen.participantId, '4');
+      expect(screen.justConfirmed, isFalse);
+      expect(find.text('Avaliação concluída'), findsOneWidget);
+      expect(find.text('86,0%'), findsOneWidget);
     });
 
     testWidgets('pendente e de outro consultor não abrem nada', (tester) async {
@@ -524,7 +529,8 @@ void main() {
       await tester.tap(find.text('Marcos Vinícius Alves'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(EvaluationPlaceholderScreen), findsNothing);
+      expect(find.byType(ResultScreen), findsNothing);
+      expect(find.byType(ChecklistScreen), findsNothing);
     });
   });
 }

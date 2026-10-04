@@ -483,10 +483,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  /// Para onde a linha leva: o checklist (Fase 4) ou o resultado — este ainda
-  /// é uma tela provisória, até a Fase 5B. O checklist lê o nome do banco, por
-  /// isso não recebe `extra`. Na fila ou enviada, a linha não leva a lugar
-  /// nenhum.
+  /// Para onde a linha leva: o checklist (Fase 4) ou o Resultado (Fase 5B).
+  /// Os dois leem o participante do banco, por isso não recebem `extra`. Na
+  /// fila ou enviada, a linha não leva a lugar nenhum.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
       return () => context.push(
@@ -496,7 +495,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     if (_viewModel.opensResult(participant)) {
       return () => context.push(
             AppRoutes.participantResult(widget.sessionId, participant.id),
-            extra: participant.name,
           );
     }
     return null;
