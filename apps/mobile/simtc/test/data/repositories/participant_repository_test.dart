@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:simtc/data/models/remote_assessment.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
@@ -421,6 +422,121 @@ void main() {
         result,
         isA<Failure<void>>().having((f) => f.message, 'message',
             'Não foi possível atribuir o participante. Tente de novo.'),
+      );
+    });
+  });
+
+  group('fetchAssessment', () {
+    const path = '/practical-assessments/by-participant/tp-1';
+
+    void answer(Object? body) {
+      when(() => api.get<Object?>(path)).thenAnswer(
+        (_) async => Response<Object?>(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 200,
+          data: body,
+        ),
+      );
+    }
+
+    /// Como o `findByParticipant` do backend devolve: cada item com a nota, a
+    /// infração e a categoria aninhadas.
+    Map<String, dynamic> assessmentJson() => {
+          'id': 'assess-1',
+          'trainingParticipantId': 'tp-1',
+          'consultantId': 'c-1',
+          'date': '2026-09-30T00:00:00.000Z',
+          'startTime': '2026-09-30T11:12:00.000Z',
+          'endTime': '2026-09-30T11:31:00.000Z',
+          'synced': true,
+          'score': 86.7,
+          'items': [
+            {
+              'id': 'item-1',
+              'assessmentId': 'assess-1',
+              'infractionNoteId': 'note-pm-1',
+              'infractionNote': {
+                'id': 'note-pm-1',
+                'infractionId': 'inf-1',
+                'noteType': 'PM',
+                'comment': 'Ajuste feito somente após solicitação',
+                'deduction': 3,
+                'infraction': {
+                  'id': 'inf-1',
+                  'categoryId': 'cat-cv',
+                  'description': 'Não ajustou o banco, cinto ou espelhos',
+                  'order': 1,
+                  'category': {
+                    'id': 'cat-cv',
+                    'code': 'CV',
+                    'name': 'Controle do Veículo',
+                    'description': null,
+                    'order': 1,
+                  },
+                },
+              },
+            },
+            // Um item sem a nota aninhada não tem o que mostrar: fica de fora.
+            {'id': 'item-2', 'assessmentId': 'assess-1', 'infractionNoteId': 'x'},
+          ],
+        };
+
+    test('traz a avaliação do backend, com cada item achatado', () async {
+      answer(assessmentJson());
+
+      final result = await repository.fetchAssessment('tp-1');
+
+      final assessment = result.dataOrNull!;
+      expect(assessment.score, 86.7);
+      expect(assessment.startTime, DateTime.utc(2026, 9, 30, 11, 12));
+      expect(assessment.endTime, DateTime.utc(2026, 9, 30, 11, 31));
+      final item = assessment.items.single;
+      expect(item.infractionNoteId, 'note-pm-1');
+      expect(item.noteType, 'PM');
+      expect(item.comment, 'Ajuste feito somente após solicitação');
+      expect(item.deduction, 3);
+      expect(item.infractionId, 'inf-1');
+      expect(item.infractionDescription, 'Não ajustou o banco, cinto ou espelhos');
+      expect(item.infractionOrder, 1);
+      expect(item.categoryId, 'cat-cv');
+      expect(item.categoryCode, 'CV');
+      expect(item.categoryName, 'Controle do Veículo');
+      expect(item.categoryOrder, 1);
+    });
+
+    test('sem avaliação no backend (200 sem corpo), sucesso vazio', () async {
+      answer(null);
+
+      final result = await repository.fetchAssessment('tp-1');
+
+      expect(result.isSuccess, isTrue);
+      expect(result.dataOrNull, isNull);
+    });
+
+    test('resposta fora do formato vira falha, com a mensagem genérica', () async {
+      answer({'id': 'assess-1'});
+
+      final result = await repository.fetchAssessment('tp-1');
+
+      expect(
+        result,
+        isA<Failure<RemoteAssessment?>>().having(
+            (f) => f.message, 'message', 'Não foi possível carregar o resultado.'),
+      );
+    });
+
+    test('sem rede, a mensagem de falta de conexão', () async {
+      when(() => api.get<Object?>(path)).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+
+      final result = await repository.fetchAssessment('tp-1');
+
+      expect(
+        result,
+        isA<Failure<RemoteAssessment?>>()
+            .having((f) => f.message, 'message', 'Sem conexão')
+            .having((f) => f.exception, 'exception', isA<ApiException>()),
       );
     });
   });

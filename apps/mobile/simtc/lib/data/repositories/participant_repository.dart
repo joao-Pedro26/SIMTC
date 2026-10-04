@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../utils/result.dart';
 import '../../utils/scoring.dart';
+import '../models/remote_assessment.dart';
 import '../models/session_participant.dart';
 import '../models/training_session.dart';
 import '../services/api/api_client.dart';
@@ -37,6 +38,7 @@ class ParticipantRepository {
       'Não foi possível atribuir o participante. Tente de novo.';
   static const String _unassignFailed =
       'Não foi possível desatribuir o participante. Tente de novo.';
+  static const String _resultFailed = 'Não foi possível carregar o resultado.';
 
   /// Participantes da sessão em ordem de nome. A ordem de exibição (meus
   /// primeiro, somente teórica por último) é regra de tela e fica na
@@ -220,6 +222,34 @@ class ParticipantRepository {
       // falhar, o re-sync que a tela dispara em seguida corrige a linha.
     }
     return const Success<void>(null);
+  }
+
+  /// A avaliação do participante no backend
+  /// (`GET /practical-assessments/by-participant/:id`), para a tela de
+  /// Resultado (Fase 5B). `Success(null)` quando o backend não tem avaliação
+  /// dele. Nada é guardado no aparelho (decisão de 01/10/2026): sem rede, a
+  /// tela mostra o que o cache da sessão já tem.
+  Future<Result<RemoteAssessment?>> fetchAssessment(String participantId) async {
+    try {
+      final response = await _api
+          .get<Object?>('/practical-assessments/by-participant/$participantId');
+      final body = response.data;
+      // O NestJS responde 200 sem corpo quando a avaliação não existe.
+      if (body == null || body == '') return const Success(null);
+
+      final assessment = RemoteAssessment.tryParse(body);
+      if (assessment == null) {
+        return Failure(
+          Exception('resposta de by-participant/$participantId fora do formato'),
+          _resultFailed,
+        );
+      }
+      return Success(assessment);
+    } on ApiException catch (error) {
+      return Failure(error, error.isNetworkError ? error.message : _resultFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _resultFailed);
+    }
   }
 
   /// "Desatribuir participante" (decisão de 01/10/2026): libera no backend
