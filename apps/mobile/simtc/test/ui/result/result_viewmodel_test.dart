@@ -264,6 +264,69 @@ void main() {
   });
 
   test(
+      'o envio aceito com o Resultado ainda lendo o aparelho não deixa o aviso '
+      'de envio velho', () async {
+    await seedParticipant(status: 'EM_AVALIACAO', assignedTo: 'c-eu');
+    final local = await confirmedHere();
+    serverFails(const ApiException(message: 'Internal server error', statusCode: 500));
+    final vm = buildViewModel(justConfirmed: true);
+    addTearDown(vm.dispose);
+
+    // Logo depois do "Confirmar": a resposta do envio chega com a leitura
+    // inicial do Resultado ainda no meio.
+    final loading = vm.init();
+    await assessmentRepository.saveSendResults({local.id: null}, at: DateTime(2026, 9, 30, 8, 45));
+    await loading;
+    await settle();
+
+    expect(vm.sendStatus, LocalSyncStatus.synced);
+    expect(vm.sendNotice, 'Enviada às 08:45.');
+  });
+
+  test(
+      'uma leitura do aparelho que falha não deixa a tela carregando: fica o '
+      'que o cache tem, com "Tentar novamente"', () async {
+    await seedParticipant(status: 'APROVADO', score: 90);
+    // Uma avaliação local que o aparelho não consegue ler (situação que o app
+    // não conhece): a leitura dela lança. É de outro usuário, para o stream
+    // das avaliações do consultor logado não passar por ela.
+    await db.into(db.localAssessments).insert(
+          LocalAssessmentsCompanion.insert(
+            id: 'ilegivel',
+            trainingParticipantId: 'tp-1',
+            sessionId: 'sess-1',
+            date: DateTime(2026, 9, 30),
+            startTime: DateTime(2026, 9, 30, 8, 12),
+            syncStatus: LocalSyncStatus.synced,
+            createdAt: DateTime(2026, 9, 30, 8, 12),
+            updatedAt: DateTime(2026, 9, 30, 8, 12),
+            ownerUserId: const Value('outro-usuario'),
+          ),
+        );
+    await db.customStatement(
+      "UPDATE local_assessments SET sync_status = 'desconhecida' WHERE id = 'ilegivel'",
+    );
+    serverAnswers(serverJson());
+    final vm = buildViewModel();
+    addTearDown(vm.dispose);
+
+    await expectLater(vm.init(), completes);
+
+    expect(vm.isLoading, isFalse);
+    expect(vm.source, ResultSource.cacheOnly);
+    expect(vm.score, 90);
+    expect(vm.dataNotice, ResultDataNotice.serverFailed);
+    expect(vm.canRetry, isTrue);
+
+    // Com a leitura de volta, o "Tentar novamente" carrega.
+    await db.customStatement("DELETE FROM local_assessments WHERE id = 'ilegivel'");
+    await vm.retry();
+
+    expect(vm.source, ResultSource.server);
+    expect(vm.dataNotice, isNull);
+  });
+
+  test(
       'avaliação aceita: a nota e as infrações do servidor, e o % de cada '
       'categoria pelo catálogo do aparelho', () async {
     await seedParticipant(status: 'APROVADO', score: 90);

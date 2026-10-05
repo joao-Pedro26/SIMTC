@@ -42,7 +42,8 @@ enum ResultDataNotice {
   /// internet — a volta da conexão busca de novo, com a tela aberta.
   offline,
 
-  /// O servidor falhou (5xx, resposta fora do formato) — "Tentar novamente".
+  /// O servidor falhou (5xx, resposta fora do formato), ou uma leitura do
+  /// aparelho lançou — "Tentar novamente".
   serverFailed,
 
   /// O servidor não tem avaliação deste participante.
@@ -113,6 +114,10 @@ class ResultViewModel extends ChangeNotifier {
   TrainingSession? _session;
   SessionParticipant? _participant;
   LocalAssessment? _local;
+
+  /// O stream das avaliações do aparelho já emitiu: daí em diante só ele
+  /// escreve em [_local].
+  bool _localFromStream = false;
   ResultSource? _source;
   ResultDataNotice? _dataNotice;
   List<ResultCategory>? _categories;
@@ -231,6 +236,7 @@ class ResultViewModel extends ChangeNotifier {
     _localSubscription ??= _assessmentRepository
         .watchSessionAssessments(sessionId, ownerUserId)
         .listen((rows) {
+      _localFromStream = true;
       _local = rows
           .where((r) =>
               r.trainingParticipantId == participantId &&
@@ -290,36 +296,45 @@ class ResultViewModel extends ChangeNotifier {
     _dataNotice = null;
     notifyListeners();
 
-    final local = await _ownLocal();
-    final catalog = await _catalogRepository.loadCatalog();
-    if (_disposed) return;
-    _local = local;
-
-    if (local != null && local.syncStatus != LocalSyncStatus.synced) {
-      // Confirmada e ainda não aceita: o servidor ainda não tem esta.
-      await _showDevice(local, catalog);
-    } else {
-      final result = await _participantRepository.fetchAssessment(participantId);
+    try {
+      final local = await _ownLocal();
+      final catalog = await _catalogRepository.loadCatalog();
       if (_disposed) return;
-      switch (result) {
-        case Success(data: final remote?):
-          _showServer(remote, catalog);
-        case Success():
-          _showCacheOnly(ResultDataNotice.notOnServer);
-        case Failure(:final exception):
-          if (local != null) {
-            await _showDevice(local, catalog);
-            _dataNotice = ResultDataNotice.deviceFallback;
-          } else {
-            final offline = exception is ApiException && exception.isNetworkError;
-            _showCacheOnly(offline ? ResultDataNotice.offline : ResultDataNotice.serverFailed);
-          }
-      }
-    }
-    if (_disposed) return;
+      // O stream é o dono de `_local` assim que emite: esta leitura pode ser
+      // mais velha que a última emissão dele (o envio foi aceito no meio do
+      // caminho), e o aviso de envio ficaria velho até a próxima escrita.
+      if (!_localFromStream) _local = local;
 
-    _loading = false;
-    notifyListeners();
+      if (local != null && local.syncStatus != LocalSyncStatus.synced) {
+        // Confirmada e ainda não aceita: o servidor ainda não tem esta.
+        await _showDevice(local, catalog);
+      } else {
+        final result = await _participantRepository.fetchAssessment(participantId);
+        if (_disposed) return;
+        switch (result) {
+          case Success(data: final remote?):
+            _showServer(remote, catalog);
+          case Success():
+            _showCacheOnly(ResultDataNotice.notOnServer);
+          case Failure(:final exception):
+            if (local != null) {
+              await _showDevice(local, catalog);
+              _dataNotice = ResultDataNotice.deviceFallback;
+            } else {
+              final offline = exception is ApiException && exception.isNetworkError;
+              _showCacheOnly(offline ? ResultDataNotice.offline : ResultDataNotice.serverFailed);
+            }
+        }
+      }
+    } catch (_) {
+      // Uma leitura do aparelho lançou: fica o que o cache tem, com o "Tentar
+      // novamente". Sem isto a exceção escaparia do `init`, a tela ficaria
+      // carregando e o `retry` não faria nada.
+      _showCacheOnly(ResultDataNotice.serverFailed);
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   /// A avaliação confirmada deste aparelho, do consultor logado.
