@@ -43,6 +43,13 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
   /// As avaliações que a tela pediu para descartar.
   final List<String> discardCalls = [];
 
+  /// O que o "Descartar" devolve. `false` é o serviço dizendo que não apagou
+  /// (o item deixou de ser recusa, ou há um envio no ar): a fila não muda.
+  bool discardResult = true;
+
+  /// Se não for nulo, o "Descartar" lança isto — uma falha do banco local.
+  Object? discardError;
+
   @override
   List<LocalAssessment> get queue => _queue;
 
@@ -59,10 +66,14 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
   @override
   Future<void> syncNow() async => syncNowCalls++;
 
-  /// Descarta e tira da fila, como o stream do banco faria.
+  /// Descarta e tira da fila, como o stream do banco faria — a não ser que o
+  /// teste tenha pedido a recusa ([discardResult]) ou o erro ([discardError]).
   @override
   Future<bool> discardRefused(String localAssessmentId) async {
     discardCalls.add(localAssessmentId);
+    final error = discardError;
+    if (error != null) throw error;
+    if (!discardResult) return false;
     setQueue(
       [for (final item in _queue) if (item.id != localAssessmentId) item],
       sendingIds: _sendingIds,

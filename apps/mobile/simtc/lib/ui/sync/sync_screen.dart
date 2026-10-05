@@ -301,7 +301,13 @@ class SyncScreen extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
 
-    final discarded = await sync.discardRefused(item.id);
+    var discarded = false;
+    try {
+      discarded = await sync.discardRefused(item.id);
+    } catch (_) {
+      // Uma falha do banco local cai no mesmo aviso de quando o serviço não
+      // apaga — sem isto, viraria uma exceção solta no toque do botão.
+    }
     if (discarded || !context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Não foi possível descartar. Tente de novo.')),

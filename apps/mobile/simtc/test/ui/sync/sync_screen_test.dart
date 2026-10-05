@@ -129,6 +129,57 @@ void main() {
     expect(find.text('Marcos Vinícius Alves'), findsNothing);
   });
 
+  group('"Descartar" que não descarta', () {
+    const notDiscarded = 'Não foi possível descartar. Tente de novo.';
+
+    /// A aba com um item recusado, e o "Descartar" dele já confirmado.
+    Future<LocalAssessment> confirmDiscard(
+      WidgetTester tester, {
+      required void Function() arrange,
+    }) async {
+      final refused = queuedAssessment(
+        '3',
+        participantName: 'Marcos Vinícius Alves',
+        status: LocalSyncStatus.error,
+        lastAttemptAt: DateTime(2026, 9, 29, 8, 5),
+        lastError: SendFailure.refused,
+      );
+      await pump(tester, queue: [refused]);
+      arrange();
+
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+      await tester.pumpAndSettle();
+      return refused;
+    }
+
+    testWidgets(
+        'o serviço não apagou (deixou de ser recusa, ou há envio no ar): avisa, '
+        'e o item continua na fila', (tester) async {
+      final refused = await confirmDiscard(
+        tester,
+        arrange: () => sync.discardResult = false,
+      );
+
+      expect(sync.discardCalls, [refused.id]);
+      expect(find.text(notDiscarded), findsOneWidget);
+      expect(find.text('Marcos Vinícius Alves'), findsOneWidget);
+    });
+
+    testWidgets('o descarte deu erro: o mesmo aviso, e o item continua na fila',
+        (tester) async {
+      final refused = await confirmDiscard(
+        tester,
+        arrange: () => sync.discardError = StateError('banco local indisponível'),
+      );
+
+      expect(sync.discardCalls, [refused.id]);
+      expect(find.text(notDiscarded), findsOneWidget);
+      expect(find.text('Marcos Vinícius Alves'), findsOneWidget);
+    });
+  });
+
   testWidgets('falha de rede ou de tempo não tem "Descartar": tenta sozinha',
       (tester) async {
     await pump(tester, queue: filaDoCanvas());

@@ -375,6 +375,9 @@ void main() {
     final sync = startService();
     final failed = await confirmed('tp-1');
     await until(() async => await statusOf(failed.id) == LocalSyncStatus.error);
+    // Sem envio no ar: quem recusa o descarte aqui é o motivo da falha, não a
+    // guarda de envio em andamento.
+    await until(() => !sync.isSending);
 
     expect(await sync.discardRefused(failed.id), isFalse);
     expect(await statusOf(failed.id), LocalSyncStatus.error);
