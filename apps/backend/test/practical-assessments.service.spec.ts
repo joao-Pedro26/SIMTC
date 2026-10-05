@@ -191,6 +191,21 @@ describe('PracticalAssessmentsService', () => {
         { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NECESSITA_REAVALIACAO' } },
       ]);
     });
+
+    it('nota zero é avaliação anterior: o participante volta a Necessita reavaliação, não a Pendente', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: { score: 0 } },
+      ]);
+      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const result = await service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor');
+
+      expect(result).toEqual({ unassigned: 1 });
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
+        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'NECESSITA_REAVALIACAO' } },
+      ]);
+    });
   });
 
   // ─── syncFromMobile ──────────────────────────────────────────────────────
