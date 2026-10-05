@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
@@ -464,7 +465,9 @@ void main() {
   });
 
   group('navegação pelas rotas reais', () {
-    Future<void> showWithRouter(
+    /// O detalhe aberto pelo `createRouter` de produção; devolve o router,
+    /// para o teste empilhar outra rota real por cima.
+    Future<GoRouter> showWithRouter(
       WidgetTester tester,
       List<SessionParticipant> list,
     ) async {
@@ -481,6 +484,7 @@ void main() {
       sessionStream.add(session());
       participantsStream.add(list);
       await tester.pump();
+      return router;
     }
 
     testWidgets('o meu participante abre o checklist de verdade',
@@ -537,6 +541,35 @@ void main() {
       expect(screen.justConfirmed, isFalse);
       expect(find.byType(ChecklistScreen), findsNothing);
       expect(find.text('Avaliação concluída'), findsOneWidget);
+    });
+
+    testWidgets(
+        'o Resultado de logo depois do "Confirmar" (?confirmada=1) traz o '
+        '"Próximo participante", que volta ao detalhe', (tester) async {
+      final ana = participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      final queued = local('1', LocalSyncStatus.pendingSync, score: 86.6667);
+      when(() => participants.watchParticipant('1'))
+          .thenAnswer((_) => Stream.value(ana));
+      when(() => assessments.findByParticipant('1')).thenAnswer((_) async => queued);
+      when(() => assessments.loadItems(queued.id)).thenAnswer((_) async => const []);
+      final router = await showWithRouter(tester, [ana]);
+
+      // O que o checklist faz depois do "Confirmar", pela rota de produção.
+      router.push(AppRoutes.participantResult('sess-1', '1', justConfirmed: true));
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<ResultScreen>(find.byType(ResultScreen));
+      expect(screen.participantId, '1');
+      expect(screen.justConfirmed, isTrue);
+      expect(find.text('Próximo participante'), findsOneWidget);
+
+      await tester.tap(find.text('Próximo participante'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ResultScreen), findsNothing);
+      expect(find.byType(SessionDetailScreen), findsOneWidget);
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
     });
 
     testWidgets('pendente e de outro consultor não abrem nada', (tester) async {

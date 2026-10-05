@@ -307,6 +307,24 @@ void main() {
     expect(tester.widget<InkWell>(rr).onTap, isNull);
   });
 
+  testWidgets(
+      'a linha da infração traz o número do item na ficha, não a posição na '
+      'lista', (tester) async {
+    await seedParticipant(status: 'EM_AVALIACAO');
+    // A única infração marcada é o item 4 de CV — a primeira da lista.
+    await confirmedHere({'inf-4': 'inf-4-PM'});
+
+    await pumpResult(tester, justConfirmed: true);
+
+    // O número é um texto próprio, ao lado da descrição: a descrição semeada
+    // ("Infração do item 4") também traz o número, e não é ela que conta.
+    final line = find
+        .ancestor(of: find.text('Infração do item 4'), matching: find.byType(Row))
+        .first;
+    expect(find.descendant(of: line, matching: find.text('4')), findsOneWidget);
+    expect(find.text('1'), findsNothing, reason: 'não é a posição na lista');
+  });
+
   testWidgets('sem nenhuma infração: "Nenhuma infração registrada."', (tester) async {
     await seedParticipant(status: 'EM_AVALIACAO');
     await confirmedHere({}, score: 100);
@@ -437,6 +455,44 @@ void main() {
     final row = await (db.select(db.participants)..where((t) => t.id.equals('tp-1')))
         .getSingle();
     expect(row.status, 'EM_AVALIACAO', reason: 'a reserva aconteceu');
+  });
+
+  testWidgets(
+      '"Reavaliar" quem foi avaliado neste aparelho, com a avaliação anterior já '
+      'enviada: o checklist abre em "não iniciada" e o "Iniciar avaliação" '
+      'começa um rascunho novo no lugar dela', (tester) async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    // A avaliação anterior: feita aqui, confirmada e já aceita pelo servidor.
+    await confirmedHere({'inf-1': 'inf-1-M'}, score: 62.5);
+    final previous = await db.select(db.localAssessments).getSingle();
+    await assessmentRepository.saveSendResults({previous.id: null}, at: at(8, 45));
+    serverAnswers(serverJson());
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
+        data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/practical-assessments/assign'),
+          statusCode: 201,
+          data: {'assigned': 1},
+        ));
+    await pumpResult(tester);
+
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsOneWidget);
+    expect(find.text('não iniciada'), findsOneWidget);
+    final untouched = await db.select(db.localAssessments).getSingle();
+    expect(untouched.id, previous.id,
+        reason: 'abrir o checklist ainda não mexe na avaliação enviada');
+
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+
+    final draft = await db.select(db.localAssessments).getSingle();
+    expect(draft.id, isNot(previous.id), reason: 'a enviada deu lugar ao rascunho novo');
+    expect(draft.syncStatus, LocalSyncStatus.draft);
+    expect(await db.select(db.localAssessmentItems).get(), isEmpty,
+        reason: 'as marcações da avaliação anterior saíram com ela');
+    expect(find.text('Finalizar avaliação'), findsOneWidget);
   });
 
   testWidgets('sessão concluída: "Necessita reavaliação" sem "Reavaliar"', (tester) async {

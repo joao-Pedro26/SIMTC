@@ -448,6 +448,25 @@ void main() {
       final rows = await db.select(db.localAssessments).get();
       expect(rows.map((r) => r.id), [queued.id]);
     });
+
+    test(
+        'a recusada que foi reenviada e aceita deixou de ser recusa: descartar '
+        'não a apaga', () async {
+      final resent = await open('tp-1');
+      await repository.confirm(resent.id, participantName: 'Ana', score: 90);
+      await repository.saveSendResults(
+        {resent.id: 'recusada pelo servidor'},
+        at: DateTime(2026, 9, 30, 9),
+      );
+      // O reenvio foi aceito com o diálogo de "Descartar" ainda aberto.
+      await repository.saveSendResults({resent.id: null}, at: DateTime(2026, 9, 30, 9, 5));
+
+      expect(
+        await repository.discardFailed(resent.id, reason: 'recusada pelo servidor'),
+        isFalse,
+      );
+      expect((await row(resent.id)).syncStatus, LocalSyncStatus.synced);
+    });
   });
 
   group('confirm', () {
