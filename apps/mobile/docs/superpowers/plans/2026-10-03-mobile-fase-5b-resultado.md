@@ -32,6 +32,37 @@ Em 01/10/2026, no brainstorm da fase (desenho aprovado em três partes):
 14. **Divergências do canvas aprovadas** (quadro `2g`): sem pontos ("39 de 45 pts", "14 de 18 pts", "−6 pts"); a linha abaixo da nota traz início e fim, sem "duração" (decisão 12 da 5A) e sem "assinatura coletada"; o número do item entra na linha da infração (o canvas o cita no rodapé, mas não o desenha); o aviso de envio é novo; o "Reavaliar" é novo; o menu ⋮ do checklist e o "Descartar" da aba não estão no canvas.
 15. **Erros e casos de borda** (parte 3 do desenho): skeleton enquanto carrega; servidor falhou → a avaliação do aparelho, se houver, com "Mostrando a avaliação feita neste aparelho.", senão a nota e o status guardados com "Não foi possível carregar as infrações." e "Tentar novamente"; servidor sem avaliação → "Não há avaliação registrada no servidor para este participante."; sem catálogo no aparelho, o "Desempenho por categoria" some; dois toques no "Reavaliar" reservam uma vez; o descarte da aba só apaga se o item ainda estiver recusado no momento do toque.
 
+### Desvios na execução (03 a 05/10/2026)
+
+A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1, 2 e 4 a 9 saíram iguais ao plano. Os desvios foram:
+
+**Task 3, posição dos métodos.** `discardDraft`, `discardFailed` e `_discardWhere` ficaram depois de `saveSendResults` em `assessment_repository.dart`, e não depois de `_startsOver`, onde o plano os punha. O código é o mesmo, e nenhuma task posterior edita esse arquivo.
+
+**Task 10, correção `92b76e8`.** A revisão da task achou que a trava do "Descartar" com um envio no ar só valia na hora de desenhar o botão: com o diálogo de confirmação aberto, um reenvio automático podia começar, e o descarte apagava do aparelho uma avaliação que o servidor ainda podia aceitar. Agora o `discardRefused` não apaga (devolve `false`) com um envio em andamento. Isso trouxe 2 testes a mais: 458 ao fim das tasks.
+
+**Revisão final.** Commits `6f16da6` a `f3bf046`, com 17 testes a mais no app e 1 no backend. A revisão do branch inteiro achou lacunas do próprio plano:
+- **"Reavaliar" só com a sessão em andamento** (`6f16da6`). O plano não tinha esse portão: numa sessão concluída, o Resultado deixava reservar e iniciar, e o envio sobrescreveria a avaliação que embasou os certificados. É a regra que o detalhe da sessão e o painel web já aplicam. Acrescenta à decisão 4: fora de "em andamento", o botão não aparece.
+- **O Resultado recarrega quando a rede volta** (`a40c691`). O aviso "Sem conexão: as infrações aparecem quando houver internet." não se cumpria com a tela aberta.
+- **Resultado sem carregamento preso** (`c011333`). Uma falha ao ler o banco do aparelho deixava a tela carregando para sempre; agora mostra a nota guardada, com "Tentar novamente". No mesmo commit, o aviso de envio deixou de poder ficar desatualizado.
+- **Desatribuir e descartar se excluem no checklist** (`bfb10ce`). Enquanto o desatribuir espera o backend, ou um descarte está gravando, "Iniciar avaliação", as notas, o menu ⋮ e o "Finalizar avaliação" não reagem: o ⋮ só deixa de abrir, sem mudar de aparência, e o "Finalizar avaliação" fica desabilitado. Se a avaliação iniciada não pôde ser apagada depois do desatribuir, a tela avisa.
+- **A aba Sincronizar trata a falha do "Descartar"** (`45bbd8c`): um erro ao apagar mostra o mesmo aviso de "Não foi possível descartar. Tente de novo.".
+- **Ajustes pequenos** (`d22ff31`): o efeito de toque passou a aparecer nos grupos de "Infrações registradas"; o diálogo do descarte sem nome diz "deste participante"; comentários do código.
+- **Testes que faltavam** (`a982398`, `edd5a06`): o Resultado pela rota real com `?confirmada=1`, o "Reavaliar" com a avaliação anterior enviada deste aparelho, o número do item na linha da infração, o descarte de uma avaliação que foi aceita no reenvio e, no backend, o desatribuir com nota zero.
+- **Auditoria da Fase 0** (`f3bf046`): nota sobre a remoção da assinatura do participante.
+
+**Fim da execução:** app com **475 testes passando** e `flutter analyze` sem issues; backend com as 12 falhas antigas e 62 testes passando (74 no total).
+
+### Decisões em aberto (para o usuário)
+
+A execução deixou estas escolhas para o usuário. Nenhuma foi decidida por conta própria:
+
+1. **Avaliação iniciada numa sessão que foi concluída ou cancelada** (regra de negócio). A regra de uma avaliação por vez vale em todas as sessões, mas o detalhe de uma sessão fora de "em andamento" não abre o checklist. Se o responsável concluir ou cancelar a sessão com uma avaliação do consultor iniciada, ela fica inalcançável e bloqueia o "Iniciar avaliação" de todos os outros participantes, em qualquer sessão. Opções: (a) abrir o checklist dessa linha só para leitura, com o "Descartar avaliação" — muda a tela; (b) a regra de uma por vez ignora a avaliação iniciada em sessão que não está em andamento — não muda a tela (recomendada pela revisão); (c) deixar para a Fase 8.
+2. **Indicador de progresso no "Desatribuir participante".** Com a rede lenta, o envio pode levar de 15 a 35 segundos, e a tela não mostra que está esperando: só o "Finalizar avaliação" fica desabilitado. Um indicador é visual novo, fora do canvas.
+3. **"Tentar novamente" ao lado do "Descartar"** na aba Sincronizar: com os dois botões na mesma linha, o rótulo "Tentar novamente" quebra em duas linhas nas larguras comuns (360 a 412 dp), sem estourar. Opções: aceitar; empilhar os dois botões; dar mais largura ao "Tentar novamente".
+4. **A pílula "Necessita reavaliação"** do Resultado e da 1.6 não encolhe: em tela de 360 dp ou com a fonte do sistema ampliada, a nota pode quebrar em duas linhas. Ver no aparelho.
+5. **A setinha nas linhas "Na fila", "Erro no envio" e "Enviada"** do detalhe: como agora abrem o Resultado (decisão 12), passaram a mostrar a seta de toque. Confirmar no aparelho.
+6. **Texto do aviso quando o "Descartar" da aba não apaga** porque a avaliação deixou de estar recusada (foi reenviada e aceita com o diálogo aberto): hoje diz "Não foi possível descartar. Tente de novo.", mas não há o que tentar de novo.
+
 ### Ajustes feitos ao preparar o plano (revisar junto com o plano)
 
 A validação na cópia descartável levou a estes ajustes — **nenhum muda regra de negócio aprovada**, mas cada um é uma escolha que o usuário deve conferir:
@@ -6257,10 +6288,13 @@ Resultado depois do "Confirmar":
 
 Resultado pelo detalhe:
 - [ ] toque num participante "Aprovado · N%": abre o Resultado com a nota e as infrações do servidor (as mesmas do painel web), sem botão no rodapé;
-- [ ] **offline** (modo avião + `adb -s <ID> reverse --remove tcp:3001`): confirme outro participante; a linha "Na fila" abre o Resultado com os dados do aparelho e "Na fila de envio…"; um "Aprovado" que não foi avaliado neste aparelho abre só com a nota, a pílula e "Sem conexão: as infrações aparecem quando houver internet.". Volte a ficar online (`adb reverse` primeiro, depois desligue o modo avião).
+- [ ] **offline** (modo avião + `adb -s <ID> reverse --remove tcp:3001`): confirme outro participante; a linha "Na fila" abre o Resultado com os dados do aparelho e "Na fila de envio…"; um "Aprovado" que não foi avaliado neste aparelho abre só com a nota, a pílula e "Sem conexão: as infrações aparecem quando houver internet.";
+- [ ] com esse Resultado ainda aberto, volte a ficar online (`adb reverse` primeiro, depois desligue o modo avião): as infrações aparecem sozinhas, sem sair da tela;
+- [ ] o Início e o Fim de uma avaliação vinda do servidor batem com os do painel web.
 
 Reavaliar:
 - [ ] avalie um participante com várias M até ficar abaixo de 70% e confirme; com o envio aceito, a linha vira "Reavaliar · N%"; abra o Resultado: o rodapé tem **"Reavaliar"**;
+- [ ] numa sessão **concluída** que tenha um participante "Reavaliar · N%", o Resultado abre sem o botão "Reavaliar";
 - [ ] offline, o "Reavaliar" fica desabilitado com "Disponível quando houver conexão";
 - [ ] com rede, toque em "Reavaliar": abre o checklist em "não iniciada" ("Iniciar avaliação"), e no detalhe a linha vira "Reavaliando · você"; o voltar leva ao detalhe;
 - [ ] com outra avaliação em andamento, o "Reavaliar" reserva e o checklist mostra "Você já está avaliando … Finalize ou descarte essa avaliação para iniciar outra.".
@@ -6280,7 +6314,13 @@ Regressões:
 - [ ] a 1.6 "Conferir e finalizar" continua igual no topo (nota, pílula, linha do participante, início e fim);
 - [ ] a aba "Sincronizar", o badge e o envio automático continuam como na 5A.
 
-**Não verificável neste aparelho, e por quê:** o "Descartar" da aba depende de o servidor **recusar** uma avaliação (participante removido da sessão ou nota apagada no painel com a avaliação ainda na fila) — difícil de provocar de propósito; fica coberto pelos testes das Tasks 3 e 10. O checklist somente leitura só aparece por um caminho que a interface não oferece (o detalhe abre o Resultado para a avaliação confirmada); fica coberto pelos testes da Task 4. O servidor sem avaliação para um participante concluído (apagada no painel) e a falha do servidor com "Tentar novamente" ficam cobertos pelos testes das Tasks 7 e 8.
+Visual (ver "Decisões em aberto"):
+- [ ] o cabeçalho do checklist, com o menu ⋮ e a hora de início, e a pílula "Necessita reavaliação" ao lado da nota, numa tela estreita ou com a fonte do sistema ampliada;
+- [ ] as linhas "Na fila", "Erro no envio" e "Enviada" do detalhe, agora com a setinha de toque;
+- [ ] o efeito de toque nos grupos de "Infrações registradas";
+- [ ] depois do "Confirmar", o voltar do Android no Resultado leva ao detalhe da sessão.
+
+**Não verificável neste aparelho, e por quê:** o "Descartar" da aba depende de o servidor **recusar** uma avaliação (participante removido da sessão ou nota apagada no painel com a avaliação ainda na fila) — difícil de provocar de propósito; fica coberto pelos testes das Tasks 3 e 10, e é só nesse item que o "Tentar novamente" aparece ao lado do "Descartar". O bloqueio do menu ⋮ e do "Finalizar avaliação" durante o desatribuir só aparece com a rede lenta; fica coberto pelos testes do checklist. O checklist somente leitura só aparece por um caminho que a interface não oferece (o detalhe abre o Resultado para a avaliação confirmada); fica coberto pelos testes da Task 4. O servidor sem avaliação para um participante concluído (apagada no painel) e a falha do servidor com "Tentar novamente" ficam cobertos pelos testes das Tasks 7 e 8.
 
 - [ ] **Step 4: Registrar o resultado**
 
@@ -6290,7 +6330,7 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a próxima fase. 
 
 ## Pendências levadas para as fases seguintes
 
-Resolvidas nesta fase (saem da lista da 5A): a tela 1.8 Resultado no lugar da provisória, o "Reavaliar", o "Próximo participante", o destino do "Confirmar", o toque na linha "Enviada", o checklist editável com a avaliação na fila, os rascunhos da Fase 4 que bloqueavam o "Iniciar" (agora há o "Descartar avaliação") e o item sempre recusado que não saía da fila.
+Resolvidas nesta fase (saem da lista da 5A): a tela 1.8 Resultado no lugar da provisória, o "Reavaliar", o "Próximo participante", o destino do "Confirmar", o toque na linha "Enviada", o checklist editável com a avaliação na fila, os rascunhos da Fase 4 que bloqueavam o "Iniciar" (agora há o "Descartar avaliação"; o caso da sessão concluída ou cancelada está em "Decisões em aberto") e o item sempre recusado que não saía da fila.
 
 | Fase | Pendência |
 |---|---|
@@ -6301,7 +6341,16 @@ Resolvidas nesta fase (saem da lista da 5A): a tela 1.8 Resultado no lugar da pr
 | 8 | Uma avaliação na fila de outro consultor, para um participante que agora está com você (reatribuído no painel), é devolvida como está pelo `openDraft`. Caso raro (aparelho compartilhado + reatribuição antes do envio). |
 | 8 | Rascunho órfão: o servidor desatribuiu, mas o aparelho não conseguiu apagar o rascunho (erro de escrita local) — ele bloquearia o "Iniciar" de outro participante, sem caminho na interface para descartá-lo. |
 | 8 | O Resultado não é guardado no aparelho: sem rede, quem não foi avaliado neste aparelho aparece só com a nota e o status. Se isso pesar em campo, guardar o resultado aberto com rede (tabela nova, migração v5). |
+| 8 | Um erro 4xx no lote inteiro marca todos os itens como "recusada pelo servidor" e libera o "Descartar" em todos (regra do `_reasonFor`, da 5A). |
+| 8 | Depois de um desatribuir recusado (409), o checklist continua aberto e ainda deixa "Finalizar" e "Confirmar" para um participante que pode estar com outro consultor. |
+| 8 | O % por categoria do Resultado vindo do servidor usa o total de infrações do catálogo do aparelho (decisão 5): com o catálogo defasado, uma infração que o aparelho não conhece muda o % em relação ao servidor. A nota geral é sempre a do servidor. |
+| 8 | Limpeza: o bloco do aviso (SnackBar) repetido em três telas, o rodapé com borda em três, o mapa B/PM/M → cor em duas, os diálogos de confirmação e os botões da aba parecidos, e "confirmada neste aparelho" (`queued`/`failed`/`sent`) escrito duas vezes no detalhe. |
+| 8 | Testes que faltam, registrados nas revisões: caminhos de falha do descarte e do desatribuir no checklist, bordas do `RemoteAssessment`, ramos do `FinalScoreBlock`, categoria sem % na tela do Resultado; e a saída da suíte ainda traz avisos do drift e um log de recusa. |
 | Backend | `syncOne` apaga os itens e depois atualiza a avaliação fora de uma transação: um reenvio que falhe no meio deixa uma avaliação aceita sem itens. |
+| Backend | `unassign`: a atualização não reafirma status e consultor (janela de concorrência, como no `assign`), e um participante que suma no meio vira erro 500; ids repetidos no corpo dão um 409 enganoso. |
+| Backend | `syncOne` não confere se o participante ainda está com quem envia nem se a sessão está em andamento; `GET /practical-assessments/by-participant/:id` não confere papel nem dono. |
+| Backend | Remover um consultor zera o `assignedConsultantId` sem mexer no status (`consultants.service.ts`): o participante fica "em avaliação" sem dono, e nem `assign` nem `unassign` o liberam. |
+| Backend | Os arquivos das assinaturas de participante continuam no bucket `signatures/participants/` depois da remoção da coluna. |
 | — | Canvas: o Resultado sem pontos, com início e fim, o número do item, o aviso de envio e o "Reavaliar"; o menu ⋮ do checklist; o "Descartar" da aba. Atualizar no Claude Design. |
 
 As pendências da Fase 8 que vieram da 5A e não estão acima continuam valendo como estão no plano da 5A.
