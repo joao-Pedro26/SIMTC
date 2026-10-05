@@ -66,6 +66,8 @@ O `pdfx` está no `pubspec.yaml`, mas nenhuma tela prevista o usa; avaliar a rem
 - `PATCH /api/practical-assessments/:id/participant-signature` (multipart, campo `file`, PNG/JPEG com menos de 2 MB) e `GET /api/practical-assessments/:id/participant-signature-url` → `{ signedUrl }`, válida por 1 h. Só ADMIN e CONSULTANT têm acesso.
 - `POST /api/practical-assessments/sync` passa a devolver `assessmentId` em cada item com `status: 'fulfilled'`.
 
+**Nota de 03/10/2026:** os três itens acima deixaram de existir — a coluna `participantSignatureUrl`, as rotas `participant-signature*` e o `assessmentId` da resposta do `POST /practical-assessments/sync` foram removidos junto com a assinatura do participante, commitados na Fase 5B (`3b4a98f`).
+
 ### 2.2 Pendências por fase (não resolvidas na Fase 0)
 
 | Fase | Achado no código | Impacto no app |
