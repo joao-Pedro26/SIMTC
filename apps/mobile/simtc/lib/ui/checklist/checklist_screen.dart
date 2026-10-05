@@ -262,13 +262,15 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Future<void> _confirmDiscard() async {
-    final name = _viewModel.participant?.name ?? 'este participante';
+    final name = _viewModel.participant?.name;
+    // "de Ana Paula Ribeiro" ou, sem o nome no aparelho, "deste participante".
+    final whose = name == null ? 'deste participante' : 'de $name';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Descartar a avaliação?'),
         content: Text(
-          'As marcações e a hora de início de $name serão apagadas. O '
+          'As marcações e a hora de início $whose serão apagadas. O '
           'participante continua com você.',
         ),
         actions: [
@@ -732,7 +734,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// "Finalizar avaliação" abre a conferência (tela 1.6), sem o diálogo das
   /// categorias sem marcação da Fase 4: a 1.6 mostra cada categoria com o %
   /// antes do "Confirmar" (decisão de 29/09/2026). Quem põe na fila é o
-  /// "Confirmar" de lá; daqui, só se decide para onde voltar.
+  /// "Confirmar" de lá; daqui, só se decide para onde ir: ao Resultado
+  /// (confirmou), à categoria tocada ou de volta ao checklist.
   Future<void> _openSummary() async {
     final exit = await context.push<SummaryExit>(
       AppRoutes.participantSummary(widget.sessionId, widget.participantId),

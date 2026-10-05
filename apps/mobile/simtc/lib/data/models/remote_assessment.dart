@@ -18,9 +18,11 @@ class RemoteAssessment {
   final double? score;
   final List<RemoteAssessmentItem> items;
 
-  /// Nulo se [json] não tem o formato esperado — sem `startTime` não há
-  /// avaliação que se possa mostrar. Item sem a nota, a infração ou a
-  /// categoria aninhadas fica de fora.
+  /// Nulo se [json] não é um objeto ou não traz um `startTime` legível — sem
+  /// ele não há avaliação que se possa mostrar. Item sem a nota, a infração
+  /// ou a categoria aninhadas fica de fora. Um campo com o tipo errado (um
+  /// `score` em texto, por exemplo) lança `TypeError`: o
+  /// `ParticipantRepository.fetchAssessment` o converte em `Failure`.
   static RemoteAssessment? tryParse(Object? json) {
     if (json is! Map<String, dynamic>) return null;
     final start = DateTime.tryParse(json['startTime'] as String? ?? '');

@@ -491,6 +491,25 @@ void main() {
   });
 
   testWidgets(
+      'sem o nome do participante no aparelho, a confirmação do descarte diz '
+      '"deste participante"', (tester) async {
+    // O cache da sessão foi podado: a avaliação iniciada continua no aparelho.
+    await db.delete(db.participants).go();
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Descartar avaliação'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('As marcações e a hora de início deste participante serão '
+          'apagadas. O participante continua com você.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
       'avaliação já confirmada: as marcações à vista, sem mudar nota, sem '
       '"Finalizar" e sem menu', (tester) async {
     final draft = await assessmentRepository.openDraft(

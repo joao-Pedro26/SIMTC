@@ -300,55 +300,60 @@ class _ResultScreenState extends State<ResultScreen> {
 
   /// Cabeçalho de um grupo de "Infrações registradas": abre e fecha o grupo.
   /// Sem infração na categoria, não há o que abrir.
+  ///
+  /// O fundo fica num `Material` próprio, embaixo do `InkWell`: como cor do
+  /// `Container` de dentro, ele cobria o efeito de toque.
   Widget _buildGroupHeader(ResultCategory category, bool isOpen) {
     final hasInfractions = category.infractions.isNotEmpty;
 
-    return InkWell(
-      key: ValueKey('result-group-${category.id}'),
-      onTap: hasInfractions
-          ? () => setState(() {
-                final open = _open!;
-                if (!open.remove(category.id)) open.add(category.id);
-              })
-          : null,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        decoration: BoxDecoration(
-          color: isOpen ? AppColors.categoryExpandedBg : AppColors.surface,
-          border: const Border.symmetric(
-            horizontal: BorderSide(color: AppColors.categoryExpandedBorder),
+    return Material(
+      color: isOpen ? AppColors.categoryExpandedBg : AppColors.surface,
+      child: InkWell(
+        key: ValueKey('result-group-${category.id}'),
+        onTap: hasInfractions
+            ? () => setState(() {
+                  final open = _open!;
+                  if (!open.remove(category.id)) open.add(category.id);
+                })
+            : null,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: const BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(color: AppColors.categoryExpandedBorder),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            CategoryCodeChip(
-              code: category.code,
-              background: isOpen ? AppColors.primary : AppColors.categoryChipBg,
-              ink: isOpen ? AppColors.surface : AppColors.primaryDark,
-            ),
-            const SizedBox(width: AppSpacing.sm + 2),
-            Expanded(
-              child: Text(
-                category.name,
-                style: AppTypography.categoryName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              CategoryCodeChip(
+                code: category.code,
+                background: isOpen ? AppColors.primary : AppColors.categoryChipBg,
+                ink: isOpen ? AppColors.surface : AppColors.primaryDark,
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm + 2),
-            Text(
-              infractionCountLabel(category.infractions.length),
-              style: AppTypography.categoryCount,
-            ),
-            if (hasInfractions) ...[
-              const SizedBox(width: AppSpacing.sm),
-              Icon(
-                isOpen ? AppIcons.expandLess : AppIcons.expandMore,
-                size: 22,
-                color: AppColors.text3,
+              const SizedBox(width: AppSpacing.sm + 2),
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: AppTypography.categoryName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: AppSpacing.sm + 2),
+              Text(
+                infractionCountLabel(category.infractions.length),
+                style: AppTypography.categoryCount,
+              ),
+              if (hasInfractions) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  isOpen ? AppIcons.expandLess : AppIcons.expandMore,
+                  size: 22,
+                  color: AppColors.text3,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
