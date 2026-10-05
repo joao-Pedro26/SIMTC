@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
@@ -550,6 +552,41 @@ void main() {
     expect(await db.select(db.localAssessments).get(), isEmpty);
     final row = await db.select(db.participants).getSingle();
     expect(row.status, 'PENDENTE');
+  });
+
+  testWidgets(
+      'com o desatribuir esperando o backend, o menu ⋮ e o "Finalizar" ficam '
+      'desabilitados', (tester) async {
+    await assignToMe();
+    final post = Completer<Response<Map<String, dynamic>>>();
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/unassign',
+        data: any(named: 'data'))).thenAnswer((_) => post.future);
+    await pumpOverOrigin(tester);
+
+    await tester.tap(find.byKey(const Key('checklist-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Desatribuir participante'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
+    await tester.pumpAndSettle();
+
+    final menu = tester.widget<PopupMenuButton<Object?>>(
+      find.byKey(const Key('checklist-menu')),
+    );
+    expect(menu.enabled, isFalse);
+    final finish = tester.widget<AppCtaButton>(
+      find.widgetWithText(AppCtaButton, 'Finalizar avaliação'),
+    );
+    expect(finish.onPressed, isNull);
+
+    post.complete(Response<Map<String, dynamic>>(
+      requestOptions: RequestOptions(path: '/practical-assessments/unassign'),
+      statusCode: 201,
+      data: {'unassigned': 1},
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('origem'), findsOneWidget);
   });
 
   testWidgets('sem rede, "Desatribuir participante" fica desabilitado',

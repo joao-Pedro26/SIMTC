@@ -18,9 +18,11 @@ import 'checklist_sections.dart';
 ///
 /// O catálogo é lido uma vez (`loadCatalog`, sem stream — não muda durante a
 /// avaliação); as marcações, sim, vêm de um stream, porque `toggleNote`
-/// escreve no banco e a tela precisa reagir à própria escrita. Nada aqui fala
-/// com o backend: a avaliação só é gravada no aparelho. Quem a põe na fila de
-/// envio é o "Confirmar" da tela 1.6 (Fase 5A).
+/// escreve no banco e a tela precisa reagir à própria escrita. A avaliação só
+/// é gravada no aparelho: quem a põe na fila de envio é o "Confirmar" da tela
+/// 1.6 (Fase 5A). O backend só entra no "Desatribuir participante"
+/// ([unassign]), que libera a reserva e, se ele recusar, baixa a sessão de
+/// novo.
 class ChecklistViewModel extends ChangeNotifier {
   ChecklistViewModel({
     required this.sessionId,
@@ -114,6 +116,12 @@ class ChecklistViewModel extends ChangeNotifier {
   /// O "Desatribuir participante" está esperando o backend.
   bool get isUnassigning => _unassigning;
 
+  /// Um desatribuir ou um descarte no ar: até terminar, iniciar, mudar nota,
+  /// descartar e desatribuir não fazem nada. O POST do desatribuir pode
+  /// demorar (rede lenta), e o que entrasse no meio mexeria numa avaliação
+  /// que está para ser apagada, ou de um participante já liberado.
+  bool get _busy => _unassigning || _discarding;
+
   /// Aviso passageiro para a tela (SnackBar); limpo por [clearMessage].
   String? get message => _message;
 
@@ -182,7 +190,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// "Iniciar avaliação": grava o início agora e mostra o checklist. Sem
   /// catálogo não inicia — não há o que avaliar, e a tela nem mostra o botão.
   Future<void> start() async {
-    if (isStarted || _starting || isBlocked || !hasCatalog) return;
+    if (isStarted || _starting || isBlocked || !hasCatalog || _busy) return;
 
     _starting = true;
     notifyListeners();
@@ -209,7 +217,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// o consultor. A tela pede confirmação antes.
   Future<void> discard() async {
     final assessmentId = _assessmentId;
-    if (assessmentId == null || !canDiscard || _discarding) return;
+    if (assessmentId == null || !canDiscard || _busy) return;
 
     _discarding = true;
     notifyListeners();
@@ -236,7 +244,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// quando o participante foi liberado: a tela fecha. A tela pede
   /// confirmação antes, e só oferece com rede.
   Future<bool> unassign() async {
-    if (!canUnassign || _unassigning) return false;
+    if (!canUnassign || _busy) return false;
 
     _unassigning = true;
     notifyListeners();
@@ -255,10 +263,13 @@ class ChecklistViewModel extends ChangeNotifier {
           final assessmentId = _assessmentId;
           if (assessmentId != null) {
             try {
-              await _assessmentRepository.discardDraft(assessmentId);
+              final discarded = await _assessmentRepository.discardDraft(assessmentId);
+              if (!discarded) _message = _draftNotDiscarded;
             } catch (_) {
               _message = _draftNotDiscarded;
             }
+            // O participante foi liberado: a tela não segura mais a avaliação.
+            _detach();
           }
           return true;
       }
@@ -349,7 +360,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// mostrar o botão pressionado na hora.
   Future<void> toggleNote(String infractionId, String noteId) async {
     final assessmentId = _assessmentId;
-    if (assessmentId == null || isConfirmed) return;
+    if (assessmentId == null || isConfirmed || _busy) return;
 
     final current = _items
         .where((i) => i.infractionId == infractionId)

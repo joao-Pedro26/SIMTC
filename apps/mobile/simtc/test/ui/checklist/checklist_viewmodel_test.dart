@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
@@ -468,6 +470,101 @@ void main() {
       expect(vm.isStarted, isTrue);
       expect(await db.select(db.localAssessments).get(), hasLength(1));
       verify(() => api.get<Map<String, dynamic>>('/training-sessions/sess-1')).called(1);
+    });
+
+    group('com o backend ainda sem responder', () {
+      /// O POST do desatribuir preso: o backend só responde quando o teste
+      /// completa o que esta função devolve (rede lenta).
+      Completer<Response<Map<String, dynamic>>> holdUnassign() {
+        final post = Completer<Response<Map<String, dynamic>>>();
+        when(() => api.post<Map<String, dynamic>>(unassignPath, data: any(named: 'data')))
+            .thenAnswer((_) => post.future);
+        return post;
+      }
+
+      Response<Map<String, dynamic>> accepted() => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: unassignPath),
+            statusCode: 201,
+            data: {'unassigned': 1},
+          );
+
+      test(
+          'descartar e mudar nota não mexem na avaliação; depois do sucesso, o '
+          'checklist fica sem ela', () async {
+        await seedParticipant();
+        await seedCatalog();
+        await assignTo('c-eu');
+        final post = holdUnassign();
+        final vm = buildViewModel();
+        addTearDown(vm.dispose);
+        await vm.init();
+        await vm.start();
+        await vm.toggleNote('inf-1', 'note-b');
+
+        final unassigning = vm.unassign();
+        expect(vm.isUnassigning, isTrue);
+        await vm.discard();
+        await vm.toggleNote('inf-1', 'note-m');
+
+        expect(await db.select(db.localAssessments).get(), hasLength(1));
+        final item = await db.select(db.localAssessmentItems).getSingle();
+        expect(item.infractionNoteId, 'note-b', reason: 'a nota não mudou');
+
+        post.complete(accepted());
+
+        expect(await unassigning, isTrue);
+        expect(vm.isStarted, isFalse);
+        expect(vm.message, isNull);
+        expect(await db.select(db.localAssessments).get(), isEmpty);
+        expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+      });
+
+      test('"Iniciar avaliação" não grava nada', () async {
+        await seedParticipant();
+        await seedCatalog();
+        await assignTo('c-eu');
+        final post = holdUnassign();
+        final vm = buildViewModel();
+        addTearDown(vm.dispose);
+        await vm.init();
+
+        final unassigning = vm.unassign();
+        await vm.start();
+
+        expect(vm.isStarted, isFalse);
+        expect(await db.select(db.localAssessments).get(), isEmpty);
+
+        post.complete(accepted());
+        expect(await unassigning, isTrue);
+      });
+
+      test(
+          'se a avaliação deixou de ser rascunho nesse meio-tempo, avisa que '
+          'ela não foi apagada do aparelho', () async {
+        await seedParticipant();
+        await seedCatalog();
+        await assignTo('c-eu');
+        final post = holdUnassign();
+        final vm = buildViewModel();
+        addTearDown(vm.dispose);
+        await vm.init();
+        await vm.start();
+        final draft = await db.select(db.localAssessments).getSingle();
+
+        final unassigning = vm.unassign();
+        // Confirmada por fora desta tela, com o POST ainda no ar.
+        await assessmentRepository.confirm(draft.id, participantName: 'Carlos', score: 100);
+        post.complete(accepted());
+
+        expect(await unassigning, isTrue);
+        expect(
+          vm.message,
+          'Participante desatribuído, mas a avaliação iniciada não foi apagada '
+          'do aparelho.',
+        );
+        final row = await db.select(db.localAssessments).getSingle();
+        expect(row.syncStatus, LocalSyncStatus.pendingSync, reason: 'a confirmada continua');
+      });
     });
   });
 

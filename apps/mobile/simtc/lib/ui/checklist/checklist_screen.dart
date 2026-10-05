@@ -56,6 +56,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// Cabeçalho da categoria aberta — há no máximo uma, então uma chave basta.
   final GlobalKey _openHeaderKey = GlobalKey();
 
+  /// Um desatribuir (que espera o backend) ou um descarte no ar: o menu ⋮ e o
+  /// "Finalizar avaliação" ficam desabilitados até terminar — outra rota
+  /// aberta por cima faria o fechamento do desatribuir fechar a tela errada.
+  bool get _isBusy => _viewModel.isUnassigning || _viewModel.isDiscarding;
+
   @override
   void initState() {
     super.initState();
@@ -175,13 +180,15 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   /// Menu ⋮ (decisão de 01/10/2026 — não está no canvas): "Descartar
   /// avaliação", com a avaliação iniciada, e "Desatribuir participante", que
-  /// precisa de rede — offline, aparece desabilitado e diz por quê.
+  /// precisa de rede — offline, aparece desabilitado e diz por quê. Com um
+  /// desatribuir ou um descarte no ar, o menu não abre.
   Widget _buildMenu(bool isOffline) {
     return SizedBox.square(
       dimension: AppSpacing.touchTarget,
       child: PopupMenuButton<_MenuAction>(
         key: const Key('checklist-menu'),
         tooltip: 'Mais opções',
+        enabled: !_isBusy,
         icon: const Icon(AppIcons.more, color: AppColors.text),
         onSelected: (action) => switch (action) {
           _MenuAction.discard => _confirmDiscard(),
@@ -688,7 +695,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               label: 'Finalizar avaliação',
               icon: AppIcons.finish,
               size: AppCtaSize.large,
-              onPressed: _openSummary,
+              onPressed: _isBusy ? null : _openSummary,
             )
           : Column(
               mainAxisSize: MainAxisSize.min,
