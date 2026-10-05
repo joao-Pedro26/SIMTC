@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/assessment_catalog.dart';
 import '../../data/models/remote_assessment.dart';
 import '../../data/models/session_participant.dart';
+import '../../data/models/training_session.dart';
 import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
+import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
 import '../../data/services/local/app_database.dart';
 import '../../utils/result.dart';
@@ -62,12 +64,14 @@ class ResultViewModel extends ChangeNotifier {
     required AssessmentRepository assessmentRepository,
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
+    required SessionRepository sessionRepository,
     this.consultantId,
     this.consultantName,
     DateTime Function()? now,
   })  : _assessmentRepository = assessmentRepository,
         _participantRepository = participantRepository,
         _catalogRepository = catalogRepository,
+        _sessionRepository = sessionRepository,
         _now = now ?? DateTime.now;
 
   final String sessionId;
@@ -88,6 +92,7 @@ class ResultViewModel extends ChangeNotifier {
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
+  final SessionRepository _sessionRepository;
   final DateTime Function() _now;
 
   static const String _reevaluateFailed =
@@ -95,10 +100,12 @@ class ResultViewModel extends ChangeNotifier {
 
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessment>>? _localSubscription;
+  StreamSubscription<TrainingSession?>? _sessionSubscription;
 
   bool _disposed = false;
   bool _loading = true;
   bool _reevaluating = false;
+  TrainingSession? _session;
   SessionParticipant? _participant;
   LocalAssessment? _local;
   ResultSource? _source;
@@ -183,7 +190,10 @@ class ResultViewModel extends ChangeNotifier {
 
   /// "Reavaliar" (decisão de 01/10/2026): só fora do "Confirmar", para quem
   /// está em "Necessita reavaliação", com perfil de consultor e sem avaliação
-  /// deste aparelho esperando envio — essa é mais nova que a do servidor.
+  /// deste aparelho esperando envio — essa é mais nova que a do servidor. E só
+  /// com a sessão em andamento, como o detalhe e o painel web: numa sessão
+  /// concluída, o envio da reavaliação sobrescreveria a avaliação que já
+  /// embasou os certificados.
   bool get canReevaluate {
     final local = _local;
     final waiting = local != null &&
@@ -192,6 +202,7 @@ class ResultViewModel extends ChangeNotifier {
     return !justConfirmed &&
         consultantId != null &&
         !waiting &&
+        _session?.status == SessionStatus.emAndamento &&
         _participant?.status == ParticipantStatus.necessitaReavaliacao;
   }
 
@@ -201,6 +212,11 @@ class ResultViewModel extends ChangeNotifier {
   String? get reevaluateError => _reevaluateError;
 
   Future<void> init() async {
+    _sessionSubscription ??=
+        _sessionRepository.watchSession(sessionId).listen((session) {
+      _session = session;
+      notifyListeners();
+    });
     _participantSubscription ??=
         _participantRepository.watchParticipant(participantId).listen((p) {
       _participant = p;
@@ -336,6 +352,7 @@ class ResultViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sessionSubscription?.cancel();
     _participantSubscription?.cancel();
     _localSubscription?.cancel();
     super.dispose();

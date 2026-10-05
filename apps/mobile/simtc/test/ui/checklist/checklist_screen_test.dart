@@ -12,6 +12,7 @@ import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
@@ -41,6 +42,7 @@ void main() {
   late AssessmentRepository assessmentRepository;
   late ParticipantRepository participantRepository;
   late AssessmentCatalogRepository catalogRepository;
+  late SessionRepository sessionRepository;
   late ConnectivityService connectivity;
 
   const pmComment = 'Excedeu o limite em trecho sinalizado';
@@ -66,6 +68,7 @@ void main() {
     assessmentRepository = AssessmentRepository(database: db);
     participantRepository = ParticipantRepository(apiClient: api, database: db);
     catalogRepository = AssessmentCatalogRepository(apiClient: api, database: db);
+    sessionRepository = SessionRepository(apiClient: api, database: db);
     connectivity = ConnectivityService();
 
     await db.into(db.sessions).insert(
@@ -134,6 +137,8 @@ void main() {
         Provider<AssessmentRepository>.value(value: assessmentRepository),
         Provider<ParticipantRepository>.value(value: participantRepository),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
+        // O "Confirmar" abre o Resultado, que segue a sessão.
+        Provider<SessionRepository>.value(value: sessionRepository),
         ChangeNotifierProvider<AuthRepository>.value(value: auth),
         ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
       ],

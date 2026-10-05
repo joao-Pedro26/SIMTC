@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/local/app_database.dart';
@@ -19,6 +20,7 @@ void main() {
   late AssessmentRepository assessmentRepository;
   late ParticipantRepository participantRepository;
   late AssessmentCatalogRepository catalogRepository;
+  late SessionRepository sessionRepository;
 
   const resultPath = '/practical-assessments/by-participant/tp-1';
   const assignPath = '/practical-assessments/assign';
@@ -32,6 +34,7 @@ void main() {
     assessmentRepository = AssessmentRepository(database: db);
     participantRepository = ParticipantRepository(apiClient: api, database: db);
     catalogRepository = AssessmentCatalogRepository(apiClient: api, database: db);
+    sessionRepository = SessionRepository(apiClient: api, database: db);
 
     await db.into(db.sessions).insert(
           SessionsCompanion.insert(
@@ -179,6 +182,7 @@ void main() {
       assessmentRepository: assessmentRepository,
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
+      sessionRepository: sessionRepository,
       now: () => now,
     );
   }
@@ -361,6 +365,32 @@ void main() {
       await waitingToSend.init();
       await settle();
       expect(waitingToSend.canReevaluate, isFalse);
+    });
+
+    test(
+        'só com a sessão em andamento: numa sessão concluída não há "Reavaliar" '
+        'nem reserva', () async {
+      Future<void> sessionStatus(String status) {
+        return (db.update(db.sessions)..where((t) => t.id.equals('sess-1')))
+            .write(SessionsCompanion(status: Value(status)));
+      }
+
+      await sessionStatus('CONCLUIDO');
+      await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+      serverAnswers(serverJson());
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await settle();
+
+      expect(vm.canReevaluate, isFalse);
+      expect(await vm.reevaluate(), isFalse);
+      verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+
+      await sessionStatus('EM_ANDAMENTO');
+      await settle();
+
+      expect(vm.canReevaluate, isTrue, reason: 'a sessão em andamento libera');
     });
 
     test('dois toques rápidos em "Reavaliar" reservam uma vez só', () async {

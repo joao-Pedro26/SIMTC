@@ -12,6 +12,7 @@ import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
@@ -34,6 +35,7 @@ void main() {
   late AssessmentRepository assessmentRepository;
   late ParticipantRepository participantRepository;
   late AssessmentCatalogRepository catalogRepository;
+  late SessionRepository sessionRepository;
   late ConnectivityService connectivity;
 
   const resultPath = '/practical-assessments/by-participant/tp-1';
@@ -59,6 +61,7 @@ void main() {
     assessmentRepository = AssessmentRepository(database: db);
     participantRepository = ParticipantRepository(apiClient: api, database: db);
     catalogRepository = AssessmentCatalogRepository(apiClient: api, database: db);
+    sessionRepository = SessionRepository(apiClient: api, database: db);
     connectivity = ConnectivityService();
 
     await db.into(db.sessions).insert(
@@ -202,6 +205,7 @@ void main() {
         Provider<AssessmentRepository>.value(value: assessmentRepository),
         Provider<ParticipantRepository>.value(value: participantRepository),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
+        Provider<SessionRepository>.value(value: sessionRepository),
         ChangeNotifierProvider<AuthRepository>.value(value: auth),
         ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
       ],
@@ -433,6 +437,18 @@ void main() {
     final row = await (db.select(db.participants)..where((t) => t.id.equals('tp-1')))
         .getSingle();
     expect(row.status, 'EM_AVALIACAO', reason: 'a reserva aconteceu');
+  });
+
+  testWidgets('sessão concluída: "Necessita reavaliação" sem "Reavaliar"', (tester) async {
+    await (db.update(db.sessions)..where((t) => t.id.equals('sess-1')))
+        .write(const SessionsCompanion(status: Value('CONCLUIDO')));
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverAnswers(serverJson());
+
+    await pumpResult(tester);
+
+    expect(find.text('Necessita reavaliação'), findsOneWidget);
+    expect(find.text('Reavaliar'), findsNothing);
   });
 
   testWidgets('sem rede, "Reavaliar" fica desabilitado e diz por quê', (tester) async {

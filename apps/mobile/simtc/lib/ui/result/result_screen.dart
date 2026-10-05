@@ -6,6 +6,7 @@ import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
+import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../data/services/local/app_database.dart';
 import '../../router.dart';
@@ -65,6 +66,7 @@ class _ResultScreenState extends State<ResultScreen> {
       assessmentRepository: context.read<AssessmentRepository>(),
       participantRepository: context.read<ParticipantRepository>(),
       catalogRepository: context.read<AssessmentCatalogRepository>(),
+      sessionRepository: context.read<SessionRepository>(),
     );
   }
 
