@@ -67,6 +67,7 @@ class _ResultScreenState extends State<ResultScreen> {
       participantRepository: context.read<ParticipantRepository>(),
       catalogRepository: context.read<AssessmentCatalogRepository>(),
       sessionRepository: context.read<SessionRepository>(),
+      connectivity: context.read<ConnectivityService>(),
     );
   }
 

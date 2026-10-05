@@ -11,6 +11,7 @@ import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
+import '../../data/services/connectivity_service.dart';
 import '../../data/services/local/app_database.dart';
 import '../../utils/result.dart';
 import '../../utils/scoring.dart';
@@ -38,7 +39,7 @@ enum ResultDataNotice {
   deviceFallback,
 
   /// Sem rede, e o aparelho não tem a avaliação: as infrações chegam com a
-  /// internet.
+  /// internet — a volta da conexão busca de novo, com a tela aberta.
   offline,
 
   /// O servidor falhou (5xx, resposta fora do formato) — "Tentar novamente".
@@ -65,6 +66,7 @@ class ResultViewModel extends ChangeNotifier {
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
     required SessionRepository sessionRepository,
+    required ConnectivityService connectivity,
     this.consultantId,
     this.consultantName,
     DateTime Function()? now,
@@ -72,6 +74,7 @@ class ResultViewModel extends ChangeNotifier {
         _participantRepository = participantRepository,
         _catalogRepository = catalogRepository,
         _sessionRepository = sessionRepository,
+        _connectivity = connectivity,
         _now = now ?? DateTime.now;
 
   final String sessionId;
@@ -93,6 +96,7 @@ class ResultViewModel extends ChangeNotifier {
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
   final SessionRepository _sessionRepository;
+  final ConnectivityService _connectivity;
   final DateTime Function() _now;
 
   static const String _reevaluateFailed =
@@ -101,6 +105,7 @@ class ResultViewModel extends ChangeNotifier {
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessment>>? _localSubscription;
   StreamSubscription<TrainingSession?>? _sessionSubscription;
+  StreamSubscription<void>? _reconnectSubscription;
 
   bool _disposed = false;
   bool _loading = true;
@@ -122,7 +127,8 @@ class ResultViewModel extends ChangeNotifier {
   ResultDataNotice? get dataNotice => _dataNotice;
 
   /// Só a falha do servidor tem "Tentar novamente"; sem rede, o aviso já diz
-  /// que as infrações chegam com a internet.
+  /// que as infrações chegam com a internet — e a volta dela busca sozinha
+  /// ([init]).
   bool get canRetry => _dataNotice == ResultDataNotice.serverFailed;
 
   /// Nulo quando só há a nota e o status do cache ([ResultSource.cacheOnly]).
@@ -231,6 +237,11 @@ class ResultViewModel extends ChangeNotifier {
               r.syncStatus != LocalSyncStatus.draft)
           .firstOrNull;
       notifyListeners();
+    });
+    // O aviso de "sem conexão" promete as infrações quando houver internet:
+    // a volta da rede busca de novo. Os outros avisos não dependem dela.
+    _reconnectSubscription ??= _connectivity.onReconnected.listen((_) {
+      if (_dataNotice == ResultDataNotice.offline) unawaited(_load());
     });
     await _load();
   }
@@ -355,6 +366,7 @@ class ResultViewModel extends ChangeNotifier {
     _sessionSubscription?.cancel();
     _participantSubscription?.cancel();
     _localSubscription?.cancel();
+    _reconnectSubscription?.cancel();
     super.dispose();
   }
 }

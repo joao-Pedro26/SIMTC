@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
@@ -9,13 +11,32 @@ import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
+import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/ui/result/result_viewmodel.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
+/// Conectividade de mentira: o serviço real conversa com o plugin de
+/// plataforma, que não existe num teste de unidade.
+class _FakeConnectivity extends ConnectivityService {
+  final _reconnected = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get onReconnected => _reconnected.stream;
+
+  void reconnect() => _reconnected.add(null);
+
+  @override
+  void dispose() {
+    _reconnected.close();
+    super.dispose();
+  }
+}
+
 void main() {
   late _MockApiClient api;
+  late _FakeConnectivity connectivity;
   late AppDatabase db;
   late AssessmentRepository assessmentRepository;
   late ParticipantRepository participantRepository;
@@ -28,6 +49,7 @@ void main() {
 
   setUp(() async {
     api = _MockApiClient();
+    connectivity = _FakeConnectivity();
     db = AppDatabase(
       DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
     );
@@ -84,7 +106,10 @@ void main() {
     }
   });
 
-  tearDown(() => db.close());
+  tearDown(() async {
+    await db.close();
+    connectivity.dispose();
+  });
 
   Future<void> seedParticipant({
     String status = 'APROVADO',
@@ -183,6 +208,7 @@ void main() {
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
       sessionRepository: sessionRepository,
+      connectivity: connectivity,
       now: () => now,
     );
   }
@@ -279,6 +305,44 @@ void main() {
     expect(vm.categories, isNull);
     expect(vm.dataNotice, ResultDataNotice.offline);
     expect(vm.canRetry, isFalse);
+  });
+
+  test(
+      'sem rede, o aviso promete as infrações com a internet: quando a rede '
+      'volta, busca no servidor de novo e mostra as dele', () async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverFails(const ApiException(message: 'Sem conexão', isNetworkError: true));
+    final vm = buildViewModel();
+    addTearDown(vm.dispose);
+    await vm.init();
+    await settle();
+    expect(vm.dataNotice, ResultDataNotice.offline);
+
+    serverAnswers(serverJson());
+    connectivity.reconnect();
+    await settle();
+
+    expect(vm.source, ResultSource.server);
+    expect(vm.dataNotice, isNull);
+    expect(vm.categories!.first.infractions.single.description,
+        'Uso excessivo ou tardio do freio');
+    verify(() => api.get<Object?>(resultPath)).called(2);
+  });
+
+  test('com outro aviso, a volta da rede não busca de novo', () async {
+    await seedParticipant(status: 'APROVADO', score: 88);
+    serverAnswers(null);
+    final vm = buildViewModel();
+    addTearDown(vm.dispose);
+    await vm.init();
+    await settle();
+    expect(vm.dataNotice, ResultDataNotice.notOnServer);
+
+    connectivity.reconnect();
+    await settle();
+
+    expect(vm.dataNotice, ResultDataNotice.notOnServer);
+    verify(() => api.get<Object?>(resultPath)).called(1);
   });
 
   test(
