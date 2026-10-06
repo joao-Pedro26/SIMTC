@@ -32,6 +32,10 @@ Em 01/10/2026, no brainstorm da fase (desenho aprovado em três partes):
 14. **Divergências do canvas aprovadas** (quadro `2g`): sem pontos ("39 de 45 pts", "14 de 18 pts", "−6 pts"); a linha abaixo da nota traz início e fim, sem "duração" (decisão 12 da 5A) e sem "assinatura coletada"; o número do item entra na linha da infração (o canvas o cita no rodapé, mas não o desenha); o aviso de envio é novo; o "Reavaliar" é novo; o menu ⋮ do checklist e o "Descartar" da aba não estão no canvas.
 15. **Erros e casos de borda** (parte 3 do desenho): skeleton enquanto carrega; servidor falhou → a avaliação do aparelho, se houver, com "Mostrando a avaliação feita neste aparelho.", senão a nota e o status guardados com "Não foi possível carregar as infrações." e "Tentar novamente"; servidor sem avaliação → "Não há avaliação registrada no servidor para este participante."; sem catálogo no aparelho, o "Desempenho por categoria" some; dois toques no "Reavaliar" reservam uma vez; o descarte da aba só apaga se o item ainda estiver recusado no momento do toque.
 
+Em 06/10/2026, na validação no aparelho:
+
+16. **"Reavaliar" não reserva mais: quem reserva é o "Iniciar avaliação"** (muda a decisão 4). O "Reavaliar" só troca o Resultado pelo checklist em "não iniciada"; voltar sem iniciar deixa o participante em "Necessita reavaliação". O "Iniciar avaliação" de quem ainda não está com o consultor reserva no backend (`assign`) e só então grava o início: é aí que a linha vira "Reavaliando · você". Se a reserva falhar (sem rede, ou outro consultor ficou com o participante), nada começa e o checklist mostra o motivo; recusada com 409, a sessão é baixada de novo. Com outra avaliação em andamento, o checklist mostra o aviso de uma por vez e nada é reservado. **Consequência aceita pelo usuário:** o "Iniciar avaliação" de uma reavaliação precisa de rede — não dá mais para tocar em "Reavaliar" em vários participantes com rede e iniciá-los depois, sem sinal. Quem já está com o consultor pelo "Atribuir a mim" continua iniciando sem rede. O "Reavaliar" segue desabilitado sem rede, e não entra elemento novo na tela.
+
 ### Desvios na execução (03 a 05/10/2026)
 
 A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1, 2 e 4 a 9 saíram iguais ao plano. Os desvios foram:
@@ -51,6 +55,8 @@ A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a 
 - **Auditoria da Fase 0** (`f3bf046`): nota sobre a remoção da assinatura do participante.
 
 **Fim da execução:** app com **475 testes passando** e `flutter analyze` sem issues; backend com as 12 falhas antigas e 62 testes passando (74 no total).
+
+**Depois da validação (06/10/2026), decisão 16.** Commit `f138d2a`. A reserva saiu do "Reavaliar" (o `reevaluate()` da `ResultViewModel` deixou de existir) e foi para o `start()` do `ChecklistViewModel`, que reserva quando o participante ainda não está com o consultor. Saíram 2 testes da reserva antiga e entraram 8: **481 testes passando**.
 
 ### Decisões em aberto (para o usuário)
 
@@ -108,8 +114,8 @@ Nas Tasks 1 e 2 (backend), os caminhos são a partir da raiz do repositório. Na
 
 Os cinco casos que o desenho implica, que um consultor real vai encontrar, e onde cada um ficou preso num teste:
 
-1. **Dois toques rápidos em "Reavaliar"** (sinal fraco, a resposta demora) → uma reserva só. Preso em: `dois toques rápidos em "Reavaliar" reservam uma vez só` (Task 7).
-2. **"Reavaliar" com outra avaliação em andamento** → a reserva acontece mesmo assim, e o checklist mostra o aviso de uma por vez em vez de deixar iniciar. Preso em: `"Reavaliar" com outra avaliação em andamento: reserva mesmo assim, e o checklist avisa que só dá uma por vez` (Task 8).
+1. **Dois toques rápidos no "Iniciar avaliação" de uma reavaliação** (sinal fraco, a resposta demora) → uma reserva só. Preso em: `dois toques rápidos no "Iniciar" reservam uma vez só` (testes do `ChecklistViewModel`). Até a decisão 16, o caso era do "Reavaliar".
+2. **"Reavaliar" com outra avaliação em andamento** → o checklist mostra o aviso de uma por vez e nada é reservado. Preso em: `"Reavaliar" com outra avaliação em andamento: o checklist avisa que só dá uma por vez, e nada é reservado` (testes da tela do Resultado). Até a decisão 16, a reserva acontecia mesmo assim.
 3. **Desatribuir que o servidor recusa** (o painel passou o participante para outro consultor) com a avaliação iniciada → nada muda no aparelho, o motivo aparece e a sessão é baixada de novo. Preso em: `se o backend recusa, nada muda no aparelho, o motivo aparece e a sessão é baixada de novo` (Task 5).
 4. **"Descartar" na aba de algo que deixou de ser recusa** (reenviado e aceito enquanto o diálogo estava aberto, ou falha de rede) → não apaga. Preso em: `descartar uma falha só apaga a avaliação em erro com o motivo pedido` (Task 3) e `"Descartar" não apaga a avaliação que falhou por rede` (Task 10).
 5. **Abrir o Resultado logo depois do "Confirmar", sem sinal** → os dados do aparelho na hora, com "Na fila de envio…", sem esperar o servidor. Preso em: `logo depois do "Confirmar": os dados do aparelho, o aviso de fila e nenhuma busca no servidor` (Task 7).
@@ -6296,8 +6302,10 @@ Reavaliar:
 - [ ] avalie um participante com várias M até ficar abaixo de 70% e confirme; com o envio aceito, a linha vira "Reavaliar · N%"; abra o Resultado: o rodapé tem **"Reavaliar"**;
 - [ ] numa sessão **concluída** que tenha um participante "Reavaliar · N%", o Resultado abre sem o botão "Reavaliar";
 - [ ] offline, o "Reavaliar" fica desabilitado com "Disponível quando houver conexão";
-- [ ] com rede, toque em "Reavaliar": abre o checklist em "não iniciada" ("Iniciar avaliação"), e no detalhe a linha vira "Reavaliando · você"; o voltar leva ao detalhe;
-- [ ] com outra avaliação em andamento, o "Reavaliar" reserva e o checklist mostra "Você já está avaliando … Finalize ou descarte essa avaliação para iniciar outra.".
+- [ ] com rede, toque em "Reavaliar": abre o checklist em "não iniciada" ("Iniciar avaliação"); volte pela seta sem iniciar: no detalhe, a linha continua "Reavaliar · N%";
+- [ ] "Reavaliar" de novo e "Iniciar avaliação": a avaliação começa, e no detalhe a linha vira "Reavaliando · você" — no painel web, também;
+- [ ] com outra avaliação em andamento, o "Reavaliar" abre o checklist com "Você já está avaliando … Finalize ou descarte essa avaliação para iniciar outra.", e o participante continua "Reavaliar · N%";
+- [ ] abra o checklist pelo "Reavaliar", tire a rede e toque em "Iniciar avaliação": aparece "Sem conexão com o servidor. Verifique a internet e tente de novo." e nada começa.
 
 Descartar avaliação:
 - [ ] inicie a avaliação de um participante e marque notas; no menu **⋮** do cabeçalho, "Descartar avaliação": o diálogo pede confirmação; "Cancelar" não muda nada; "Descartar" volta à tela "não iniciada" e as marcações somem;
