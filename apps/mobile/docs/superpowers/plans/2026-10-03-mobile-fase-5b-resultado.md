@@ -35,6 +35,7 @@ Em 01/10/2026, no brainstorm da fase (desenho aprovado em três partes):
 Em 06/10/2026, na validação no aparelho:
 
 16. **"Reavaliar" não reserva mais: quem reserva é o "Iniciar avaliação"** (muda a decisão 4). O "Reavaliar" só troca o Resultado pelo checklist em "não iniciada"; voltar sem iniciar deixa o participante em "Necessita reavaliação". O "Iniciar avaliação" de quem ainda não está com o consultor reserva no backend (`assign`) e só então grava o início: é aí que a linha vira "Reavaliando · você". Se a reserva falhar (sem rede, ou outro consultor ficou com o participante), nada começa e o checklist mostra o motivo; recusada com 409, a sessão é baixada de novo. Com outra avaliação em andamento, o checklist mostra o aviso de uma por vez e nada é reservado. **Consequência aceita pelo usuário:** o "Iniciar avaliação" de uma reavaliação precisa de rede — não dá mais para tocar em "Reavaliar" em vários participantes com rede e iniciá-los depois, sem sinal. Quem já está com o consultor pelo "Atribuir a mim" continua iniciando sem rede. O "Reavaliar" segue desabilitado sem rede, e não entra elemento novo na tela.
+17. **O voltar do checklist aberto pelo "Reavaliar" leva ao Resultado**, e não ao detalhe da sessão (muda a decisão 4, que trocava o Resultado pelo checklist). Vale só para o checklist aberto pelo "Reavaliar": o que abre pela linha do participante no detalhe continua voltando para o detalhe. Depois do "Iniciar avaliação", o voltar também leva ao Resultado, já sem o botão "Reavaliar". No "Confirmar", o Resultado da avaliação anterior sai junto com o checklist: o Resultado novo fica direto sobre o detalhe, e o X e o "Próximo participante" continuam voltando para ele (decisões 2 e 3).
 
 ### Desvios na execução (03 a 05/10/2026)
 
@@ -57,6 +58,8 @@ A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a 
 **Fim da execução:** app com **475 testes passando** e `flutter analyze` sem issues; backend com as 12 falhas antigas e 62 testes passando (74 no total).
 
 **Depois da validação (06/10/2026), decisão 16.** Commit `f138d2a`. A reserva saiu do "Reavaliar" (o `reevaluate()` da `ResultViewModel` deixou de existir) e foi para o `start()` do `ChecklistViewModel`, que reserva quando o participante ainda não está com o consultor. Saíram 2 testes da reserva antiga e entraram 8: **481 testes passando**.
+
+**Decisão 17, no mesmo dia.** Commit `6aa8a00`. O "Reavaliar" passou a empilhar o checklist sobre o Resultado (a rota leva `?origem=resultado`), em vez de trocar um pelo outro. No "Confirmar" de um checklist aberto assim, o checklist sai antes, e o Resultado novo entra no lugar do antigo. 3 testes a mais: **484 testes passando**.
 
 ### Decisões em aberto (para o usuário)
 
@@ -6302,8 +6305,9 @@ Reavaliar:
 - [ ] avalie um participante com várias M até ficar abaixo de 70% e confirme; com o envio aceito, a linha vira "Reavaliar · N%"; abra o Resultado: o rodapé tem **"Reavaliar"**;
 - [ ] numa sessão **concluída** que tenha um participante "Reavaliar · N%", o Resultado abre sem o botão "Reavaliar";
 - [ ] offline, o "Reavaliar" fica desabilitado com "Disponível quando houver conexão";
-- [ ] com rede, toque em "Reavaliar": abre o checklist em "não iniciada" ("Iniciar avaliação"); volte pela seta sem iniciar: no detalhe, a linha continua "Reavaliar · N%";
-- [ ] "Reavaliar" de novo e "Iniciar avaliação": a avaliação começa, e no detalhe a linha vira "Reavaliando · você" — no painel web, também;
+- [ ] com rede, toque em "Reavaliar": abre o checklist em "não iniciada" ("Iniciar avaliação"); volte pela seta sem iniciar: volta para o Resultado, ainda com o "Reavaliar", e no detalhe a linha continua "Reavaliar · N%";
+- [ ] "Reavaliar" de novo e "Iniciar avaliação": a avaliação começa, e no detalhe a linha vira "Reavaliando · você" — no painel web, também; o voltar do checklist leva ao Resultado, agora sem o "Reavaliar";
+- [ ] termine essa reavaliação ("Finalizar avaliação" e "Confirmar"): abre o Resultado novo, e o X e o "Próximo participante" voltam direto ao detalhe da sessão, sem passar pelo Resultado antigo;
 - [ ] com outra avaliação em andamento, o "Reavaliar" abre o checklist com "Você já está avaliando … Finalize ou descarte essa avaliação para iniciar outra.", e o participante continua "Reavaliar · N%";
 - [ ] abra o checklist pelo "Reavaliar", tire a rede e toque em "Iniciar avaliação": aparece "Sem conexão com o servidor. Verifique a internet e tente de novo." e nada começa.
 
