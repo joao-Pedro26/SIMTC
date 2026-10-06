@@ -498,8 +498,27 @@ void main() {
       await tester.tap(find.text('Ana Paula Ribeiro'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ChecklistScreen), findsOneWidget);
+      final screen = tester.widget<ChecklistScreen>(find.byType(ChecklistScreen));
+      expect(screen.fromResult, isFalse, reason: 'o voltar leva ao detalhe');
       expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+    });
+
+    testWidgets(
+        'o checklist aberto pelo "Reavaliar" do Resultado (?origem=resultado) '
+        'sabe que tem o Resultado embaixo', (tester) async {
+      final ana = participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.necessitaReavaliacao, score: 62);
+      when(() => participants.watchParticipant('1'))
+          .thenAnswer((_) => Stream.value(ana));
+      final router = await showWithRouter(tester, [ana]);
+
+      // O que o "Reavaliar" do Resultado faz, pela rota de produção.
+      router.push(AppRoutes.participantChecklist('sess-1', '1', fromResult: true));
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<ChecklistScreen>(find.byType(ChecklistScreen));
+      expect(screen.participantId, '1');
+      expect(screen.fromResult, isTrue);
     });
 
     testWidgets('um concluído abre o Resultado', (tester) async {

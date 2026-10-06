@@ -21,6 +21,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/result/result_screen.dart';
+import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
@@ -220,8 +221,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  /// O Resultado empilhado sobre uma origem, pelas rotas reais do Resultado e
-  /// do checklist.
+  /// O Resultado empilhado sobre uma origem, pelas rotas reais do Resultado,
+  /// do checklist e da conferência.
   Future<void> pumpResult(WidgetTester tester, {bool justConfirmed = false}) async {
     tallScreen(tester);
     final router = GoRouter(
@@ -241,8 +242,15 @@ void main() {
         ),
         GoRoute(
           path: AppRoutes.participantChecklist('sess-1', 'tp-1'),
-          builder: (context, state) =>
-              const ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+          builder: (context, state) => ChecklistScreen(
+            sessionId: 'sess-1',
+            participantId: 'tp-1',
+            fromResult: state.uri.queryParameters['origem'] == 'resultado',
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.participantSummary('sess-1', 'tp-1'),
+          builder: (context, state) => const SummaryScreen(participantId: 'tp-1'),
         ),
       ],
     );
@@ -387,9 +395,8 @@ void main() {
   });
 
   testWidgets(
-      '"Reavaliar" só abre o checklist em "não iniciada": voltar sem iniciar '
-      'deixa o participante em "Necessita reavaliação", sem reserva',
-      (tester) async {
+      '"Reavaliar" abre o checklist em "não iniciada" por cima do Resultado: '
+      'voltar sem iniciar leva de volta a ele, sem reserva', (tester) async {
     await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
     serverAnswers(serverJson());
     await pumpResult(tester);
@@ -404,11 +411,18 @@ void main() {
     await tester.tap(find.byTooltip('Voltar'));
     await tester.pumpAndSettle();
 
-    expect(find.text('origem'), findsOneWidget);
+    expect(find.byType(ChecklistScreen), findsNothing);
+    expect(find.byType(ResultScreen), findsOneWidget);
+    expect(find.text('Reavaliar'), findsOneWidget,
+        reason: 'o participante continua em "Necessita reavaliação"');
     verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
     final row = await db.select(db.participants).getSingle();
     expect(row.status, 'NECESSITA_REAVALIACAO');
     expect(row.assignedConsultantId, isNull);
+
+    await tester.tap(find.byTooltip('Fechar'));
+    await tester.pumpAndSettle();
+    expect(find.text('origem'), findsOneWidget);
   });
 
   testWidgets(
@@ -438,6 +452,68 @@ void main() {
     expect(row.assignedConsultantId, 'c-eu');
     expect(row.assignedConsultantName, 'Carla Souza');
     expect(find.text('Finalizar avaliação'), findsOneWidget);
+  });
+
+  testWidgets(
+      'depois do "Iniciar avaliação", voltar também leva ao Resultado, já sem '
+      'o "Reavaliar"', (tester) async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverAnswers(serverJson());
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
+        data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/practical-assessments/assign'),
+          statusCode: 201,
+          data: {'assigned': 1},
+        ));
+    await pumpResult(tester);
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsNothing);
+    expect(find.byType(ResultScreen), findsOneWidget);
+    expect(find.text('Reavaliar'), findsNothing,
+        reason: 'a reavaliação já está em andamento com quem está logado');
+  });
+
+  testWidgets(
+      'reavaliação até o "Confirmar": o Resultado novo fica no lugar do '
+      'anterior, e o "Próximo participante" volta à tela de origem',
+      (tester) async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverAnswers(serverJson());
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
+        data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/practical-assessments/assign'),
+          statusCode: 201,
+          data: {'assigned': 1},
+        ));
+    await pumpResult(tester);
+
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finalizar avaliação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsNothing);
+    final confirmed = tester.widget<ResultScreen>(find.byType(ResultScreen));
+    expect(confirmed.justConfirmed, isTrue);
+    expect(find.text('Próximo participante'), findsOneWidget);
+
+    await tester.tap(find.text('Próximo participante'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ResultScreen), findsNothing,
+        reason: 'o Resultado da avaliação anterior não ficou embaixo');
+    expect(find.text('origem'), findsOneWidget);
   });
 
   testWidgets(

@@ -476,13 +476,17 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  /// "Reavaliar": troca o Resultado pelo checklist em "não iniciada", sem
-  /// reservar nada — o participante só muda de status no "Iniciar avaliação"
-  /// de lá (decisão de 06/10/2026). O voltar do checklist leva ao detalhe da
-  /// sessão.
+  /// "Reavaliar": abre o checklist em "não iniciada" por cima do Resultado,
+  /// sem reservar nada — o participante só muda de status no "Iniciar
+  /// avaliação" de lá, e o voltar do checklist traz de volta a este
+  /// Resultado (decisões de 06/10/2026).
   void _reevaluate() {
-    context.pushReplacement(
-      AppRoutes.participantChecklist(widget.sessionId, widget.participantId),
+    context.push(
+      AppRoutes.participantChecklist(
+        widget.sessionId,
+        widget.participantId,
+        fromResult: true,
+      ),
     );
   }
 }

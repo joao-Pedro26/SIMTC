@@ -32,10 +32,17 @@ class ChecklistScreen extends StatefulWidget {
     super.key,
     required this.sessionId,
     required this.participantId,
+    this.fromResult = false,
   });
 
   final String sessionId;
   final String participantId;
+
+  /// Aberto pelo "Reavaliar" do Resultado (decisão de 06/10/2026): o
+  /// Resultado da avaliação anterior continua embaixo, e o voltar leva a ele.
+  /// No "Confirmar", ele sai junto com o checklist, para o Resultado novo
+  /// ficar direto sobre o detalhe da sessão.
+  final bool fromResult;
 
   @override
   State<ChecklistScreen> createState() => _ChecklistScreenState();
@@ -748,7 +755,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         // Confirmada: o Resultado ("Avaliação concluída") toma o lugar do
         // checklist, como no canvas — o X e o "Próximo participante" de lá
         // voltam ao detalhe da sessão (decisão de 01/10/2026).
-        context.pushReplacement(
+        final router = GoRouter.of(context);
+        // Numa reavaliação aberta pelo Resultado, o da avaliação anterior
+        // ainda está embaixo: o checklist sai, e o Resultado novo entra no
+        // lugar do antigo.
+        if (widget.fromResult) router.pop();
+        router.pushReplacement(
           AppRoutes.participantResult(
             widget.sessionId,
             widget.participantId,

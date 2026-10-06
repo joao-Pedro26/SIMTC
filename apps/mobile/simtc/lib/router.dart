@@ -24,9 +24,15 @@ abstract final class AppRoutes {
   /// Detalhe da sessão (tela 1.4).
   static String sessionDetail(String sessionId) => '/sessions/$sessionId';
 
-  /// Checklist do participante (Fase 4).
-  static String participantChecklist(String sessionId, String participantId) =>
-      '/sessions/$sessionId/participants/$participantId/checklist';
+  /// Checklist do participante (Fase 4). [fromResult]: aberto pelo
+  /// "Reavaliar" do Resultado, que continua embaixo — o voltar leva a ele.
+  static String participantChecklist(
+    String sessionId,
+    String participantId, {
+    bool fromResult = false,
+  }) =>
+      '/sessions/$sessionId/participants/$participantId/checklist'
+      '${fromResult ? '?origem=resultado' : ''}';
 
   /// "Conferir e finalizar" (tela 1.6, Fase 5A), aberta pelo checklist.
   static String participantSummary(String sessionId, String participantId) =>
@@ -84,6 +90,7 @@ GoRouter createRouter(
             builder: (context, state) => ChecklistScreen(
               sessionId: state.pathParameters['sessionId']!,
               participantId: state.pathParameters['participantId']!,
+              fromResult: state.uri.queryParameters['origem'] == 'resultado',
             ),
           ),
           GoRoute(
