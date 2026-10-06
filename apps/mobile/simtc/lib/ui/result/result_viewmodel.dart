@@ -193,7 +193,7 @@ class ResultViewModel extends ChangeNotifier {
   }
 
   /// "Reavaliar" (decisão de 01/10/2026): só fora do "Confirmar", para quem
-  /// está em "Necessita reavaliação", com perfil de consultor e sem avaliação
+  /// está em "Não recomendado", com perfil de consultor e sem avaliação
   /// deste aparelho esperando envio — essa é mais nova que a do servidor. E só
   /// com a sessão em andamento, como o detalhe e o painel web: numa sessão
   /// concluída, o envio da reavaliação sobrescreveria a avaliação que já

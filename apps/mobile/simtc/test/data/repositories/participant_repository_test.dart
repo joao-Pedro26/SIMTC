@@ -157,7 +157,7 @@ void main() {
         (_) async => ok(detailJson([
           participantJson('tp-1'),
           participantJson('tp-2', status: 'APROVADO'),
-          participantJson('tp-3', status: 'NECESSITA_REAVALIACAO'),
+          participantJson('tp-3', status: 'NAO_RECOMENDADO'),
           participantJson('tp-4', participationType: 'SOMENTE_TEORICA'),
         ])),
       );

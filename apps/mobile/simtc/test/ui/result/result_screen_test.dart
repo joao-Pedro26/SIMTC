@@ -287,7 +287,7 @@ void main() {
     expect(find.text('Infração do item 1'), findsOneWidget);
     expect(find.text(comment), findsOneWidget);
     expect(find.text('PM'), findsOneWidget);
-    expect(find.textContaining('O número de cada linha é o item'), findsOneWidget);
+    expect(find.textContaining('O número de cada linha é o item'), findsNothing);
     expect(find.text('Próximo participante'), findsOneWidget);
     expect(find.text('Reavaliar'), findsNothing);
     expect(find.textContaining('pts'), findsNothing, reason: 'o app não tem pontos');
@@ -346,13 +346,13 @@ void main() {
   testWidgets(
       'avaliação do servidor: a nota dele e as infrações da resposta, sem aviso '
       'de envio', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
 
     await pumpResult(tester);
 
     expect(find.text('62,5%'), findsOneWidget);
-    expect(find.text('Necessita reavaliação'), findsOneWidget);
+    expect(find.text('Não recomendado'), findsOneWidget);
     expect(find.text('Não ajustou o banco, cinto ou espelhos'), findsOneWidget);
     expect(find.text('Não realizou nenhum ajuste'), findsOneWidget);
     expect(find.textContaining('Na fila de envio'), findsNothing);
@@ -379,7 +379,7 @@ void main() {
   });
 
   testWidgets('o servidor falhou: "Tentar novamente" busca de novo', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     when(() => api.get<Object?>(resultPath)).thenThrow(
       const ApiException(message: 'Internal server error', statusCode: 500),
     );
@@ -397,7 +397,7 @@ void main() {
   testWidgets(
       '"Reavaliar" abre o checklist em "não iniciada" por cima do Resultado: '
       'voltar sem iniciar leva de volta a ele, sem reserva', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
     await pumpResult(tester);
 
@@ -414,10 +414,10 @@ void main() {
     expect(find.byType(ChecklistScreen), findsNothing);
     expect(find.byType(ResultScreen), findsOneWidget);
     expect(find.text('Reavaliar'), findsOneWidget,
-        reason: 'o participante continua em "Necessita reavaliação"');
+        reason: 'o participante continua em "Não recomendado"');
     verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
     final row = await db.select(db.participants).getSingle();
-    expect(row.status, 'NECESSITA_REAVALIACAO');
+    expect(row.status, 'NAO_RECOMENDADO');
     expect(row.assignedConsultantId, isNull);
 
     await tester.tap(find.byTooltip('Fechar'));
@@ -428,7 +428,7 @@ void main() {
   testWidgets(
       'depois do "Reavaliar", é o "Iniciar avaliação" que reserva o '
       'participante para quem está logado', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
         data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
@@ -457,7 +457,7 @@ void main() {
   testWidgets(
       'depois do "Iniciar avaliação", voltar também leva ao Resultado, já sem '
       'o "Reavaliar"', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
         data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
@@ -484,7 +484,7 @@ void main() {
       'reavaliação até o "Confirmar": o Resultado novo fica no lugar do '
       'anterior, e o "Próximo participante" volta à tela de origem',
       (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
         data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
@@ -519,7 +519,7 @@ void main() {
   testWidgets(
       'se a reserva é recusada no "Iniciar avaliação", o checklist continua em '
       '"não iniciada" e mostra o motivo', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
         data: any(named: 'data'))).thenThrow(const ApiException(
@@ -546,7 +546,7 @@ void main() {
   testWidgets(
       '"Reavaliar" com outra avaliação em andamento: o checklist avisa que só '
       'dá uma por vez, e nada é reservado', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     await db.into(db.participants).insert(
           ParticipantsCompanion.insert(
             id: 'tp-2',
@@ -578,14 +578,14 @@ void main() {
     verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
     final row = await (db.select(db.participants)..where((t) => t.id.equals('tp-1')))
         .getSingle();
-    expect(row.status, 'NECESSITA_REAVALIACAO', reason: 'sem iniciar, nada é reservado');
+    expect(row.status, 'NAO_RECOMENDADO', reason: 'sem iniciar, nada é reservado');
   });
 
   testWidgets(
       '"Reavaliar" quem foi avaliado neste aparelho, com a avaliação anterior já '
       'enviada: o checklist abre em "não iniciada" e o "Iniciar avaliação" '
       'começa um rascunho novo no lugar dela', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     // A avaliação anterior: feita aqui, confirmada e já aceita pelo servidor.
     await confirmedHere({'inf-1': 'inf-1-M'}, score: 62.5);
     final previous = await db.select(db.localAssessments).getSingle();
@@ -619,20 +619,20 @@ void main() {
     expect(find.text('Finalizar avaliação'), findsOneWidget);
   });
 
-  testWidgets('sessão concluída: "Necessita reavaliação" sem "Reavaliar"', (tester) async {
+  testWidgets('sessão concluída: "Não recomendado" sem "Reavaliar"', (tester) async {
     await (db.update(db.sessions)..where((t) => t.id.equals('sess-1')))
         .write(const SessionsCompanion(status: Value('CONCLUIDO')));
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverAnswers(serverJson());
 
     await pumpResult(tester);
 
-    expect(find.text('Necessita reavaliação'), findsOneWidget);
+    expect(find.text('Não recomendado'), findsOneWidget);
     expect(find.text('Reavaliar'), findsNothing);
   });
 
   testWidgets('sem rede, "Reavaliar" fica desabilitado e diz por quê', (tester) async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     when(() => api.get<Object?>(resultPath)).thenThrow(
       const ApiException(message: 'Sem conexão', isNetworkError: true),
     );

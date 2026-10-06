@@ -31,7 +31,7 @@ enum ParticipantStatus {
         ParticipantStatus.pendente => 'PENDENTE',
         ParticipantStatus.emAvaliacao => 'EM_AVALIACAO',
         ParticipantStatus.aprovado => 'APROVADO',
-        ParticipantStatus.necessitaReavaliacao => 'NECESSITA_REAVALIACAO',
+        ParticipantStatus.necessitaReavaliacao => 'NAO_RECOMENDADO',
       };
 
   /// Um status novo no backend não pode derrubar a lista, então o
@@ -39,7 +39,7 @@ enum ParticipantStatus {
   static ParticipantStatus parse(String? value) => switch (value) {
         'EM_AVALIACAO' => ParticipantStatus.emAvaliacao,
         'APROVADO' => ParticipantStatus.aprovado,
-        'NECESSITA_REAVALIACAO' => ParticipantStatus.necessitaReavaliacao,
+        'NAO_RECOMENDADO' => ParticipantStatus.necessitaReavaliacao,
         _ => ParticipantStatus.pendente,
       };
 }

@@ -36,11 +36,11 @@ double calculateOverallScore(List<double> categoryScores) {
   return total / categoryScores.length;
 }
 
-/// `'APROVADO'` com 70 ou mais; `'NECESSITA_REAVALIACAO'` abaixo disso —
+/// `'APROVADO'` com 70 ou mais; `'NAO_RECOMENDADO'` abaixo disso —
 /// mesmo corte e mesmas strings do backend (`getApprovalStatus`,
 /// `ParticipantStatus`). Devolve o texto puro, não o enum do app: quem
 /// consumir aqui decide se quer `ParticipantStatus.parse()` sobre o
 /// resultado, ou só o texto mesmo.
 String getApprovalStatus(double score) {
-  return score >= 70 ? 'APROVADO' : 'NECESSITA_REAVALIACAO';
+  return score >= 70 ? 'APROVADO' : 'NAO_RECOMENDADO';
 }

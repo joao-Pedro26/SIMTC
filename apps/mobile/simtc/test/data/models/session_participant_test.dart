@@ -86,7 +86,7 @@ void main() {
   test('sem endTime, o momento da avaliação é o startTime', () {
     final p = SessionParticipant.fromJson(
       json(
-        status: 'NECESSITA_REAVALIACAO',
+        status: 'NAO_RECOMENDADO',
         assessment: {
           'consultantId': 'c-1',
           'startTime': '2026-09-23T10:58:00.000Z',

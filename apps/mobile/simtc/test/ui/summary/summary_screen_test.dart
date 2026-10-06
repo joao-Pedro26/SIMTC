@@ -195,13 +195,13 @@ void main() {
     expect(find.text('Confirmar'), findsOneWidget);
   });
 
-  testWidgets('abaixo de 70% mostra "Necessita reavaliação"', (tester) async {
+  testWidgets('abaixo de 70% mostra "Não recomendado"', (tester) async {
     await draftWith({'inf-1': 'inf-1-M', 'inf-2': 'inf-2-M'});
 
     await pumpSummary(tester);
 
     expect(find.text('50,0%'), findsOneWidget);
-    expect(find.text('Necessita reavaliação'), findsOneWidget);
+    expect(find.text('Não recomendado'), findsOneWidget);
     expect(
       find.text('Ana Paula Ribeiro · 2 infrações · mínimo para aprovação 70%.'),
       findsOneWidget,

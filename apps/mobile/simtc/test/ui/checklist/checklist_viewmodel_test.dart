@@ -208,7 +208,7 @@ void main() {
     test(
         'reavaliação: o "Iniciar" reserva o participante no backend e só então '
         'grava o início', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedParticipant(status: 'NAO_RECOMENDADO');
       await seedCatalog();
       when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
           .thenAnswer((_) async => reserved());
@@ -237,7 +237,7 @@ void main() {
     test(
         'se o backend recusa a reserva, a avaliação não começa: o motivo '
         'aparece e a sessão é baixada de novo', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedParticipant(status: 'NAO_RECOMENDADO');
       await seedCatalog();
       when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
           .thenThrow(const ApiException(
@@ -257,12 +257,12 @@ void main() {
       expect(vm.message, 'Um ou mais participantes já estão em avaliação com outro consultor');
       expect(await db.select(db.localAssessments).get(), isEmpty);
       final row = await db.select(db.participants).getSingle();
-      expect(row.status, 'NECESSITA_REAVALIACAO');
+      expect(row.status, 'NAO_RECOMENDADO');
       verify(() => api.get<Map<String, dynamic>>('/training-sessions/sess-1')).called(1);
     });
 
     test('sem rede, a reavaliação não começa e o aviso diz o que fazer', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedParticipant(status: 'NAO_RECOMENDADO');
       await seedCatalog();
       when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
           .thenThrow(const ApiException(
@@ -282,7 +282,7 @@ void main() {
     });
 
     test('dois toques rápidos no "Iniciar" reservam uma vez só', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedParticipant(status: 'NAO_RECOMENDADO');
       await seedCatalog();
       final post = Completer<Response<Map<String, dynamic>>>();
       when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))

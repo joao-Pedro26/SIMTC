@@ -7,7 +7,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
 /// O topo da tela 1.6 e do Resultado (canvas "2e" e "2g"): "Pontuação final",
-/// o % em destaque e a pílula "Aprovado"/"Necessita reavaliação", com as
+/// o % em destaque e a pílula "Aprovado"/"Não recomendado", com as
 /// linhas de detalhe embaixo.
 class FinalScoreBlock extends StatelessWidget {
   const FinalScoreBlock({
@@ -72,7 +72,7 @@ class FinalScoreBlock extends StatelessWidget {
   }
 }
 
-/// "Aprovado" ou "Necessita reavaliação", ao lado do % — o corte de 70% do
+/// "Aprovado" ou "Não recomendado", ao lado do % — o corte de 70% do
 /// backend. As cores são as dos chips de status do detalhe da sessão.
 class _ResultPill extends StatelessWidget {
   const _ResultPill({required this.approved});
@@ -90,7 +90,7 @@ class _ResultPill extends StatelessWidget {
             AppColors.successInk,
           )
         : (
-            'Necessita reavaliação',
+            'Não recomendado',
             AppIcons.needsReview,
             AppColors.dangerBg,
             AppColors.dangerBorder,

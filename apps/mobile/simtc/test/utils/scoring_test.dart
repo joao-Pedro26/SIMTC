@@ -64,13 +64,13 @@ void main() {
       expect(getApprovalStatus(100), 'APROVADO');
     });
 
-    test('(backend) NECESSITA_REAVALIACAO se score < 70', () {
-      expect(getApprovalStatus(69), 'NECESSITA_REAVALIACAO');
-      expect(getApprovalStatus(0), 'NECESSITA_REAVALIACAO');
+    test('(backend) NAO_RECOMENDADO se score < 70', () {
+      expect(getApprovalStatus(69), 'NAO_RECOMENDADO');
+      expect(getApprovalStatus(0), 'NAO_RECOMENDADO');
     });
 
     test('o corte não arredonda: 69,9 ainda precisa de reavaliação', () {
-      expect(getApprovalStatus(69.9), 'NECESSITA_REAVALIACAO');
+      expect(getApprovalStatus(69.9), 'NAO_RECOMENDADO');
     });
   });
 }

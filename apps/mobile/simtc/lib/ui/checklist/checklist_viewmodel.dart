@@ -197,7 +197,7 @@ class ChecklistViewModel extends ChangeNotifier {
   }
 
   /// O participante ainda não está reservado para este consultor: é o caso
-  /// de quem chega pelo "Reavaliar" do Resultado ("Necessita reavaliação"),
+  /// de quem chega pelo "Reavaliar" do Resultado ("Não recomendado"),
   /// que só abre o checklist. Quem veio pelo "Atribuir a mim" já está — e sem
   /// consultor na linha, vale o que o servidor disse por último.
   bool get _needsReservation {

@@ -352,7 +352,7 @@ void main() {
   test(
       'sem rede e sem avaliação no aparelho: a nota e o status guardados, com '
       'o aviso', () async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverFails(const ApiException(message: 'Sem conexão', isNetworkError: true));
     final vm = buildViewModel();
     addTearDown(vm.dispose);
@@ -371,7 +371,7 @@ void main() {
   test(
       'sem rede, o aviso promete as infrações com a internet: quando a rede '
       'volta, busca no servidor de novo e mostra as dele', () async {
-    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
     serverFails(const ApiException(message: 'Sem conexão', isNetworkError: true));
     final vm = buildViewModel();
     addTearDown(vm.dispose);
@@ -461,9 +461,9 @@ void main() {
 
   group('Reavaliar', () {
     test(
-        'só para "Necessita reavaliação", fora do "Confirmar", com perfil de '
+        'só para "Não recomendado", fora do "Confirmar", com perfil de '
         'consultor e sem avaliação do aparelho esperando envio', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+      await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
       serverAnswers(serverJson());
 
       final fromDetail = buildViewModel();
@@ -500,7 +500,7 @@ void main() {
       }
 
       await sessionStatus('CONCLUIDO');
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+      await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
       serverAnswers(serverJson());
       final vm = buildViewModel();
       addTearDown(vm.dispose);

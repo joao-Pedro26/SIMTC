@@ -228,13 +228,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  /// Volta para "Pendente" ou, numa reavaliação, para "Necessita
-  /// reavaliação" — a mesma regra do backend.
+  /// Volta para "Pendente" ou, numa reavaliação, para "Não recomendado" —
+  /// a mesma regra do backend.
   Future<void> _confirmUnassign() async {
     final participant = _viewModel.participant;
     final name = participant?.name;
     final status = participant?.hasPreviousAssessment == true
-        ? 'Necessita reavaliação'
+        ? 'Não recomendado'
         : 'Pendente';
     final discardNote =
         _viewModel.isStarted ? ' A avaliação iniciada será descartada.' : '';

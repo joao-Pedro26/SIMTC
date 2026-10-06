@@ -293,7 +293,6 @@ class _ResultScreenState extends State<ResultScreen> {
         if (open.contains(category.id))
           for (final infraction in category.infractions) _buildInfraction(infraction),
       ],
-      _buildFootnote(),
     ];
   }
 
@@ -402,24 +401,8 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  Widget _buildFootnote() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.md + 2,
-        AppSpacing.xl,
-        AppSpacing.xl,
-      ),
-      child: Text(
-        'O número de cada linha é o item da categoria na ficha oficial — é por '
-        'ele que a infração é localizada em caso de contestação.',
-        style: AppTypography.meta,
-      ),
-    );
-  }
-
   /// Um botão no máximo: "Próximo participante" logo depois do "Confirmar",
-  /// ou "Reavaliar" para quem está em "Necessita reavaliação". Nos outros
+  /// ou "Reavaliar" para quem está em "Não recomendado". Nos outros
   /// casos, o X fecha a tela.
   Widget? _buildFooter(bool isOffline) {
     if (_viewModel.isLoading) return null;
