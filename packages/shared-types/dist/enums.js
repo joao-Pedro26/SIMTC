@@ -41,7 +41,7 @@ var ParticipantStatus;
     ParticipantStatus["PENDENTE"] = "PENDENTE";
     ParticipantStatus["EM_AVALIACAO"] = "EM_AVALIACAO";
     ParticipantStatus["APROVADO"] = "APROVADO";
-    ParticipantStatus["NECESSITA_REAVALIACAO"] = "NECESSITA_REAVALIACAO";
+    ParticipantStatus["NAO_RECOMENDADO"] = "NAO_RECOMENDADO";
 })(ParticipantStatus || (exports.ParticipantStatus = ParticipantStatus = {}));
 var UserRole;
 (function (UserRole) {

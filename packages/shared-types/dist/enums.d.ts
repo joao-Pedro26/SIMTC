@@ -30,7 +30,7 @@ export declare enum ParticipantStatus {
     PENDENTE = "PENDENTE",
     EM_AVALIACAO = "EM_AVALIACAO",
     APROVADO = "APROVADO",
-    NECESSITA_REAVALIACAO = "NECESSITA_REAVALIACAO"
+    NAO_RECOMENDADO = "NAO_RECOMENDADO"
 }
 export declare enum UserRole {
     ADMIN = "ADMIN",

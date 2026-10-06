@@ -40,11 +40,11 @@ function calculateOverallScore(categoryScores) {
     return categoryScores.reduce((a, b) => a + b, 0) / categoryScores.length;
 }
 function getApprovalStatus(score) {
-    return score >= 70 ? 'APROVADO' : 'NECESSITA_REAVALIACAO';
+    return score >= 70 ? 'APROVADO' : 'NAO_RECOMENDADO';
 }
 function getApprovalLabel(score) {
     if (score >= 70)
         return 'Aprovado';
-    return 'Necessita Reavaliação';
+    return 'Não Recomendado';
 }
 //# sourceMappingURL=scoring.js.map

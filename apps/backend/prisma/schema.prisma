@@ -230,7 +230,7 @@ enum ParticipantStatus {
   PENDENTE
   EM_AVALIACAO
   APROVADO
-  NECESSITA_REAVALIACAO
+  NAO_RECOMENDADO
 }
 
 // ─── AVALIAÇÃO PRÁTICA ───────────────────────────────────────────────────────

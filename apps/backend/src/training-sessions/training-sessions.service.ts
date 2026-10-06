@@ -97,7 +97,7 @@ export class TrainingSessionsService {
       current.total += count;
       if (row.participationType === 'TEORICA_E_PRATICA') {
         current.assessable += count;
-        if (row.status === 'APROVADO' || row.status === 'NECESSITA_REAVALIACAO') {
+        if (row.status === 'APROVADO' || row.status === 'NAO_RECOMENDADO') {
           current.assessed += count;
         }
       }

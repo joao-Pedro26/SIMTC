@@ -2,7 +2,7 @@ export type ParticipantStatus =
   | 'PENDENTE'
   | 'EM_AVALIACAO'
   | 'APROVADO'
-  | 'NECESSITA_REAVALIACAO'
+  | 'NAO_RECOMENDADO'
 
 export interface SessionParticipant {
   /** PK da linha TrainingParticipant (join table) — usar este para ações em lote (bulk-download etc). */

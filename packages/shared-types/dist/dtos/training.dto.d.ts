@@ -34,7 +34,7 @@ export interface TrainingSessionParticipantStats {
      * então incluí-lo faria a barra nunca chegar a 100%.
      */
     assessable: number;
-    /** Avaliáveis já concluídos (`APROVADO` ou `NECESSITA_REAVALIACAO`). */
+    /** Avaliáveis já concluídos (`APROVADO` ou `NAO_RECOMENDADO`). */
     assessed: number;
 }
 //# sourceMappingURL=training.dto.d.ts.map

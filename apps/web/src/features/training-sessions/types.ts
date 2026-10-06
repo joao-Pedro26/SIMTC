@@ -12,7 +12,7 @@ export type ParticipantStatus =
   | 'PENDENTE'
   | 'EM_AVALIACAO'
   | 'APROVADO'
-  | 'NECESSITA_REAVALIACAO'
+  | 'NAO_RECOMENDADO'
 
 export interface TrainingCompany {
   id: string

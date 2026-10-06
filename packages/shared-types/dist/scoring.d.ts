@@ -14,6 +14,6 @@ export declare const NOTE_DEDUCTIONS: Record<'B' | 'PM' | 'M', number>;
 export declare function calculateCategoryScore(noteWeights: number[], totalInfractionsInCategory: number): number;
 /** Média simples entre todas as categorias (inclusive as não avaliadas, que contam 100%) */
 export declare function calculateOverallScore(categoryScores: number[]): number;
-export declare function getApprovalStatus(score: number): 'APROVADO' | 'NECESSITA_REAVALIACAO';
+export declare function getApprovalStatus(score: number): 'APROVADO' | 'NAO_RECOMENDADO';
 export declare function getApprovalLabel(score: number): string;
 //# sourceMappingURL=scoring.d.ts.map

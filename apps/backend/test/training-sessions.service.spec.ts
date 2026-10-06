@@ -86,7 +86,7 @@ describe('TrainingSessionsService.findAll', () => {
     mockPrisma.trainingParticipant.groupBy.mockResolvedValue([
       groupRow('s1', 'PENDENTE', 'TEORICA_E_PRATICA', 3),
       groupRow('s1', 'APROVADO', 'TEORICA_E_PRATICA', 4),
-      groupRow('s1', 'NECESSITA_REAVALIACAO', 'TEORICA_E_PRATICA', 1),
+      groupRow('s1', 'NAO_RECOMENDADO', 'TEORICA_E_PRATICA', 1),
       groupRow('s1', 'APROVADO', 'SOMENTE_TEORICA', 2),
     ]);
 

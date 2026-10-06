@@ -41,7 +41,7 @@ interface BackendSession {
  * Ações possíveis por participante:
  * - atribuir   → PENDENTE: apenas atribui ao consultor logado (sem abrir drawer)
  * - avaliar    → EM_AVALIACAO próprio, primeira avaliação (sem assessment anterior): abre o checklist
- * - reavaliar  → NECESSITA_REAVALIACAO, ou EM_AVALIACAO próprio já com assessment anterior
+ * - reavaliar  → NAO_RECOMENDADO, ou EM_AVALIACAO próprio já com assessment anterior
  *                (reavaliação em andamento — status técnico volta a EM_AVALIACAO ao atribuir,
  *                mas a existência do assessment anterior mantém a ação como "reavaliar")
  * - blocked    → EM_AVALIACAO de outro consultor
@@ -68,7 +68,7 @@ function getAction(
       // mesmo com o status técnico voltando para EM_AVALIACAO ao ser atribuído novamente.
       return p.assessment != null ? 'reavaliar' : 'avaliar'
     case 'APROVADO': return 'none'
-    case 'NECESSITA_REAVALIACAO': return 'reavaliar'
+    case 'NAO_RECOMENDADO': return 'reavaliar'
     default: return 'none'
   }
 }
@@ -76,10 +76,10 @@ function getAction(
 /**
  * Status "visual" do participante: quando está EM_AVALIACAO mas já existe um assessment
  * anterior, trata-se de uma reavaliação em andamento — mantém o badge como
- * "Necessita Reavaliação" em vez de mostrar "Em Avaliação".
+ * "Não Recomendado" em vez de mostrar "Em Avaliação".
  */
 function getDisplayStatus(p: BackendParticipant): string {
-  if (p.status === 'EM_AVALIACAO' && p.assessment != null) return 'NECESSITA_REAVALIACAO'
+  if (p.status === 'EM_AVALIACAO' && p.assessment != null) return 'NAO_RECOMENDADO'
   return p.status
 }
 
@@ -87,14 +87,14 @@ const statusLabels: Record<string, string> = {
   PENDENTE: 'Pendente',
   EM_AVALIACAO: 'Em Avaliação',
   APROVADO: 'Aprovado',
-  NECESSITA_REAVALIACAO: 'Necessita Reavaliação',
+  NAO_RECOMENDADO: 'Não Recomendado',
 }
 
 const statusCssMap: Record<string, string> = {
   PENDENTE: styles.statusPendente,
   EM_AVALIACAO: styles.statusEmAvaliacao,
   APROVADO: styles.statusAprovado,
-  NECESSITA_REAVALIACAO: styles.statusNecessita,
+  NAO_RECOMENDADO: styles.statusNecessita,
 }
 
 // ── Formulário de participante ─────────────────────────────────────────────────
@@ -363,16 +363,16 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   const canEdit = isAdmin && (session?.status === 'PLANEJADO' || session?.status === 'EM_ANDAMENTO')
   const canStart = canManageLifecycle && session?.status === 'PLANEJADO'
   // Usa o status "visual" (getDisplayStatus): um participante em reavaliação-em-andamento
-  // (EM_AVALIACAO com assessment anterior) conta como NECESSITA_REAVALIACAO para não bloquear
+  // (EM_AVALIACAO com assessment anterior) conta como NAO_RECOMENDADO para não bloquear
   // nem esconder o botão de concluir o treinamento — só uma avaliação de fato inédita (sem
   // assessment anterior) mantém a sessão como "ainda não pode concluir".
   const canComplete = canManageLifecycle && session?.status === 'EM_ANDAMENTO' && participants.length > 0 &&
     participants.every((p) => {
       const ds = getDisplayStatus(p)
-      return p.participationType === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NECESSITA_REAVALIACAO'
+      return p.participationType === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NAO_RECOMENDADO'
     })
   const hasUnapprovedParticipants = participants.some(
-    (p) => p.participationType !== 'SOMENTE_TEORICA' && getDisplayStatus(p) === 'NECESSITA_REAVALIACAO',
+    (p) => p.participationType !== 'SOMENTE_TEORICA' && getDisplayStatus(p) === 'NAO_RECOMENDADO',
   )
 
   function courseTypeLabel(): string {
@@ -713,7 +713,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
             </p>
             <p className={styles.completeDialogBody}>
               {hasUnapprovedParticipants
-                ? 'Há participante(s) com status "Necessita Reavaliação" nesta sessão. Deseja concluir o treinamento mesmo assim?'
+                ? 'Há participante(s) com status "Não Recomendado" nesta sessão. Deseja concluir o treinamento mesmo assim?'
                 : 'Todos os participantes já foram avaliados. Deseja concluir este treinamento? Essa ação encerra a sessão.'}
             </p>
             <div className={styles.completeDialogActions}>

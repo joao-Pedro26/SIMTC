@@ -42,11 +42,11 @@ export function calculateOverallScore(categoryScores: number[]): number {
   return categoryScores.reduce((a, b) => a + b, 0) / categoryScores.length;
 }
 
-export function getApprovalStatus(score: number): 'APROVADO' | 'NECESSITA_REAVALIACAO' {
-  return score >= 70 ? 'APROVADO' : 'NECESSITA_REAVALIACAO';
+export function getApprovalStatus(score: number): 'APROVADO' | 'NAO_RECOMENDADO' {
+  return score >= 70 ? 'APROVADO' : 'NAO_RECOMENDADO';
 }
 
 export function getApprovalLabel(score: number): string {
   if (score >= 70) return 'Aprovado';
-  return 'Necessita Reavaliação';
+  return 'Não Recomendado';
 }

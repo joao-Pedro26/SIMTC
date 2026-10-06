@@ -34,7 +34,7 @@ export const mockTrainingSessions: TrainingSession[] = [
       {
         id: 'mock-p3', name: 'Carlos Pereira', cpf: '111.222.333-44', email: 'carlos@email.com',
         cnhCategory: 'B', cnhExpiration: '2026-11-20',
-        type: 'TEORICA_E_PRATICA', status: 'NECESSITA_REAVALIACAO', score: 62, certificateGenerated: false, certificateId: null, certificatePdfUrl: null,
+        type: 'TEORICA_E_PRATICA', status: 'NAO_RECOMENDADO', score: 62, certificateGenerated: false, certificateId: null, certificatePdfUrl: null,
       },
     ],
   },

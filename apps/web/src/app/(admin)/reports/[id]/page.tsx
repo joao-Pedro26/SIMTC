@@ -24,7 +24,7 @@ interface Certificate {
 interface SessionParticipant {
   id: string
   participationType: 'SOMENTE_TEORICA' | 'TEORICA_E_PRATICA'
-  status: 'PENDENTE' | 'EM_AVALIACAO' | 'APROVADO' | 'NECESSITA_REAVALIACAO'
+  status: 'PENDENTE' | 'EM_AVALIACAO' | 'APROVADO' | 'NAO_RECOMENDADO'
   participant: { id: string; name: string; cpf: string }
   assessment?: Assessment | null
   certificate?: Certificate | null
@@ -60,7 +60,7 @@ const participantStatusLabels: Record<string, string> = {
   PENDENTE: 'Pendente',
   EM_AVALIACAO: 'Em Avaliação',
   APROVADO: 'Aprovado',
-  NECESSITA_REAVALIACAO: 'Nec. Reavaliação',
+  NAO_RECOMENDADO: 'Não Recomendado',
 }
 
 function ScoreBadge({ score, participationType }: { score: number | null; participationType: string }) {

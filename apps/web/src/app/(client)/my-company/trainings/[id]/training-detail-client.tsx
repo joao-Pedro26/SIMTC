@@ -30,23 +30,23 @@ const statusLabels: Record<ParticipantStatus, string> = {
   PENDENTE:              'Pendente',
   EM_AVALIACAO:          'Em Avaliação',
   APROVADO:              'Aprovado',
-  NECESSITA_REAVALIACAO: 'Necessita Reavaliação',
+  NAO_RECOMENDADO: 'Não Recomendado',
 }
 
 const statusCssMap: Record<ParticipantStatus, string> = {
   PENDENTE:              styles.statusPendente,
   EM_AVALIACAO:          styles.statusEmAvaliacao,
   APROVADO:              styles.statusAprovado,
-  NECESSITA_REAVALIACAO: styles.statusNecessita,
+  NAO_RECOMENDADO: styles.statusNecessita,
 }
 
 /**
  * Status "visual": quando está EM_AVALIACAO mas já existe um assessment anterior,
- * trata-se de uma reavaliação em andamento — mantém o badge como "Necessita Reavaliação"
+ * trata-se de uma reavaliação em andamento — mantém o badge como "Não Recomendado"
  * em vez de mostrar "Em Avaliação".
  */
 function getDisplayStatus(p: { status: ParticipantStatus; assessment?: { score: number | null } | null }): ParticipantStatus {
-  if (p.status === 'EM_AVALIACAO' && p.assessment != null) return 'NECESSITA_REAVALIACAO'
+  if (p.status === 'EM_AVALIACAO' && p.assessment != null) return 'NAO_RECOMENDADO'
   return p.status
 }
 

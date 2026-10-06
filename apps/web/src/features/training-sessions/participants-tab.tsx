@@ -24,23 +24,23 @@ const statusLabels: Record<ParticipantStatus, string> = {
   PENDENTE: 'Pendente',
   EM_AVALIACAO: 'Em Avaliação',
   APROVADO: 'Aprovado',
-  NECESSITA_REAVALIACAO: 'Necessita Reavaliação',
+  NAO_RECOMENDADO: 'Não Recomendado',
 }
 
 const statusColors: Record<ParticipantStatus, string> = {
   PENDENTE: styles.statusPendente,
   EM_AVALIACAO: styles.statusEmAvaliacao,
   APROVADO: styles.statusAprovado,
-  NECESSITA_REAVALIACAO: styles.statusNecessita,
+  NAO_RECOMENDADO: styles.statusNecessita,
 }
 
 /**
  * Status "visual": quando está EM_AVALIACAO mas já existe uma nota anterior (score),
- * trata-se de uma reavaliação em andamento — mantém o badge como "Necessita Reavaliação"
+ * trata-se de uma reavaliação em andamento — mantém o badge como "Não Recomendado"
  * em vez de mostrar "Em Avaliação".
  */
 function getDisplayStatus(p: TrainingParticipant): ParticipantStatus {
-  if (p.status === 'EM_AVALIACAO' && p.score != null) return 'NECESSITA_REAVALIACAO'
+  if (p.status === 'EM_AVALIACAO' && p.score != null) return 'NAO_RECOMENDADO'
   return p.status
 }
 
@@ -74,7 +74,7 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     { label: 'Pendente',              value: 'PENDENTE'              },
     { label: 'Em Avaliação',          value: 'EM_AVALIACAO'          },
     { label: 'Aprovado',              value: 'APROVADO'              },
-    { label: 'Necessita Reavaliação', value: 'NECESSITA_REAVALIACAO' },
+    { label: 'Não Recomendado', value: 'NAO_RECOMENDADO' },
   ]
 
   const filteredParticipants = session.participants.filter((p) => {
@@ -164,14 +164,14 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
 
   const canStart = !readOnly && session.status === 'PLANEJADO'
   // Usa o status "visual" (getDisplayStatus): reavaliação-em-andamento conta como
-  // NECESSITA_REAVALIACAO para não esconder o botão de concluir o treinamento.
+  // NAO_RECOMENDADO para não esconder o botão de concluir o treinamento.
   const canComplete =
     !readOnly &&
     session.status === 'EM_ANDAMENTO' &&
     session.participants.length > 0 &&
     session.participants.every((p) => {
       const ds = getDisplayStatus(p)
-      return p.type === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NECESSITA_REAVALIACAO'
+      return p.type === 'SOMENTE_TEORICA' || ds === 'APROVADO' || ds === 'NAO_RECOMENDADO'
     })
 
   const totalCols = 4 + (canEdit ? 2 : 0)

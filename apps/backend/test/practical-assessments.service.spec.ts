@@ -78,9 +78,9 @@ describe('PracticalAssessmentsService', () => {
       expect(getApprovalStatus(100)).toBe('APROVADO');
     });
 
-    it('retorna NECESSITA_REAVALIACAO se score < 70', () => {
-      expect(getApprovalStatus(69)).toBe('NECESSITA_REAVALIACAO');
-      expect(getApprovalStatus(0)).toBe('NECESSITA_REAVALIACAO');
+    it('retorna NAO_RECOMENDADO se score < 70', () => {
+      expect(getApprovalStatus(69)).toBe('NAO_RECOMENDADO');
+      expect(getApprovalStatus(0)).toBe('NAO_RECOMENDADO');
     });
   });
 
@@ -188,11 +188,11 @@ describe('PracticalAssessmentsService', () => {
       });
       expect(mockPrisma.$transaction).toHaveBeenCalledWith([
         { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } },
-        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NECESSITA_REAVALIACAO' } },
+        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } },
       ]);
     });
 
-    it('nota zero é avaliação anterior: o participante volta a Necessita reavaliação, não a Pendente', async () => {
+    it('nota zero é avaliação anterior: o participante volta a Não recomendado, não a Pendente', async () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([
         { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: { score: 0 } },
       ]);
@@ -203,7 +203,7 @@ describe('PracticalAssessmentsService', () => {
 
       expect(result).toEqual({ unassigned: 1 });
       expect(mockPrisma.$transaction).toHaveBeenCalledWith([
-        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'NECESSITA_REAVALIACAO' } },
+        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } },
       ]);
     });
   });
