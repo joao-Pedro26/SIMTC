@@ -61,7 +61,6 @@ class _ResultScreenState extends State<ResultScreen> {
       participantId: widget.participantId,
       ownerUserId: user.id,
       consultantId: user.consultantId,
-      consultantName: user.name,
       justConfirmed: widget.justConfirmed,
       assessmentRepository: context.read<AssessmentRepository>(),
       participantRepository: context.read<ParticipantRepository>(),
@@ -436,20 +435,16 @@ class _ResultScreenState extends State<ResultScreen> {
         onPressed: () => Navigator.of(context).maybePop(),
       );
     } else if (_viewModel.canReevaluate) {
-      final error = _viewModel.reevaluateError;
       content = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (error != null) ...[
-            InlineNotice(icon: AppIcons.needsReview, tone: NoticeTone.danger, message: error),
-            const SizedBox(height: AppSpacing.sm),
-          ],
           AppCtaButton(
             label: 'Reavaliar',
             icon: AppIcons.retry,
             size: AppCtaSize.large,
-            isLoading: _viewModel.isReevaluating,
+            // O "Iniciar avaliação" do checklist é que reserva o participante,
+            // e isso precisa de rede: sem ela, nem vale abrir o checklist.
             onPressed: isOffline ? null : _reevaluate,
           ),
           if (isOffline) ...[
@@ -481,12 +476,11 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  /// "Reavaliar": reserva o participante e troca o Resultado pelo checklist
-  /// em "não iniciada" — a nova avaliação só começa no "Iniciar avaliação".
-  /// O voltar do checklist leva ao detalhe da sessão.
-  Future<void> _reevaluate() async {
-    final reserved = await _viewModel.reevaluate();
-    if (!reserved || !mounted) return;
+  /// "Reavaliar": troca o Resultado pelo checklist em "não iniciada", sem
+  /// reservar nada — o participante só muda de status no "Iniciar avaliação"
+  /// de lá (decisão de 06/10/2026). O voltar do checklist leva ao detalhe da
+  /// sessão.
+  void _reevaluate() {
     context.pushReplacement(
       AppRoutes.participantChecklist(widget.sessionId, widget.participantId),
     );

@@ -37,7 +37,12 @@ void main() {
 
   tearDown(() => db.close());
 
-  Future<void> seedParticipant({String id = 'tp-1', String name = 'Carlos Eduardo Nunes'}) async {
+  Future<void> seedParticipant({
+    String id = 'tp-1',
+    String name = 'Carlos Eduardo Nunes',
+    String status = 'EM_AVALIACAO',
+    String? assignedConsultantId,
+  }) async {
     await db.into(db.sessions).insert(
           SessionsCompanion.insert(
             id: 'sess-1',
@@ -56,7 +61,8 @@ void main() {
             name: name,
             cpf: '187.443.***-**',
             participationType: 'TEORICA_E_PRATICA',
-            status: 'EM_AVALIACAO',
+            status: status,
+            assignedConsultantId: Value(assignedConsultantId),
             cachedAt: DateTime(2026, 9, 25, 8),
           ),
         );
@@ -100,6 +106,7 @@ void main() {
       participantId: 'tp-1',
       ownerUserId: 'user-1',
       consultantId: consultantId,
+      consultantName: 'Carla Souza',
       assessmentRepository: assessmentRepository,
       participantRepository: participantRepository,
       catalogRepository: catalogRepository,
@@ -184,6 +191,150 @@ void main() {
       expect(second.isStarted, isTrue);
       expect(second.expandedCategoryId, 'cat-1');
       expect(second.sections.single.infractions.single.selectedNoteId, 'note-pm');
+    });
+  });
+
+  // O "Reavaliar" do Resultado só abre o checklist: é o "Iniciar avaliação"
+  // que reserva o participante (decisão de 06/10/2026).
+  group('"Iniciar avaliação" de quem ainda não está com o consultor', () {
+    const assignPath = '/practical-assessments/assign';
+
+    Response<Map<String, dynamic>> reserved() => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: assignPath),
+          statusCode: 201,
+          data: {'assigned': 1},
+        );
+
+    test(
+        'reavaliação: o "Iniciar" reserva o participante no backend e só então '
+        'grava o início', () async {
+      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedCatalog();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer((_) async => reserved());
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+
+      await vm.start();
+
+      final sent = verify(
+        () => api.post<Map<String, dynamic>>(assignPath, data: captureAny(named: 'data')),
+      ).captured;
+      expect(sent.single, {
+        'participantIds': ['tp-1'],
+      });
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'EM_AVALIACAO');
+      expect(row.assignedConsultantId, 'c-eu');
+      expect(row.assignedConsultantName, 'Carla Souza');
+      expect(vm.isStarted, isTrue);
+      final draft = await db.select(db.localAssessments).getSingle();
+      expect(draft.syncStatus, LocalSyncStatus.draft);
+    });
+
+    test(
+        'se o backend recusa a reserva, a avaliação não começa: o motivo '
+        'aparece e a sessão é baixada de novo', () async {
+      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedCatalog();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Um ou mais participantes já estão em avaliação com outro consultor',
+        statusCode: 409,
+      ));
+      when(() => api.get<Map<String, dynamic>>(any()))
+          .thenThrow(const ApiException(message: 'Sem conexão', isNetworkError: true));
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.isStarting, isFalse);
+      expect(vm.message, 'Um ou mais participantes já estão em avaliação com outro consultor');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'NECESSITA_REAVALIACAO');
+      verify(() => api.get<Map<String, dynamic>>('/training-sessions/sess-1')).called(1);
+    });
+
+    test('sem rede, a reavaliação não começa e o aviso diz o que fazer', () async {
+      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedCatalog();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+        isNetworkError: true,
+      ));
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.message, 'Sem conexão com o servidor. Verifique a internet e tente de novo.');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      verifyNever(() => api.get<Map<String, dynamic>>(any()));
+    });
+
+    test('dois toques rápidos no "Iniciar" reservam uma vez só', () async {
+      await seedParticipant(status: 'NECESSITA_REAVALIACAO');
+      await seedCatalog();
+      final post = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer((_) => post.future);
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      final first = vm.start();
+      final second = vm.start();
+      post.complete(reserved());
+      await Future.wait([first, second]);
+
+      verify(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .called(1);
+      expect(await db.select(db.localAssessments).get(), hasLength(1));
+    });
+
+    test(
+        'quem está com outro consultor não começa: o backend recusa e o motivo '
+        'aparece', () async {
+      await seedParticipant(assignedConsultantId: 'c-outro');
+      await seedCatalog();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Um ou mais participantes já estão em avaliação com outro consultor',
+        statusCode: 409,
+      ));
+      when(() => api.get<Map<String, dynamic>>(any()))
+          .thenThrow(const ApiException(message: 'Sem conexão', isNetworkError: true));
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.message, 'Um ou mais participantes já estão em avaliação com outro consultor');
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test('quem já está com o consultor inicia sem falar com o backend', () async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
     });
   });
 

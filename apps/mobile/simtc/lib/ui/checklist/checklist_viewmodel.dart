@@ -20,8 +20,10 @@ import 'checklist_sections.dart';
 /// avaliação); as marcações, sim, vêm de um stream, porque `toggleNote`
 /// escreve no banco e a tela precisa reagir à própria escrita. A avaliação só
 /// é gravada no aparelho: quem a põe na fila de envio é o "Confirmar" da tela
-/// 1.6 (Fase 5A). O backend só entra no "Desatribuir participante"
-/// ([unassign]), que libera a reserva e, se ele recusar, baixa a sessão de
+/// 1.6 (Fase 5A). O backend só entra em dois pontos: no "Iniciar avaliação"
+/// de quem ainda não está com o consultor ([start], o caso da reavaliação),
+/// que reserva o participante, e no "Desatribuir participante" ([unassign]),
+/// que libera a reserva. Se ele recusar um ou outro, a sessão é baixada de
 /// novo.
 class ChecklistViewModel extends ChangeNotifier {
   ChecklistViewModel({
@@ -29,6 +31,7 @@ class ChecklistViewModel extends ChangeNotifier {
     required this.participantId,
     required this.ownerUserId,
     required this.consultantId,
+    this.consultantName,
     required AssessmentRepository assessmentRepository,
     required ParticipantRepository participantRepository,
     required AssessmentCatalogRepository catalogRepository,
@@ -47,11 +50,17 @@ class ChecklistViewModel extends ChangeNotifier {
   /// `AuthUser.consultantId` do consultor logado — quem a reserva do
   /// participante aponta. Nulo para um usuário sem perfil de consultor.
   final String? consultantId;
+
+  /// Nome do consultor logado: vai para a linha do participante quando o
+  /// "Iniciar avaliação" faz a reserva.
+  final String? consultantName;
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentCatalogRepository _catalogRepository;
   final DateTime Function() _now;
 
+  static const String _reserveFailed =
+      'Não foi possível reservar o participante. Tente de novo.';
   static const String _discardFailed = 'Não foi possível descartar. Tente de novo.';
   static const String _unassignFailed =
       'Não foi possível desatribuir o participante. Tente de novo.';
@@ -187,14 +196,33 @@ class ChecklistViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// O participante ainda não está reservado para este consultor: é o caso
+  /// de quem chega pelo "Reavaliar" do Resultado ("Necessita reavaliação"),
+  /// que só abre o checklist. Quem veio pelo "Atribuir a mim" já está — e sem
+  /// consultor na linha, vale o que o servidor disse por último.
+  bool get _needsReservation {
+    final participant = _participant;
+    if (participant == null) return false;
+    if (participant.status != ParticipantStatus.emAvaliacao) return true;
+    final assignedTo = participant.assignedConsultantId;
+    return assignedTo != null && assignedTo != consultantId;
+  }
+
   /// "Iniciar avaliação": grava o início agora e mostra o checklist. Sem
   /// catálogo não inicia — não há o que avaliar, e a tela nem mostra o botão.
+  ///
+  /// Numa reavaliação, é aqui que o participante é reservado (decisão de
+  /// 06/10/2026): o status só muda quando a avaliação começa de fato, e
+  /// voltar sem iniciar não mexe em nada. Essa reserva precisa de rede; se
+  /// ela falhar, nada começa e a tela mostra o motivo.
   Future<void> start() async {
     if (isStarted || _starting || isBlocked || !hasCatalog || _busy) return;
 
     _starting = true;
     notifyListeners();
     try {
+      if (_needsReservation && !await _reserve()) return;
+      if (_disposed) return;
       final assessment = await _assessmentRepository.openDraft(
         trainingParticipantId: participantId,
         sessionId: sessionId,
@@ -209,6 +237,37 @@ class ChecklistViewModel extends ChangeNotifier {
     } finally {
       _starting = false;
       notifyListeners();
+    }
+  }
+
+  /// Reserva o participante para o consultor logado
+  /// (`POST /practical-assessments/assign`). Recusado (409), outro consultor
+  /// ficou com ele: baixar a sessão mostra quem.
+  Future<bool> _reserve() async {
+    final consultantId = this.consultantId;
+    if (consultantId == null) {
+      _message = _reserveFailed;
+      return false;
+    }
+    try {
+      final result = await _participantRepository.assign(
+        participantId,
+        consultantId: consultantId,
+        consultantName: consultantName ?? '',
+      );
+      switch (result) {
+        case Success():
+          return true;
+        case Failure(:final exception, :final message):
+          _message = message ?? _reserveFailed;
+          if (exception is ApiException && exception.statusCode == 409) {
+            unawaited(_participantRepository.syncSession(sessionId));
+          }
+          return false;
+      }
+    } catch (_) {
+      _message = _reserveFailed;
+      return false;
     }
   }
 

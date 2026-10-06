@@ -48,6 +48,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     // A rota só abre com sessão (redirecionamento do `router.dart`).
     ownerUserId: context.read<AuthRepository>().currentUser!.id,
     consultantId: context.read<AuthRepository>().currentUser!.consultantId,
+    consultantName: context.read<AuthRepository>().currentUser!.name,
     assessmentRepository: context.read<AssessmentRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     catalogRepository: context.read<AssessmentCatalogRepository>(),

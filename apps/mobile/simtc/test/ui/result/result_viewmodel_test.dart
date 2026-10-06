@@ -44,7 +44,6 @@ void main() {
   late SessionRepository sessionRepository;
 
   const resultPath = '/practical-assessments/by-participant/tp-1';
-  const assignPath = '/practical-assessments/assign';
   final now = DateTime(2026, 9, 30, 9);
 
   setUp(() async {
@@ -202,7 +201,6 @@ void main() {
       participantId: 'tp-1',
       ownerUserId: 'user-1',
       consultantId: consultantId,
-      consultantName: 'Carla Souza',
       justConfirmed: justConfirmed,
       assessmentRepository: assessmentRepository,
       participantRepository: participantRepository,
@@ -494,9 +492,8 @@ void main() {
       expect(waitingToSend.canReevaluate, isFalse);
     });
 
-    test(
-        'só com a sessão em andamento: numa sessão concluída não há "Reavaliar" '
-        'nem reserva', () async {
+    test('só com a sessão em andamento: numa sessão concluída não há "Reavaliar"',
+        () async {
       Future<void> sessionStatus(String status) {
         return (db.update(db.sessions)..where((t) => t.id.equals('sess-1')))
             .write(SessionsCompanion(status: Value(status)));
@@ -511,36 +508,11 @@ void main() {
       await settle();
 
       expect(vm.canReevaluate, isFalse);
-      expect(await vm.reevaluate(), isFalse);
-      verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
 
       await sessionStatus('EM_ANDAMENTO');
       await settle();
 
       expect(vm.canReevaluate, isTrue, reason: 'a sessão em andamento libera');
-    });
-
-    test('dois toques rápidos em "Reavaliar" reservam uma vez só', () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
-      serverAnswers(serverJson());
-      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
-          .thenAnswer((_) async => Response<Map<String, dynamic>>(
-                requestOptions: RequestOptions(path: assignPath),
-                statusCode: 201,
-                data: {'assigned': 1},
-              ));
-      final vm = buildViewModel();
-      addTearDown(vm.dispose);
-      await vm.init();
-      await settle();
-
-      final first = vm.reevaluate();
-      final second = vm.reevaluate();
-
-      expect(await first, isTrue);
-      expect(await second, isFalse);
-      verify(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
-          .called(1);
     });
 
     test('aprovado não tem "Reavaliar"', () async {
@@ -553,38 +525,6 @@ void main() {
       await settle();
 
       expect(vm.canReevaluate, isFalse);
-    });
-
-    test('reserva o participante para quem tocou; um 409 mostra o motivo',
-        () async {
-      await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
-      serverAnswers(serverJson());
-      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
-          .thenThrow(const ApiException(
-        message: 'Um ou mais participantes já estão em avaliação com outro consultor',
-        statusCode: 409,
-      ));
-      final vm = buildViewModel();
-      addTearDown(vm.dispose);
-      await vm.init();
-      await settle();
-
-      expect(await vm.reevaluate(), isFalse);
-      expect(vm.reevaluateError,
-          'Um ou mais participantes já estão em avaliação com outro consultor');
-
-      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
-          .thenAnswer((_) async => Response<Map<String, dynamic>>(
-                requestOptions: RequestOptions(path: assignPath),
-                statusCode: 201,
-                data: {'assigned': 1},
-              ));
-
-      expect(await vm.reevaluate(), isTrue);
-      expect(vm.reevaluateError, isNull);
-      final row = await db.select(db.participants).getSingle();
-      expect(row.status, 'EM_AVALIACAO');
-      expect(row.assignedConsultantId, 'c-eu');
     });
   });
 }

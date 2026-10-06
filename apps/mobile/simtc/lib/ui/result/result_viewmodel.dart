@@ -69,7 +69,6 @@ class ResultViewModel extends ChangeNotifier {
     required SessionRepository sessionRepository,
     required ConnectivityService connectivity,
     this.consultantId,
-    this.consultantName,
     DateTime Function()? now,
   })  : _assessmentRepository = assessmentRepository,
         _participantRepository = participantRepository,
@@ -88,10 +87,9 @@ class ResultViewModel extends ChangeNotifier {
   /// participante".
   final bool justConfirmed;
 
-  /// `AuthUser.consultantId` e `AuthUser.name` — o "Reavaliar" reserva o
-  /// participante em nome dele.
+  /// `AuthUser.consultantId` do consultor logado — sem perfil de consultor
+  /// não há "Reavaliar".
   final String? consultantId;
-  final String? consultantName;
 
   final AssessmentRepository _assessmentRepository;
   final ParticipantRepository _participantRepository;
@@ -100,9 +98,6 @@ class ResultViewModel extends ChangeNotifier {
   final ConnectivityService _connectivity;
   final DateTime Function() _now;
 
-  static const String _reevaluateFailed =
-      'Não foi possível reservar o participante. Tente de novo.';
-
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessment>>? _localSubscription;
   StreamSubscription<TrainingSession?>? _sessionSubscription;
@@ -110,7 +105,6 @@ class ResultViewModel extends ChangeNotifier {
 
   bool _disposed = false;
   bool _loading = true;
-  bool _reevaluating = false;
   TrainingSession? _session;
   SessionParticipant? _participant;
   LocalAssessment? _local;
@@ -124,7 +118,6 @@ class ResultViewModel extends ChangeNotifier {
   double? _score;
   DateTime? _startTime;
   DateTime? _endTime;
-  String? _reevaluateError;
 
   bool get isLoading => _loading;
   SessionParticipant? get participant => _participant;
@@ -205,6 +198,9 @@ class ResultViewModel extends ChangeNotifier {
   /// com a sessão em andamento, como o detalhe e o painel web: numa sessão
   /// concluída, o envio da reavaliação sobrescreveria a avaliação que já
   /// embasou os certificados.
+  ///
+  /// O botão só abre o checklist em "não iniciada": quem reserva o
+  /// participante é o "Iniciar avaliação" de lá (decisão de 06/10/2026).
   bool get canReevaluate {
     final local = _local;
     final waiting = local != null &&
@@ -216,11 +212,6 @@ class ResultViewModel extends ChangeNotifier {
         _session?.status == SessionStatus.emAndamento &&
         _participant?.status == ParticipantStatus.necessitaReavaliacao;
   }
-
-  bool get isReevaluating => _reevaluating;
-
-  /// Por que o último "Reavaliar" não reservou — a tela mostra num aviso.
-  String? get reevaluateError => _reevaluateError;
 
   Future<void> init() async {
     _sessionSubscription ??=
@@ -256,39 +247,6 @@ class ResultViewModel extends ChangeNotifier {
   Future<void> retry() async {
     if (_loading) return;
     await _load();
-  }
-
-  /// "Reavaliar": reserva o participante para o consultor logado
-  /// (`POST /practical-assessments/assign`) — o backend tira a atribuição
-  /// depois de cada envio. Com sucesso, devolve `true` e a tela abre o
-  /// checklist em "não iniciada".
-  Future<bool> reevaluate() async {
-    final consultantId = this.consultantId;
-    if (!canReevaluate || _reevaluating || consultantId == null) return false;
-
-    _reevaluating = true;
-    _reevaluateError = null;
-    notifyListeners();
-    try {
-      final result = await _participantRepository.assign(
-        participantId,
-        consultantId: consultantId,
-        consultantName: consultantName ?? '',
-      );
-      switch (result) {
-        case Success():
-          return true;
-        case Failure(:final message):
-          _reevaluateError = message ?? _reevaluateFailed;
-          return false;
-      }
-    } catch (_) {
-      _reevaluateError = _reevaluateFailed;
-      return false;
-    } finally {
-      _reevaluating = false;
-      notifyListeners();
-    }
   }
 
   Future<void> _load() async {

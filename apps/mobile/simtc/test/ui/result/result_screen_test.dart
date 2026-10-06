@@ -387,8 +387,33 @@ void main() {
   });
 
   testWidgets(
-      '"Reavaliar" reserva o participante e abre o checklist em "não '
-      'iniciada"; o voltar leva à tela de origem', (tester) async {
+      '"Reavaliar" só abre o checklist em "não iniciada": voltar sem iniciar '
+      'deixa o participante em "Necessita reavaliação", sem reserva',
+      (tester) async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverAnswers(serverJson());
+    await pumpResult(tester);
+
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsOneWidget);
+    expect(find.text('não iniciada'), findsOneWidget);
+    expect(find.text('Iniciar avaliação'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('origem'), findsOneWidget);
+    verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+    final row = await db.select(db.participants).getSingle();
+    expect(row.status, 'NECESSITA_REAVALIACAO');
+    expect(row.assignedConsultantId, isNull);
+  });
+
+  testWidgets(
+      'depois do "Reavaliar", é o "Iniciar avaliação" que reserva o '
+      'participante para quem está logado', (tester) async {
     await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
     serverAnswers(serverJson());
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
@@ -401,22 +426,50 @@ void main() {
 
     await tester.tap(find.text('Reavaliar'));
     await tester.pumpAndSettle();
+    verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
 
-    expect(find.byType(ChecklistScreen), findsOneWidget);
-    expect(find.text('não iniciada'), findsOneWidget);
-    expect(find.text('Iniciar avaliação'), findsOneWidget);
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+
+    verify(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
+        data: any(named: 'data'))).called(1);
     final row = await db.select(db.participants).getSingle();
     expect(row.status, 'EM_AVALIACAO');
     expect(row.assignedConsultantId, 'c-eu');
-
-    await tester.tap(find.byTooltip('Voltar'));
-    await tester.pumpAndSettle();
-    expect(find.text('origem'), findsOneWidget);
+    expect(row.assignedConsultantName, 'Carla Souza');
+    expect(find.text('Finalizar avaliação'), findsOneWidget);
   });
 
   testWidgets(
-      '"Reavaliar" com outra avaliação em andamento: reserva mesmo assim, e o '
-      'checklist avisa que só dá uma por vez', (tester) async {
+      'se a reserva é recusada no "Iniciar avaliação", o checklist continua em '
+      '"não iniciada" e mostra o motivo', (tester) async {
+    await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
+    serverAnswers(serverJson());
+    when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
+        data: any(named: 'data'))).thenThrow(const ApiException(
+      message: 'Um ou mais participantes já estão em avaliação com outro consultor',
+      statusCode: 409,
+    ));
+    when(() => api.get<Map<String, dynamic>>(any()))
+        .thenThrow(const ApiException(message: 'Sem conexão', isNetworkError: true));
+    await pumpResult(tester);
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Um ou mais participantes já estão em avaliação com outro consultor'),
+      findsOneWidget,
+    );
+    expect(find.text('Iniciar avaliação'), findsOneWidget);
+    expect(await db.select(db.localAssessments).get(), isEmpty);
+  });
+
+  testWidgets(
+      '"Reavaliar" com outra avaliação em andamento: o checklist avisa que só '
+      'dá uma por vez, e nada é reservado', (tester) async {
     await seedParticipant(status: 'NECESSITA_REAVALIACAO', score: 62.5);
     await db.into(db.participants).insert(
           ParticipantsCompanion.insert(
@@ -435,12 +488,6 @@ void main() {
       ownerUserId: 'user-1',
     );
     serverAnswers(serverJson());
-    when(() => api.post<Map<String, dynamic>>('/practical-assessments/assign',
-        data: any(named: 'data'))).thenAnswer((_) async => Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/practical-assessments/assign'),
-          statusCode: 201,
-          data: {'assigned': 1},
-        ));
     await pumpResult(tester);
 
     await tester.tap(find.text('Reavaliar'));
@@ -452,9 +499,10 @@ void main() {
           'avaliação para iniciar outra.'),
       findsOneWidget,
     );
+    verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
     final row = await (db.select(db.participants)..where((t) => t.id.equals('tp-1')))
         .getSingle();
-    expect(row.status, 'EM_AVALIACAO', reason: 'a reserva aconteceu');
+    expect(row.status, 'NECESSITA_REAVALIACAO', reason: 'sem iniciar, nada é reservado');
   });
 
   testWidgets(
