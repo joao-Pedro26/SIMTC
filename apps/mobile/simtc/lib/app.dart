@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'app_providers.dart';
 import 'data/services/local/app_database.dart';
 import 'router.dart';
+import 'ui/core/app_localization.dart';
 import 'ui/core/theme/app_theme.dart';
 
 class SimtcApp extends StatefulWidget {
@@ -51,6 +52,9 @@ class _SimtcAppState extends State<SimtcApp> {
         title: 'SIMTC',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        locale: AppLocalization.locale,
+        supportedLocales: AppLocalization.supportedLocales,
+        localizationsDelegates: AppLocalization.delegates,
         routerConfig: _router,
       ),
     );

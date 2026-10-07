@@ -10,6 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Textos do próprio Material em português (calendário, copiar/colar)
+  flutter_localizations:
+    sdk: flutter
+
   # Arquitetura oficial Flutter (MVVM)
   provider: ^6.1.2
 
@@ -38,7 +42,7 @@ dependencies:
   flutter_cache_manager: ^3.4.1
 
   # Utilitários
-  intl: ^0.19.0
+  intl: ^0.20.2
   connectivity_plus: ^6.0.5
   uuid: ^4.4.2
 
