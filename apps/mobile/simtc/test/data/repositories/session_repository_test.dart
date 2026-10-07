@@ -394,4 +394,223 @@ void main() {
       expect(row.status, 'PLANEJADO');
     });
   });
+
+  group('edição pelo ADMIN', () {
+    const path = '/training-sessions/s1';
+
+    Future<void> seedSession() {
+      return db.into(db.sessions).insert(
+            SessionsCompanion.insert(
+              id: 's1',
+              companyName: 'Bracell Celulose',
+              courseName: 'Direção Preventiva',
+              city: 'Itabira',
+              state: 'MG',
+              date: Value(DateTime(2026, 9, 12)),
+              status: 'EM_ANDAMENTO',
+              notes: const Value('Pátio 3 — portaria B.'),
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+    }
+
+    Response<Map<String, dynamic>> ok(String requestPath) {
+      return Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: requestPath),
+        statusCode: 200,
+        data: {'id': 's1'},
+      );
+    }
+
+    void patchAnswers() {
+      when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+          .thenAnswer((_) async => ok(path));
+    }
+
+    Object? sentBody() {
+      return verify(
+        () => api.patch<Map<String, dynamic>>(path, data: captureAny(named: 'data')),
+      ).captured.single;
+    }
+
+    group('update', () {
+      test(
+          'manda só o que mudou, com a data como AAAA-MM-DD, e já grava no '
+          'cache', () async {
+        await seedSession();
+        patchAnswers();
+
+        final result = await repository.update(
+          's1',
+          date: DateTime(2026, 10, 3),
+          notes: '',
+        );
+
+        expect(result.isSuccess, isTrue);
+        expect(sentBody(), {'date': '2026-10-03', 'notes': ''});
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.date, DateTime(2026, 10, 3));
+        expect(row.notes, '');
+        expect(row.city, 'Itabira', reason: 'o que não mudou fica como estava');
+        expect(row.state, 'MG');
+      });
+
+      test('cidade e UF vão separadas, como o backend guarda', () async {
+        await seedSession();
+        patchAnswers();
+
+        final result = await repository.update('s1', city: 'Betim', state: 'SP');
+
+        expect(result.isSuccess, isTrue);
+        expect(sentBody(), {'city': 'Betim', 'state': 'SP'});
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.city, 'Betim');
+        expect(row.state, 'SP');
+        expect(row.date, DateTime(2026, 9, 12));
+        expect(row.notes, 'Pátio 3 — portaria B.');
+      });
+
+      test('dia e mês de um dígito ganham o zero à esquerda', () async {
+        await seedSession();
+        patchAnswers();
+
+        await repository.update('s1', date: DateTime(2027, 1, 5));
+
+        expect(sentBody(), {'date': '2027-01-05'});
+      });
+
+      test('sem mudança nenhuma, não chama o servidor', () async {
+        await seedSession();
+
+        final result = await repository.update('s1');
+
+        expect(result.isSuccess, isTrue);
+        verifyNever(
+          () => api.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        );
+      });
+
+      test('403 devolve a mensagem do backend e não mexe no cache', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+            .thenThrow(const ApiException(
+          message: 'Não é possível editar um treinamento concluído ou cancelado',
+          statusCode: 403,
+        ));
+
+        final result = await repository.update('s1', city: 'Betim');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Não é possível editar um treinamento concluído ou cancelado',
+          ),
+        );
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.city, 'Itabira');
+      });
+
+      test('sem rede, a mensagem de falta de conexão', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+            .thenThrow(const ApiException(
+          message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+          isNetworkError: true,
+        ));
+
+        final result = await repository.update('s1', city: 'Betim');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+          ),
+        );
+      });
+
+      test('erro inesperado do servidor vira uma mensagem genérica', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+            .thenThrow(const ApiException(
+          message: 'city must be a string',
+          statusCode: 400,
+        ));
+
+        final result = await repository.update('s1', city: 'Betim');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Não foi possível salvar as alterações. Tente de novo.',
+          ),
+        );
+      });
+    });
+
+    group('cancel', () {
+      const cancelPath = '/training-sessions/s1/cancel';
+
+      test('chama o /cancel e já marca a sessão local como cancelada',
+          () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(cancelPath))
+            .thenAnswer((_) async => ok(cancelPath));
+
+        final result = await repository.cancel('s1');
+
+        expect(result.isSuccess, isTrue);
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.status, 'CANCELADO');
+      });
+
+      test('403 devolve a mensagem do backend e não mexe no status local',
+          () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(cancelPath))
+            .thenThrow(const ApiException(
+          message: 'Não é possível cancelar um treinamento já concluído',
+          statusCode: 403,
+        ));
+
+        final result = await repository.cancel('s1');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Não é possível cancelar um treinamento já concluído',
+          ),
+        );
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.status, 'EM_ANDAMENTO');
+      });
+
+      test('erro inesperado do servidor vira uma mensagem genérica', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(cancelPath)).thenThrow(
+          const ApiException(message: 'Internal server error', statusCode: 500),
+        );
+
+        final result = await repository.cancel('s1');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Não foi possível cancelar a sessão. Tente de novo.',
+          ),
+        );
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.status, 'EM_ANDAMENTO');
+      });
+    });
+  });
 }

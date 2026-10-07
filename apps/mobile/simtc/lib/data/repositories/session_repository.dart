@@ -42,6 +42,19 @@ class SessionRepository {
   static const String _startFailed =
       'Não foi possível iniciar a sessão. Tente de novo.';
 
+  static const String _updateFailed =
+      'Não foi possível salvar as alterações. Tente de novo.';
+
+  static const String _cancelFailed =
+      'Não foi possível cancelar a sessão. Tente de novo.';
+
+  /// `AAAA-MM-DD`: a data de calendário como o backend a recebe — o mesmo
+  /// formato que o painel web manda de um `<input type="date">`.
+  static String _isoDate(DateTime date) {
+    String dois(int value) => value.toString().padLeft(2, '0');
+    return '${date.year}-${dois(date.month)}-${dois(date.day)}';
+  }
+
   /// Lista do cache, da data mais próxima para a mais distante; sem data por
   /// último, porque não dá para saber onde ela entra na agenda.
   Stream<List<TrainingSession>> watchSessions() {
@@ -93,6 +106,84 @@ class SessionRepository {
     return const Success<void>(null);
   }
 
+  /// "Dados do treinamento" (Fase 6A): edita data, cidade, UF e observações
+  /// (`PATCH /training-sessions/:id`, só ADMIN). Nulo quer dizer "não mudou"
+  /// e não é enviado — assim uma edição feita no painel web em outro campo
+  /// não é desfeita por um valor velho do cache. Observações vazias limpam o
+  /// campo no servidor; a data não tem como ser apagada (o backend ignora
+  /// data vazia).
+  ///
+  /// O backend recusa (403) sessão concluída ou cancelada. Com sucesso, o
+  /// cache muda na hora, sem esperar o re-sync do detalhe.
+  Future<Result<void>> update(
+    String sessionId, {
+    DateTime? date,
+    String? city,
+    String? state,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      if (date != null) 'date': _isoDate(date),
+      if (city != null) 'city': city,
+      if (state != null) 'state': state,
+      if (notes != null) 'notes': notes,
+    };
+    if (body.isEmpty) return const Success<void>(null);
+
+    try {
+      await _api.patch<Map<String, dynamic>>('$_path/$sessionId', data: body);
+    } on ApiException catch (error) {
+      return Failure(error, _ownMessage(error) ? error.message : _updateFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _updateFailed);
+    }
+
+    try {
+      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        SessionsCompanion(
+          date: date == null ? const Value.absent() : Value(date),
+          city: city == null ? const Value.absent() : Value(city),
+          state: state == null ? const Value.absent() : Value(state),
+          notes: notes == null ? const Value.absent() : Value(notes),
+        ),
+      );
+    } catch (_) {
+      // O backend já gravou; o re-sync do detalhe corrige a linha local.
+    }
+    return const Success<void>(null);
+  }
+
+  /// "Cancelar sessão" (`PATCH /training-sessions/:id/cancel`, só ADMIN). O
+  /// backend recusa (403) sessão já concluída ou já cancelada, e não há como
+  /// desfazer. Com sucesso, o status local muda na hora — e a Home deixa de
+  /// mostrar a sessão (decisão de 20/09/2026).
+  Future<Result<void>> cancel(String sessionId) async {
+    try {
+      await _api.patch<Map<String, dynamic>>('$_path/$sessionId/cancel');
+    } on ApiException catch (error) {
+      return Failure(error, _ownMessage(error) ? error.message : _cancelFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _cancelFailed);
+    }
+
+    try {
+      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
+          .write(
+        SessionsCompanion(status: Value(SessionStatus.cancelado.wireValue)),
+      );
+    } catch (_) {
+      // O backend já cancelou; o próximo sync corrige a linha local.
+    }
+    return const Success<void>(null);
+  }
+
+  /// Recusas do backend que explicam o que houve — 403 (sessão concluída ou
+  /// cancelada) e 404 (sessão apagada) — e a falta de rede, cuja mensagem já
+  /// diz o que fazer. O resto (400 de validação, 5xx) vira o texto genérico.
+  static bool _ownMessage(ApiException error) =>
+      error.statusCode == 403 || error.statusCode == 404 || error.isNetworkError;
+
   /// Quando o cache foi atualizado pela última vez — a tela mostra isso quando
   /// está offline, para o consultor saber a idade do que está vendo.
   Stream<DateTime?> watchLastSyncedAt() {
@@ -115,7 +206,6 @@ class SessionRepository {
     final from = DateTime.now().subtract(
       const Duration(days: _historyWindowDays),
     );
-    String dois(int value) => value.toString().padLeft(2, '0');
 
     try {
       for (var page = 1; page <= _maxPages; page++) {
@@ -124,7 +214,7 @@ class SessionRepository {
           queryParameters: {
             'page': page,
             'limit': _pageSize,
-            'from': '${from.year}-${dois(from.month)}-${dois(from.day)}',
+            'from': _isoDate(from),
           },
         );
 
