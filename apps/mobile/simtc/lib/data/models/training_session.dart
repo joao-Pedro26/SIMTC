@@ -12,6 +12,12 @@ enum SessionStatus {
 
   final String label;
 
+  /// Planejada ou em andamento: o backend aceita editar os dados, cancelar e
+  /// inscrever participantes. Concluída ou cancelada, recusa os três — é o
+  /// que liga e desliga as ações de ADMIN do app (Fase 6A).
+  bool get acceptsChanges =>
+      this == SessionStatus.planejado || this == SessionStatus.emAndamento;
+
   /// Nome que o backend usa — também é o que vai para o cache.
   String get wireValue => switch (this) {
         SessionStatus.planejado => 'PLANEJADO',

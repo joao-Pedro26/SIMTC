@@ -94,4 +94,11 @@ void main() {
     expect(session.participantsSyncedAt, isNull,
         reason: 'a data de sync dos participantes só existe no cache');
   });
+
+  test('só a sessão planejada ou em andamento aceita mudanças', () {
+    expect(SessionStatus.planejado.acceptsChanges, isTrue);
+    expect(SessionStatus.emAndamento.acceptsChanges, isTrue);
+    expect(SessionStatus.concluido.acceptsChanges, isFalse);
+    expect(SessionStatus.cancelado.acceptsChanges, isFalse);
+  });
 }
