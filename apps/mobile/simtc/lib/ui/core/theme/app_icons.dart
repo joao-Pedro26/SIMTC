@@ -62,4 +62,8 @@ abstract final class AppIcons {
   /// "Descartar" do item que o servidor recusou, na aba Sincronizar (Fase
   /// 5B — não está no canvas).
   static const IconData discard = Icons.delete_outline;
+
+  /// "Dados do treinamento" (Fase 6A, canvas "3b"): salvar e cancelar sessão.
+  static const IconData save = Icons.save_outlined;
+  static const IconData cancelSession = Icons.event_busy_outlined;
 }

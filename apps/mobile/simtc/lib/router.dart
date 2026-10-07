@@ -7,6 +7,7 @@ import 'ui/checklist/checklist_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
 import 'ui/result/result_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
+import 'ui/session_edit/session_edit_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
 import 'ui/splash/splash_screen.dart';
 import 'ui/summary/summary_screen.dart';
@@ -23,6 +24,9 @@ abstract final class AppRoutes {
 
   /// Detalhe da sessão (tela 1.4).
   static String sessionDetail(String sessionId) => '/sessions/$sessionId';
+
+  /// "Dados do treinamento" (tela 1.12, Fase 6A), só para ADMIN.
+  static String sessionEdit(String sessionId) => '/sessions/$sessionId/edit';
 
   /// Checklist do participante (Fase 4). [fromResult]: aberto pelo
   /// "Reavaliar" do Resultado, que continua embaixo — o voltar leva a ele.
@@ -85,6 +89,12 @@ GoRouter createRouter(
           sessionId: state.pathParameters['sessionId']!,
         ),
         routes: [
+          GoRoute(
+            path: 'edit',
+            builder: (context, state) => SessionEditScreen(
+              sessionId: state.pathParameters['sessionId']!,
+            ),
+          ),
           GoRoute(
             path: 'participants/:participantId/checklist',
             builder: (context, state) => ChecklistScreen(
