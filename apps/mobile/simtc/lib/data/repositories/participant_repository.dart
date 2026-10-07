@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../utils/result.dart';
 import '../../utils/scoring.dart';
+import '../models/cpf_lookup.dart';
 import '../models/remote_assessment.dart';
 import '../models/session_participant.dart';
 import '../models/training_session.dart';
@@ -39,6 +40,9 @@ class ParticipantRepository {
   static const String _unassignFailed =
       'Não foi possível desatribuir o participante. Tente de novo.';
   static const String _resultFailed = 'Não foi possível carregar o resultado.';
+  static const String _lookupFailed = 'Não foi possível consultar o CPF.';
+  static const String _addFailed =
+      'Não foi possível adicionar o participante. Tente de novo.';
 
   /// Participantes da sessão em ordem de nome. A ordem de exibição (meus
   /// primeiro, somente teórica por último) é regra de tela e fica na
@@ -299,5 +303,111 @@ class ParticipantRepository {
       // sessão corrige a linha.
     }
     return const Success<void>(null);
+  }
+
+  /// Consulta de CPF de "Adicionar participante" (Fase 6A,
+  /// `POST /training-sessions/:id/participants/lookup`, só ADMIN): diz se o
+  /// CPF já tem cadastro — com nome e e-mail, para a tela preencher — e se já
+  /// está nesta sessão. [cpf] vai só com dígitos, no corpo (não na URL).
+  ///
+  /// Toda falha tem a mesma mensagem: a tela não bloqueia por causa dela —
+  /// segue como formulário simples, e o backend resolve o CPF repetido.
+  Future<Result<CpfLookup>> lookupCpf(String sessionId, String cpf) async {
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        '/training-sessions/$sessionId/participants/lookup',
+        data: {'cpf': cpf},
+      );
+      final lookup = CpfLookup.tryParse(response.data);
+      if (lookup == null) {
+        return Failure(
+          Exception('resposta de participants/lookup fora do formato'),
+          _lookupFailed,
+        );
+      }
+      return Success(lookup);
+    } on ApiException catch (error) {
+      return Failure(error, _lookupFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _lookupFailed);
+    }
+  }
+
+  /// "Adicionar participante" (Fase 6A): inscreve na sessão
+  /// (`POST /training-sessions/:id/participants`, só ADMIN). [cpf] vai só com
+  /// dígitos, como o painel web manda. Para um CPF que já tem cadastro, o
+  /// backend reaproveita o cadastro e grava nele o [name] — e o [email], se
+  /// vier preenchido (vazio não apaga o que já está lá).
+  ///
+  /// Recusas com motivo próprio: 409 (CPF já inscrito nesta sessão), 400
+  /// (inscrições encerradas: sessão concluída ou cancelada) e 404.
+  ///
+  /// Com sucesso, a linha entra no cache na hora, já com o CPF mascarado — o
+  /// CPF inteiro nunca é guardado no aparelho.
+  Future<Result<SessionParticipant>> add(
+    String sessionId, {
+    required String cpf,
+    required String name,
+    String? email,
+    required ParticipationType participationType,
+  }) async {
+    final SessionParticipant added;
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        '/training-sessions/$sessionId/participants',
+        data: {
+          'cpf': cpf,
+          'name': name,
+          if (email != null && email.isNotEmpty) 'email': email,
+          'participationType': participationType.wireValue,
+        },
+      );
+      added = SessionParticipant.fromJson(
+        response.data ?? const <String, dynamic>{},
+        sessionId: sessionId,
+      );
+    } on ApiException catch (error) {
+      final ownMessage = error.statusCode == 409 ||
+          error.statusCode == 400 ||
+          error.statusCode == 404 ||
+          error.isNetworkError;
+      return Failure(error, ownMessage ? error.message : _addFailed);
+    } catch (error) {
+      return Failure(Exception('$error'), _addFailed);
+    }
+
+    // O backend já inscreveu. Um corpo fora do formato não vira falha — o
+    // admin tentaria de novo e receberia "CPF já inscrito": só não há linha
+    // para o cache, e o re-sync do detalhe a traz.
+    if (added.id.isEmpty) {
+      return Success(
+        SessionParticipant(
+          id: '',
+          sessionId: sessionId,
+          name: name,
+          maskedCpf: maskCpf(cpf),
+          participationType: participationType,
+          status: ParticipantStatus.pendente,
+        ),
+      );
+    }
+
+    try {
+      await _db.into(_db.participants).insertOnConflictUpdate(
+            ParticipantsCompanion.insert(
+              id: added.id,
+              sessionId: sessionId,
+              name: added.name,
+              cpf: added.maskedCpf,
+              participationType: added.participationType.wireValue,
+              status: added.status.wireValue,
+              cachedAt: _now(),
+            ),
+          );
+    } catch (_) {
+      // Sessão fora do cache, por exemplo (a linha violaria a chave
+      // estrangeira): o re-sync do detalhe corrige.
+    }
+    return Success(added);
   }
 }

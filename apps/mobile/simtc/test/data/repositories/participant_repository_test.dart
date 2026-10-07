@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:simtc/data/models/cpf_lookup.dart';
 import 'package:simtc/data/models/remote_assessment.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
@@ -653,6 +654,284 @@ void main() {
         isA<Failure<void>>().having((f) => f.message, 'message',
             'Não foi possível desatribuir o participante. Tente de novo.'),
       );
+    });
+  });
+
+  group('lookupCpf', () {
+    const lookupPath = '/training-sessions/sess-1/participants/lookup';
+
+    void lookupAnswers(Map<String, dynamic>? body) {
+      when(() => api.post<Map<String, dynamic>>(lookupPath,
+          data: any(named: 'data'))).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: lookupPath),
+          statusCode: 200,
+          data: body,
+        ),
+      );
+    }
+
+    test('manda o CPF no corpo e devolve o cadastro que o backend achou',
+        () async {
+      lookupAnswers({
+        'registered': true,
+        'name': 'Fernanda Lopes Meireles',
+        'email': 'fernanda@empresa.com.br',
+        'enrolled': false,
+      });
+
+      final result = await repository.lookupCpf('sess-1', '52998224725');
+
+      final sent = verify(() => api.post<Map<String, dynamic>>(lookupPath,
+          data: captureAny(named: 'data'))).captured.single;
+      expect(sent, {'cpf': '52998224725'});
+      final lookup = (result as Success<CpfLookup>).data;
+      expect(lookup.registered, isTrue);
+      expect(lookup.enrolled, isFalse);
+      expect(lookup.name, 'Fernanda Lopes Meireles');
+      expect(lookup.email, 'fernanda@empresa.com.br');
+    });
+
+    test('CPF já inscrito nesta sessão', () async {
+      lookupAnswers({
+        'registered': true,
+        'name': 'Fernanda Lopes Meireles',
+        'email': null,
+        'enrolled': true,
+      });
+
+      final result = await repository.lookupCpf('sess-1', '52998224725');
+
+      expect((result as Success<CpfLookup>).data.enrolled, isTrue);
+    });
+
+    test('resposta fora do formato vira falha, não "sem cadastro"', () async {
+      lookupAnswers(null);
+
+      final result = await repository.lookupCpf('sess-1', '52998224725');
+
+      expect(
+        result,
+        isA<Failure<CpfLookup>>().having(
+            (f) => f.message, 'message', 'Não foi possível consultar o CPF.'),
+      );
+    });
+
+    test('sem rede ou com erro do servidor, a mesma falha de consulta',
+        () async {
+      when(() => api.post<Map<String, dynamic>>(lookupPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+
+      final result = await repository.lookupCpf('sess-1', '52998224725');
+
+      expect(
+        result,
+        isA<Failure<CpfLookup>>().having(
+            (f) => f.message, 'message', 'Não foi possível consultar o CPF.'),
+      );
+    });
+  });
+
+  group('add', () {
+    const addPath = '/training-sessions/sess-1/participants';
+
+    Map<String, dynamic> addedJson({
+      String participationType = 'TEORICA_E_PRATICA',
+    }) {
+      return {
+        'id': 'tp-9',
+        'trainingSessionId': 'sess-1',
+        'participantId': 'p-9',
+        'participationType': participationType,
+        'status': 'PENDENTE',
+        'assignedConsultantId': null,
+        'registeredAt': '2026-10-07T12:00:00.000Z',
+        'participant': {
+          'id': 'p-9',
+          'name': 'Fernanda Lopes Meireles',
+          'cpf': '52998224725',
+          'email': 'fernanda@empresa.com.br',
+        },
+      };
+    }
+
+    void addAnswers(Map<String, dynamic>? body) {
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: addPath),
+          statusCode: 201,
+          data: body,
+        ),
+      );
+    }
+
+    Object? sentBody() {
+      return verify(() => api.post<Map<String, dynamic>>(addPath,
+          data: captureAny(named: 'data'))).captured.single;
+    }
+
+    test(
+        'inscreve no backend e a linha já entra no cache, com o CPF '
+        'mascarado', () async {
+      await seedSession();
+      addAnswers(addedJson());
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        email: 'fernanda@empresa.com.br',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(sentBody(), {
+        'cpf': '52998224725',
+        'name': 'Fernanda Lopes Meireles',
+        'email': 'fernanda@empresa.com.br',
+        'participationType': 'TEORICA_E_PRATICA',
+      });
+      final added = (result as Success<SessionParticipant>).data;
+      expect(added.id, 'tp-9');
+      expect(added.name, 'Fernanda Lopes Meireles');
+
+      final row = await db.select(db.participants).getSingle();
+      expect(row.id, 'tp-9');
+      expect(row.sessionId, 'sess-1');
+      expect(row.name, 'Fernanda Lopes Meireles');
+      expect(row.cpf, '529.982.***-**', reason: 'o CPF inteiro não é guardado');
+      expect(row.status, 'PENDENTE');
+      expect(row.participationType, 'TEORICA_E_PRATICA');
+      expect(row.assignedConsultantId, isNull);
+    });
+
+    test('sem e-mail, o campo nem é enviado; somente teórica vai com o tipo',
+        () async {
+      await seedSession();
+      addAnswers(addedJson(participationType: 'SOMENTE_TEORICA'));
+
+      await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        email: '',
+        participationType: ParticipationType.somenteTeorica,
+      );
+
+      expect(sentBody(), {
+        'cpf': '52998224725',
+        'name': 'Fernanda Lopes Meireles',
+        'participationType': 'SOMENTE_TEORICA',
+      });
+      final row = await db.select(db.participants).getSingle();
+      expect(row.participationType, 'SOMENTE_TEORICA');
+    });
+
+    test('409 devolve o motivo e não cria linha', () async {
+      await seedSession();
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(
+          message: 'CPF já inscrito neste treinamento',
+          statusCode: 409,
+        ),
+      );
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(
+        result,
+        isA<Failure<SessionParticipant>>().having(
+            (f) => f.message, 'message', 'CPF já inscrito neste treinamento'),
+      );
+      expect(await db.select(db.participants).get(), isEmpty);
+    });
+
+    test('400 (inscrições encerradas) devolve o motivo do backend', () async {
+      await seedSession();
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(
+          message: 'Inscrições encerradas para este treinamento',
+          statusCode: 400,
+        ),
+      );
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(
+        result,
+        isA<Failure<SessionParticipant>>().having((f) => f.message, 'message',
+            'Inscrições encerradas para este treinamento'),
+      );
+    });
+
+    test('erro inesperado do servidor vira uma mensagem genérica', () async {
+      await seedSession();
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Internal server error', statusCode: 500),
+      );
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(
+        result,
+        isA<Failure<SessionParticipant>>().having((f) => f.message, 'message',
+            'Não foi possível adicionar o participante. Tente de novo.'),
+      );
+    });
+
+    test(
+        'aceito pelo backend com o corpo fora do formato: sucesso, sem linha '
+        'no cache', () async {
+      await seedSession();
+      addAnswers(null);
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      // Falhar aqui faria o admin tentar de novo e receber "CPF já inscrito".
+      final added = (result as Success<SessionParticipant>).data;
+      expect(added.name, 'Fernanda Lopes Meireles');
+      expect(added.maskedCpf, '529.982.***-**');
+      expect(await db.select(db.participants).get(), isEmpty);
+    });
+
+    test('sessão fora do cache: o backend inscreveu, e isso basta', () async {
+      // Sem `seedSession()`: a linha local violaria a chave estrangeira.
+      addAnswers(addedJson());
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(await db.select(db.participants).get(), isEmpty);
     });
   });
 }
