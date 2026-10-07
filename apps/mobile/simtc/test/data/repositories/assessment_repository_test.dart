@@ -19,11 +19,17 @@ void main() {
   tearDown(() => db.close());
 
   /// Abre o rascunho de [participantId] para [owner] — o caminho do checklist.
-  Future<LocalAssessment> open(String participantId, {String owner = 'user-1'}) {
+  /// [consultant] é o `Consultant.id` de [owner].
+  Future<LocalAssessment> open(
+    String participantId, {
+    String owner = 'user-1',
+    String? consultant = 'c-1',
+  }) {
     return repository.openDraft(
       trainingParticipantId: participantId,
       sessionId: 'sess-1',
       ownerUserId: owner,
+      consultantId: consultant,
     );
   }
 
@@ -71,6 +77,27 @@ void main() {
             state: 'MG',
             status: 'EM_ANDAMENTO',
             date: Value(date),
+            cachedAt: DateTime(2026, 9, 12, 8),
+          ),
+        );
+  }
+
+  /// O participante no cache, como o detalhe da sessão o grava: em avaliação
+  /// com [consultant]. É o que faz a avaliação dele "ainda dar para abrir".
+  Future<void> seedParticipant(
+    String id, {
+    String? consultant = 'c-1',
+    String status = 'EM_AVALIACAO',
+  }) {
+    return db.into(db.participants).insert(
+          ParticipantsCompanion.insert(
+            id: id,
+            sessionId: 'sess-1',
+            name: 'Participante $id',
+            cpf: '042.118.***-**',
+            participationType: 'TEORICA_E_PRATICA',
+            status: status,
+            assignedConsultantId: Value(consultant),
             cachedAt: DateTime(2026, 9, 12, 8),
           ),
         );
@@ -205,9 +232,22 @@ void main() {
   });
 
   group('um por vez', () {
-    Future<LocalAssessment?> other(String except, {String owner = 'user-1'}) {
+    // A sessão em andamento e o tp-1 com o consultor: é o que faz o rascunho
+    // dele contar — só bloqueia a avaliação que ainda dá para abrir (decisão
+    // de 06/10/2026).
+    setUp(() async {
+      await seedSession();
+      await seedParticipant('tp-1');
+    });
+
+    Future<LocalAssessment?> other(
+      String except, {
+      String owner = 'user-1',
+      String? consultant = 'c-1',
+    }) {
       return repository.findInProgressOther(
         ownerUserId: owner,
+        consultantId: consultant,
         exceptTrainingParticipantId: except,
       );
     }
@@ -217,7 +257,7 @@ void main() {
 
       expect((await other('tp-2'))?.id, a.id);
       expect(await other('tp-1'), isNull, reason: 'o próprio não conta');
-      expect(await other('tp-2', owner: 'user-2'), isNull,
+      expect(await other('tp-2', owner: 'user-2', consultant: 'c-2'), isNull,
           reason: 'o rascunho é de outro consultor');
     });
 
@@ -257,11 +297,109 @@ void main() {
     });
 
     test('o rascunho de outro consultor não bloqueia', () async {
-      await open('tp-1', owner: 'user-2');
+      await open('tp-1', owner: 'user-2', consultant: 'c-2');
 
       final mine = await open('tp-2');
 
       expect(mine.ownerUserId, 'user-1');
+    });
+
+    group('avaliação presa', () {
+      Future<void> setSessionStatus(String status) {
+        return (db.update(db.sessions)..where((t) => t.id.equals('sess-1')))
+            .write(SessionsCompanion(status: Value(status)));
+      }
+
+      Future<void> setParticipant({
+        required String status,
+        required String? consultant,
+      }) {
+        return (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+            .write(
+          ParticipantsCompanion(
+            status: Value(status),
+            assignedConsultantId: Value(consultant),
+          ),
+        );
+      }
+
+      test('sessão que não está mais em andamento: o rascunho deixa de bloquear',
+          () async {
+        final a = await open('tp-1');
+
+        for (final status in ['CONCLUIDO', 'CANCELADO', 'PLANEJADO']) {
+          await setSessionStatus(status);
+          expect(await other('tp-2'), isNull, reason: status);
+        }
+
+        await setSessionStatus('EM_ANDAMENTO');
+        expect((await other('tp-2'))?.id, a.id, reason: 'voltou a andamento');
+      });
+
+      test('sessão que saiu do aparelho (o consultor foi removido dela)',
+          () async {
+        await open('tp-1');
+        await db.delete(db.participants).go();
+        await db.delete(db.sessions).go();
+
+        expect(await other('tp-2'), isNull);
+      });
+
+      test('participante liberado, com outro consultor ou sem dono', () async {
+        await open('tp-1');
+
+        await setParticipant(status: 'PENDENTE', consultant: null);
+        expect(await other('tp-2'), isNull, reason: 'liberado: voltou a pendente');
+
+        await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-outro');
+        expect(await other('tp-2'), isNull, reason: 'com outro consultor');
+
+        await setParticipant(status: 'EM_AVALIACAO', consultant: null);
+        expect(await other('tp-2'), isNull, reason: 'em avaliação, sem dono');
+      });
+
+      test('nada é apagado: se o participante volta, o rascunho volta a bloquear',
+          () async {
+        final a = await open('tp-1');
+        await setParticipant(status: 'PENDENTE', consultant: null);
+
+        expect(await other('tp-2'), isNull);
+        final rows = await db.select(db.localAssessments).get();
+        expect(rows.map((r) => r.id), [a.id], reason: 'continua guardado');
+
+        await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-1');
+        expect((await other('tp-2'))?.id, a.id);
+      });
+
+      test('sem perfil de consultor, nenhum participante está com o usuário',
+          () async {
+        await open('tp-1');
+
+        expect(await other('tp-2', consultant: null), isNull);
+      });
+
+      test('com um rascunho preso e outro que ainda abre, bloqueia o que abre',
+          () async {
+        // O tp-0 começou antes e ficou preso: não está mais com o consultor.
+        await seedParticipant('tp-0', status: 'PENDENTE', consultant: null);
+        await insertDraft('tp-0');
+        final a = await open('tp-1');
+
+        expect((await other('tp-2'))?.id, a.id);
+      });
+
+      test('iniciar outro participante passa quando o rascunho antigo ficou preso',
+          () async {
+        final a = await open('tp-1');
+        await setParticipant(status: 'PENDENTE', consultant: null);
+
+        final next = await open('tp-2');
+
+        expect(next.trainingParticipantId, 'tp-2');
+        final rows = await db.select(db.localAssessments).get();
+        expect(rows.map((r) => r.id), unorderedEquals([a.id, next.id]),
+            reason: 'o preso continua guardado');
+      });
     });
   });
 

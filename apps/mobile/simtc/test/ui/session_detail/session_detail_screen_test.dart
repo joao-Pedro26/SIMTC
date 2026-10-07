@@ -130,6 +130,7 @@ void main() {
         )).thenAnswer((_) async => null);
     when(() => assessments.findInProgressOther(
           ownerUserId: any(named: 'ownerUserId'),
+          consultantId: any(named: 'consultantId'),
           exceptTrainingParticipantId: any(named: 'exceptTrainingParticipantId'),
         )).thenAnswer((_) async => null);
   });

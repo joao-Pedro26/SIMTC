@@ -118,6 +118,7 @@ void main() {
       trainingParticipantId: 'tp-1',
       sessionId: 'sess-1',
       ownerUserId: 'user-1',
+      consultantId: 'c-eu',
     );
     for (final MapEntry(key: infraction, value: note) in marks.entries) {
       await assessmentRepository.mark(

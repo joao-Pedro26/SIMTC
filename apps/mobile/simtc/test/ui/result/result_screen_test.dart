@@ -139,6 +139,7 @@ void main() {
       trainingParticipantId: 'tp-1',
       sessionId: 'sess-1',
       ownerUserId: 'user-1',
+      consultantId: 'c-eu',
     );
     for (final MapEntry(key: infraction, value: note) in marks.entries) {
       await assessmentRepository.mark(
@@ -555,6 +556,7 @@ void main() {
             cpf: '111.222.***-**',
             participationType: 'TEORICA_E_PRATICA',
             status: 'EM_AVALIACAO',
+            assignedConsultantId: const Value('c-eu'),
             cachedAt: DateTime(2026, 9, 30, 7),
           ),
         );
@@ -562,6 +564,7 @@ void main() {
       trainingParticipantId: 'tp-2',
       sessionId: 'sess-1',
       ownerUserId: 'user-1',
+      consultantId: 'c-eu',
     );
     serverAnswers(serverJson());
     await pumpResult(tester);

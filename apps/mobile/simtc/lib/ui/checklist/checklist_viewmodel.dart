@@ -227,6 +227,7 @@ class ChecklistViewModel extends ChangeNotifier {
         trainingParticipantId: participantId,
         sessionId: sessionId,
         ownerUserId: ownerUserId,
+        consultantId: consultantId,
       );
       if (_disposed) return;
       _attach(assessment);
@@ -348,12 +349,14 @@ class ChecklistViewModel extends ChangeNotifier {
   }
 
   /// Só uma avaliação por vez: confere se outro participante do consultor
-  /// está em andamento, para o aviso e o "Iniciar" desabilitado.
+  /// está em andamento, para o aviso e o "Iniciar" desabilitado. Só conta a
+  /// avaliação que ele ainda consegue abrir — a "presa" não bloqueia.
   Future<void> _checkBlock() async {
     _blockingParticipantId = null;
     _blockingName = null;
     final inProgress = await _assessmentRepository.findInProgressOther(
       ownerUserId: ownerUserId,
+      consultantId: consultantId,
       exceptTrainingParticipantId: participantId,
     );
     if (inProgress != null) await _block(inProgress.trainingParticipantId);

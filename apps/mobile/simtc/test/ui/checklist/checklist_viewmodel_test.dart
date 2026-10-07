@@ -409,6 +409,7 @@ void main() {
               cpf: '111.222.***-**',
               participationType: 'TEORICA_E_PRATICA',
               status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-eu'),
               cachedAt: DateTime(2026, 9, 25, 8),
             ),
           );
@@ -416,6 +417,7 @@ void main() {
         trainingParticipantId: 'tp-2',
         sessionId: 'sess-1',
         ownerUserId: 'user-1',
+        consultantId: 'c-eu',
       );
     }
 
@@ -473,6 +475,33 @@ void main() {
       final rows = await db.select(db.localAssessments).get();
       expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
     });
+
+    test(
+        'avaliação presa — a de um participante que não está mais com o '
+        'consultor — não bloqueia, e continua guardada', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await startOtherParticipant();
+      // O painel passou a Marina para outro consultor.
+      await (db.update(db.participants)..where((t) => t.id.equals('tp-2')))
+          .write(
+        const ParticipantsCompanion(assignedConsultantId: Value('c-outro')),
+      );
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+
+      await vm.init();
+      expect(vm.isBlocked, isFalse);
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      final rows = await db.select(db.localAssessments).get();
+      expect(
+        rows.map((r) => r.trainingParticipantId),
+        unorderedEquals(['tp-1', 'tp-2']),
+      );
+    });
   });
 
   group('descartar', () {
@@ -512,6 +541,7 @@ void main() {
         trainingParticipantId: 'tp-1',
         sessionId: 'sess-1',
         ownerUserId: 'user-1',
+        consultantId: 'c-eu',
       );
       await assessmentRepository.mark(
         localAssessmentId: draft.id,

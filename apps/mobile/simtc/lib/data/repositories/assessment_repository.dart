@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/session_participant.dart';
+import '../models/training_session.dart';
 import '../services/local/app_database.dart';
 
 /// O consultor já tem outra avaliação em andamento (rascunho iniciado e ainda
@@ -62,20 +64,57 @@ class AssessmentRepository {
   }
 
   /// O rascunho que [ownerUserId] tem em andamento com outro participante que
-  /// não [exceptTrainingParticipantId] — iniciado e ainda não confirmado. Nulo
-  /// se não há. Avaliação confirmada (na fila ou enviada) não conta.
+  /// não [exceptTrainingParticipantId] — iniciado, ainda não confirmado, e
+  /// que ele ainda consegue abrir ([_canStillOpen]). Nulo se não há.
+  /// Avaliação confirmada (na fila ou enviada) não conta.
+  ///
+  /// [consultantId] é o `Consultant.id` de [ownerUserId]: é com ele que a
+  /// atribuição do participante é conferida. Sem perfil de consultor (nulo),
+  /// nenhum participante está com o usuário, e nada bloqueia.
   Future<LocalAssessment?> findInProgressOther({
     required String ownerUserId,
+    required String? consultantId,
     required String exceptTrainingParticipantId,
-  }) {
-    return (_db.select(_db.localAssessments)
+  }) async {
+    if (consultantId == null) return null;
+
+    final drafts = await (_db.select(_db.localAssessments)
           ..where((t) =>
               t.ownerUserId.equals(ownerUserId) &
               t.syncStatus.equalsValue(LocalSyncStatus.draft) &
               t.trainingParticipantId.equals(exceptTrainingParticipantId).not())
-          ..orderBy([(t) => OrderingTerm.asc(t.startTime)])
-          ..limit(1))
+          ..orderBy([(t) => OrderingTerm.asc(t.startTime)]))
+        .get();
+    for (final draft in drafts) {
+      if (await _canStillOpen(draft, consultantId)) return draft;
+    }
+    return null;
+  }
+
+  /// A avaliação iniciada ainda pode ser aberta pelo consultor: a sessão dela
+  /// está em andamento no aparelho e o participante continua com ele — a
+  /// mesma condição com que o detalhe da sessão abre o checklist.
+  ///
+  /// Fora disso, ela é uma "avaliação presa" (decisão de 06/10/2026): a
+  /// sessão foi concluída ou cancelada, a sessão saiu do aparelho (o
+  /// consultor foi removido dela) ou o participante foi liberado ou passado a
+  /// outro consultor. O rascunho continua guardado, mas não segura mais a
+  /// regra de uma avaliação por vez — antes, bloqueava o "Iniciar avaliação"
+  /// de todos os outros participantes, sem saída na interface.
+  Future<bool> _canStillOpen(LocalAssessment draft, String consultantId) async {
+    final participant = await (_db.select(_db.participants)
+          ..where((t) => t.id.equals(draft.trainingParticipantId)))
         .getSingleOrNull();
+    if (participant == null ||
+        participant.status != ParticipantStatus.emAvaliacao.wireValue ||
+        participant.assignedConsultantId != consultantId) {
+      return false;
+    }
+
+    final session = await (_db.select(_db.sessions)
+          ..where((t) => t.id.equals(participant.sessionId)))
+        .getSingleOrNull();
+    return session?.status == SessionStatus.emAndamento.wireValue;
   }
 
   /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
@@ -84,8 +123,10 @@ class AssessmentRepository {
   /// recomeçar: um segundo toque não muda a hora de início.
   ///
   /// Só uma avaliação em andamento por consultor, em todas as sessões: se
-  /// [ownerUserId] já tem um rascunho com outro participante, lança
-  /// [EvaluationInProgressException] e não grava nada.
+  /// [ownerUserId] já tem um rascunho com outro participante — e ainda
+  /// consegue abri-lo ([findInProgressOther], que confere a atribuição com
+  /// [consultantId]) —, lança [EvaluationInProgressException] e não grava
+  /// nada.
   ///
   /// `date` é a data de calendário da sessão (como `TrainingSession.date`,
   /// meia-noite local); sessão sem data, ou fora do cache, usa a de hoje.
@@ -93,6 +134,7 @@ class AssessmentRepository {
     required String trainingParticipantId,
     required String sessionId,
     required String ownerUserId,
+    required String? consultantId,
   }) async {
     final current = await findCurrent(
       trainingParticipantId: trainingParticipantId,
@@ -109,6 +151,7 @@ class AssessmentRepository {
     await _db.transaction(() async {
       final inProgress = await findInProgressOther(
         ownerUserId: ownerUserId,
+        consultantId: consultantId,
         exceptTrainingParticipantId: trainingParticipantId,
       );
       if (inProgress != null) {

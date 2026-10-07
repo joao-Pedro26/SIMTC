@@ -141,6 +141,7 @@ void main() {
       trainingParticipantId: participantId,
       sessionId: 'sess-1',
       ownerUserId: owner,
+      consultantId: 'c-eu',
     );
     await assessments.confirm(draft.id, participantName: 'P $participantId', score: 90);
     return draft;
