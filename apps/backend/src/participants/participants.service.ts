@@ -191,6 +191,42 @@ export class ParticipantsService {
     });
   }
 
+  /**
+   * Consulta de CPF da tela "Adicionar participante" do app mobile: diz se o
+   * CPF já tem cadastro (`Participant`, compartilhado entre treinamentos) —
+   * devolvendo nome e e-mail para a tela preencher — e se já está inscrito
+   * nesta sessão. Só lê: quem grava é o `addParticipant`.
+   */
+  async lookupByCpf(trainingSessionId: string, cpf: string) {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { id: trainingSessionId },
+      select: { id: true },
+    });
+    if (!session) throw new NotFoundException('Sessão de treinamento não encontrada');
+
+    const participant = await this.prisma.participant.findUnique({ where: { cpf } });
+    if (!participant) {
+      return { registered: false, name: null, email: null, enrolled: false };
+    }
+
+    const enrollment = await this.prisma.trainingParticipant.findUnique({
+      where: {
+        trainingSessionId_participantId: {
+          trainingSessionId,
+          participantId: participant.id,
+        },
+      },
+      select: { id: true },
+    });
+
+    return {
+      registered: true,
+      name: participant.name,
+      email: participant.email ?? null,
+      enrolled: enrollment !== null,
+    };
+  }
+
   updateParticipationType( participantId: string, dto: UpdateParticipantTypeDto) {
     const record = this.prisma.trainingParticipant.findUnique({
       where: { id: participantId },

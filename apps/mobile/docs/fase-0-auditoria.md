@@ -92,6 +92,8 @@ O `pdfx` está no `pubspec.yaml`, mas nenhuma tela prevista o usa; avaliar a rem
 | 6 | Quando recebe `additionalConsultantsIds`, o `updateSession` recria os vínculos e sempre inclui de novo o consultor responsável | A tela 1.4.3 não precisa enviar o responsável na lista |
 | 6 | `GET /consultants?active=true` (ADMIN e CONSULTANT) lista os consultores ativos | É a fonte da busca "Adicionar consultor" |
 
+**Nota de 07/10/2026:** a Fase 6A criou a consulta de participante por CPF que faltava: `POST /api/training-sessions/:id/participants/lookup` (só ADMIN; corpo `{ cpf }` → `{ registered, name, email, enrolled }`). O `POST /training-sessions/:id/participants` continua como descrito acima: deduplica por CPF e sobrescreve o `name` do cadastro.
+
 ### 2.3 Testes do backend
 
 Em 17/09/2026, `npx jest` em `apps/backend` já tinha 12 falhas pré-existentes: `test/auth.service.spec.ts` espera `sendOtpCode` com 2 argumentos, e `test/participants.service.spec.ts` não tem o mock de `EmailService`. Qualquer fase que mexa no backend deve manter esse número, sem criar falhas novas.
