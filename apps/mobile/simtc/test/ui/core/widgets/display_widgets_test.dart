@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
@@ -377,17 +378,25 @@ void main() {
 
     testWidgets('nome e apoio compridos encolhem com reticências, sem estourar',
         (tester) async {
+      const nome = 'Transportes Vale Norte Sociedade Anônima do Brasil';
+      const apoio = 'Direção Defensiva — Veículo Pesado · Reciclagem anual';
+
       await _pump(
         tester,
         const SizedBox(
           width: 320,
-          child: SessionContextHeader(
-            companyName: 'Transportes Vale Norte Sociedade Anônima do Brasil',
-            subtitle: 'Direção Defensiva — Veículo Pesado · Reciclagem anual',
-          ),
+          child: SessionContextHeader(companyName: nome, subtitle: apoio),
         ),
       );
 
+      expect(
+        tester.renderObject<RenderParagraph>(find.text(nome)).didExceedMaxLines,
+        isTrue,
+      );
+      expect(
+        tester.renderObject<RenderParagraph>(find.text(apoio)).didExceedMaxLines,
+        isTrue,
+      );
       expect(tester.takeException(), isNull);
     });
   });
