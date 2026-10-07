@@ -223,3 +223,150 @@ class AppCtaButton extends StatelessWidget {
     );
   }
 }
+
+/// Ação destrutiva em contorno vermelho, na caixa do botão principal —
+/// "Cancelar sessão" (canvas "3b"): mora no fim da tela, longe do salvar.
+class AppDangerOutlineButton extends StatelessWidget {
+  const AppDangerOutlineButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.isLoading = false,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = onPressed != null || isLoading;
+
+    return SizedBox(
+      height: AppSpacing.controlHeight,
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.dangerInk,
+          disabledForegroundColor:
+              isLoading ? AppColors.dangerInk : AppColors.textMuted,
+          side: BorderSide(
+            color: available ? AppColors.dangerBorder : AppColors.border,
+            width: 1.5,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          // A cor vem do `foregroundColor`; daqui só o tamanho e o peso.
+          textStyle: AppTypography.buttonDanger,
+        ),
+        child: isLoading ? _buildSpinner() : _buildContent(),
+      ),
+    );
+  }
+
+  Widget _buildSpinner() {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        strokeWidth: 2.5,
+        valueColor: AlwaysStoppedAnimation<Color>(AppColors.dangerInk),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+  }
+}
+
+/// Tinta do [AppTextButton].
+enum AppTextButtonTone {
+  /// Cor de marca — uma segunda forma de concluir ("Salvar e adicionar outro").
+  primary,
+
+  /// Cinza — desistir ("Descartar").
+  neutral,
+}
+
+/// Ação secundária em texto, sob o botão principal de um rodapé (canvas "3a"
+/// e "3b"). Ocupa a largura toda, com o alvo mínimo de toque.
+class AppTextButton extends StatelessWidget {
+  const AppTextButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.tone = AppTextButtonTone.primary,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final AppTextButtonTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AppSpacing.touchTarget,
+      width: double.infinity,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: tone == AppTextButtonTone.primary
+              ? AppColors.primaryDark
+              : AppColors.text3,
+          disabledForegroundColor: AppColors.textMuted,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: AppTypography.textAction,
+        ),
+        child: Text(label, overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+}
+
+/// Atalho de ícone: um alvo de toque inteiro (48dp) em volta de um ícone na
+/// cor de marca — o lápis da barra superior e o "adicionar participante" do
+/// detalhe da sessão (canvas "1f", que os desenha com 32dp). Sem ação, fica
+/// apagado: as ações de ADMIN nunca somem, só desabilitam.
+class AppIconAction extends StatelessWidget {
+  const AppIconAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: AppSpacing.touchTarget,
+      child: IconButton(
+        tooltip: tooltip,
+        icon: Icon(icon, size: 22),
+        color: AppColors.primaryDark,
+        disabledColor: AppColors.textMuted,
+        onPressed: onPressed,
+      ),
+    );
+  }
+}

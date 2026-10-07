@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
+import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
+import 'package:simtc/ui/core/widgets/session_context_header.dart';
 import 'package:simtc/ui/core/widgets/severity_badge.dart';
 import 'package:simtc/ui/core/widgets/skeleton.dart';
 import 'package:simtc/ui/core/widgets/status_chip.dart';
@@ -295,5 +298,97 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Detalhe da sessão'), findsNothing);
     expect(find.text('abrir'), findsOneWidget);
+  });
+
+  testWidgets('AppTopBar põe os atalhos entre o título e o indicador',
+      (tester) async {
+    var taps = 0;
+    await _pump(
+      tester,
+      AppTopBar(
+        title: 'Detalhe da sessão',
+        actions: [
+          AppIconAction(
+            icon: AppIcons.search,
+            tooltip: 'Editar dados do treinamento',
+            onPressed: () => taps++,
+          ),
+        ],
+        trailing: const SyncStatusIndicator(),
+      ),
+    );
+
+    final title = tester.getCenter(find.text('Detalhe da sessão')).dx;
+    final action = tester.getCenter(find.byType(AppIconAction)).dx;
+    final indicator = tester.getCenter(find.byType(SyncStatusIndicator)).dx;
+    expect(title, lessThan(action));
+    expect(action, lessThan(indicator));
+
+    await tester.tap(find.byTooltip('Editar dados do treinamento'));
+    expect(taps, 1);
+  });
+
+  group('SessionContextHeader', () {
+    testWidgets('mostra as iniciais (sem logo), a empresa e a linha de apoio',
+        (tester) async {
+      await _pump(
+        tester,
+        const SessionContextHeader(
+          companyName: 'Bracell Celulose',
+          subtitle: 'Direção Defensiva — Veículo Pesado',
+        ),
+      );
+
+      expect(find.text('BC'), findsOneWidget);
+      expect(find.text('Bracell Celulose'), findsOneWidget);
+      expect(find.text('Direção Defensiva — Veículo Pesado'), findsOneWidget);
+    });
+
+    testWidgets('apagada usa o fundo da tela; a normal, o da superfície',
+        (tester) async {
+      Color? background() {
+        final container = tester.widget<Container>(
+          find
+              .descendant(
+                of: find.byType(SessionContextHeader),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        return (container.decoration! as BoxDecoration).color;
+      }
+
+      await _pump(
+        tester,
+        const SessionContextHeader(companyName: 'Bracell', subtitle: 'Curso'),
+      );
+      expect(background(), AppColors.surface);
+
+      await _pump(
+        tester,
+        const SessionContextHeader(
+          companyName: 'Bracell',
+          subtitle: 'Curso',
+          muted: true,
+        ),
+      );
+      expect(background(), AppColors.background);
+    });
+
+    testWidgets('nome e apoio compridos encolhem com reticências, sem estourar',
+        (tester) async {
+      await _pump(
+        tester,
+        const SizedBox(
+          width: 320,
+          child: SessionContextHeader(
+            companyName: 'Transportes Vale Norte Sociedade Anônima do Brasil',
+            subtitle: 'Direção Defensiva — Veículo Pesado · Reciclagem anual',
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
   });
 }

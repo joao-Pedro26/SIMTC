@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
+import 'package:simtc/ui/core/theme/app_typography.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_checkbox.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
@@ -86,6 +88,285 @@ void main() {
       );
       expect(toggleSize.width, greaterThanOrEqualTo(48));
       expect(toggleSize.height, greaterThanOrEqualTo(48));
+    });
+
+    testWidgets('mostra o texto de apoio, e o erro toma o lugar dele', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(label: 'CPF', controller: controller, helperText: 'CPF válido.'),
+      );
+      expect(find.text('CPF válido.'), findsOneWidget);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'CPF',
+          controller: controller,
+          helperText: 'CPF válido.',
+          errorText: 'CPF inválido.',
+        ),
+      );
+      expect(find.text('CPF inválido.'), findsOneWidget);
+      expect(find.text('CPF válido.'), findsNothing);
+    });
+
+    testWidgets('mostra a nota ao lado do rótulo e o widget à direita do texto',
+        (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'E-mail',
+          controller: controller,
+          labelTrailing: 'opcional',
+          trailing: const Icon(AppIcons.approved, key: Key('ok')),
+        ),
+      );
+
+      expect(find.text('opcional'), findsOneWidget);
+      expect(find.byKey(const Key('ok')), findsOneWidget);
+      expect(
+        tester.getCenter(find.byKey(const Key('ok'))).dx,
+        greaterThan(tester.getCenter(find.byType(TextField)).dx),
+      );
+    });
+
+    testWidgets('aplica os formatadores de entrada e a capitalização', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'UF',
+          controller: controller,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [LengthLimitingTextInputFormatter(2)],
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'MGX');
+      expect(controller.text, 'MG');
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).textCapitalization,
+        TextCapitalization.characters,
+      );
+    });
+
+    testWidgets(
+        'só leitura: o toque em qualquer ponto da caixa chama a ação e não '
+        'abre o teclado', (tester) async {
+      final controller = TextEditingController(text: '12 set 2026');
+      addTearDown(controller.dispose);
+      var taps = 0;
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'Data',
+          controller: controller,
+          icon: AppIcons.event,
+          readOnly: true,
+          onTap: () => taps++,
+        ),
+      );
+
+      // `tapAt`: o campo de dentro não recebe o ponteiro (é a caixa que
+      // responde), e o `tap` num widget assim avisa que errou o alvo.
+      await tester.tapAt(tester.getCenter(find.byIcon(AppIcons.event)));
+      await tester.tapAt(tester.getCenter(find.text('12 set 2026')));
+      await tester.pump();
+
+      expect(taps, 2);
+      expect(tester.testTextInput.isVisible, isFalse);
+    });
+
+    testWidgets('só leitura e desabilitado: o toque não chama a ação', (tester) async {
+      final controller = TextEditingController(text: '12 set 2026');
+      addTearDown(controller.dispose);
+      var taps = 0;
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'Data',
+          controller: controller,
+          readOnly: true,
+          enabled: false,
+          onTap: () => taps++,
+        ),
+      );
+
+      await tester.tapAt(tester.getCenter(find.text('12 set 2026')));
+      expect(taps, 0);
+    });
+
+    testWidgets('várias linhas: cresce a partir do mínimo e fica mais alto que '
+        'um campo comum', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'Observações',
+          controller: controller,
+          minLines: 3,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+        ),
+      );
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.minLines, 3);
+      expect(field.maxLines, isNull);
+      expect(tester.getSize(find.byType(AppTextField)).height, greaterThan(96));
+    });
+
+    testWidgets('mono: o valor usa a fonte de números', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(tester, AppTextField(label: 'CPF', controller: controller, mono: true));
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.style?.fontFamily, AppTypography.monoFamily);
+    });
+  });
+
+  group('AppDangerOutlineButton', () {
+    testWidgets('dispara a ação, com 56dp de altura e a tinta de perigo',
+        (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        AppDangerOutlineButton(
+          label: 'Cancelar sessão',
+          icon: AppIcons.needsReview,
+          onPressed: () => taps++,
+        ),
+      );
+
+      await tester.tap(find.text('Cancelar sessão'));
+      expect(taps, 1);
+      expect(tester.getSize(find.byType(AppDangerOutlineButton)).height, 56);
+
+      final context = tester.element(find.text('Cancelar sessão'));
+      expect(DefaultTextStyle.of(context).style.color, AppColors.dangerInk);
+      expect(find.byIcon(AppIcons.needsReview), findsOneWidget);
+    });
+
+    testWidgets('em carregamento mostra o indicador e não responde ao toque',
+        (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        AppDangerOutlineButton(
+          label: 'Cancelar sessão',
+          isLoading: true,
+          onPressed: () => taps++,
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Cancelar sessão'), findsNothing);
+
+      await tester.tap(find.byType(AppDangerOutlineButton));
+      expect(taps, 0);
+    });
+
+    testWidgets('sem ação, fica desabilitado', (tester) async {
+      await _pump(tester, const AppDangerOutlineButton(label: 'Cancelar sessão'));
+
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(button.onPressed, isNull);
+    });
+  });
+
+  group('AppTextButton', () {
+    testWidgets('dispara a ação e tem o alvo mínimo de toque', (tester) async {
+      var taps = 0;
+      await _pump(tester, AppTextButton(label: 'Descartar', onPressed: () => taps++));
+
+      await tester.tap(find.text('Descartar'));
+      expect(taps, 1);
+      expect(
+        tester.getSize(find.byType(AppTextButton)).height,
+        greaterThanOrEqualTo(48),
+      );
+    });
+
+    testWidgets('o tom neutro usa a tinta de texto, não a de marca', (tester) async {
+      await _pump(
+        tester,
+        Column(
+          children: [
+            AppTextButton(label: 'Salvar e adicionar outro', onPressed: () {}),
+            AppTextButton(
+              label: 'Descartar',
+              tone: AppTextButtonTone.neutral,
+              onPressed: () {},
+            ),
+          ],
+        ),
+      );
+
+      Color? inkOf(String label) =>
+          DefaultTextStyle.of(tester.element(find.text(label))).style.color;
+      expect(inkOf('Salvar e adicionar outro'), AppColors.primaryDark);
+      expect(inkOf('Descartar'), AppColors.text3);
+    });
+
+    testWidgets('sem ação, fica desabilitado', (tester) async {
+      await _pump(tester, const AppTextButton(label: 'Descartar'));
+
+      final button = tester.widget<TextButton>(find.byType(TextButton));
+      expect(button.onPressed, isNull);
+    });
+  });
+
+  group('AppIconAction', () {
+    testWidgets('dispara a ação num alvo de 48dp, com a dica de acessibilidade',
+        (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        Row(
+          children: [
+            AppIconAction(
+              icon: AppIcons.search,
+              tooltip: 'Editar dados do treinamento',
+              onPressed: () => taps++,
+            ),
+          ],
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Editar dados do treinamento'));
+      expect(taps, 1);
+      expect(tester.getSize(find.byType(AppIconAction)), const Size(48, 48));
+    });
+
+    testWidgets('sem ação, continua visível, apagado, e não responde',
+        (tester) async {
+      await _pump(
+        tester,
+        const Row(
+          children: [
+            AppIconAction(icon: AppIcons.search, tooltip: 'Editar dados do treinamento'),
+          ],
+        ),
+      );
+
+      expect(find.byIcon(AppIcons.search), findsOneWidget);
+      final button = tester.widget<IconButton>(find.byType(IconButton));
+      expect(button.onPressed, isNull);
+      expect(button.disabledColor, AppColors.textMuted);
     });
   });
 

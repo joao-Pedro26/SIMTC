@@ -110,6 +110,18 @@ abstract final class AppTypography {
   static TextStyle get fieldValue =>
       _inter(size: 16, weight: FontWeight.w400, height: 1.3);
 
+  /// Texto digitado em campo de número (o CPF de "Adicionar participante")
+  static TextStyle get fieldValueMono =>
+      _mono(size: 16, weight: FontWeight.w600, height: 1.3);
+
+  /// Nota à direita do rótulo de um campo ("opcional")
+  static TextStyle get fieldOptional =>
+      _inter(size: 11.5, weight: FontWeight.w400, height: 1.2, color: AppColors.textMuted);
+
+  /// Empresa na faixa de contexto dos formulários de ADMIN (canvas "3b")
+  static TextStyle get contextTitle =>
+      _inter(size: 15, weight: FontWeight.w600, height: 1.25);
+
   /// Rótulo de chip (status, severidade, filtro)
   static TextStyle get chipLabel =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2);
@@ -133,6 +145,14 @@ abstract final class AppTypography {
   /// Texto de botão compacto, dentro de uma linha de lista ("Atribuir a mim")
   static TextStyle get buttonCompact =>
       _inter(size: 14, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
+
+  /// Texto do botão de contorno vermelho ("Cancelar sessão", canvas "3b")
+  static TextStyle get buttonDanger =>
+      _inter(size: 15, weight: FontWeight.w700, height: 1.2, color: AppColors.dangerInk);
+
+  /// Ação em texto sob o botão principal de um rodapé ("Descartar")
+  static TextStyle get textAction =>
+      _inter(size: 14, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryDark);
 
   /// Link discreto ("Esqueci a senha")
   static TextStyle get link =>

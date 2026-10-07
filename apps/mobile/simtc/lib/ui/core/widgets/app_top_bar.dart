@@ -10,11 +10,13 @@ import '../theme/app_typography.dart';
 /// atalho à direita.
 ///
 /// O lado direito sempre reserva o espaço de um alvo de toque, com ou sem
-/// atalho — é o que mantém o título no centro da tela.
+/// atalho — é o que mantém o título no centro da tela. Com [actions], o
+/// título fica centrado no espaço que sobra, como no canvas "1f".
 class AppTopBar extends StatelessWidget {
   const AppTopBar({
     super.key,
     required this.title,
+    this.actions = const [],
     this.trailing,
     this.leadingIcon = AppIcons.back,
     this.leadingIconSize = 30,
@@ -22,6 +24,10 @@ class AppTopBar extends StatelessWidget {
   });
 
   final String title;
+
+  /// Atalhos antes do [trailing] — o lápis do ADMIN no detalhe da sessão.
+  /// Cada um traz o próprio alvo de toque (`AppIconAction`).
+  final List<Widget> actions;
   final Widget? trailing;
 
   /// O botão da esquerda: o voltar, ou o fechar do Resultado (canvas "2g").
@@ -58,6 +64,7 @@ class AppTopBar extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          ...actions,
           SizedBox.square(dimension: AppSpacing.touchTarget, child: trailing),
         ],
       ),
