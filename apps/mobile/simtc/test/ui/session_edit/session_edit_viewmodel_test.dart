@@ -253,7 +253,30 @@ void main() {
       final vm = await open(withSession: session(state: 'mg', city: 'Itabira '));
 
       expect(vm.isDirty, isFalse);
-      expect(vm.stateError, isNull, reason: 'o que não mudou não é conferido');
+      expect(vm.stateError, isNull);
+    });
+
+    test('UF e cidade antigas fora do padrão não travam o salvar de outro campo',
+        () async {
+      // Só o campo que mudou é conferido: o valor antigo fica como está.
+      final vm = await open(
+        withSession: session(state: 'Minas Gerais', city: ''),
+      );
+
+      expect(vm.stateError, isNull);
+      expect(vm.cityError, isNull);
+
+      vm.setNotes('Levar colete.');
+
+      expect(vm.canSave, isTrue);
+      expect(await vm.save(), isTrue);
+      verify(() => sessions.update(
+            'sess-1',
+            date: null,
+            city: null,
+            state: null,
+            notes: 'Levar colete.',
+          )).called(1);
     });
 
     test('um valor novo do cache não desfaz o que o admin digitou', () async {
