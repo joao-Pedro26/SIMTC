@@ -46,6 +46,7 @@ void main() {
 
   const lookupPath = '/training-sessions/sess-1/participants/lookup';
   const addPath = '/training-sessions/sess-1/participants';
+  const sessionPath = '/training-sessions/sess-1';
 
   // CPF com os dígitos verificadores certos.
   const cpf = '52998224725';
@@ -469,6 +470,51 @@ void main() {
     expect(await closed, isTrue);
   });
 
+  testWidgets(
+      '"Salvar e adicionar outro" com a resposta demorando: o formulário '
+      'limpa e o foco volta ao CPF', (tester) async {
+    await seedSession();
+    cpfIsFree();
+    when(() => api.post<Map<String, dynamic>>(addPath, data: any(named: 'data')))
+        .thenAnswer(
+      (_) => Future.delayed(
+        const Duration(milliseconds: 300),
+        () => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: addPath),
+          statusCode: 201,
+          data: addedJson(),
+        ),
+      ),
+    );
+    await pumpAdd(tester);
+    await typeCpf(tester);
+    await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await tester.pump();
+
+    await tester.tap(find.text('Salvar e adicionar outro'));
+    // Com a rede de verdade sempre há um quadro entre o toque e a resposta, e é
+    // nele que os campos são reconstruídos travados. A resposta imediata do
+    // `addAnswers` chega antes de qualquer quadro e esconde o problema.
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(field('campo-cpf')).enabled,
+      isFalse,
+      reason: 'o envio está no ar',
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(textOf(tester, 'campo-cpf'), '');
+    expect(textOf(tester, 'campo-nome'), '');
+    expect(textOf(tester, 'campo-email'), '');
+    expect(
+      tester.widget<TextField>(field('campo-cpf')).focusNode!.hasFocus,
+      isTrue,
+      reason: 'o admin segue com o próximo CPF sem tocar no campo',
+    );
+  });
+
   testWidgets('e-mail com erro de digitação: o aviso aparece ao sair do campo',
       (tester) async {
     await seedSession();
@@ -725,6 +771,58 @@ void main() {
 
       expect(find.text('Este CPF já está nesta sessão.'), findsOneWidget);
       expect(addButton(tester).onPressed, isNull);
+    });
+
+    testWidgets(
+        'sessão concluída por outra pessoa com o formulário aberto (400): o '
+        'motivo aparece, a sessão é baixada de novo e o formulário trava',
+        (tester) async {
+      await seedSession();
+      cpfIsFree();
+      when(() => api.post<Map<String, dynamic>>(addPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Inscrições encerradas para este treinamento',
+        statusCode: 400,
+      ));
+      // O que o servidor devolve agora: a mesma sessão, já concluída.
+      when(() => api.get<Map<String, dynamic>>(sessionPath)).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: sessionPath),
+          statusCode: 200,
+          data: {
+            'id': 'sess-1',
+            'city': 'Itabira',
+            'state': 'MG',
+            'date': '2026-09-12T00:00:00.000Z',
+            'status': 'CONCLUIDO',
+            'company': {'id': 'emp-1', 'name': 'Bracell'},
+            'course': {
+              'id': 'cur-1',
+              'name': 'Direção Defensiva — Veículo Pesado',
+            },
+            'participants': <Map<String, dynamic>>[],
+          },
+        ),
+      );
+      await pumpAdd(tester);
+
+      await fillAndAdd(tester);
+
+      expect(
+        find.text('Inscrições encerradas para este treinamento'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Sessão concluída: não dá mais para adicionar participantes.'),
+        findsOneWidget,
+      );
+      for (final input in tester.widgetList<AppTextField>(find.byType(AppTextField))) {
+        expect(input.enabled, isFalse, reason: input.label);
+      }
+      expect(addButton(tester).onPressed, isNull);
+      expect(addAnotherButton(tester).onPressed, isNull);
+      expect(textOf(tester, 'campo-nome'), 'Fernanda Lopes Meireles');
+      verify(() => api.get<Map<String, dynamic>>(sessionPath)).called(1);
     });
   });
 

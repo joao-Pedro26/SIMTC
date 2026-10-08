@@ -355,10 +355,17 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     );
   }
 
+  /// A falha do "adicionar" (a rede fora, ou o servidor que recusou) aparece
+  /// aqui, acima do botão que o admin acabou de tocar, como no Resumo: dentro
+  /// da lista ela podia ficar abaixo da dobra, e a única pista da falha seria o
+  /// botão voltar a habilitar. Os avisos do CPF não vêm para cá: ficam sob o
+  /// campo.
   Widget _buildFooter(bool isOffline) {
     final canSubmit = _viewModel.canSubmit && !isOffline;
     final error = _viewModel.errorMessage;
 
+    // Recuos e vão do canvas "3a" (12 em cima, 16 nos lados e embaixo, vão de
+    // 8), os mesmos dos rodapés irmãos.
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -425,7 +432,11 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     messenger.showSnackBar(
       SnackBar(content: Text('${added.name} entrou na sessão.')),
     );
-    _cpfFocus.requestFocus();
+    // Os campos ficaram travados durante o envio; só aceitam foco no quadro que
+    // vem. Pedir o foco agora não faria nada.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _cpfFocus.requestFocus();
+    });
   }
 
   /// O X, o voltar do Android e o gesto de voltar caem aqui. Com algo
