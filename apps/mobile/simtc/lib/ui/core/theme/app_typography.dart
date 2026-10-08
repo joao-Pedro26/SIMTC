@@ -122,6 +122,16 @@ abstract final class AppTypography {
   static TextStyle get contextTitle =>
       _inter(size: 15, weight: FontWeight.w600, height: 1.25);
 
+  /// Rótulo de um cartão de opção ("Somente teórica", canvas "3a"). São dois
+  /// estilos, e não um `copyWith(fontWeight:)`: o `copyWith` não mexe no
+  /// `fontVariations`, e é do eixo `wght` que vem o peso da fonte variável.
+  static TextStyle get optionCard =>
+      _inter(size: 13, weight: FontWeight.w600, height: 1.2, color: AppColors.text2);
+
+  /// O cartão de opção escolhido ("Teórica + prática")
+  static TextStyle get optionCardSelected =>
+      _inter(size: 13, weight: FontWeight.w700, height: 1.2, color: AppColors.primaryDark);
+
   /// Rótulo de chip (status, severidade, filtro)
   static TextStyle get chipLabel =>
       _inter(size: 12, weight: FontWeight.w600, height: 1.2);

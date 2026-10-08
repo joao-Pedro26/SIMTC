@@ -8,6 +8,11 @@ void main() {
     expect(dayMonthYearLabel(DateTime(2026, 9, 12)), '12 set 2026');
   });
 
+  test('dayMonthLabel é a mesma data, sem o ano', () {
+    expect(dayMonthLabel(DateTime(2026, 9, 12)), '12 set');
+    expect(dayMonthLabel(DateTime(2027, 1, 5)), '5 jan');
+  });
+
   test('momentLabel diz "hoje" no mesmo dia', () {
     expect(momentLabel(DateTime(2026, 9, 23, 8, 5), agora), 'hoje 08:05');
   });

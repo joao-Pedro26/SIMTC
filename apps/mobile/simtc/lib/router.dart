@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/repositories/auth_repository.dart';
+import 'ui/add_participant/add_participant_screen.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/checklist/checklist_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
@@ -27,6 +28,10 @@ abstract final class AppRoutes {
 
   /// "Dados do treinamento" (tela 1.12, Fase 6A), só para ADMIN.
   static String sessionEdit(String sessionId) => '/sessions/$sessionId/edit';
+
+  /// "Adicionar participante" (tela 1.11, Fase 6A), só para ADMIN.
+  static String addParticipant(String sessionId) =>
+      '/sessions/$sessionId/participants/new';
 
   /// Checklist do participante (Fase 4). [fromResult]: aberto pelo
   /// "Reavaliar" do Resultado, que continua embaixo — o voltar leva a ele.
@@ -92,6 +97,12 @@ GoRouter createRouter(
           GoRoute(
             path: 'edit',
             builder: (context, state) => SessionEditScreen(
+              sessionId: state.pathParameters['sessionId']!,
+            ),
+          ),
+          GoRoute(
+            path: 'participants/new',
+            builder: (context, state) => AddParticipantScreen(
               sessionId: state.pathParameters['sessionId']!,
             ),
           ),

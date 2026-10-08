@@ -8,9 +8,13 @@ const List<String> _meses = [
 
 String _dois(int value) => value.toString().padLeft(2, '0');
 
+/// "12 set" — a data de uma sessão onde o ano não precisa aparecer (a faixa
+/// de contexto de "Adicionar participante").
+String dayMonthLabel(DateTime date) => '${date.day} ${_meses[date.month - 1]}';
+
 /// "12 set 2026" — a data de uma sessão, no cabeçalho do detalhe.
 String dayMonthYearLabel(DateTime date) =>
-    '${date.day} ${_meses[date.month - 1]} ${date.year}';
+    '${dayMonthLabel(date)} ${date.year}';
 
 /// Quando algo aconteceu, do jeito que se fala em campo: "hoje 08:12",
 /// "12 set 08:12" ou, em outro ano, "12 set 2025 08:12". Converte para a hora

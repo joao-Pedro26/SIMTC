@@ -66,4 +66,10 @@ abstract final class AppIcons {
   /// "Dados do treinamento" (Fase 6A, canvas "3b"): salvar e cancelar sessão.
   static const IconData save = Icons.save_outlined;
   static const IconData cancelSession = Icons.event_busy_outlined;
+
+  /// "Adicionar participante" (Fase 6A, canvas "3a"): o campo do CPF, o
+  /// cartão "Teórica + prática" e o botão que adiciona.
+  static const IconData cpf = Icons.badge_outlined;
+  static const IconData practice = Icons.directions_car_outlined;
+  static const IconData addParticipant = Icons.person_add_outlined;
 }
