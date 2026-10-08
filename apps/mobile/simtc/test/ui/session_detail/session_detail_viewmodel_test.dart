@@ -353,6 +353,48 @@ void main() {
       );
       expect(jaIniciada.canStartSession, isFalse);
     });
+
+    group('ações de ADMIN (Fase 6A)', () {
+      const admin = AuthUser(
+        id: 'u2',
+        name: 'Rita Alves',
+        email: 'rita@simtc.com.br',
+        role: AppUserRole.admin,
+      );
+
+      test('o consultor comum não as tem', () async {
+        final vm = await ready();
+
+        expect(vm.isAdmin, isFalse);
+        expect(vm.adminActionsAllowed, isFalse);
+      });
+
+      test('valem com a sessão planejada ou em andamento', () async {
+        for (final status in [SessionStatus.planejado, SessionStatus.emAndamento]) {
+          final vm = await ready(withSession: session(status: status), user: admin);
+
+          expect(vm.isAdmin, isTrue);
+          expect(vm.adminActionsAllowed, isTrue, reason: status.name);
+        }
+      });
+
+      test('sessão concluída ou cancelada: o ADMIN continua ADMIN, mas as '
+          'ações não valem', () async {
+        for (final status in [SessionStatus.concluido, SessionStatus.cancelado]) {
+          final vm = await ready(withSession: session(status: status), user: admin);
+
+          expect(vm.isAdmin, isTrue);
+          expect(vm.adminActionsAllowed, isFalse, reason: status.name);
+        }
+      });
+
+      test('antes de a sessão chegar do cache, ficam desligadas', () {
+        final vm = build(user: admin)..init();
+
+        expect(vm.isAdmin, isTrue);
+        expect(vm.adminActionsAllowed, isFalse);
+      });
+    });
   });
 
   group('linha "comigo" depois do envio aceito (revisão de 30/09/2026)', () {

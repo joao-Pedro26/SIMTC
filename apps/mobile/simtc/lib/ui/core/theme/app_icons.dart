@@ -67,6 +67,9 @@ abstract final class AppIcons {
   static const IconData save = Icons.save_outlined;
   static const IconData cancelSession = Icons.event_busy_outlined;
 
+  /// O lápis do ADMIN na barra do detalhe da sessão (Fase 6A, canvas "1f").
+  static const IconData edit = Icons.edit_outlined;
+
   /// "Adicionar participante" (Fase 6A, canvas "3a"): o campo do CPF, o
   /// cartão "Teórica + prática" e o botão que adiciona.
   static const IconData cpf = Icons.badge_outlined;

@@ -136,6 +136,15 @@ class SessionDetailViewModel extends ChangeNotifier {
         session.responsibleConsultantId == myConsultantId;
   }
 
+  /// O lápis e o "adicionar participante" (Fase 6A) são só do ADMIN. Para
+  /// ele, nunca somem: fora de hora, ficam apagados.
+  bool get isAdmin => _currentUser?.isAdmin == true;
+
+  /// O backend só aceita editar a sessão e inscrever participante com ela
+  /// planejada ou em andamento. A tela ainda exige conexão.
+  bool get adminActionsAllowed =>
+      isAdmin && (_session?.status.acceptsChanges ?? false);
+
   /// Há alguém que eu poderia atribuir agora — é quando o aviso de "atribuir
   /// precisa de internet" faz sentido.
   bool get hasPendingToAssign => _participants.any(canAssign);

@@ -17,12 +17,15 @@ import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
+import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
+import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/session_detail/participant_row.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
+import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/utils/result.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
@@ -55,6 +58,13 @@ void main() {
     email: 'carla@simtc.com.br',
     role: AppUserRole.consultant,
     consultantId: 'c-eu',
+  );
+  const admin = AuthUser(
+    id: 'u-admin',
+    name: 'Sebastião Souza',
+    email: 'admin@simtc.com.br',
+    role: AppUserRole.admin,
+    consultantId: 'c-admin',
   );
 
   TrainingSession session({
@@ -117,6 +127,9 @@ void main() {
     when(() => participants.watchBySession('sess-1'))
         .thenAnswer((_) => participantsStream.stream);
     when(() => assessments.watchSessionAssessments('sess-1', 'u1'))
+        .thenAnswer((_) => localStream.stream);
+    // O ADMIN dos testes da Fase 6A é outro usuário, com a própria fila.
+    when(() => assessments.watchSessionAssessments('sess-1', 'u-admin'))
         .thenAnswer((_) => localStream.stream);
     when(() => participants.syncSession('sess-1'))
         .thenAnswer((_) async => const Success(0));
@@ -465,6 +478,133 @@ void main() {
     });
   });
 
+  group('ações de ADMIN (Fase 6A)', () {
+    AppIconAction action(WidgetTester tester, IconData icon) =>
+        tester.widget<AppIconAction>(find.widgetWithIcon(AppIconAction, icon));
+
+    testWidgets('consultor comum não vê o lápis nem o adicionar participante',
+        (tester) async {
+      await show(tester, withParticipants: [
+        participant('2', 'Carlos Eduardo Nunes'),
+      ]);
+
+      expect(find.byType(AppIconAction), findsNothing);
+      expect(find.byTooltip('Editar dados do treinamento'), findsNothing);
+      expect(find.byTooltip('Adicionar participante'), findsNothing);
+    });
+
+    testWidgets(
+        'ADMIN vê os dois, habilitados, e o cabeçalho continua com o status e '
+        'as observações', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+
+      expect(action(tester, AppIcons.edit).onPressed, isNotNull);
+      expect(action(tester, AppIcons.addParticipant).onPressed, isNotNull);
+      expect(find.byTooltip('Editar dados do treinamento'), findsOneWidget);
+      expect(find.byTooltip('Adicionar participante'), findsOneWidget);
+      // O quadro "1f" não desenha os dois, mas o ADMIN precisa de ambos.
+      expect(find.text('Em andamento'), findsOneWidget);
+      expect(find.text('Pátio 3 — apresentar-se na portaria B às 07h30.'),
+          findsOneWidget);
+    });
+
+    testWidgets('o adicionar fica na linha do título "Participantes", à direita',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+
+      final title = tester.getCenter(find.text('Participantes'));
+      final add = tester.getCenter(find.byTooltip('Adicionar participante'));
+      expect(add.dy, closeTo(title.dy, 1));
+      expect(add.dx, greaterThan(title.dx));
+      expect(tester.getSize(find.widgetWithIcon(AppIconAction, AppIcons.addParticipant)),
+          const Size(48, 48));
+    });
+
+    testWidgets('sessão planejada também aceita as ações de ADMIN',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester, withSession: session(status: SessionStatus.planejado));
+
+      expect(action(tester, AppIcons.edit).onPressed, isNotNull);
+      expect(action(tester, AppIcons.addParticipant).onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'ADMIN sem conexão: os dois continuam à vista, apagados, com o aviso '
+        'do canvas', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await goOffline();
+
+      await show(tester, withParticipants: [
+        participant('2', 'Carlos Eduardo Nunes'),
+      ]);
+
+      expect(action(tester, AppIcons.edit).onPressed, isNull);
+      expect(action(tester, AppIcons.addParticipant).onPressed, isNull);
+      expect(
+        find.text('Ações administrativas precisam de conexão. A avaliação '
+            'continua funcionando offline.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('atribuir precisa de internet'), findsNothing,
+          reason: 'um aviso por vez');
+    });
+
+    testWidgets(
+        'ADMIN em sessão concluída ou cancelada: apagados, e o aviso diz que '
+        'os dados não mudam mais', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester, withSession: session(status: SessionStatus.concluido));
+
+      expect(action(tester, AppIcons.edit).onPressed, isNull);
+      expect(action(tester, AppIcons.addParticipant).onPressed, isNull);
+      expect(
+        find.text('Sessão concluída: os participantes ficam só para consulta, '
+            'e os dados não podem mais ser alterados.'),
+        findsOneWidget,
+      );
+
+      sessionStream.add(session(status: SessionStatus.cancelado));
+      await tester.pump();
+
+      expect(action(tester, AppIcons.edit).onPressed, isNull);
+      expect(
+        find.text('Sessão cancelada: os participantes ficam só para consulta, '
+            'e os dados não podem mais ser alterados.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('consultor comum em sessão concluída vê o aviso de sempre',
+        (tester) async {
+      await show(tester, withSession: session(status: SessionStatus.concluido));
+
+      expect(
+        find.text('Sessão concluída: os participantes ficam só para consulta.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('antes de a sessão carregar, o lápis do ADMIN já está lá, apagado',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await tester.pumpWidget(
+        withProviders(
+          const MaterialApp(home: SessionDetailScreen(sessionId: 'sess-1')),
+        ),
+      );
+      await tester.pump();
+
+      expect(action(tester, AppIcons.edit).onPressed, isNull);
+    });
+  });
+
   group('navegação pelas rotas reais', () {
     /// O detalhe aberto pelo `createRouter` de produção; devolve o router,
     /// para o teste empilhar outra rota real por cima.
@@ -605,6 +745,87 @@ void main() {
 
       expect(find.byType(ResultScreen), findsNothing);
       expect(find.byType(ChecklistScreen), findsNothing);
+    });
+
+    group('ADMIN', () {
+      /// O detalhe do ADMIN pelas rotas reais. As telas de ADMIN assinam o
+      /// mesmo cache depois: cada assinatura recebe a sessão de novo, como o
+      /// banco de verdade faz (o stream de transmissão dos outros testes só
+      /// entrega a quem já estava ouvindo).
+      Future<GoRouter> showAdmin(WidgetTester tester) async {
+        when(() => auth.currentUser).thenReturn(admin);
+        when(() => sessions.watchSession('sess-1'))
+            .thenAnswer((_) => Stream.value(session()));
+        when(() => participants.watchBySession('sess-1'))
+            .thenAnswer((_) => Stream.value(const []));
+        final router = await showWithRouter(tester, const []);
+        await tester.pumpAndSettle();
+        // Só as chamadas daqui para a frente interessam (a abertura já baixou
+        // a sessão uma vez).
+        clearInteractions(participants);
+        return router;
+      }
+
+      testWidgets(
+          'o lápis abre "Dados do treinamento"; voltar de lá depois de salvar '
+          'baixa a sessão de novo', (tester) async {
+        final router = await showAdmin(tester);
+
+        await tester.tap(find.byTooltip('Editar dados do treinamento'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionEditScreen), findsOneWidget);
+
+        router.pop(true);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionEditScreen), findsNothing);
+        expect(find.byType(SessionDetailScreen), findsOneWidget);
+        verify(() => participants.syncSession('sess-1')).called(1);
+      });
+
+      testWidgets('voltar de "Dados do treinamento" sem salvar não baixa nada',
+          (tester) async {
+        final router = await showAdmin(tester);
+        await tester.tap(find.byTooltip('Editar dados do treinamento'));
+        await tester.pumpAndSettle();
+
+        router.pop();
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionDetailScreen), findsOneWidget);
+        verifyNever(() => participants.syncSession(any()));
+      });
+
+      testWidgets(
+          'o adicionar abre "Adicionar participante"; fechar com alguém '
+          'adicionado baixa a sessão de novo', (tester) async {
+        final router = await showAdmin(tester);
+
+        await tester.tap(find.byTooltip('Adicionar participante'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AddParticipantScreen), findsOneWidget);
+
+        router.pop(true);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AddParticipantScreen), findsNothing);
+        verify(() => participants.syncSession('sess-1')).called(1);
+      });
+
+      testWidgets('fechar "Adicionar participante" sem adicionar não baixa nada',
+          (tester) async {
+        final router = await showAdmin(tester);
+        await tester.tap(find.byTooltip('Adicionar participante'));
+        await tester.pumpAndSettle();
+
+        router.pop(false);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionDetailScreen), findsOneWidget);
+        verifyNever(() => participants.syncSession(any()));
+      });
     });
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -95,6 +97,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           children: [
             AppTopBar(
               title: 'Detalhe da sessão',
+              actions: [
+                if (_viewModel.isAdmin)
+                  AppIconAction(
+                    icon: AppIcons.edit,
+                    tooltip: 'Editar dados do treinamento',
+                    onPressed: _adminActionsEnabled(isOffline) ? _openEdit : null,
+                  ),
+              ],
               trailing: SyncStatusIndicator(
                 onTap: () => context.go(AppRoutes.sync),
               ),
@@ -110,6 +120,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// As ações de ADMIN (canvas "1f") precisam de conexão e de uma sessão
+  /// que ainda aceite mudanças. Sem isso, continuam à vista, apagadas — e o
+  /// aviso da lista diz o motivo.
+  bool _adminActionsEnabled(bool isOffline) =>
+      _viewModel.adminActionsAllowed && !isOffline;
+
+  /// Salvou lá: baixa a sessão de novo, para ficar com o estado oficial do
+  /// servidor. (Se a sessão foi cancelada, a tela de lá já levou o ADMIN para
+  /// a lista, e este detalhe nem existe mais.)
+  Future<void> _openEdit() async {
+    final saved =
+        await context.push<bool>(AppRoutes.sessionEdit(widget.sessionId));
+    if (saved == true && mounted) unawaited(_viewModel.refresh());
+  }
+
+  /// Entrou gente lá: a linha nova já está no cache, e baixar de novo acerta
+  /// os contadores.
+  Future<void> _openAddParticipant() async {
+    final added =
+        await context.push<bool>(AppRoutes.addParticipant(widget.sessionId));
+    if (added == true && mounted) unawaited(_viewModel.refresh());
   }
 
   Widget _buildBody(bool isOffline) {
@@ -351,7 +384,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               ),
               child: notice,
             ),
-          _buildListHeader(),
+          _buildListHeader(isOffline),
           if (visible.isEmpty)
             _buildEmpty()
           else
@@ -374,6 +407,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       );
     }
 
+    // ADMIN sem conexão, numa sessão que ainda aceita mudanças: o aviso do
+    // canvas "1f". Cobre também o "Atribuir a mim", que fica desabilitado.
+    if (isOffline && _viewModel.adminActionsAllowed) {
+      return const InlineNotice(
+        icon: AppIcons.offline,
+        tone: NoticeTone.warning,
+        message: 'Ações administrativas precisam de conexão. A avaliação '
+            'continua funcionando offline.',
+      );
+    }
+
+    // O ADMIN vê o lápis e o adicionar apagados: o aviso diz por quê.
+    final lockedForAdmin = _viewModel.isAdmin
+        ? ', e os dados não podem mais ser alterados.'
+        : '.';
+
     switch (session.status) {
       case SessionStatus.planejado:
         // Quem pode iniciar já tem o botão e a explicação no cabeçalho.
@@ -384,14 +433,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               'e avaliar participantes.',
         );
       case SessionStatus.concluido:
-        return const InlineNotice(
+        return InlineNotice(
           icon: AppIcons.approved,
-          message: 'Sessão concluída: os participantes ficam só para consulta.',
+          message: 'Sessão concluída: os participantes ficam só para consulta'
+              '$lockedForAdmin',
         );
       case SessionStatus.cancelado:
-        return const InlineNotice(
+        return InlineNotice(
           icon: AppIcons.needsReview,
-          message: 'Sessão cancelada: os participantes ficam só para consulta.',
+          message: 'Sessão cancelada: os participantes ficam só para consulta'
+              '$lockedForAdmin',
         );
       case SessionStatus.emAndamento:
         if (!_viewModel.hasConsultantProfile) {
@@ -414,13 +465,37 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
   }
 
-  Widget _buildListHeader() {
+  Widget _buildListHeader(bool isOffline) {
+    final title = Text('Participantes', style: AppTypography.sectionTitle);
+    if (!_viewModel.isAdmin) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.lg - 1,
+        ),
+        child: title,
+      );
+    }
+
+    // ADMIN (canvas "1f"): o "adicionar participante" à direita do título. O
+    // alvo de 48dp já dá a altura da linha; o recuo menor à direita alinha o
+    // ícone, e não a área de toque, com a margem da lista.
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
-        vertical: AppSpacing.lg - 1,
+      padding: const EdgeInsets.only(
+        left: AppSpacing.xl,
+        right: AppSpacing.sm,
       ),
-      child: Text('Participantes', style: AppTypography.sectionTitle),
+      child: Row(
+        children: [
+          Expanded(child: title),
+          AppIconAction(
+            icon: AppIcons.addParticipant,
+            tooltip: 'Adicionar participante',
+            onPressed:
+                _adminActionsEnabled(isOffline) ? _openAddParticipant : null,
+          ),
+        ],
+      ),
     );
   }
 
