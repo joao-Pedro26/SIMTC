@@ -95,12 +95,17 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
 
-    // Com mudança por salvar, o voltar (da barra ou do Android) pergunta
-    // antes; o `pop` direto — do "Descartar" e do salvar — não passa por aqui.
+    // O voltar (da barra ou do Android) depende do que está em jogo: com
+    // mudança por salvar, pergunta antes; com um envio no ar (salvar ou
+    // cancelar), é ignorado — não sai e não pergunta, como o "Descartar" do
+    // rodapé, que fica apagado. Sem isso, o diálogo abriria sobre um envio que
+    // o servidor ainda vai aceitar, e o `pop(true)` do salvar fecharia o
+    // diálogo em vez da tela. O `pop` direto — do "Descartar" e do salvar —
+    // não passa por aqui.
     return PopScope<Object?>(
-      canPop: !_viewModel.isDirty,
+      canPop: !_viewModel.isDirty && !_viewModel.isBusy,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _confirmLeave();
+        if (!didPop && !_viewModel.isBusy) _confirmLeave();
       },
       child: Scaffold(
         backgroundColor: AppColors.surface,
@@ -159,14 +164,6 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
               _buildPlaceRow(),
               const SizedBox(height: AppSpacing.lg + 2),
               _buildNotesField(),
-              if (_viewModel.errorMessage != null) ...[
-                const SizedBox(height: AppSpacing.lg),
-                InlineNotice(
-                  icon: AppIcons.needsReview,
-                  message: _viewModel.errorMessage!,
-                  tone: NoticeTone.danger,
-                ),
-              ],
               const SizedBox(height: AppSpacing.xxl),
               _buildCancelButton(isOffline),
             ],
@@ -284,7 +281,15 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     );
   }
 
+  /// A falha do salvar ou do cancelar (que compartilham a mensagem) aparece
+  /// aqui, acima do botão que o admin acabou de tocar, como no Resumo: dentro
+  /// da lista ela podia ficar abaixo da dobra, e a única pista da falha seria o
+  /// botão voltar a habilitar.
   Widget _buildFooter(bool isOffline) {
+    final error = _viewModel.errorMessage;
+
+    // Recuos e vão do canvas "3b" (12 em cima, 16 nos lados e embaixo, vão de
+    // 8), os mesmos dos rodapés irmãos.
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -294,12 +299,20 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
         AppSpacing.lg,
         AppSpacing.md,
         AppSpacing.lg,
-        AppSpacing.sm,
+        AppSpacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (error != null) ...[
+            InlineNotice(
+              icon: AppIcons.needsReview,
+              message: error,
+              tone: NoticeTone.danger,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           AppCtaButton(
             label: 'Salvar alterações',
             icon: AppIcons.save,
@@ -315,7 +328,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
               textAlign: TextAlign.center,
             ),
           ],
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
           AppTextButton(
             label: 'Descartar',
             tone: AppTextButtonTone.neutral,

@@ -39,6 +39,10 @@ void main() {
   late ConnectivityService connectivity;
   late GoRouter router;
 
+  /// O que a tela devolve à de baixo quando fecha: `true` se salvou (é o que
+  /// faz o detalhe baixar a sessão de novo). Guardado pelo `pumpEdit`.
+  late Future<bool?> editResult;
+
   const path = '/training-sessions/sess-1';
   const cancelPath = '/training-sessions/sess-1/cancel';
 
@@ -193,8 +197,18 @@ void main() {
         ),
       ),
     );
-    router.push(AppRoutes.sessionEdit('sess-1'));
+    editResult = router.push<bool>(AppRoutes.sessionEdit('sess-1'));
     await tester.pumpAndSettle();
+  }
+
+  /// Deixa as animações de rota e de diálogo correrem até o fim. Com um envio
+  /// no ar o botão gira sem parar e o `pumpAndSettle` não assenta; então, um
+  /// quadro para a animação começar (o `maybePop` decide o pop num microtask)
+  /// e outro, de 1 s, para ela acabar — a troca de tela do Android leva 450 ms,
+  /// e a tela só sai da árvore quando ela termina.
+  Future<void> pumpTransitions(WidgetTester tester) async {
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
   }
 
   Finder field(String key) => find.descendant(
@@ -380,6 +394,54 @@ void main() {
     expect(saveButton(tester).onPressed, isNotNull, reason: 'dá para tentar de novo');
   });
 
+  testWidgets(
+      'falha ao salvar num celular de 360x640: o motivo fica à vista, no '
+      'rodapé acima do botão, sem precisar rolar', (tester) async {
+    await seedSession();
+    const reason =
+        'Sem conexão com o servidor. Verifique a internet e tente de novo.';
+    when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+        .thenThrow(const ApiException(message: reason, isNetworkError: true));
+    await pumpEdit(tester, screen: const Size(360, 640));
+
+    await tester.enterText(field('campo-cidade'), 'Betim');
+    await tester.pump();
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pumpAndSettle();
+
+    final notice = find.text(reason);
+    expect(notice, findsOneWidget);
+    final rect = tester.getRect(notice);
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(rect.bottom, lessThanOrEqualTo(640));
+    // Estar montado e com as medidas dentro da tela não basta: a lista corta o
+    // que passa da dobra e o rodapé cobre o que ficou embaixo dela. Só um
+    // texto à vista recebe o toque no centro dele.
+    expect(notice.hitTestable(), findsOneWidget);
+    // Junto do botão que o admin acabou de tocar.
+    expect(
+      rect.bottom,
+      lessThanOrEqualTo(tester.getTopLeft(find.byType(AppCtaButton)).dy),
+    );
+  });
+
+  testWidgets(
+      'rodapé como o do canvas "3b": 8 entre o salvar e o "Descartar", 16 de '
+      'recuo embaixo', (tester) async {
+    await seedSession();
+    await pumpEdit(tester);
+
+    final save = tester.getRect(find.byType(AppCtaButton));
+    final discard =
+        tester.getRect(find.widgetWithText(AppTextButton, 'Descartar'));
+    // O rodapé encosta na base da área segura — que, sem recortes do sistema
+    // no teste, é a base da tela.
+    final footerBottom = tester.view.physicalSize.height;
+
+    expect(discard.top - save.bottom, 8);
+    expect(footerBottom - discard.bottom, 16);
+  });
+
   group('sair da tela', () {
     testWidgets('sem mudança, o voltar sai direto', (tester) async {
       await seedSession();
@@ -449,6 +511,70 @@ void main() {
       verifyNever(
         () => api.patch<Map<String, dynamic>>(any(), data: any(named: 'data')),
       );
+    });
+
+    testWidgets(
+        'com o salvar no ar, o voltar do Android é ignorado: sem diálogo, a '
+        'tela fica e, com a resposta, fecha devolvendo `true`', (tester) async {
+      await seedSession();
+      final reply = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+          .thenAnswer((_) => reply.future);
+      await pumpEdit(tester);
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+
+      await tester.tap(find.text('Salvar alterações'));
+      await tester.pump();
+      expect(saveButton(tester).isLoading, isTrue, reason: 'o salvar está no ar');
+
+      await tester.binding.handlePopRoute();
+      await pumpTransitions(tester);
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(SessionEditScreen), findsOneWidget);
+
+      reply.complete(ok(path));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SessionEditScreen), findsNothing);
+      expect(find.text('origem'), findsOneWidget);
+      expect(find.text('Dados do treinamento atualizados.'), findsOneWidget);
+      expect(await editResult, isTrue);
+    });
+
+    testWidgets(
+        'com o cancelar no ar, o voltar da barra é ignorado: a tela fica e, '
+        'com a resposta, vai para a lista de sessões', (tester) async {
+      await seedSession();
+      final reply = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.patch<Map<String, dynamic>>(cancelPath))
+          .thenAnswer((_) => reply.future);
+      await pumpEdit(tester);
+
+      await tester.tap(find.text('Cancelar sessão'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Cancelar sessão'));
+      // O diálogo fecha e o pedido sai; só depois da animação de saída a barra
+      // volta a receber o toque.
+      await pumpTransitions(tester);
+      expect(
+        cancelButton(tester).isLoading,
+        isTrue,
+        reason: 'o cancelar está no ar',
+      );
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await pumpTransitions(tester);
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(SessionEditScreen), findsOneWidget);
+
+      reply.complete(ok(cancelPath));
+      await tester.pumpAndSettle();
+
+      expect(find.text('lista de sessões'), findsOneWidget);
+      expect(find.text('Sessão cancelada.'), findsOneWidget);
     });
   });
 
