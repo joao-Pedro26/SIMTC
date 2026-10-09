@@ -270,6 +270,28 @@ void main() {
       expect(vm.name, 'Fernanda', reason: 'inscrito não preenche o formulário');
     });
 
+    test(
+        'já inscrito nesta sessão: baixa a sessão de novo, para a lista do '
+        'detalhe mostrar a pessoa', () async {
+      lookupAnswers(const CpfLookup(
+        registered: true,
+        enrolled: true,
+        name: 'Fernanda Lopes Meireles',
+      ));
+      final vm = await open();
+
+      // Um CPF livre não tem o que baixar.
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+      verifyNever(() => participants.syncSession(any()));
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      expect(vm.cpfCheck, CpfCheck.enrolled);
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
     test('consulta que falha: avisa e segue como formulário simples', () async {
       when(() => participants.lookupCpf('sess-1', cpf)).thenAnswer(
         (_) async => Failure<CpfLookup>(
@@ -426,6 +448,20 @@ void main() {
       expect(vm.name, 'Fernanda L. Meireles');
       expect(vm.email, '', reason: 'o e-mail ele não tinha mexido');
     });
+
+    test('trocar o CPF não apaga o e-mail que o admin corrigiu à mão', () async {
+      lookupAnswers(registered);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      vm.setEmail('fernanda.meireles@outraempresa.com.br');
+
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+
+      expect(vm.email, 'fernanda.meireles@outraempresa.com.br');
+      expect(vm.name, '', reason: 'o nome ele não tinha mexido');
+    });
   });
 
   group('demais campos', () {
@@ -536,6 +572,23 @@ void main() {
       expect(vm.addedCount, 2);
     });
 
+    test(
+        '"Salvar e adicionar outro" depois de um preenchimento pelo cadastro: '
+        'o aviso do cadastro some com o formulário', () async {
+      lookupAnswers(registered);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      expect(vm.registryNotice, isNotNull, reason: 'nome e e-mail vieram do cadastro');
+
+      await vm.submit(addAnother: true);
+
+      expect(vm.registryNotice, isNull);
+      expect(vm.filledFromRegistry, isFalse);
+      expect(vm.name, '');
+      expect(vm.email, '');
+    });
+
     test('sem os dados mínimos, não chama o repositório', () async {
       final vm = await open();
 
@@ -566,6 +619,20 @@ void main() {
       expect(vm.errorMessage, isNull);
       expect(vm.canSubmit, isFalse);
       expect(vm.addedCount, 0);
+    });
+
+    test(
+        'a recusa 409 também baixa a sessão de novo, para a lista do detalhe '
+        'mostrar a pessoa', () async {
+      addAnswers(const Failure<SessionParticipant>(
+        ApiException(message: 'CPF já inscrito neste treinamento', statusCode: 409),
+        'CPF já inscrito neste treinamento',
+      ));
+      final vm = await filled();
+
+      await vm.submit();
+
+      verify(() => participants.syncSession('sess-1')).called(1);
     });
 
     test('inscrições encerradas (400): mostra o motivo e baixa a sessão de novo',

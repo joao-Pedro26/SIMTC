@@ -248,6 +248,11 @@ class AddParticipantViewModel extends ChangeNotifier {
       case Success(:final data) when data.enrolled:
         _cpfCheck = CpfCheck.enrolled;
         _enrolledName = data.name;
+        // A pessoa já está na sessão lá no servidor — entrou pelo QR code, pelo
+        // painel ou por um envio nosso cuja resposta se perdeu. A lista do
+        // detalhe lê o cache: sem baixar a sessão de novo, ela não aparece
+        // nela até o admin puxar para atualizar.
+        unawaited(_participantRepository.syncSession(sessionId));
       case Success(:final data):
         _cpfCheck = CpfCheck.available;
         if (data.registered) _fillFromRegistry(data);
@@ -326,9 +331,13 @@ class AddParticipantViewModel extends ChangeNotifier {
   void _refused(Exception exception, String? message) {
     final status = exception is ApiException ? exception.statusCode : null;
     if (status == 409) {
-      // Outra pessoa inscreveu este CPF entre a consulta e o toque.
+      // Outra pessoa inscreveu este CPF entre a consulta e o toque — ou o nosso
+      // envio foi aceito e a resposta se perdeu. A lista do detalhe lê o cache:
+      // sem baixar a sessão de novo, a pessoa não aparece nela até o admin
+      // puxar para atualizar.
       _cpfCheck = CpfCheck.enrolled;
       _enrolledName = null;
+      unawaited(_participantRepository.syncSession(sessionId));
       return;
     }
 

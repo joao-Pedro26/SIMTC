@@ -94,6 +94,8 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
+    // O teclado aberto tira espaço do rodapé: ver `_buildFooter`.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     // O voltar (da barra ou do Android) depende do que está em jogo: com
     // mudança por salvar, pergunta antes; com um envio no ar (salvar ou
@@ -122,7 +124,8 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
                 message: 'Sem conexão — salvar precisa de internet.',
               ),
               Expanded(child: _buildBody(isOffline)),
-              if (_viewModel.session != null) _buildFooter(isOffline),
+              if (_viewModel.session != null)
+                _buildFooter(isOffline, keyboardOpen),
             ],
           ),
         ),
@@ -164,7 +167,9 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
               _buildPlaceRow(),
               const SizedBox(height: AppSpacing.lg + 2),
               _buildNotesField(),
-              const SizedBox(height: AppSpacing.xxl),
+              // O vão de 18 dos campos mais os 4 do botão: 22, como no quadro
+              // "3b" (o gap do bloco e o `padding-top` do botão).
+              const SizedBox(height: AppSpacing.lg + 2 + AppSpacing.xs),
               _buildCancelButton(isOffline),
             ],
           ),
@@ -285,7 +290,16 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   /// aqui, acima do botão que o admin acabou de tocar, como no Resumo: dentro
   /// da lista ela podia ficar abaixo da dobra, e a única pista da falha seria o
   /// botão voltar a habilitar.
-  Widget _buildFooter(bool isOffline) {
+  ///
+  /// Com o teclado aberto, o rodapé fica só com os dois botões: nem o aviso de
+  /// falha nem a dica "Disponível quando houver conexão" aparecem. Num celular
+  /// baixo com a fonte ampliada, o que sobra acima do teclado não comporta o
+  /// aviso, e o rodapé estourava (RenderFlex) até a primeira tecla, que já o
+  /// apagava; o teclado só sobe depois da falha porque `_save` tira o foco
+  /// antes de enviar. Fechado o teclado, o aviso e a dica voltam. Os botões não
+  /// mudam, nem desabilitados offline: o motivo segue escrito na faixa de
+  /// offline do topo.
+  Widget _buildFooter(bool isOffline, bool keyboardOpen) {
     final error = _viewModel.errorMessage;
 
     // Recuos e vão do canvas "3b" (12 em cima, 16 nos lados e embaixo, vão de
@@ -305,7 +319,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (error != null) ...[
+          if (error != null && !keyboardOpen) ...[
             InlineNotice(
               icon: AppIcons.needsReview,
               message: error,
@@ -320,7 +334,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
             isLoading: _viewModel.isSaving,
             onPressed: _viewModel.canSave && !isOffline ? _save : null,
           ),
-          if (isOffline && _viewModel.canEdit) ...[
+          if (isOffline && _viewModel.canEdit && !keyboardOpen) ...[
             const SizedBox(height: AppSpacing.sm + 2),
             Text(
               'Disponível quando houver conexão',

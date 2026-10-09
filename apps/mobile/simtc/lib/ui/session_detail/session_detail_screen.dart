@@ -478,12 +478,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
 
     // ADMIN (canvas "1f"): o "adicionar participante" à direita do título. O
-    // alvo de 48dp já dá a altura da linha; o recuo menor à direita alinha o
-    // ícone, e não a área de toque, com a margem da lista.
+    // quadro desenha a linha com 62dp (15 + um alvo de 32 + 15); o alvo de 48dp
+    // fecha os mesmos 62 com 7 em cima e 7 embaixo, e o ícone fica à mesma
+    // distância do topo. O recuo menor à direita alinha o ícone, e não a área
+    // de toque, com a margem da lista.
     return Padding(
-      padding: const EdgeInsets.only(
-        left: AppSpacing.xl,
-        right: AppSpacing.sm,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm - 1,
+        AppSpacing.sm,
+        AppSpacing.sm - 1,
       ),
       child: Row(
         children: [

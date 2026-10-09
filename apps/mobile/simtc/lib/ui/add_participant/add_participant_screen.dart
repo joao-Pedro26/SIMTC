@@ -108,6 +108,8 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
+    // O teclado aberto tira espaço do rodapé: ver `_buildFooter`.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     // Todo fechar passa por `_close`: ele confirma o descarte e devolve à
     // tela de baixo se alguém foi adicionado.
@@ -134,7 +136,8 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
                 message: 'Sem conexão — adicionar participante precisa de internet.',
               ),
               Expanded(child: _buildBody()),
-              if (_viewModel.session != null) _buildFooter(isOffline),
+              if (_viewModel.session != null)
+                _buildFooter(isOffline, keyboardOpen),
             ],
           ),
         ),
@@ -360,7 +363,16 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   /// da lista ela podia ficar abaixo da dobra, e a única pista da falha seria o
   /// botão voltar a habilitar. Os avisos do CPF não vêm para cá: ficam sob o
   /// campo.
-  Widget _buildFooter(bool isOffline) {
+  ///
+  /// Com o teclado aberto, o rodapé fica só com os dois botões: nem o aviso de
+  /// falha nem a dica "Disponível quando houver conexão" aparecem. Num celular
+  /// baixo com a fonte ampliada, o que sobra acima do teclado não comporta o
+  /// aviso, e o rodapé estourava (RenderFlex) até a primeira tecla, que já o
+  /// apagava; o teclado só sobe depois da falha porque `_submit` tira o foco
+  /// antes de enviar. Fechado o teclado, o aviso e a dica voltam. Os botões não
+  /// mudam, nem desabilitados offline: o motivo segue escrito na faixa de
+  /// offline do topo.
+  Widget _buildFooter(bool isOffline, bool keyboardOpen) {
     final canSubmit = _viewModel.canSubmit && !isOffline;
     final error = _viewModel.errorMessage;
 
@@ -381,7 +393,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (error != null) ...[
+          if (error != null && !keyboardOpen) ...[
             InlineNotice(
               icon: AppIcons.needsReview,
               message: error,
@@ -396,7 +408,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
             isLoading: _viewModel.isSubmitting,
             onPressed: canSubmit ? () => _submit(addAnother: false) : null,
           ),
-          if (isOffline && _viewModel.canAdd) ...[
+          if (isOffline && _viewModel.canAdd && !keyboardOpen) ...[
             const SizedBox(height: AppSpacing.sm + 2),
             Text(
               'Disponível quando houver conexão',
@@ -449,11 +461,16 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   }
 
   Future<bool> _confirmDiscard() async {
+    // Com o CPF já inscrito, "ainda não foi adicionado" seria falso: a pessoa
+    // está na sessão. Nesse caso o diálogo fica só com o título e os botões.
+    final enrolled = _viewModel.cpfCheck == CpfCheck.enrolled;
     final discard = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Descartar o que foi preenchido?'),
-        content: const Text('Este participante ainda não foi adicionado.'),
+        content: enrolled
+            ? null
+            : const Text('Este participante ainda não foi adicionado.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

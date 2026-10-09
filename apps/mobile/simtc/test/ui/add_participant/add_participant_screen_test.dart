@@ -146,6 +146,30 @@ void main() {
     ).captured;
   }
 
+  /// O que o servidor devolve quando a tela baixa a sessão de novo (o CPF já
+  /// está nela): a mesma sessão, sem participantes.
+  void sessionAnswers() {
+    when(() => api.get<Map<String, dynamic>>(sessionPath)).thenAnswer(
+      (_) async => Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: sessionPath),
+        statusCode: 200,
+        data: {
+          'id': 'sess-1',
+          'city': 'Itabira',
+          'state': 'MG',
+          'date': '2026-09-12T00:00:00.000Z',
+          'status': 'EM_ANDAMENTO',
+          'company': {'id': 'emp-1', 'name': 'Bracell'},
+          'course': {
+            'id': 'cur-1',
+            'name': 'Direção Defensiva — Veículo Pesado',
+          },
+          'participants': <Map<String, dynamic>>[],
+        },
+      ),
+    );
+  }
+
   Future<void> goOffline() async {
     final plugin = _MockConnectivity();
     when(plugin.checkConnectivity).thenAnswer((_) async => [ConnectivityResult.none]);
@@ -165,6 +189,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
 
     router = GoRouter(
       initialLocation: '/origem',
@@ -216,6 +241,12 @@ void main() {
   Future<void> pumpTransitions(WidgetTester tester) async {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+  }
+
+  /// O teclado do sistema aberto, com [height] de altura (ou fechado, com 0).
+  Future<void> setKeyboard(WidgetTester tester, double height) async {
+    tester.view.viewInsets = FakeViewPadding(bottom: height);
+    await tester.pump();
   }
 
   Finder field(String key) => find.descendant(
@@ -388,6 +419,7 @@ void main() {
       'email': null,
       'enrolled': true,
     });
+    sessionAnswers();
     await pumpAdd(tester);
 
     await typeCpf(tester);
@@ -599,6 +631,58 @@ void main() {
     });
 
     testWidgets(
+        'com um CPF livre e o nome preenchido, o diálogo diz que o '
+        'participante ainda não foi adicionado', (tester) async {
+      await seedSession();
+      cpfIsFree();
+      await pumpAdd(tester);
+      await typeCpf(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda');
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Fechar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Descartar o que foi preenchido?'), findsOneWidget);
+      expect(
+        find.text('Este participante ainda não foi adicionado.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'com o CPF já inscrito no formulário, o diálogo fica só com o título e '
+        'os dois botões: a frase "ainda não foi adicionado" seria falsa',
+        (tester) async {
+      await seedSession();
+      lookupAnswers({
+        'registered': true,
+        'name': 'Fernanda Lopes Meireles',
+        'email': null,
+        'enrolled': true,
+      });
+      sessionAnswers();
+      await pumpAdd(tester);
+      await typeCpf(tester);
+      expect(
+        find.text('Fernanda Lopes Meireles já está nesta sessão.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('Fechar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Descartar o que foi preenchido?'), findsOneWidget);
+      expect(
+        find.text('Este participante ainda não foi adicionado.'),
+        findsNothing,
+      );
+      expect(tester.widget<AlertDialog>(find.byType(AlertDialog)).content, isNull);
+      expect(find.text('Continuar preenchendo'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Descartar'), findsOneWidget);
+    });
+
+    testWidgets(
         'com o envio no ar, o voltar do Android é ignorado: sem diálogo, a '
         'tela fica e, com a resposta, fecha devolvendo `true`', (tester) async {
       await seedSession();
@@ -656,6 +740,36 @@ void main() {
     expect(addButton(tester).onPressed, isNull);
     expect(addAnotherButton(tester).onPressed, isNull);
     expect(textOf(tester, 'campo-nome'), 'Fernanda Lopes Meireles');
+  });
+
+  testWidgets(
+      'sem conexão, a dica "Disponível quando houver conexão" some com o '
+      'teclado aberto e volta com ele fechado; os botões ficam como estão',
+      (tester) async {
+    await seedSession();
+    cpfIsFree();
+    await goOffline();
+    await pumpAdd(tester, screen: const Size(360, 640));
+    await typeCpf(tester);
+    await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await tester.pump();
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
+
+    await setKeyboard(tester, 280);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Disponível quando houver conexão'), findsNothing);
+    // O motivo segue escrito na faixa do topo, e os botões seguem apagados.
+    expect(
+      find.text('Sem conexão — adicionar participante precisa de internet.'),
+      findsOneWidget,
+    );
+    expect(addButton(tester).onPressed, isNull);
+    expect(addAnotherButton(tester).onPressed, isNull);
+
+    await setKeyboard(tester, 0);
+
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
   });
 
   testWidgets(
@@ -756,6 +870,34 @@ void main() {
     });
 
     testWidgets(
+        'com o teclado aberto num celular de 360x640 e a fonte ampliada, o '
+        'rodapé não estoura e esconde o aviso de falha; fechado o teclado, o '
+        'aviso volta', (tester) async {
+      await seedSession();
+      cpfIsFree();
+      const reason =
+          'Sem conexão com o servidor. Verifique a internet e tente de novo.';
+      when(() => api.post<Map<String, dynamic>>(addPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(message: reason, isNetworkError: true));
+      await pumpAdd(tester, screen: const Size(360, 640), textScale: 1.6);
+      await fillAndAdd(tester);
+      expect(find.text(reason), findsOneWidget, reason: 'o teclado está fechado');
+
+      // O admin toca num campo para corrigir: o teclado sobe com o aviso ainda
+      // na tela. Sem tirá-lo, o rodapé não cabe no que sobra (RenderFlex).
+      await setKeyboard(tester, 280);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(reason), findsNothing);
+      expect(addButton(tester).onPressed, isNotNull, reason: 'dá para tentar de novo');
+
+      await setKeyboard(tester, 0);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(reason), findsOneWidget);
+    });
+
+    testWidgets(
         'CPF inscrito por outra pessoa entre a consulta e o toque: o aviso '
         'vai para o CPF', (tester) async {
       await seedSession();
@@ -765,6 +907,7 @@ void main() {
         message: 'CPF já inscrito neste treinamento',
         statusCode: 409,
       ));
+      sessionAnswers();
       await pumpAdd(tester);
 
       await fillAndAdd(tester);

@@ -524,6 +524,23 @@ void main() {
           const Size(48, 48));
     });
 
+    testWidgets(
+        'a linha do título "Participantes" do ADMIN tem 62 de altura, como a do '
+        'quadro "1f" (15 + 32 + 15): o alvo de 48 começa 7 abaixo do topo dela',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+
+      final row = find
+          .ancestor(of: find.text('Participantes'), matching: find.byType(Padding))
+          .first;
+      final target = find.widgetWithIcon(AppIconAction, AppIcons.addParticipant);
+      expect(find.descendant(of: row, matching: target), findsOneWidget);
+      expect(tester.getSize(row).height, 62);
+      expect(tester.getTopLeft(target).dy - tester.getTopLeft(row).dy, 7);
+    });
+
     testWidgets('sessão planejada também aceita as ações de ADMIN',
         (tester) async {
       when(() => auth.currentUser).thenReturn(admin);

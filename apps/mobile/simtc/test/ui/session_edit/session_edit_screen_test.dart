@@ -153,6 +153,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
 
     router = GoRouter(
       initialLocation: '/origem',
@@ -209,6 +210,12 @@ void main() {
   Future<void> pumpTransitions(WidgetTester tester) async {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+  }
+
+  /// O teclado do sistema aberto, com [height] de altura (ou fechado, com 0).
+  Future<void> setKeyboard(WidgetTester tester, double height) async {
+    tester.view.viewInsets = FakeViewPadding(bottom: height);
+    await tester.pump();
   }
 
   Finder field(String key) => find.descendant(
@@ -426,6 +433,94 @@ void main() {
   });
 
   testWidgets(
+      'com o teclado aberto num celular de 360x640 e a fonte ampliada, o '
+      'rodapé não estoura e esconde o aviso de falha; fechado o teclado, o '
+      'aviso volta', (tester) async {
+    await seedSession();
+    const reason =
+        'Sem conexão com o servidor. Verifique a internet e tente de novo.';
+    when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+        .thenThrow(const ApiException(message: reason, isNetworkError: true));
+    await pumpEdit(tester, screen: const Size(360, 640), textScale: 1.6);
+
+    await tester.enterText(field('campo-cidade'), 'Betim');
+    await tester.pump();
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pumpAndSettle();
+    expect(find.text(reason), findsOneWidget, reason: 'o teclado está fechado');
+
+    // O admin toca num campo para corrigir: o teclado sobe com o aviso ainda
+    // na tela. Sem tirá-lo, o rodapé não cabe no que sobra (RenderFlex).
+    await setKeyboard(tester, 280);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(reason), findsNothing);
+    expect(saveButton(tester).onPressed, isNotNull, reason: 'dá para tentar de novo');
+
+    await setKeyboard(tester, 0);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(reason), findsOneWidget);
+  });
+
+  testWidgets(
+      'salvar recusado pelo servidor (403): o motivo aparece, a sessão é '
+      'baixada de novo e os campos e botões travam, com o que foi digitado',
+      (tester) async {
+    await seedSession();
+    when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+        .thenThrow(const ApiException(
+      message: 'Não é possível editar um treinamento concluído ou cancelado',
+      statusCode: 403,
+    ));
+    // O que o servidor devolve agora: a mesma sessão, já concluída.
+    when(() => api.get<Map<String, dynamic>>(path)).thenAnswer(
+      (_) async => Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: path),
+        statusCode: 200,
+        data: {
+          'id': 'sess-1',
+          'city': 'Itabira',
+          'state': 'MG',
+          'date': '2026-09-12T00:00:00.000Z',
+          'status': 'CONCLUIDO',
+          'company': {'id': 'emp-1', 'name': 'Bracell'},
+          'course': {
+            'id': 'cur-1',
+            'name': 'Direção Defensiva — Veículo Pesado',
+          },
+          'participants': <Map<String, dynamic>>[],
+        },
+      ),
+    );
+    await pumpEdit(tester);
+
+    await tester.enterText(field('campo-cidade'), 'Betim');
+    await tester.pump();
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SessionEditScreen), findsOneWidget);
+    expect(
+      find.text('Não é possível editar um treinamento concluído ou cancelado'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Sessão concluída: os dados não podem mais ser alterados.'),
+      findsOneWidget,
+    );
+    final inputs = tester.widgetList<AppTextField>(find.byType(AppTextField)).toList();
+    expect(inputs, hasLength(4), reason: 'data, cidade, UF e observações');
+    for (final input in inputs) {
+      expect(input.enabled, isFalse, reason: input.label);
+    }
+    expect(saveButton(tester).onPressed, isNull);
+    expect(cancelButton(tester).onPressed, isNull);
+    expect(find.text('Betim'), findsOneWidget, reason: 'o que o admin digitou fica');
+    verify(() => api.get<Map<String, dynamic>>(path)).called(1);
+  });
+
+  testWidgets(
       'rodapé como o do canvas "3b": 8 entre o salvar e o "Descartar", 16 de '
       'recuo embaixo', (tester) async {
     await seedSession();
@@ -593,6 +688,31 @@ void main() {
     expect(saveButton(tester).onPressed, isNull);
     expect(cancelButton(tester).onPressed, isNull);
     expect(find.text('Betim'), findsOneWidget);
+  });
+
+  testWidgets(
+      'sem conexão, a dica "Disponível quando houver conexão" some com o '
+      'teclado aberto e volta com ele fechado; os botões ficam como estão',
+      (tester) async {
+    await seedSession();
+    await goOffline();
+    await pumpEdit(tester, screen: const Size(360, 640));
+    await tester.enterText(field('campo-cidade'), 'Betim');
+    await tester.pump();
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
+
+    await setKeyboard(tester, 280);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Disponível quando houver conexão'), findsNothing);
+    // O motivo segue escrito na faixa do topo, e os botões seguem apagados.
+    expect(find.text('Sem conexão — salvar precisa de internet.'), findsOneWidget);
+    expect(saveButton(tester).onPressed, isNull);
+    expect(find.widgetWithText(AppTextButton, 'Descartar'), findsOneWidget);
+
+    await setKeyboard(tester, 0);
+
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
   });
 
   testWidgets(
