@@ -1,5 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { UserRole } from '@simtc/shared-types';
+import { ROLES_KEY } from 'src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { ParticipantsController } from 'src/participants/participants.controller';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -143,5 +149,23 @@ describe('ParticipantsController.lookupParticipant', () => {
       BadRequestException,
     );
     expect(service.lookupByCpf).not.toHaveBeenCalled();
+  });
+});
+
+describe('ParticipantsController.lookupParticipant: quem pode consultar', () => {
+  // A consulta devolve nome e e-mail de quem já tem cadastro: é só para ADMIN
+  // (decisões 4 e 11 da Fase 6A). Os testes acima chamam o método direto e
+  // passam por cima dos guards; quem tranca a rota é o metadado que o Nest lê.
+  // O papel e os guards estão no método, e não na classe: o `findBySession`
+  // da mesma classe é aberto a qualquer usuário logado.
+  const handler = ParticipantsController.prototype.lookupParticipant;
+  const reflector = new Reflector();
+
+  it('exige o papel ADMIN', () => {
+    expect(reflector.get<UserRole[]>(ROLES_KEY, handler)).toEqual([UserRole.ADMIN]);
+  });
+
+  it('passa pelo JwtAuthGuard e, depois dele, pelo RolesGuard, que é quem lê o papel', () => {
+    expect(reflector.get(GUARDS_METADATA, handler)).toEqual([JwtAuthGuard, RolesGuard]);
   });
 });
