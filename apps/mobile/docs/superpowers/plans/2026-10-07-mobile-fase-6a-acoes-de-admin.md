@@ -10005,7 +10005,9 @@ Em modo debug (`flutter run`), um estouro de layout aparece como uma faixa listr
 
 **Não verificável neste aparelho, e por quê:** a recusa do servidor com o formulário aberto (alguém conclui a sessão, ou inscreve o mesmo CPF, entre abrir a tela e tocar no botão) depende de coordenar dois aparelhos no mesmo segundo — fica coberta pelos testes das Tasks 7 e 9 e pelos testes de tela das Tasks 8 e 10; a resposta atrasada da consulta de um CPF que já foi trocado só aparece com a rede lenta — Task 9; a consulta de CPF que falha depende de o servidor cair entre abrir a tela e digitar — Tasks 9 e 10; a rota aberta por quem não é ADMIN não tem caminho pela interface — Tasks 8 e 10; a avaliação presa por consultor removido ou por participante liberado só passa a acontecer pelo app na 6B — fica coberta pelos testes da Task 6.
 
-- [ ] **Step 4: Registrar o resultado**
+- [x] **Step 4: Registrar o resultado**
+
+**Validado em 09/10/2026, no aparelho físico, pelo usuário: o roteiro passou inteiro. As oito "Decisões em aberto" seguem em aberto. Aval dado para planejar a Fase 6B.**
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a 6B. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
 
