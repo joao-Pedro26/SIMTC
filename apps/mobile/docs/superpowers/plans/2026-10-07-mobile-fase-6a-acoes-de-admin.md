@@ -64,6 +64,45 @@ Em 06 e 07/10/2026, o desenho, aprovado em três partes:
     - **Quadro `3a`:** CPF antes do nome, por causa da busca; sem "Consultor responsável" (decisão 3); os avisos da consulta, que o canvas não tem; e a conferência de formato do e-mail, que o backend não faz — é só para barrar erro de digitação no endereço que recebe o certificado.
 13. **Fora da 6A**, como no roteiro: editar ou remover participante já inscrito, e trocar curso, empresa ou responsável. Continuam no painel web.
 
+### Desvios na execução (07 a 09/10/2026)
+
+A execução foi por subagentes, uma task por vez, cada uma conferida arquivo a arquivo contra o código validado e revisada antes da próxima. As Tasks 1, 2, 4, 5, 6, 9 e 11 saíram iguais ao plano. Os desvios foram:
+
+**Task 3, posição dos grupos de teste e correção `bb3253e`.** Em `form_widgets_test.dart`, os três grupos novos (`AppDangerOutlineButton`, `AppTextButton`, `AppIconAction`) ficaram antes de `AppPrimaryButton`, e não antes de `AppCheckbox`, onde o plano os punha; os testes são os mesmos, e nenhuma task posterior edita esse arquivo. A revisão da task achou que o teste "nome e apoio compridos encolhem com reticências, sem estourar" passava mesmo sem a truncagem: ele ganhou a afirmação de que os dois textos foram cortados.
+
+**Task 7, correção `9bd32c6`.** Nenhum teste travava a decisão 9 ("um valor antigo fora do padrão não trava o salvar"): sem a regra, os testes da ViewModel continuavam todos passando. Entrou o teste com UF "Minas Gerais" e cidade vazia antigas. 1 teste a mais.
+
+**Task 8, correção `f3fb077`.** A revisão da task achou três defeitos que vinham do plano:
+- **O voltar espera o envio.** Com o salvar ou o cancelar em andamento, o voltar abria "Descartar as alterações?" por cima; conforme a hora em que a resposta chegava, o detalhe não se atualizava ou a tela de baixo fechava junto. Agora, enquanto envia, o voltar da barra e o do Android não fazem nada, como o "Descartar" do rodapé.
+- **A falha aparece no rodapé, acima do botão**, como na tela de Resumo, e não mais dentro da lista: em celular pequeno, com a fonte ampliada ou com uma observação longa, ela ficava abaixo da dobra. Vale para a falha do salvar e para a do cancelar. O canvas não desenha esse estado.
+- **O rodapé segue o canvas** (12 em cima, 16 nos lados e embaixo, 8 entre os botões). O plano tinha 8 embaixo e 4 entre os botões, diferença que não estava entre as aprovadas na decisão 12.
+
+4 testes a mais.
+
+**Task 10, com os ajustes da Task 8 (`cf11ab7`) e a correção `86102b5`.** A tela 1.11 já nasceu com o rodapé do canvas e a falha no rodapé, mais o teste do voltar com o envio em andamento (o código do plano já protegia esse caso). A revisão da task achou ainda que, com a rede de verdade, o foco não voltava ao CPF depois do "Salvar e adicionar outro": o campo ainda estava travado quando o pedido de foco rodava, e o teste do plano não via isso porque o servidor simulado respondia na hora. O pedido de foco passou para depois do quadro. Entrou também o teste de tela da recusa do servidor com a sessão concluída por outra pessoa. 5 testes a mais que o plano.
+
+**Revisão final.** Commits `a773d2a` e `5927d9d`, com 12 testes a mais no app e 2 no backend. A revisão do branch inteiro não achou nada crítico; entraram:
+- **CPF já inscrito baixa a sessão de novo.** Quando o servidor diz que o CPF já está na sessão — na consulta ou na recusa do envio —, a lista do detalhe não mostrava a pessoa até o admin puxar para atualizar. Acontece com quem entra pelo QR code ou pelo painel, e quando o envio é aceito mas a resposta se perde. Nesse estado, o diálogo de descarte deixou de mostrar "Este participante ainda não foi adicionado.", que seria falso: fica só com o título e os botões.
+- **A linha "Participantes" do ADMIN tem 62dp**, como o quadro `1f`. O plano tinha 48dp, e a decisão 12 só aprova o alvo de toque de 48dp.
+- **Com o teclado aberto, o rodapé das duas telas mostra só os botões.** O aviso de falha e a dica "Disponível quando houver conexão" somem enquanto o teclado está aberto e voltam quando ele fecha: com a fonte do sistema ampliada num aparelho de até 700dp de altura, o rodapé estourava. Sem conexão, o motivo continua escrito na faixa do topo.
+- **22dp antes do "Cancelar sessão"**, como o quadro `3b` (eram 24).
+- **Testes que faltavam:** a consulta de CPF só para ADMIN, no backend; o e-mail corrigido à mão, que fica ao trocar o CPF; o aviso do cadastro, que some depois do "Salvar e adicionar outro"; e, na 1.12, a recusa do servidor que baixa a sessão e trava a tela.
+
+**Fim da execução:** app com **698 testes passando** e `flutter analyze` sem issues; backend com as 12 falhas antigas e 72 testes passando (84 no total).
+
+### Decisões em aberto (para o usuário)
+
+A execução deixou estas escolhas para o usuário. Nenhuma foi decidida por conta própria:
+
+1. **A consulta responde com o admin no meio da digitação do nome** (regra de tela). Nome e e-mail ficam editáveis durante o "Consultando o CPF…", e o cadastro substitui o que estiver nos campos. Com a rede lenta, o texto troca sob o cursor, e o que o admin continuar digitando emenda no fim do nome do cadastro — e vai para o cadastro compartilhado. O plano escolheu "o cadastro vence o que foi digitado" sem levar a escolha ao usuário. Opções: (a) travar nome e e-mail enquanto consulta; (b) o cadastro só preencher campo vazio; (c) deixar como está.
+2. **Data com mais de 90 dias no passado tira a sessão do app** (encontro de duas regras). O calendário da 1.12 começa em 2020, e a lista de sessões só baixa as dos últimos 90 dias (ou sem data): um toque errado no ano faz a sessão — mesmo em andamento — sumir da lista de todos os aparelhos no próximo sync, sem aviso, e só o painel web conserta. Opções: (a) pedir confirmação quando a data escolhida for anterior à janela; (b) limitar o calendário; (c) deixar como está.
+3. **Consulta de CPF sem conexão.** Com o CPF completo digitado sem conexão, a consulta falha e a tela mostra juntos "Sem conexão — adicionar participante precisa de internet.", "Não foi possível consultar o CPF. Preencha os dados e adicione assim mesmo." e "Disponível quando houver conexão": o texto do meio convida a adicionar enquanto os outros dizem que não dá. E, quando a conexão volta, o CPF não é consultado de novo, a não ser que o admin mexa nele. Opções: (a) não consultar sem conexão e consultar sozinho quando a rede voltar (recomendada pela revisão: preserva o objetivo da decisão 4 no caso mais comum em campo); (b) só trocar o texto; (c) deixar para a Fase 8, como a pendência já registrada.
+4. **"Cancelar sessão" sem conexão não tem motivo próprio.** A faixa do topo diz "Sem conexão — salvar precisa de internet.", e "Disponível quando houver conexão" fica sob o "Salvar alterações"; o "Cancelar sessão" fica apagado no fim da rolagem. Trocar a faixa para dizer que salvar e cancelar precisam de internet, ou deixar?
+5. **Cores do canvas que o app não tem.** O canvas desenha o "Somente teórica" (o ícone do cartão na 1.11 e o chip da lista) com a tinta #6B4A7A; o app usa o mauve #9B80A8 desde o Design System, inclusive no chip já validado. E a borda do "Cancelar sessão" é #E9A2A2 no quadro `3b`; o app usa o `dangerBorder` #FCA5A5. Aprovar as cores atuais, ou criar os tons do canvas?
+6. **Contraste do "opcional"** ao lado do rótulo do e-mail: #94A3B8 em 11,5sp, cerca de 2,6:1 sobre o branco. É exatamente o que o canvas desenha, mas fica abaixo do recomendado para leitura. Manter, ou escurecer?
+7. **Título "Participantes" apagado sem conexão.** No requadro "Mesma tela, admin offline" do quadro `1f`, o título também aparece apagado, junto com o ícone; no app, só o ícone apaga. É intenção do desenho, ou só o estilo do requadro?
+8. **Medidas pequenas que ficaram diferentes do canvas**, por o campo de texto e o cabeçalho de contexto serem um widget só para as duas telas: o texto das observações em 16/1,3 (o quadro `3b` tem 15/1,45); o recuo vertical do cabeçalho de contexto em 12 (o `3b` tem 14), com o nome da empresa em 15 e vão de 3 na 1.11 (o `3a` tem 14 e 2); e o ícone de adicionar do detalhe com 22 (o `1f` tem 20). Aceitar, ou alinhar?
+
 ### Ajustes feitos ao preparar o plano (revisar junto com o plano)
 
 A validação na cópia descartável levou a estes ajustes — **nenhum muda regra de negócio aprovada**, mas cada um é uma escolha que o usuário deve conferir:
@@ -9934,6 +9973,7 @@ Dados do treinamento:
 - [ ] apague as observações e salve: o bloco de observações some do detalhe;
 - [ ] mude algo e toque no voltar: o diálogo pergunta se descarta; "Continuar editando" fica, "Descartar" sai sem salvar; o "Descartar" do rodapé sai direto;
 - [ ] com a tela aberta, tire a rede: "Salvar alterações" e "Cancelar sessão" desabilitam, com "Disponível quando houver conexão"; volte a rede: os botões voltam e o que foi digitado continua lá;
+- [ ] com o backend parado (e o aparelho com rede), mude a cidade e toque em "Salvar alterações": o motivo aparece no rodapé, acima do botão, e o que foi digitado fica; toque num campo: com o teclado aberto, o aviso some e o rodapé fica só com os dois botões; feche o teclado sem digitar: o aviso volta (suba o backend de novo antes de seguir);
 - [ ] na sessão de teste, "Cancelar sessão": o diálogo diz a consequência e quantos estão em avaliação; "Voltar" não cancela; "Cancelar sessão" leva à lista de sessões com "Sessão cancelada.", a sessão some da lista e o painel web a mostra como cancelada.
 
 Adicionar participante:
@@ -9941,7 +9981,8 @@ Adicionar participante:
 - [ ] o CPF é mascarado enquanto se digita; um CPF com dígito errado mostra "CPF inválido.";
 - [ ] um CPF válido e novo: aparece "Consultando o CPF…" e depois o check com "CPF válido e sem cadastro nesta sessão."; preencha o nome e toque em "Adicionar participante": volta ao detalhe com "Participante adicionado." e a pessoa na lista, como "Pendente" — no painel web, também;
 - [ ] o CPF de alguém que já fez **outro** treinamento: nome e e-mail aparecem preenchidos, com o aviso "Já cadastrado em outro treinamento…"; apague um dígito do CPF: os dois campos se limpam;
-- [ ] o CPF de alguém que **já está nesta sessão**: "Fulano já está nesta sessão." e os dois botões desabilitados;
+- [ ] o CPF de alguém que **já está nesta sessão**: "Fulano já está nesta sessão." e os dois botões desabilitados; o X pergunta se descarta, sem a frase "Este participante ainda não foi adicionado.";
+- [ ] com o detalhe da sessão aberto no app, inscreva alguém pelo painel web; sem puxar para atualizar, abra "Adicionar participante" e digite o CPF dessa pessoa: a tela diz que ela já está na sessão e, ao fechar, ela aparece na lista;
 - [ ] um e-mail com erro ("nome@empresa"): ao sair do campo, aparece "E-mail inválido.";
 - [ ] "Somente teórica" e "Salvar e adicionar outro": o formulário se limpa, o aviso diz quem entrou e o foco volta ao CPF; feche pelo X: o detalhe já mostra a pessoa, com o chip "Somente teórica";
 - [ ] com algo preenchido, o X pergunta se descarta.
@@ -9955,11 +9996,14 @@ Regressões:
 - [ ] um toque longo num campo de texto mostra o menu de copiar/colar em português.
 
 Visual (ver "Ajustes feitos ao preparar o plano"):
-- [ ] as duas telas novas com o teclado aberto: o rodapé e o campo em edição continuam alcançáveis;
+- [ ] as duas telas novas com o teclado aberto: o rodapé (só os dois botões, enquanto o teclado está aberto) e o campo em edição continuam alcançáveis;
 - [ ] a linha "Cidade | UF" e os dois cartões de tipo numa tela estreita ou com a fonte do sistema ampliada;
-- [ ] o alinhamento do ícone de adicionar com a margem da lista.
+- [ ] o alinhamento do ícone de adicionar com a margem da lista, e a altura da linha "Participantes" do ADMIN;
+- [ ] o rodapé das duas telas novas: o espaço entre os dois botões e o recuo embaixo.
 
-**Não verificável neste aparelho, e por quê:** a recusa do servidor com o formulário aberto (alguém conclui a sessão, ou inscreve o mesmo CPF, entre abrir a tela e tocar no botão) depende de coordenar dois aparelhos no mesmo segundo — fica coberta pelos testes das Tasks 7 e 9; a resposta atrasada da consulta de um CPF que já foi trocado só aparece com a rede lenta — Task 9; a consulta de CPF que falha depende de o servidor cair entre abrir a tela e digitar — Tasks 9 e 10; a rota aberta por quem não é ADMIN não tem caminho pela interface — Tasks 8 e 10; a avaliação presa por consultor removido ou por participante liberado só passa a acontecer pelo app na 6B — fica coberta pelos testes da Task 6.
+Em modo debug (`flutter run`), um estouro de layout aparece como uma faixa listrada amarela e preta. Ainda é esperado num caso só: a 1.11 sem conexão, num aparelho de até 640dp de altura, com o teclado aberto e a fonte do sistema em 1,6x ou mais (pendência da Fase 8).
+
+**Não verificável neste aparelho, e por quê:** a recusa do servidor com o formulário aberto (alguém conclui a sessão, ou inscreve o mesmo CPF, entre abrir a tela e tocar no botão) depende de coordenar dois aparelhos no mesmo segundo — fica coberta pelos testes das Tasks 7 e 9 e pelos testes de tela das Tasks 8 e 10; a resposta atrasada da consulta de um CPF que já foi trocado só aparece com a rede lenta — Task 9; a consulta de CPF que falha depende de o servidor cair entre abrir a tela e digitar — Tasks 9 e 10; a rota aberta por quem não é ADMIN não tem caminho pela interface — Tasks 8 e 10; a avaliação presa por consultor removido ou por participante liberado só passa a acontecer pelo app na 6B — fica coberta pelos testes da Task 6.
 
 - [ ] **Step 4: Registrar o resultado**
 
@@ -9977,16 +10021,31 @@ Resolvidas nesta fase: as pendências "6" da auditoria da Fase 0 sobre adicionar
 | 6B | Remover um consultor com avaliação em andamento devolve os participantes dele para "Pendente" (ou o status da nota anterior) — mudança no backend, que vale também para o painel web (decisão 6). |
 | 6B | ADMIN desatribuir um participante de outro consultor, por um menu ⋮ na linha (decisão 6). O `unassign` só libera os do próprio consultor. |
 | 6B | A avaliação presa de um participante liberado que volta pelo "Reavaliar": hoje o checklist abre já iniciado, com a avaliação antiga, sem reservar o participante. Só passa a acontecer quando a 6B trouxer a liberação; a correção é o checklist tratar como "não iniciada" a avaliação de quem não está com o consultor. |
-| 8 | A consulta de CPF que falhou não é refeita sozinha quando a rede volta: o admin precisa mexer no CPF, ou seguir sem ela. |
+| 6B | A avaliação presa que volta a valer (o participante é reatribuído ao mesmo consultor) depois de outra ter sido iniciada: ficam duas abertas ao mesmo tempo, porque nada é apagado (decisão 5). Só passa a acontecer pelo app com a liberação; decidir no plano da 6B. |
+| 8 | A consulta de CPF que falhou não é refeita sozinha quando a rede volta: o admin precisa mexer no CPF, ou seguir sem ela (ver a decisão em aberto 3). |
 | 8 | O formulário de "Dados do treinamento" não atualiza os campos que o admin não tocou quando o cache muda com a tela aberta (eles não são enviados, então nada se perde). |
 | 8 | A máscara do CPF leva o cursor sempre para o fim do campo. |
 | 8 | As buscas (a lupa do detalhe, da Home e, na 6B, da tela de Consultores). |
 | 8 | As "decisões em aberto" 2 a 6 da 5B (indicador de progresso do desatribuir, "Tentar novamente" ao lado do "Descartar", a pílula que não encolhe, a setinha das linhas da fila e o texto do descarte que não apagou) continuam em aberto. |
 | 8 | Limpeza: as duas telas novas repetem o rodapé com borda e o diálogo de confirmação que já se repetiam nas outras (pendência da 5B). |
+| 8 | A tela travada ainda pergunta se descarta: depois que a sessão é concluída por outra pessoa com mudança por salvar, o voltar da 1.12 e o X da 1.11 abrem a confirmação, sem haver mais o que salvar. |
+| 8 | Rodapé das duas telas novas com o teclado aberto: sobraram duas combinações com estouro (a 1.11 sem conexão, em aparelho de 640dp de altura, com teclado alto e fonte em 1,6x ou mais). E, na 1.12, o "Cancelar sessão" não tira o foco do campo antes do diálogo: com um campo em edição, o teclado volta sozinho quando o diálogo fecha e, se o cancelar falhar nesse intervalo, o aviso fica escondido até o teclado fechar (uma linha no `_confirmCancel`). |
+| 8 | Consulta de CPF: a resposta atrasada é reconhecida pelo CPF, e não pela consulta (digitar, apagar um dígito e redigitar antes da resposta dispara duas, e a segunda pode repor o nome do cadastro sobre uma correção do admin); e ela não tem tempo limite próprio (com sinal ruim, "Consultando o CPF…" segura os botões por até 35 segundos). |
+| 8 | Sessão apagada no servidor (404) com a 1.11 ou a 1.12 aberta: a tela mostra o texto do servidor e continua aberta para edição (baixar de novo só resolve a recusa por status); sem teste. E `lockedReason`, nas duas ViewModels novas, devolve "Esta sessão não está mais disponível neste aparelho." enquanto a tela carrega (sem efeito hoje: as telas olham o carregamento antes). |
+| 8 | Corridas do "grava no cache e baixa de novo": a resposta atrasada de uma baixa da sessão pode regravar o cache por cima do que acabou de ser salvo, cancelado ou adicionado, até a próxima baixa (janela estreita; cura-se sozinho). |
+| 8 | O aviso "Você já está avaliando…" do checklist só é recalculado ao abrir a tela e ao descartar: com a regra nova da avaliação presa, ele pode ficar desatualizado até a tela ser reaberta. E os rascunhos presos de sessão concluída ou cancelada ficam no aparelho para sempre (decisão 5): falta uma limpeza. |
+| 8 | Leitor de tela (TalkBack) nas telas novas: o campo só leitura da data gera três nós soltos, e os cartões de tipo não dizem "desativado" nem mostram a ondulação do toque. Conferir também o gesto de voltar preditivo do Android 14 em diante, e o formulário depois de o Android encerrar o app em segundo plano (o que foi digitado se perde, como em todas as telas). |
+| 8 | Limpeza de código anotada pelas revisões: o esqueleto repetido de `start`, `update` e `cancel` no `SessionRepository`, com duas versões de "mantém a mensagem do backend", e o `update` gravando no cache a data como veio (quem chama já normaliza); o `add` do `ParticipantRepository` mandando CPF e e-mail como chegam (quem chama já normaliza); a terceira cópia do spinner dos botões e da regra "está comigo" (`SessionParticipant.isWith`); os textos de falha duplicados entre repositório e ViewModel; `_openEdit` e `_openAddParticipant`; o exemplo do campo do CPF em Inter, com os dígitos em fonte mono; comentários imprecisos (a data vazia no `SessionRepository`, o rodapé da 1.12); a faixa do `intl` no `pubspec.yaml`, presa à versão do SDK; e, no backend, a consulta de inscrição repetida três vezes no `participants.service.ts`. |
+| 8 | Lacunas de teste anotadas pelas revisões (o código faz a coisa certa hoje): as mensagens de 404 e de falta de rede nos repositórios; o ramo "resto 10" do CPF; a cláusula de status da avaliação presa, isolada; os campos travados durante o envio e o primeiro quadro das duas telas novas; a recusa do cancelar com o repositório de verdade; as combinações do aviso do ADMIN sem conexão no detalhe; os delegates de idioma do `SimtcApp`; e o ruído antigo na saída da suíte (avisos do drift e o `debugPrint` do envio). |
+| 8 | A data copiada para a avaliação ao iniciar não acompanha uma mudança de data da sessão feita depois (pelo app ou pelo painel): conferir o que vai para o servidor. |
 | 8 | Conferir no aparelho os `copyWith(fontWeight: …)` que já existem nas telas (por exemplo, a linha do progresso no detalhe da sessão): o `copyWith` não mexe no `fontVariations` do estilo, de onde vem o peso da fonte variável, então o peso pedido pode não aparecer. Não foi conferido nesta fase. |
 | Backend | No `POST …/participants`, o `ValidateCpfPipe` é aplicado pelo decorator e o que ele devolve é descartado: o CPF é gravado como veio. O web e o app mandam só dígitos, mas um cliente que mande o CPF com máscara cria um cadastro duplicado. Pela leitura do código, um corpo sem `cpf` também chega ao pipe antes da validação do DTO e vira erro 500, em vez de 400. |
 | Backend | `PATCH /training-sessions/:id` não tem como apagar a data (data vazia é ignorada), e o `email` do `AddParticipantDto` não é conferido como e-mail. |
 | Backend | `cancelSession` não mexe nos participantes: quem estava "em avaliação" continua assim numa sessão cancelada. |
+| Backend | No `POST …/participants`, o nome e o e-mail do cadastro são atualizados **antes** da recusa por CPF já inscrito (409): numa recusa, o que o admin digitou ainda é gravado no cadastro compartilhado. |
+| Backend | `assign` e `sync` não conferem o status da sessão (a regra está só no app); a consulta de CPF não tem limite de frequência; e `updateParticipationType` existe no service sem rota — se ganhar uma, a regra da avaliação presa (`_canStillOpen`) precisa olhar o tipo de participação. |
+| Backend | O inventário de endpoints de `apps/backend/CLAUDE.md` não lista o `POST …/participants/lookup`. |
+| Web | O painel não usa a consulta de CPF nova (continua trocando o nome do cadastro sem avisar) e não consegue apagar as observações de uma sessão (o formulário não manda o campo quando ele fica vazio). |
 | — | Canvas: a 1.12 sem "Início", com "Cidade" + "UF" e sem o contador; a 1.11 com o CPF primeiro, sem "Consultor responsável" e com os avisos da consulta; os diálogos de confirmação. Atualizar no Claude Design. |
 
 As pendências da Fase 8 que vieram da 5A e da 5B e não estão acima continuam valendo como estão nos planos delas.
