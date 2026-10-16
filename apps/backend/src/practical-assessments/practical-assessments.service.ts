@@ -4,6 +4,7 @@ import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 import { statusAfterRelease } from '../participants/participant-release.util';
+import { SYNC_REFUSAL_NOT_ASSIGNED, SyncRefusedException } from './sync-refused.exception';
 
 @Injectable()
 export class PracticalAssessmentsService {
@@ -39,6 +40,11 @@ export class PracticalAssessmentsService {
       trainingParticipantId: dtos[i].trainingParticipantId,
       status: r.status,
       error: r.status === 'rejected' ? (r.reason as Error).message : undefined,
+      // Só a recusa que o app mobile trata à parte leva código.
+      code:
+        r.status === 'rejected' && r.reason instanceof SyncRefusedException
+          ? r.reason.code
+          : undefined,
     }));
   }
 
@@ -52,6 +58,35 @@ export class PracticalAssessmentsService {
     const existing = await this.prisma.practicalAssessment.findUnique({
       where: { trainingParticipantId: dto.trainingParticipantId },
     });
+
+    // Só envia avaliação quem está com o participante (Fase 6B do app
+    // mobile). Quem foi removido do treinamento, ou desatribuído pelo ADMIN,
+    // com a avaliação em andamento não grava mais nada: o participante voltou
+    // para a fila, e outro consultor pode já ter assumido — ou avaliado.
+    const participant = await this.prisma.trainingParticipant.findUnique({
+      where: { id: dto.trainingParticipantId },
+      select: { status: true, assignedConsultantId: true },
+    });
+    if (!participant) {
+      throw new ConflictException('Participante não encontrado');
+    }
+    const isWithSender =
+      participant.status === 'EM_AVALIACAO' && participant.assignedConsultantId === consultantId;
+    if (!isWithSender) {
+      // Reenvio: o primeiro envio desta mesma avaliação já foi aceito (por
+      // isso o participante não está mais "em avaliação"), mas a resposta se
+      // perdeu e o app tentou de novo. Não há o que regravar.
+      const alreadySaved =
+        existing != null &&
+        existing.consultantId === consultantId &&
+        existing.startTime.getTime() === new Date(dto.startTime).getTime();
+      if (alreadySaved) return existing;
+
+      throw new SyncRefusedException(
+        SYNC_REFUSAL_NOT_ASSIGNED,
+        'Este participante não está mais em avaliação com você. A avaliação não foi registrada.',
+      );
+    }
 
     if (existing) {
       // Reavaliação: apaga os itens anteriores e atualiza o registro

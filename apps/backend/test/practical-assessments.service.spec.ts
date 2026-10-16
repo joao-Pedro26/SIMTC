@@ -12,7 +12,7 @@ import {
 
 const mockPrisma = {
   practicalAssessment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), findUniqueOrThrow: jest.fn() },
-  trainingParticipant: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+  trainingParticipant: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   assessmentItem: { deleteMany: jest.fn() },
   assessmentCategory: { findMany: jest.fn() },
   $transaction: jest.fn(),
@@ -270,6 +270,11 @@ describe('PracticalAssessmentsService', () => {
     beforeEach(() => {
       mockPrisma.assessmentCategory.findMany.mockResolvedValue([]);
       mockPrisma.$transaction.mockResolvedValue([]);
+      // Quem envia está com o participante: é o caso de todo envio normal.
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+        status: 'EM_AVALIACAO',
+        assignedConsultantId: 'consultant-1',
+      });
     });
 
     it('sincroniza uma avaliação nova com sucesso', async () => {
@@ -301,6 +306,142 @@ describe('PracticalAssessmentsService', () => {
       expect(result).toEqual([
         { trainingParticipantId: 'tp-1', status: 'rejected', error: 'falha no banco' },
       ]);
+    });
+
+    // Só envia avaliação quem está com o participante (decisão 2 da Fase 6B do
+    // app mobile): quem foi removido do treinamento, ou desatribuído pelo
+    // ADMIN, não grava mais nada — nem por cima da avaliação de quem assumiu.
+    describe('quem não está com o participante', () => {
+      const refused = {
+        trainingParticipantId: 'tp-1',
+        status: 'rejected',
+        error: 'Este participante não está mais em avaliação com você. A avaliação não foi registrada.',
+        code: 'NOT_ASSIGNED',
+      };
+
+      it.each([
+        ['foi liberado e voltou a Pendente', { status: 'PENDENTE', assignedConsultantId: null }],
+        ['está em avaliação com outro consultor', { status: 'EM_AVALIACAO', assignedConsultantId: 'consultant-2' }],
+        ['já foi avaliado por outro consultor', { status: 'APROVADO', assignedConsultantId: null }],
+        ['está em avaliação sem consultor na linha', { status: 'EM_AVALIACAO', assignedConsultantId: null }],
+        ['já tem nota, com o consultor ainda na linha', { status: 'APROVADO', assignedConsultantId: 'consultant-1' }],
+      ])('%s: recusa com o código, sem gravar nada', async (_caso, participant) => {
+        mockPrisma.trainingParticipant.findUnique.mockResolvedValue(participant);
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([refused]);
+        expect(mockPrisma.practicalAssessment.create).not.toHaveBeenCalled();
+        expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+        expect(mockPrisma.assessmentItem.deleteMany).not.toHaveBeenCalled();
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('não sobrescreve a avaliação que outro consultor gravou depois', async () => {
+        mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+          status: 'APROVADO',
+          assignedConsultantId: null,
+        });
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
+          id: 'assess-1',
+          consultantId: 'consultant-2',
+          startTime: new Date('2026-09-17T10:00:00.000Z'),
+        });
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([refused]);
+        expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+        expect(mockPrisma.assessmentItem.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it('reenvio da mesma avaliação (a resposta do primeiro envio se perdeu): aceita sem regravar', async () => {
+        // O primeiro envio foi aceito: o participante já tem a nota e ficou sem consultor.
+        mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+          status: 'APROVADO',
+          assignedConsultantId: null,
+        });
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
+          id: 'assess-1',
+          consultantId: 'consultant-1',
+          startTime: new Date('2026-09-17T10:00:00.000Z'),
+        });
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([{ trainingParticipantId: 'tp-1', status: 'fulfilled' }]);
+        expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+        expect(mockPrisma.assessmentItem.deleteMany).not.toHaveBeenCalled();
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('avaliação antiga do mesmo consultor, com outra hora de início, não conta como reenvio', async () => {
+        mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+          status: 'NAO_RECOMENDADO',
+          assignedConsultantId: null,
+        });
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({
+          id: 'assess-1',
+          consultantId: 'consultant-1',
+          startTime: new Date('2026-09-10T08:00:00.000Z'),
+        });
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([refused]);
+        expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+      });
+
+      it('participante que não existe: recusa, sem o código', async () => {
+        mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([
+          { trainingParticipantId: 'tp-1', status: 'rejected', error: 'Participante não encontrado' },
+        ]);
+        expect(mockPrisma.practicalAssessment.create).not.toHaveBeenCalled();
+      });
+    });
+
+    it('confere quem está com o participante pela linha dele', async () => {
+      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+      mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+      await service.syncFromMobile([dto], 'consultant-1');
+
+      expect(mockPrisma.trainingParticipant.findUnique).toHaveBeenCalledWith({
+        where: { id: 'tp-1' },
+        select: { status: true, assignedConsultantId: true },
+      });
+    });
+
+    it('num lote, recusa só a avaliação de quem não está com o participante', async () => {
+      const outro = { ...dto, trainingParticipantId: 'tp-2' };
+      mockPrisma.trainingParticipant.findUnique.mockImplementation(
+        ({ where }: { where: { id: string } }) =>
+          Promise.resolve(
+            where.id === 'tp-1'
+              ? { status: 'EM_AVALIACAO', assignedConsultantId: 'consultant-1' }
+              : { status: 'PENDENTE', assignedConsultantId: null },
+          ),
+      );
+      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+      mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+      const result = await service.syncFromMobile([dto, outro], 'consultant-1');
+
+      expect(result).toEqual([
+        { trainingParticipantId: 'tp-1', status: 'fulfilled' },
+        expect.objectContaining({
+          trainingParticipantId: 'tp-2',
+          status: 'rejected',
+          code: 'NOT_ASSIGNED',
+        }),
+      ]);
+      expect(mockPrisma.practicalAssessment.create).toHaveBeenCalledTimes(1);
     });
   });
 });
