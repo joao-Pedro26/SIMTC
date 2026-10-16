@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -40,10 +40,23 @@ void main() {
     };
   }
 
-  /// O detalhe como `findTrainingSessionById` devolve (`company: true`, por
-  /// isso o logo vem junto).
-  Map<String, dynamic> detailJson(List<Map<String, dynamic>> participants) {
+  /// Um vínculo de `consultants[]` do detalhe (`include: { consultant: true }`).
+  Map<String, dynamic> consultantLink(String id, String name, {String? email}) {
     return {
+      'trainingSessionId': 'sess-1',
+      'consultantId': id,
+      'consultant': {'id': id, 'name': name, 'email': email, 'active': true},
+    };
+  }
+
+  /// O detalhe como `findTrainingSessionById` devolve (`company: true`, por
+  /// isso o logo vem junto). Sem [consultants], o corpo nem traz a chave.
+  Map<String, dynamic> detailJson(
+    List<Map<String, dynamic>> participants, {
+    List<Map<String, dynamic>>? consultants,
+  }) {
+    return {
+      if (consultants != null) 'consultants': consultants,
       'id': 'sess-1',
       'responsibleConsultantId': 'c-resp',
       'city': 'Itabira',
@@ -176,6 +189,79 @@ void main() {
       expect(session.participantsSyncedAt, isNotNull);
       expect(session.cachedAt, DateTime(2026, 9, 22, 8),
           reason: 'a idade da agenda da Home não muda por abrir uma sessão');
+    });
+
+    test('grava os consultores da sessão que vêm no detalhe', () async {
+      await seedSession();
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson(
+          [participantJson('tp-1')],
+          consultants: [
+            consultantLink('c-resp', 'Carla Mendes', email: 'carla@sim.com'),
+            consultantLink('c-2', 'Rafael Lima'),
+          ],
+        )),
+      );
+
+      await repository.syncSession('sess-1');
+
+      final rows = await (db.select(db.sessionConsultants)
+            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+          .get();
+      expect(rows.map((r) => r.sessionId), everyElement('sess-1'));
+      expect(rows.map((r) => (r.consultantId, r.name, r.email)), [
+        ('c-resp', 'Carla Mendes', 'carla@sim.com'),
+        ('c-2', 'Rafael Lima', null),
+      ]);
+    });
+
+    test('o consultor que saiu da sessão no servidor sai do cache', () async {
+      await seedSession();
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson(
+          const [],
+          consultants: [
+            consultantLink('c-resp', 'Carla Mendes'),
+            consultantLink('c-2', 'Rafael Lima'),
+          ],
+        )),
+      );
+      await repository.syncSession('sess-1');
+
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson(
+          const [],
+          consultants: [
+            consultantLink('c-resp', 'Carla Mendes'),
+            consultantLink('c-3', 'Tatiane Souza'),
+          ],
+        )),
+      );
+      await repository.syncSession('sess-1');
+
+      final rows = await db.select(db.sessionConsultants).get();
+      expect(rows.map((r) => r.consultantId).toSet(), {'c-resp', 'c-3'});
+    });
+
+    test('detalhe sem a lista de consultores não apaga os que estão no cache',
+        () async {
+      await seedSession();
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson(
+          const [],
+          consultants: [consultantLink('c-resp', 'Carla Mendes')],
+        )),
+      );
+      await repository.syncSession('sess-1');
+
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson([participantJson('tp-1')])),
+      );
+      final result = await repository.syncSession('sess-1');
+
+      expect(result.dataOrNull, 1);
+      final rows = await db.select(db.sessionConsultants).get();
+      expect(rows.map((r) => r.consultantId), ['c-resp']);
     });
 
     test('quem saiu da sessão no servidor sai do cache', () async {

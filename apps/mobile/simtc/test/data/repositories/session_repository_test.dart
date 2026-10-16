@@ -91,6 +91,38 @@ void main() {
     expect(ids, ['s2']);
   });
 
+  test('a sessão que sumiu do servidor leva os consultores dela do cache',
+      () async {
+    // Os consultores têm chave estrangeira para a sessão (Fase 6B): se não
+    // saíssem junto, apagar a sessão derrubaria a transação inteira do sync.
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page(
+              [sessionJson('s1'), sessionJson('s2')],
+              pageNumber: 1,
+              totalPages: 1,
+            ));
+    await repository.syncAll();
+    for (final sessionId in ['s1', 's2']) {
+      await db.into(db.sessionConsultants).insert(
+            SessionConsultantsCompanion.insert(
+              sessionId: sessionId,
+              consultantId: 'c-1',
+              name: 'Carla Mendes',
+            ),
+          );
+    }
+
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) async => page([sessionJson('s2')], pageNumber: 1, totalPages: 1));
+    final result = await repository.syncAll();
+
+    expect(result.isSuccess, isTrue);
+    final rows = await db.select(db.sessionConsultants).get();
+    expect(rows.map((r) => r.sessionId), ['s2']);
+  });
+
   test('falha de rede preserva o que já estava no cache', () async {
     when(() => api.get<Map<String, dynamic>>('/training-sessions',
             queryParameters: any(named: 'queryParameters')))

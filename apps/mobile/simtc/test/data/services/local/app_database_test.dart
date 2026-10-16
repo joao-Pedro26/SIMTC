@@ -142,6 +142,29 @@ const String _participantsV1 = '''
   )
 ''';
 
+/// A tabela `sessions` como as Fases 3 a 6A a deixaram (esquemas 3 e 4): a do
+/// esquema 2 mais o responsável e a hora do download dos participantes.
+const String _sessionsV4 = '''
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    company_logo_url TEXT NULL,
+    course_name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    date INTEGER NULL,
+    status TEXT NOT NULL,
+    notes TEXT NULL,
+    total_participants INTEGER NOT NULL DEFAULT 0,
+    assessable_participants INTEGER NOT NULL DEFAULT 0,
+    assessed_participants INTEGER NOT NULL DEFAULT 0,
+    responsible_consultant_id TEXT NULL,
+    participants_synced_at INTEGER NULL,
+    cached_at INTEGER NOT NULL,
+    PRIMARY KEY (id)
+  )
+''';
+
 /// A tabela `local_assessments` como a Fase 1 a criou — nenhuma migração
 /// mexeu nela até a Fase 5A (esquema 4).
 const String _localAssessmentsV3 = '''
@@ -165,6 +188,12 @@ const String _localAssessmentsV3 = '''
 
 void main() {
   late AppDatabase db;
+
+  // Os testes de migração abrem um `AppDatabase` próprio com o do `setUp`
+  // ainda aberto. Cada um tem o seu arquivo (ou a sua memória), então o aviso
+  // do drift sobre o mesmo banco aberto duas vezes não se aplica — e sujava a
+  // saída da suíte.
+  setUpAll(() => driftRuntimeOptions.dontWarnAboutMultipleDatabases = true);
 
   setUp(() => db = AppDatabase(NativeDatabase.memory()));
   tearDown(() => db.close());
@@ -207,6 +236,77 @@ void main() {
           ),
       throwsA(isA<SqliteException>()),
     );
+  });
+
+  group('consultores da sessão', () {
+    SessionConsultantsCompanion consultant(String sessionId, String id) {
+      return SessionConsultantsCompanion.insert(
+        sessionId: sessionId,
+        consultantId: id,
+        name: 'Carla Mendes',
+      );
+    }
+
+    test('exigem uma sessão existente e não se repetem na mesma sessão',
+        () async {
+      await expectLater(
+        db.into(db.sessionConsultants).insert(consultant('nao-existe', 'c-1')),
+        throwsA(isA<SqliteException>()),
+      );
+
+      await insertSession('sess-1');
+      await insertSession('sess-2');
+      await db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-1'));
+      // O mesmo consultor em outra sessão é outra linha.
+      await db.into(db.sessionConsultants).insert(consultant('sess-2', 'c-1'));
+
+      await expectLater(
+        db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-1')),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('somem junto com a sessão, sem ninguém precisar apagá-los antes',
+        () async {
+      await insertSession('sess-1');
+      await insertSession('sess-2');
+      await db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-1'));
+      await db.into(db.sessionConsultants).insert(consultant('sess-2', 'c-1'));
+
+      await (db.delete(db.sessions)..where((t) => t.id.equals('sess-1'))).go();
+
+      final left = await db.select(db.sessionConsultants).get();
+      expect(left.map((r) => r.sessionId), ['sess-2']);
+    });
+
+    test('clearSessionsCache não deixa consultor de sessão para trás', () async {
+      await insertSession('sess-1');
+      await db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-1'));
+
+      await db.clearSessionsCache();
+
+      expect(await db.select(db.sessionConsultants).get(), isEmpty);
+      expect(await db.select(db.sessions).get(), isEmpty);
+    });
+
+    test('replaceSessionConsultants troca só os da sessão pedida', () async {
+      await insertSession('sess-1');
+      await insertSession('sess-2');
+      await db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-1'));
+      await db.into(db.sessionConsultants).insert(consultant('sess-1', 'c-2'));
+      await db.into(db.sessionConsultants).insert(consultant('sess-2', 'c-9'));
+
+      await db.replaceSessionConsultants('sess-1', [
+        consultant('sess-1', 'c-2'),
+        consultant('sess-1', 'c-3'),
+      ]);
+
+      final rows = await db.select(db.sessionConsultants).get();
+      expect(
+        rows.map((r) => (r.sessionId, r.consultantId)).toSet(),
+        {('sess-1', 'c-2'), ('sess-1', 'c-3'), ('sess-2', 'c-9')},
+      );
+    });
   });
 
   test('avaliação local guarda o status de sincronização como enum', () async {
@@ -543,5 +643,51 @@ void main() {
     expect('$secondError', contains('interrompida de propósito'),
         reason: 'sem a transação, a 2ª tentativa quebraria com "duplicate '
             'column name: owner_user_id"');
+  });
+
+  test(
+      'migra do esquema 4 para o 5 criando a tabela de consultores da sessão, '
+      'sem mexer nas sessões já cacheadas', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_v5');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          raw.execute(_sessionsV4);
+          raw.execute('''
+            INSERT INTO sessions (id, company_name, course_name, city, state,
+                                  status, responsible_consultant_id, cached_at)
+            VALUES ('sess-1', 'Bracell', 'Direção Defensiva', 'Itabira', 'MG',
+                    'EM_ANDAMENTO', 'c-1', 1758600000)
+          ''');
+          raw.execute('PRAGMA user_version = 4');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    // A tabela nova nasce vazia: o próximo download do detalhe a preenche.
+    expect(await migrated.select(migrated.sessionConsultants).get(), isEmpty);
+
+    final session = await migrated.select(migrated.sessions).getSingle();
+    expect(session.companyName, 'Bracell');
+    expect(session.responsibleConsultantId, 'c-1');
+
+    await migrated.into(migrated.sessionConsultants).insert(
+          SessionConsultantsCompanion.insert(
+            sessionId: 'sess-1',
+            consultantId: 'c-1',
+            name: 'Carla Mendes',
+          ),
+        );
+    final row = await migrated.select(migrated.sessionConsultants).getSingle();
+    expect(row.name, 'Carla Mendes');
+    expect(row.email, isNull);
   });
 }

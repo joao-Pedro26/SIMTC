@@ -1456,6 +1456,289 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
   }
 }
 
+class $SessionConsultantsTable extends SessionConsultants
+    with TableInfo<$SessionConsultantsTable, SessionConsultantRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SessionConsultantsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sessionIdMeta =
+      const VerificationMeta('sessionId');
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+      'session_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES sessions (id) ON DELETE CASCADE'));
+  static const VerificationMeta _consultantIdMeta =
+      const VerificationMeta('consultantId');
+  @override
+  late final GeneratedColumn<String> consultantId = GeneratedColumn<String>(
+      'consultant_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+      'email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [sessionId, consultantId, name, email];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'session_consultants';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<SessionConsultantRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('session_id')) {
+      context.handle(_sessionIdMeta,
+          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('consultant_id')) {
+      context.handle(
+          _consultantIdMeta,
+          consultantId.isAcceptableOrUnknown(
+              data['consultant_id']!, _consultantIdMeta));
+    } else if (isInserting) {
+      context.missing(_consultantIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sessionId, consultantId};
+  @override
+  SessionConsultantRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SessionConsultantRow(
+      sessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}session_id'])!,
+      consultantId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}consultant_id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      email: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}email']),
+    );
+  }
+
+  @override
+  $SessionConsultantsTable createAlias(String alias) {
+    return $SessionConsultantsTable(attachedDatabase, alias);
+  }
+}
+
+class SessionConsultantRow extends DataClass
+    implements Insertable<SessionConsultantRow> {
+  final String sessionId;
+
+  /// `Consultant.id`.
+  final String consultantId;
+  final String name;
+  final String? email;
+  const SessionConsultantRow(
+      {required this.sessionId,
+      required this.consultantId,
+      required this.name,
+      this.email});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['session_id'] = Variable<String>(sessionId);
+    map['consultant_id'] = Variable<String>(consultantId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
+    return map;
+  }
+
+  SessionConsultantsCompanion toCompanion(bool nullToAbsent) {
+    return SessionConsultantsCompanion(
+      sessionId: Value(sessionId),
+      consultantId: Value(consultantId),
+      name: Value(name),
+      email:
+          email == null && nullToAbsent ? const Value.absent() : Value(email),
+    );
+  }
+
+  factory SessionConsultantRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SessionConsultantRow(
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      consultantId: serializer.fromJson<String>(json['consultantId']),
+      name: serializer.fromJson<String>(json['name']),
+      email: serializer.fromJson<String?>(json['email']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'sessionId': serializer.toJson<String>(sessionId),
+      'consultantId': serializer.toJson<String>(consultantId),
+      'name': serializer.toJson<String>(name),
+      'email': serializer.toJson<String?>(email),
+    };
+  }
+
+  SessionConsultantRow copyWith(
+          {String? sessionId,
+          String? consultantId,
+          String? name,
+          Value<String?> email = const Value.absent()}) =>
+      SessionConsultantRow(
+        sessionId: sessionId ?? this.sessionId,
+        consultantId: consultantId ?? this.consultantId,
+        name: name ?? this.name,
+        email: email.present ? email.value : this.email,
+      );
+  SessionConsultantRow copyWithCompanion(SessionConsultantsCompanion data) {
+    return SessionConsultantRow(
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      consultantId: data.consultantId.present
+          ? data.consultantId.value
+          : this.consultantId,
+      name: data.name.present ? data.name.value : this.name,
+      email: data.email.present ? data.email.value : this.email,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionConsultantRow(')
+          ..write('sessionId: $sessionId, ')
+          ..write('consultantId: $consultantId, ')
+          ..write('name: $name, ')
+          ..write('email: $email')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(sessionId, consultantId, name, email);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SessionConsultantRow &&
+          other.sessionId == this.sessionId &&
+          other.consultantId == this.consultantId &&
+          other.name == this.name &&
+          other.email == this.email);
+}
+
+class SessionConsultantsCompanion
+    extends UpdateCompanion<SessionConsultantRow> {
+  final Value<String> sessionId;
+  final Value<String> consultantId;
+  final Value<String> name;
+  final Value<String?> email;
+  final Value<int> rowid;
+  const SessionConsultantsCompanion({
+    this.sessionId = const Value.absent(),
+    this.consultantId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.email = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SessionConsultantsCompanion.insert({
+    required String sessionId,
+    required String consultantId,
+    required String name,
+    this.email = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : sessionId = Value(sessionId),
+        consultantId = Value(consultantId),
+        name = Value(name);
+  static Insertable<SessionConsultantRow> custom({
+    Expression<String>? sessionId,
+    Expression<String>? consultantId,
+    Expression<String>? name,
+    Expression<String>? email,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sessionId != null) 'session_id': sessionId,
+      if (consultantId != null) 'consultant_id': consultantId,
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SessionConsultantsCompanion copyWith(
+      {Value<String>? sessionId,
+      Value<String>? consultantId,
+      Value<String>? name,
+      Value<String?>? email,
+      Value<int>? rowid}) {
+    return SessionConsultantsCompanion(
+      sessionId: sessionId ?? this.sessionId,
+      consultantId: consultantId ?? this.consultantId,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (consultantId.present) {
+      map['consultant_id'] = Variable<String>(consultantId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionConsultantsCompanion(')
+          ..write('sessionId: $sessionId, ')
+          ..write('consultantId: $consultantId, ')
+          ..write('name: $name, ')
+          ..write('email: $email, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AssessmentCategoriesTable extends AssessmentCategories
     with TableInfo<$AssessmentCategoriesTable, AssessmentCategory> {
   @override
@@ -3470,6 +3753,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $SessionsTable sessions = $SessionsTable(this);
   late final $ParticipantsTable participants = $ParticipantsTable(this);
+  late final $SessionConsultantsTable sessionConsultants =
+      $SessionConsultantsTable(this);
   late final $AssessmentCategoriesTable assessmentCategories =
       $AssessmentCategoriesTable(this);
   late final $InfractionsTable infractions = $InfractionsTable(this);
@@ -3486,12 +3771,25 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         sessions,
         participants,
+        sessionConsultants,
         assessmentCategories,
         infractions,
         infractionNotes,
         localAssessments,
         localAssessmentItems
       ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
+        [
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('sessions',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('session_consultants', kind: UpdateKind.delete),
+            ],
+          ),
+        ],
+      );
 }
 
 typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
@@ -3546,6 +3844,24 @@ final class $$SessionsTableReferences
         .filter((f) => f.sessionId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_participantsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$SessionConsultantsTable,
+      List<SessionConsultantRow>> _sessionConsultantsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.sessionConsultants,
+          aliasName: $_aliasNameGenerator(
+              db.sessions.id, db.sessionConsultants.sessionId));
+
+  $$SessionConsultantsTableProcessedTableManager get sessionConsultantsRefs {
+    final manager = $$SessionConsultantsTableTableManager(
+            $_db, $_db.sessionConsultants)
+        .filter((f) => f.sessionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_sessionConsultantsRefsTable($_db));
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
@@ -3624,6 +3940,27 @@ class $$SessionsTableFilterComposer
             $$ParticipantsTableFilterComposer(
               $db: $db,
               $table: $db.participants,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> sessionConsultantsRefs(
+      Expression<bool> Function($$SessionConsultantsTableFilterComposer f) f) {
+    final $$SessionConsultantsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.sessionConsultants,
+        getReferencedColumn: (t) => t.sessionId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SessionConsultantsTableFilterComposer(
+              $db: $db,
+              $table: $db.sessionConsultants,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -3768,6 +4105,28 @@ class $$SessionsTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> sessionConsultantsRefs<T extends Object>(
+      Expression<T> Function($$SessionConsultantsTableAnnotationComposer a) f) {
+    final $$SessionConsultantsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.sessionConsultants,
+            getReferencedColumn: (t) => t.sessionId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$SessionConsultantsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.sessionConsultants,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
 }
 
 class $$SessionsTableTableManager extends RootTableManager<
@@ -3781,7 +4140,8 @@ class $$SessionsTableTableManager extends RootTableManager<
     $$SessionsTableUpdateCompanionBuilder,
     (Session, $$SessionsTableReferences),
     Session,
-    PrefetchHooks Function({bool participantsRefs})> {
+    PrefetchHooks Function(
+        {bool participantsRefs, bool sessionConsultantsRefs})> {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
       : super(TableManagerState(
           db: db,
@@ -3868,10 +4228,14 @@ class $$SessionsTableTableManager extends RootTableManager<
               .map((e) =>
                   (e.readTable(table), $$SessionsTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({participantsRefs = false}) {
+          prefetchHooksCallback: (
+              {participantsRefs = false, sessionConsultantsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (participantsRefs) db.participants],
+              explicitlyWatchedTables: [
+                if (participantsRefs) db.participants,
+                if (sessionConsultantsRefs) db.sessionConsultants
+              ],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
@@ -3884,6 +4248,19 @@ class $$SessionsTableTableManager extends RootTableManager<
                         managerFromTypedResult: (p0) =>
                             $$SessionsTableReferences(db, table, p0)
                                 .participantsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.sessionId == item.id),
+                        typedResults: items),
+                  if (sessionConsultantsRefs)
+                    await $_getPrefetchedData<Session, $SessionsTable,
+                            SessionConsultantRow>(
+                        currentTable: table,
+                        referencedTable: $$SessionsTableReferences
+                            ._sessionConsultantsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$SessionsTableReferences(db, table, p0)
+                                .sessionConsultantsRefs,
                         referencedItemsForCurrentItem:
                             (item, referencedItems) => referencedItems
                                 .where((e) => e.sessionId == item.id),
@@ -3906,7 +4283,8 @@ typedef $$SessionsTableProcessedTableManager = ProcessedTableManager<
     $$SessionsTableUpdateCompanionBuilder,
     (Session, $$SessionsTableReferences),
     Session,
-    PrefetchHooks Function({bool participantsRefs})>;
+    PrefetchHooks Function(
+        {bool participantsRefs, bool sessionConsultantsRefs})>;
 typedef $$ParticipantsTableCreateCompanionBuilder = ParticipantsCompanion
     Function({
   required String id,
@@ -4309,6 +4687,271 @@ typedef $$ParticipantsTableProcessedTableManager = ProcessedTableManager<
     $$ParticipantsTableUpdateCompanionBuilder,
     (Participant, $$ParticipantsTableReferences),
     Participant,
+    PrefetchHooks Function({bool sessionId})>;
+typedef $$SessionConsultantsTableCreateCompanionBuilder
+    = SessionConsultantsCompanion Function({
+  required String sessionId,
+  required String consultantId,
+  required String name,
+  Value<String?> email,
+  Value<int> rowid,
+});
+typedef $$SessionConsultantsTableUpdateCompanionBuilder
+    = SessionConsultantsCompanion Function({
+  Value<String> sessionId,
+  Value<String> consultantId,
+  Value<String> name,
+  Value<String?> email,
+  Value<int> rowid,
+});
+
+final class $$SessionConsultantsTableReferences extends BaseReferences<
+    _$AppDatabase, $SessionConsultantsTable, SessionConsultantRow> {
+  $$SessionConsultantsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
+      db.sessions.createAlias($_aliasNameGenerator(
+          db.sessionConsultants.sessionId, db.sessions.id));
+
+  $$SessionsTableProcessedTableManager get sessionId {
+    final $_column = $_itemColumn<String>('session_id')!;
+
+    final manager = $$SessionsTableTableManager($_db, $_db.sessions)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$SessionConsultantsTableFilterComposer
+    extends Composer<_$AppDatabase, $SessionConsultantsTable> {
+  $$SessionConsultantsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get consultantId => $composableBuilder(
+      column: $table.consultantId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnFilters(column));
+
+  $$SessionsTableFilterComposer get sessionId {
+    final $$SessionsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.sessionId,
+        referencedTable: $db.sessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SessionsTableFilterComposer(
+              $db: $db,
+              $table: $db.sessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$SessionConsultantsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SessionConsultantsTable> {
+  $$SessionConsultantsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get consultantId => $composableBuilder(
+      column: $table.consultantId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnOrderings(column));
+
+  $$SessionsTableOrderingComposer get sessionId {
+    final $$SessionsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.sessionId,
+        referencedTable: $db.sessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SessionsTableOrderingComposer(
+              $db: $db,
+              $table: $db.sessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$SessionConsultantsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SessionConsultantsTable> {
+  $$SessionConsultantsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get consultantId => $composableBuilder(
+      column: $table.consultantId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  $$SessionsTableAnnotationComposer get sessionId {
+    final $$SessionsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.sessionId,
+        referencedTable: $db.sessions,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SessionsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.sessions,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$SessionConsultantsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SessionConsultantsTable,
+    SessionConsultantRow,
+    $$SessionConsultantsTableFilterComposer,
+    $$SessionConsultantsTableOrderingComposer,
+    $$SessionConsultantsTableAnnotationComposer,
+    $$SessionConsultantsTableCreateCompanionBuilder,
+    $$SessionConsultantsTableUpdateCompanionBuilder,
+    (SessionConsultantRow, $$SessionConsultantsTableReferences),
+    SessionConsultantRow,
+    PrefetchHooks Function({bool sessionId})> {
+  $$SessionConsultantsTableTableManager(
+      _$AppDatabase db, $SessionConsultantsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SessionConsultantsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SessionConsultantsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SessionConsultantsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> sessionId = const Value.absent(),
+            Value<String> consultantId = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionConsultantsCompanion(
+            sessionId: sessionId,
+            consultantId: consultantId,
+            name: name,
+            email: email,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String sessionId,
+            required String consultantId,
+            required String name,
+            Value<String?> email = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionConsultantsCompanion.insert(
+            sessionId: sessionId,
+            consultantId: consultantId,
+            name: name,
+            email: email,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$SessionConsultantsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({sessionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (sessionId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.sessionId,
+                    referencedTable:
+                        $$SessionConsultantsTableReferences._sessionIdTable(db),
+                    referencedColumn: $$SessionConsultantsTableReferences
+                        ._sessionIdTable(db)
+                        .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$SessionConsultantsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SessionConsultantsTable,
+    SessionConsultantRow,
+    $$SessionConsultantsTableFilterComposer,
+    $$SessionConsultantsTableOrderingComposer,
+    $$SessionConsultantsTableAnnotationComposer,
+    $$SessionConsultantsTableCreateCompanionBuilder,
+    $$SessionConsultantsTableUpdateCompanionBuilder,
+    (SessionConsultantRow, $$SessionConsultantsTableReferences),
+    SessionConsultantRow,
     PrefetchHooks Function({bool sessionId})>;
 typedef $$AssessmentCategoriesTableCreateCompanionBuilder
     = AssessmentCategoriesCompanion Function({
@@ -5906,6 +6549,8 @@ class $AppDatabaseManager {
       $$SessionsTableTableManager(_db, _db.sessions);
   $$ParticipantsTableTableManager get participants =>
       $$ParticipantsTableTableManager(_db, _db.participants);
+  $$SessionConsultantsTableTableManager get sessionConsultants =>
+      $$SessionConsultantsTableTableManager(_db, _db.sessionConsultants);
   $$AssessmentCategoriesTableTableManager get assessmentCategories =>
       $$AssessmentCategoriesTableTableManager(_db, _db.assessmentCategories);
   $$InfractionsTableTableManager get infractions =>

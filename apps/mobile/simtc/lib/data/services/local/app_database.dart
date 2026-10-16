@@ -16,6 +16,7 @@ part 'app_database.g.dart';
   tables: [
     Sessions,
     Participants,
+    SessionConsultants,
     AssessmentCategories,
     Infractions,
     InfractionNotes,
@@ -27,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -75,6 +76,12 @@ class AppDatabase extends _$AppDatabase {
               );
               await m.addColumn(localAssessments, localAssessments.score);
             }
+            if (from < 5) {
+              // Fase 6B: os consultores de cada sessão, para a tela
+              // "Consultores" e o "N consultores" do detalhe abrirem offline.
+              // Tabela nova e vazia: o próximo download do detalhe a preenche.
+              await m.createTable(sessionConsultants);
+            }
           });
         },
         beforeOpen: (details) async {
@@ -86,7 +93,8 @@ class AppDatabase extends _$AppDatabase {
 
   static QueryExecutor _openConnection() => driftDatabase(name: 'simtc');
 
-  /// Apaga o cache de sessões e participantes.
+  /// Apaga o cache de sessões e participantes (os consultores de cada sessão
+  /// vão junto, pela chave estrangeira em cascata).
   ///
   /// Chamado ao trocar de consultor (logout ou expiração do refresh token):
   /// `watchSessions()` não tem escopo de usuário, então sem isto a Home do
@@ -98,6 +106,24 @@ class AppDatabase extends _$AppDatabase {
       // a restrição, mesma ordem usada em `SessionRepository._write`.
       await delete(participants).go();
       await delete(sessions).go();
+    });
+  }
+
+  /// Troca os consultores de uma sessão no cache pelos de [rows] (Fase 6B).
+  ///
+  /// Tem transação própria, e entra na de quem chama quando há uma aberta: o
+  /// detalhe da sessão grava participantes e consultores de uma vez só.
+  Future<void> replaceSessionConsultants(
+    String sessionId,
+    Iterable<SessionConsultantsCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(sessionConsultants)
+            ..where((t) => t.sessionId.equals(sessionId)))
+          .go();
+      for (final row in rows) {
+        await into(sessionConsultants).insert(row);
+      }
     });
   }
 }

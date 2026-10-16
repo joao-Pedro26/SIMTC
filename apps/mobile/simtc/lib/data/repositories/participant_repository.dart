@@ -4,6 +4,7 @@ import '../../utils/result.dart';
 import '../../utils/scoring.dart';
 import '../models/cpf_lookup.dart';
 import '../models/remote_assessment.dart';
+import '../models/session_consultant.dart';
 import '../models/session_participant.dart';
 import '../models/training_session.dart';
 import '../services/api/api_client.dart';
@@ -77,8 +78,9 @@ class ParticipantRepository {
     return row == null ? null : SessionParticipant.fromRow(row);
   }
 
-  /// Baixa `GET /training-sessions/:id` e regrava a sessão e os participantes
-  /// dela numa transação só. Devolve quantos participantes ficaram.
+  /// Baixa `GET /training-sessions/:id` e regrava a sessão, os participantes e
+  /// os consultores dela numa transação só. Devolve quantos participantes
+  /// ficaram.
   ///
   /// O `participantsSyncedAt` é a hora em que o GET foi **pedido**, não a da
   /// escrita: os dados valem a partir de quando foram pedidos. Um GET
@@ -108,7 +110,12 @@ class ParticipantRepository {
           .where((p) => p.id.isNotEmpty)
           .toList(growable: false);
 
-      await _write(session, participants, requestedAt);
+      await _write(
+        session,
+        participants,
+        SessionConsultant.listFromJson(body),
+        requestedAt,
+      );
       return Success(participants.length);
     } on ApiException catch (error) {
       // 403 (consultor saiu da sessão) e 404 (sessão apagada) têm mensagem
@@ -124,6 +131,7 @@ class ParticipantRepository {
   Future<void> _write(
     TrainingSession session,
     List<SessionParticipant> participants,
+    List<SessionConsultant>? consultants,
     DateTime now,
   ) {
     final assessable = participants
@@ -179,6 +187,15 @@ class ParticipantRepository {
                 cachedAt: now,
               ),
             );
+      }
+
+      // Os consultores vêm no mesmo corpo (Fase 6B). Nulo: a resposta não
+      // trouxe a lista, e o que já está no cache fica.
+      if (consultants != null) {
+        await _db.replaceSessionConsultants(
+          session.id,
+          consultants.map((c) => c.toCompanion(session.id)),
+        );
       }
     });
   }

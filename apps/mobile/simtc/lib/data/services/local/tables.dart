@@ -79,6 +79,27 @@ class Participants extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cache dos consultores de uma sessão (`SessionConsultant` do backend): a
+/// tela "Consultores" e o "N consultores" do detalhe, que abrem offline
+/// (Fase 6B). Vem do detalhe da sessão, junto com os participantes.
+///
+/// A linha some com a sessão (`ON DELETE CASCADE`): quem apaga sessões do
+/// cache — a Home, ao tirar o que saiu da agenda, e a troca de usuário — não
+/// precisa saber desta tabela.
+@DataClassName('SessionConsultantRow')
+class SessionConsultants extends Table {
+  TextColumn get sessionId =>
+      text().references(Sessions, #id, onDelete: KeyAction.cascade)();
+
+  /// `Consultant.id`.
+  TextColumn get consultantId => text()();
+  TextColumn get name => text()();
+  TextColumn get email => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {sessionId, consultantId};
+}
+
 /// Catálogo: categorias de avaliação (`GET /assessment-categories`).
 class AssessmentCategories extends Table {
   TextColumn get id => text()();
