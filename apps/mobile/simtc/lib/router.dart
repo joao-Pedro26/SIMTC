@@ -7,6 +7,7 @@ import 'ui/auth/login_screen.dart';
 import 'ui/checklist/checklist_screen.dart';
 import 'ui/debug/ds_gallery_screen.dart';
 import 'ui/result/result_screen.dart';
+import 'ui/session_consultants/session_consultants_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
 import 'ui/session_edit/session_edit_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
@@ -32,6 +33,10 @@ abstract final class AppRoutes {
   /// "Adicionar participante" (tela 1.11, Fase 6A), só para ADMIN.
   static String addParticipant(String sessionId) =>
       '/sessions/$sessionId/participants/new';
+
+  /// "Consultores" da sessão (tela 1.13, Fase 6B), só para ADMIN.
+  static String sessionConsultants(String sessionId) =>
+      '/sessions/$sessionId/consultants';
 
   /// Checklist do participante (Fase 4). [fromResult]: aberto pelo
   /// "Reavaliar" do Resultado, que continua embaixo — o voltar leva a ele.
@@ -103,6 +108,12 @@ GoRouter createRouter(
           GoRoute(
             path: 'participants/new',
             builder: (context, state) => AddParticipantScreen(
+              sessionId: state.pathParameters['sessionId']!,
+            ),
+          ),
+          GoRoute(
+            path: 'consultants',
+            builder: (context, state) => SessionConsultantsScreen(
               sessionId: state.pathParameters['sessionId']!,
             ),
           ),

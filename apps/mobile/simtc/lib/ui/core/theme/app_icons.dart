@@ -76,6 +76,9 @@ abstract final class AppIcons {
   static const IconData practice = Icons.directions_car_outlined;
   static const IconData addParticipant = Icons.person_add_outlined;
 
-  /// O aviso de uma linha da tela "Consultores" (Fase 6B, canvas "3c").
+  /// Tela "Consultores" (Fase 6B, canvas "3c"): o aviso de uma linha, e os
+  /// botões de entrar e de sair da sessão.
   static const IconData info = Icons.info_outlined;
+  static const IconData addConsultant = Icons.person_add_outlined;
+  static const IconData removeConsultant = Icons.person_remove_outlined;
 }
