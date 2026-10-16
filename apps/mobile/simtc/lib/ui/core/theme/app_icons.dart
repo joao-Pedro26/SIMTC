@@ -74,11 +74,11 @@ abstract final class AppIcons {
   /// cartão "Teórica + prática" e o botão que adiciona.
   static const IconData cpf = Icons.badge_outlined;
   static const IconData practice = Icons.directions_car_outlined;
-  static const IconData addParticipant = Icons.person_add_outlined;
+  static const IconData addParticipant = Icons.person_add_alt_outlined;
 
   /// Tela "Consultores" (Fase 6B, canvas "3c"): o aviso de uma linha, e os
   /// botões de entrar e de sair da sessão.
   static const IconData info = Icons.info_outlined;
-  static const IconData addConsultant = Icons.person_add_outlined;
+  static const IconData addConsultant = Icons.person_add_alt_outlined;
   static const IconData removeConsultant = Icons.person_remove_outlined;
 }
