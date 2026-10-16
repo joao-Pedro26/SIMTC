@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
+import { statusAfterRelease } from '../participants/participant-release.util';
 
 @Injectable()
 export class PracticalAssessmentsService {
@@ -221,13 +222,22 @@ export class PracticalAssessmentsService {
   }
 
   /**
-   * Libera participantes atribuídos ao consultor logado (o "Desatribuir" do
-   * app mobile). Só quem está com o participante pode liberá-lo; ele volta ao
-   * status de antes da atribuição: `PENDENTE` se nunca foi avaliado, ou o
-   * status da nota da avaliação anterior numa reavaliação.
+   * Libera participantes em avaliação (o "Desatribuir" do app mobile). O
+   * consultor só libera os que estão com ele; o ADMIN libera os de qualquer
+   * consultor (Fase 6B do app) e não precisa ter perfil de consultor. O
+   * participante volta ao status de antes da atribuição: `PENDENTE` se nunca
+   * foi avaliado, ou o status da nota da avaliação anterior numa reavaliação.
    */
-  async unassignParticipants(dto: AssignParticipantsDto, consultantIdFromJwt?: string, userId?: string) {
-    const consultantId = await this.resolveConsultantId(consultantIdFromJwt, userId);
+  async unassignParticipants(
+    dto: AssignParticipantsDto,
+    consultantIdFromJwt?: string,
+    userId?: string,
+    role?: string,
+  ) {
+    const isAdmin = role === 'ADMIN';
+    const consultantId = isAdmin
+      ? undefined
+      : await this.resolveConsultantId(consultantIdFromJwt, userId);
     const records = await this.prisma.trainingParticipant.findMany({
       where: { id: { in: dto.participantIds } },
       include: { assessment: { select: { score: true } } },
@@ -237,24 +247,29 @@ export class PracticalAssessmentsService {
       throw new ConflictException('Um ou mais participantes não foram encontrados');
     }
 
-    const notMine = records.filter(
-      (r) => r.status !== 'EM_AVALIACAO' || r.assignedConsultantId !== consultantId,
-    );
-    if (notMine.length > 0) {
-      throw new ConflictException('Um ou mais participantes não estão atribuídos a você');
+    if (isAdmin) {
+      if (records.some((r) => r.status !== 'EM_AVALIACAO')) {
+        throw new ConflictException('Um ou mais participantes não estão em avaliação');
+      }
+    } else {
+      const notMine = records.filter(
+        (r) => r.status !== 'EM_AVALIACAO' || r.assignedConsultantId !== consultantId,
+      );
+      if (notMine.length > 0) {
+        throw new ConflictException('Um ou mais participantes não estão atribuídos a você');
+      }
     }
 
     await this.prisma.$transaction(
-      records.map((r) => {
-        const score = r.assessment?.score;
-        return this.prisma.trainingParticipant.update({
+      records.map((r) =>
+        this.prisma.trainingParticipant.update({
           where: { id: r.id },
           data: {
             assignedConsultantId: null,
-            status: score != null ? getApprovalStatus(score) : 'PENDENTE',
+            status: statusAfterRelease(r.assessment?.score),
           },
-        });
-      }),
+        }),
+      ),
     );
 
     return { unassigned: records.length };

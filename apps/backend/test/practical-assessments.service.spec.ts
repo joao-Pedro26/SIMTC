@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException } from '@nestjs/common';
+import { PracticalAssessmentsController } from 'src/practical-assessments/practical-assessments.controller';
 import { PracticalAssessmentsService } from 'src/practical-assessments/practical-assessments.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   calculateCategoryScore,
   calculateOverallScore,
   getApprovalStatus,
+  JwtPayload,
 } from '@simtc/shared-types';
 
 const mockPrisma = {
@@ -206,6 +208,52 @@ describe('PracticalAssessmentsService', () => {
         { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } },
       ]);
     });
+
+    it('ADMIN libera participante que está com outro consultor, sem precisar de perfil de consultor', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor', assessment: null },
+        { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'mais-um', assessment: { score: 90 } },
+      ]);
+      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      // Sem `consultantId` no token: só o papel. Se o serviço fosse procurar o
+      // perfil de consultor do usuário, o mock (que não tem `user`) estouraria.
+      const result = await service.unassignParticipants(
+        { participantIds: ['tp-1', 'tp-2'] },
+        undefined,
+        'user-admin',
+        'ADMIN',
+      );
+
+      expect(result).toEqual({ unassigned: 2 });
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
+        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } },
+        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'APROVADO' } },
+      ]);
+    });
+
+    it('ADMIN: quem não está em avaliação não tem o que liberar', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'PENDENTE', assignedConsultantId: null, assessment: null },
+      ]);
+
+      await expect(
+        service.unassignParticipants({ participantIds: ['tp-1'] }, undefined, 'user-admin', 'ADMIN'),
+      ).rejects.toThrow('Um ou mais participantes não estão em avaliação');
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('o papel de consultor não libera participante de outro consultor', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor', assessment: null },
+      ]);
+
+      await expect(
+        service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor', 'user-1', 'CONSULTANT'),
+      ).rejects.toThrow('Um ou mais participantes não estão atribuídos a você');
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 
   // ─── syncFromMobile ──────────────────────────────────────────────────────
@@ -254,5 +302,19 @@ describe('PracticalAssessmentsService', () => {
         { trainingParticipantId: 'tp-1', status: 'rejected', error: 'falha no banco' },
       ]);
     });
+  });
+});
+
+describe('PracticalAssessmentsController.unassign', () => {
+  it('passa o papel de quem pediu: é ele que deixa o ADMIN liberar participante de outro consultor', () => {
+    const service = { unassignParticipants: jest.fn().mockReturnValue('ok') };
+    const controller = new PracticalAssessmentsController(
+      service as unknown as PracticalAssessmentsService,
+    );
+    const dto = { participantIds: ['tp-1'] };
+    const admin = { sub: 'user-admin', email: 'admin@sim.com', role: 'ADMIN' } as JwtPayload;
+
+    expect(controller.unassign(dto, admin)).toBe('ok');
+    expect(service.unassignParticipants).toHaveBeenCalledWith(dto, undefined, 'user-admin', 'ADMIN');
   });
 });

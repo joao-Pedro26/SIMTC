@@ -21,9 +21,9 @@ export class PracticalAssessmentsController {
   }
 
   @Post('unassign')
-  @ApiOperation({ summary: 'Libera participantes atribuídos ao consultor logado (voltam ao status anterior)' })
+  @ApiOperation({ summary: 'Libera participantes em avaliação (voltam ao status anterior) — o consultor, os dele; o ADMIN, os de qualquer consultor' })
   unassign(@Body() dto: AssignParticipantsDto, @CurrentUser() user: JwtPayload) {
-    return this.service.unassignParticipants(dto, user.consultantId, user.sub);
+    return this.service.unassignParticipants(dto, user.consultantId, user.sub, user.role);
   }
 
   @Post('sync')
