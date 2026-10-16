@@ -11,6 +11,7 @@ import { QrCodeService } from './qr-code.service';
 import { JwtPayload } from '@simtc/shared-types';
 import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
+import { AddSessionConsultantDto } from './dto/add-session-consultant.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('training-sessions')
@@ -87,5 +88,19 @@ export class TrainingSessionsController {
   @Roles('ADMIN' as any)
   updateTrainingSession(@Param('id') id: string, @Body() dto: UpdateTrainingSessionDto) {
     return this.service.updateSession(id, dto);
+  }
+
+  @Post(':id/consultants')
+  @Roles('ADMIN' as any)
+  @ApiOperation({ summary: 'Põe um consultor na sessão (app mobile) — devolve os consultores da sessão' })
+  addConsultant(@Param('id') id: string, @Body() dto: AddSessionConsultantDto) {
+    return this.service.addConsultant(id, dto.consultantId);
+  }
+
+  @Delete(':id/consultants/:consultantId')
+  @Roles('ADMIN' as any)
+  @ApiOperation({ summary: 'Tira um consultor da sessão e libera quem estava em avaliação com ele (app mobile) — devolve os consultores da sessão' })
+  removeConsultant(@Param('id') id: string, @Param('consultantId') consultantId: string) {
+    return this.service.removeConsultant(id, consultantId);
   }
 }

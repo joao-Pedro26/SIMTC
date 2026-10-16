@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -8,6 +8,7 @@ import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
+import { releaseParticipantsOfConsultants } from '../participants/participant-release.util';
 
 @Injectable()
 export class TrainingSessionsService {
@@ -351,12 +352,96 @@ export class TrainingSessionsService {
     });
   }
 
+  /** Sessão concluída ou cancelada não muda mais: nem os dados, nem os consultores. */
+  private assertEditable(status: string) {
+    if (status === 'CONCLUIDO' || status === 'CANCELADO') {
+      throw new ForbiddenException('Não é possível editar um treinamento concluído ou cancelado');
+    }
+  }
+
+  /**
+   * Os consultores da sessão, no formato que o detalhe (`GET :id`) já devolve
+   * em `consultants`, mais quem é o responsável. É a resposta das duas rotas
+   * de consultor do app mobile.
+   */
+  private async consultantsOf(id: string, responsibleConsultantId: string | null) {
+    const consultants = await this.prisma.sessionConsultant.findMany({
+      where: { trainingSessionId: id },
+      include: { consultant: { select: { id: true, name: true, email: true } } },
+      orderBy: { consultant: { name: 'asc' } },
+    });
+    return { responsibleConsultantId, consultants };
+  }
+
+  /**
+   * Põe um consultor na sessão (app mobile, Fase 6B). Repetir o pedido não é
+   * erro: o app manda um consultor por vez e pode reenviar depois de uma
+   * resposta que se perdeu.
+   */
+  async addConsultant(id: string, consultantId: string) {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { id },
+      select: { status: true, responsibleConsultantId: true },
+    });
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
+    this.assertEditable(session.status);
+
+    const consultant = await this.prisma.consultant.findUnique({
+      where: { id: consultantId },
+      select: { active: true },
+    });
+    if (!consultant) {
+      throw new NotFoundException('Consultor não encontrado');
+    }
+    if (!consultant.active) {
+      throw new BadRequestException('Consultor inativo não pode entrar em um treinamento');
+    }
+
+    await this.prisma.sessionConsultant.upsert({
+      where: { trainingSessionId_consultantId: { trainingSessionId: id, consultantId } },
+      create: { trainingSessionId: id, consultantId },
+      update: {},
+    });
+
+    return this.consultantsOf(id, session.responsibleConsultantId);
+  }
+
+  /**
+   * Tira um consultor da sessão (app mobile, Fase 6B) e, na mesma transação,
+   * libera quem estava em avaliação com ele. O responsável não sai por aqui:
+   * trocar o responsável é do painel (`PATCH :id`). Tirar quem já não estava
+   * não é erro.
+   */
+  async removeConsultant(id: string, consultantId: string) {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { id },
+      select: { status: true, responsibleConsultantId: true },
+    });
+    if (!session) {
+      throw new NotFoundException('Sessão de treinamento não encontrada');
+    }
+    this.assertEditable(session.status);
+
+    if (session.responsibleConsultantId === consultantId) {
+      throw new BadRequestException(
+        'O consultor responsável não pode ser removido do treinamento. Troque o responsável antes.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sessionConsultant.deleteMany({ where: { trainingSessionId: id, consultantId } });
+      await releaseParticipantsOfConsultants(tx, id, [consultantId]);
+    });
+
+    return this.consultantsOf(id, session.responsibleConsultantId);
+  }
+
   async updateSession (id: string, dto: UpdateTrainingSessionDto) {
     const session = await this.findTrainingSessionById(id);
 
-    if (session.status === 'CONCLUIDO' || session.status === 'CANCELADO') {
-      throw new ForbiddenException('Não é possível editar um treinamento concluído ou cancelado');
-    }
+    this.assertEditable(session.status);
 
     return this.prisma.$transaction(async (tx) => {
       if(dto.additionalConsultantsIds !== undefined) {
@@ -373,6 +458,13 @@ export class TrainingSessionsService {
             consultantId,
           })),
         });
+
+        // Quem ficou de fora da lista nova saiu da sessão: os participantes
+        // que estavam em avaliação com ele são liberados (Fase 6B).
+        const removedIds = session.consultants
+          .map((link) => link.consultantId)
+          .filter((consultantId) => !allConsultantIds.includes(consultantId));
+        await releaseParticipantsOfConsultants(tx, id, removedIds);
       }
 
       return tx.trainingSession.update({
