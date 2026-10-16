@@ -37,6 +37,55 @@ void main() {
     expect(find.byIcon(AppIcons.approved), findsOneWidget);
   });
 
+  testWidgets('LabelPill mostra só o texto, nas cores do tom e com o recuo do '
+      'canvas', (tester) async {
+    await _pump(
+      tester,
+      const Row(
+        children: [
+          LabelPill(label: 'Responsável', tone: StatusTone.info),
+          LabelPill(label: 'Consultor', tone: StatusTone.neutral),
+        ],
+      ),
+    );
+
+    expect(find.byType(Icon), findsNothing);
+
+    BoxDecoration boxOf(String label) {
+      final container = tester.widget<Container>(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(Container))
+            .first,
+      );
+      return container.decoration! as BoxDecoration;
+    }
+
+    Color? inkOf(String label) =>
+        tester.renderObject<RenderParagraph>(find.text(label)).text.style?.color;
+
+    expect(boxOf('Responsável').color, AppColors.primarySurface);
+    expect(
+      boxOf('Responsável').border,
+      Border.all(color: AppColors.primary, width: 1.5),
+    );
+    expect(inkOf('Responsável'), AppColors.primaryDark);
+    expect(boxOf('Consultor').color, AppColors.neutralBg);
+    expect(
+      boxOf('Consultor').border,
+      Border.all(color: AppColors.neutralBorder, width: 1.5),
+    );
+    expect(inkOf('Consultor'), AppColors.neutralInk);
+
+    // Recuo de 10 dos lados e 5 em cima e embaixo, por dentro do contorno
+    // de 1,5 (canvas "3c").
+    final pill = tester.getRect(find.byType(LabelPill).first);
+    final text = tester.getRect(find.text('Responsável'));
+    expect(text.left - pill.left, 11.5);
+    expect(pill.right - text.right, 11.5);
+    expect(text.top - pill.top, 6.5);
+    expect(pill.bottom - text.bottom, 6.5);
+  });
+
   testWidgets('SeverityBadge usa os rótulos literais B, PM e M', (tester) async {
     await _pump(
       tester,
@@ -343,6 +392,23 @@ void main() {
       expect(find.text('BC'), findsOneWidget);
       expect(find.text('Bracell Celulose'), findsOneWidget);
       expect(find.text('Direção Defensiva — Veículo Pesado'), findsOneWidget);
+    });
+
+    testWidgets('com título, a primeira linha é ele, e as iniciais continuam '
+        'sendo as da empresa', (tester) async {
+      await _pump(
+        tester,
+        const SessionContextHeader(
+          companyName: 'Bracell Celulose',
+          title: 'Bracell Celulose · 12 set',
+          subtitle: '5 participantes · 3 consultores',
+        ),
+      );
+
+      expect(find.text('BC'), findsOneWidget);
+      expect(find.text('Bracell Celulose · 12 set'), findsOneWidget);
+      expect(find.text('Bracell Celulose'), findsNothing);
+      expect(find.text('5 participantes · 3 consultores'), findsOneWidget);
     });
 
     testWidgets('apagada usa o fundo da tela; a normal, o da superfície',

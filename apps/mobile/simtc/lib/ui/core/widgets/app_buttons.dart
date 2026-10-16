@@ -224,8 +224,11 @@ class AppCtaButton extends StatelessWidget {
   }
 }
 
-/// Ação destrutiva em contorno vermelho, na caixa do botão principal —
-/// "Cancelar sessão" (canvas "3b"): mora no fim da tela, longe do salvar.
+/// Ação destrutiva em contorno vermelho. No tamanho padrão, tem a caixa do
+/// botão principal — "Cancelar sessão" (canvas "3b"): mora no fim da tela,
+/// longe do salvar. Com [compact], é a ação de uma linha de lista — "Remover
+/// da sessão" (canvas "3c"): o quadro a desenha com 44dp, aqui ela tem 48dp, o
+/// alvo mínimo do DS.
 class AppDangerOutlineButton extends StatelessWidget {
   const AppDangerOutlineButton({
     super.key,
@@ -233,19 +236,21 @@ class AppDangerOutlineButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.icon,
+    this.compact = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
   final IconData? icon;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final available = onPressed != null || isLoading;
 
     return SizedBox(
-      height: AppSpacing.controlHeight,
+      height: compact ? AppSpacing.touchTarget : AppSpacing.controlHeight,
       width: double.infinity,
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
@@ -257,12 +262,17 @@ class AppDangerOutlineButton extends StatelessWidget {
             color: available ? AppColors.dangerBorder : AppColors.border,
             width: 1.5,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? AppSpacing.lg : AppSpacing.xl,
+          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(
+              compact ? AppRadius.sm + 2 : AppRadius.md,
+            ),
           ),
           // A cor vem do `foregroundColor`; daqui só o tamanho e o peso.
-          textStyle: AppTypography.buttonDanger,
+          textStyle:
+              compact ? AppTypography.buttonCompact : AppTypography.buttonDanger,
         ),
         child: isLoading ? _buildSpinner() : _buildContent(),
       ),
@@ -285,10 +295,95 @@ class AppDangerOutlineButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 20),
+          Icon(icon, size: compact ? 19 : 20),
           const SizedBox(width: AppSpacing.sm),
         ],
         Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+  }
+}
+
+/// Ação em contorno cinza ao lado de um item de lista — o "Adicionar" da tela
+/// "Consultores" (canvas "3c"). Tem a largura do rótulo, e não a da linha; o
+/// quadro a desenha com 44dp, aqui ela tem 48dp, o alvo mínimo do DS.
+class AppCompactOutlineButton extends StatelessWidget {
+  const AppCompactOutlineButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.isLoading = false,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = onPressed != null || isLoading;
+
+    return SizedBox(
+      height: AppSpacing.touchTarget,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primaryDark,
+          disabledForegroundColor:
+              isLoading ? AppColors.primaryDark : AppColors.textMuted,
+          backgroundColor: AppColors.surface,
+          side: BorderSide(
+            color: available ? AppColors.borderStrong : AppColors.border,
+            width: 1.5,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+          ),
+          // A cor vem do `foregroundColor`; daqui só o tamanho e o peso.
+          textStyle: AppTypography.buttonCompact,
+        ),
+        // O rótulo continua ocupando o lugar dele enquanto o indicador gira:
+        // o botão tem a largura do conteúdo, e sem isso a linha pularia.
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Visibility(
+              visible: !isLoading,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: _buildContent(),
+            ),
+            if (isLoading) _buildSpinner(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpinner() {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        strokeWidth: 2.5,
+        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryDark),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 19),
+          const SizedBox(width: AppSpacing.sm - AppSpacing.xxs),
+        ],
+        Text(label),
       ],
     );
   }

@@ -75,4 +75,7 @@ abstract final class AppIcons {
   static const IconData cpf = Icons.badge_outlined;
   static const IconData practice = Icons.directions_car_outlined;
   static const IconData addParticipant = Icons.person_add_outlined;
+
+  /// O aviso de uma linha da tela "Consultores" (Fase 6B, canvas "3c").
+  static const IconData info = Icons.info_outlined;
 }

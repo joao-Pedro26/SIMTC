@@ -5,7 +5,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'company_logo.dart';
 
-/// Faixa de contexto no topo dos formulários de ADMIN (canvas "3a" e "3b"):
+/// Faixa de contexto no topo das telas de ADMIN (canvas "3a", "3b" e "3c"):
 /// o logo da empresa e duas linhas dizendo em que sessão o admin está
 /// mexendo — ele cadastra em sequência e precisa saber onde está.
 class SessionContextHeader extends StatelessWidget {
@@ -13,12 +13,18 @@ class SessionContextHeader extends StatelessWidget {
     super.key,
     required this.companyName,
     required this.subtitle,
+    this.title,
     this.logoUrl,
     this.muted = false,
   });
 
+  /// De onde saem o logo e as iniciais — e a primeira linha, sem [title].
   final String companyName;
   final String? logoUrl;
+
+  /// A primeira linha, quando não é só o nome da empresa ("Bracell · 12 set",
+  /// canvas "3c").
+  final String? title;
 
   /// A segunda linha: o curso e, quando ajuda, a data ("… · 12 set").
   final String subtitle;
@@ -47,7 +53,7 @@ class SessionContextHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  companyName,
+                  title ?? companyName,
                   style: AppTypography.contextTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

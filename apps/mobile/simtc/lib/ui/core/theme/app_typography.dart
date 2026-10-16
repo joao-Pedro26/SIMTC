@@ -122,6 +122,10 @@ abstract final class AppTypography {
   static TextStyle get contextTitle =>
       _inter(size: 15, weight: FontWeight.w600, height: 1.25);
 
+  /// Nome do consultor na tela "Consultores" (canvas "3c")
+  static TextStyle get consultantName =>
+      _inter(size: 15.5, weight: FontWeight.w600, height: 1.25);
+
   /// Rótulo de um cartão de opção ("Somente teórica", canvas "3a"). São dois
   /// estilos, e não um `copyWith(fontWeight:)`: o `copyWith` não mexe no
   /// `fontVariations`, e é do eixo `wght` que vem o peso da fonte variável.

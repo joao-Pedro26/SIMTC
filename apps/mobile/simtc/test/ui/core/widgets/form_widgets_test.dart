@@ -286,6 +286,153 @@ void main() {
       final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
       expect(button.onPressed, isNull);
     });
+
+    testWidgets('compacto tem 48dp, texto 14, ícone 19 e canto 10, como o '
+        '"Remover da sessão" do canvas', (tester) async {
+      await _pump(
+        tester,
+        AppDangerOutlineButton(
+          label: 'Remover da sessão',
+          icon: AppIcons.discard,
+          compact: true,
+          onPressed: () {},
+        ),
+      );
+
+      expect(tester.getSize(find.byType(AppDangerOutlineButton)).height, 48);
+      expect(tester.widget<Icon>(find.byIcon(AppIcons.discard)).size, 19);
+      final text =
+          tester.renderObject<RenderParagraph>(find.text('Remover da sessão'));
+      expect(text.text.style?.fontSize, 14);
+      expect(text.text.style?.color, AppColors.dangerInk);
+
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(
+        button.style!.shape!.resolve(const {}),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      );
+    });
+
+    testWidgets('o tamanho padrão continua com texto 15, ícone 20 e canto 12',
+        (tester) async {
+      await _pump(
+        tester,
+        AppDangerOutlineButton(
+          label: 'Cancelar sessão',
+          icon: AppIcons.cancelSession,
+          onPressed: () {},
+        ),
+      );
+
+      expect(tester.widget<Icon>(find.byIcon(AppIcons.cancelSession)).size, 20);
+      final text =
+          tester.renderObject<RenderParagraph>(find.text('Cancelar sessão'));
+      expect(text.text.style?.fontSize, 15);
+
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(
+        button.style!.shape!.resolve(const {}),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+    });
+  });
+
+  group('AppCompactOutlineButton', () {
+    // Como na tela: ao lado de um texto que ocupa o resto da linha.
+    Widget inRow(Widget button) {
+      return Row(
+        children: [const Expanded(child: Text('Diego Barbosa')), button],
+      );
+    }
+
+    testWidgets('dispara a ação, com 48dp de altura, a largura do rótulo e as '
+        'medidas do "Adicionar" do canvas', (tester) async {
+      var taps = 0;
+      await _pump(
+        tester,
+        inRow(
+          AppCompactOutlineButton(
+            label: 'Adicionar',
+            icon: AppIcons.assign,
+            onPressed: () => taps++,
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Adicionar'));
+      expect(taps, 1);
+
+      final box = tester.getRect(find.byType(AppCompactOutlineButton));
+      final icon = tester.getRect(find.byIcon(AppIcons.assign));
+      final label = tester.getRect(find.text('Adicionar'));
+      expect(box.height, 48);
+      // Recuo de 14, ícone de 19, vão de 6, o rótulo e mais 14.
+      expect(icon.left - box.left, 14);
+      expect(icon.width, 19);
+      expect(label.left - icon.right, 6);
+      expect(box.right - label.right, 14);
+
+      final outlined = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(
+        outlined.style!.side!.resolve(const {}),
+        const BorderSide(color: AppColors.borderStrong, width: 1.5),
+      );
+      expect(
+        outlined.style!.shape!.resolve(const {}),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      );
+      final text = tester.renderObject<RenderParagraph>(find.text('Adicionar'));
+      expect(text.text.style?.fontSize, 14);
+      expect(text.text.style?.color, AppColors.primaryDark);
+    });
+
+    testWidgets('em carregamento mostra o indicador, não responde ao toque e '
+        'mantém a largura', (tester) async {
+      var taps = 0;
+      Widget build({required bool loading}) {
+        return inRow(
+          AppCompactOutlineButton(
+            label: 'Adicionar',
+            icon: AppIcons.assign,
+            isLoading: loading,
+            onPressed: () => taps++,
+          ),
+        );
+      }
+
+      await _pump(tester, build(loading: false));
+      final idle = tester.getSize(find.byType(AppCompactOutlineButton));
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      await _pump(tester, build(loading: true));
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // A linha não pula quando o botão troca o rótulo pelo indicador.
+      expect(tester.getSize(find.byType(AppCompactOutlineButton)), idle);
+
+      await tester.tap(find.byType(AppCompactOutlineButton));
+      expect(taps, 0);
+    });
+
+    testWidgets('sem ação, continua à vista, apagado', (tester) async {
+      await _pump(
+        tester,
+        inRow(
+          const AppCompactOutlineButton(
+            label: 'Adicionar',
+            icon: AppIcons.assign,
+          ),
+        ),
+      );
+
+      final outlined = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(outlined.onPressed, isNull);
+      expect(
+        outlined.style!.side!.resolve(const {}),
+        const BorderSide(color: AppColors.border, width: 1.5),
+      );
+      final text = tester.renderObject<RenderParagraph>(find.text('Adicionar'));
+      expect(text.text.style?.color, AppColors.textMuted);
+    });
   });
 
   group('AppTextButton', () {
