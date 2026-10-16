@@ -578,7 +578,88 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       action: _viewModel.canAssign(participant)
           ? _buildAssignButton(participant, isOffline)
           : null,
+      menu: _viewModel.showsAdminMenu(participant)
+          ? _buildAdminMenu(participant, isOffline)
+          : null,
     );
+  }
+
+  /// ⋮ do ADMIN na linha de quem está com outro consultor (decisão de
+  /// 09/10/2026 — não está no canvas): "Desatribuir participante". Segue a
+  /// regra das ações de ADMIN: sem conexão ou com a sessão encerrada, fica à
+  /// vista, apagado, e o aviso da lista diz por quê. Com um desatribuir no ar,
+  /// a linha dele gira e os outros menus não abrem.
+  Widget _buildAdminMenu(SessionParticipant participant, bool isOffline) {
+    final unassigning = _viewModel.unassigningParticipantId;
+    if (unassigning == participant.id) {
+      return SizedBox.square(
+        key: ValueKey('desatribuindo-${participant.id}'),
+        dimension: AppSpacing.touchTarget,
+        child: const Center(
+          child: SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.text3),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final enabled = _adminActionsEnabled(isOffline) && unassigning == null;
+    return SizedBox.square(
+      dimension: AppSpacing.touchTarget,
+      child: PopupMenuButton<_RowAction>(
+        key: ValueKey('menu-${participant.id}'),
+        tooltip: 'Mais opções',
+        enabled: enabled,
+        icon: Icon(
+          AppIcons.more,
+          color: enabled ? AppColors.text : AppColors.textMuted,
+        ),
+        onSelected: (_) => _confirmUnassign(participant),
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: _RowAction.unassign,
+            child: Text('Desatribuir participante'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Volta para "Pendente" ou, numa reavaliação, para "Não recomendado" — a
+  /// mesma regra do backend.
+  Future<void> _confirmUnassign(SessionParticipant participant) async {
+    final consultant = participant.assignedConsultantName?.trim() ?? '';
+    final withWhom = consultant.isEmpty ? 'outro consultor' : consultant;
+    final status =
+        participant.hasPreviousAssessment ? 'Não recomendado' : 'Pendente';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Desatribuir ${participant.name}?'),
+        content: Text(
+          'Está em avaliação com $withWhom. Ao desatribuir, volta para '
+          '$status e pode ser avaliado por outro consultor.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Desatribuir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _viewModel.unassignAsAdmin(participant.id);
+    }
   }
 
   /// Para onde a linha leva: o checklist (Fase 4) ou o Resultado (Fase 5B) —
@@ -682,3 +763,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 }
+
+/// O que o ⋮ de uma linha oferece ao ADMIN.
+enum _RowAction { unassign }

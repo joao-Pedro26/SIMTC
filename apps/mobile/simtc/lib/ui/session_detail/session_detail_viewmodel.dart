@@ -61,6 +61,8 @@ class SessionDetailViewModel extends ChangeNotifier {
       'Não foi possível atribuir o participante. Tente de novo.';
   static const String _startFailed =
       'Não foi possível iniciar a sessão. Tente de novo.';
+  static const String _unassignFailed =
+      'Não foi possível desatribuir o participante. Tente de novo.';
 
   StreamSubscription<TrainingSession?>? _sessionSubscription;
   StreamSubscription<List<SessionParticipant>>? _participantsSubscription;
@@ -77,6 +79,7 @@ class SessionDetailViewModel extends ChangeNotifier {
   bool _isRefreshing = false;
   bool _isStarting = false;
   String? _assigningParticipantId;
+  String? _unassigningParticipantId;
   ParticipantFilter _filter = ParticipantFilter.todos;
   String? _message;
 
@@ -101,6 +104,9 @@ class SessionDetailViewModel extends ChangeNotifier {
 
   /// Participante com atribuição em andamento — só um de cada vez.
   String? get assigningParticipantId => _assigningParticipantId;
+
+  /// Participante que o ADMIN está desatribuindo — só um de cada vez.
+  String? get unassigningParticipantId => _unassigningParticipantId;
 
   /// Aviso passageiro (SnackBar) — sucesso ou falha de uma ação.
   String? get message => _message;
@@ -191,6 +197,12 @@ class SessionDetailViewModel extends ChangeNotifier {
       evaluationOpen &&
       hasConsultantProfile &&
       situationFor(participant) == ParticipantSituation.pending;
+
+  /// O ⋮ do ADMIN (Fase 6B) aparece na linha de quem está em avaliação com
+  /// outro consultor. Os participantes do próprio ADMIN continuam pelo ⋮ do
+  /// checklist.
+  bool showsAdminMenu(SessionParticipant participant) =>
+      isAdmin && situationFor(participant) == ParticipantSituation.other;
 
   /// A avaliação deste aparelho para o participante — só as do consultor
   /// logado.
@@ -351,6 +363,47 @@ class SessionDetailViewModel extends ChangeNotifier {
       _message = _assignFailed;
     } finally {
       _assigningParticipantId = null;
+      notifyListeners();
+    }
+
+    // A tela pode ter sido fechada enquanto a resposta ainda viajava.
+    if (resync && !_disposed) unawaited(refresh());
+  }
+
+  /// "Desatribuir participante" pelo ⋮ do ADMIN: libera quem está em
+  /// avaliação com outro consultor (o backend só aceita isso de um ADMIN). A
+  /// linha muda na hora, e o detalhe é baixado de novo depois — no sucesso,
+  /// para ficar com o estado oficial; na recusa, para mostrar o que mudou.
+  Future<void> unassignAsAdmin(String participantId) async {
+    final participant =
+        _participants.where((p) => p.id == participantId).firstOrNull;
+    if (participant == null ||
+        !showsAdminMenu(participant) ||
+        !adminActionsAllowed ||
+        _unassigningParticipantId != null) {
+      return;
+    }
+
+    _unassigningParticipantId = participantId;
+    notifyListeners();
+
+    var resync = false;
+    try {
+      final result = await _participantRepository.unassign(participantId);
+      switch (result) {
+        case Success():
+          _message = '${participant.name} foi desatribuído.';
+          resync = true;
+        case Failure(:final exception, :final message):
+          _message = message ?? _unassignFailed;
+          // Sem rede, o re-sync falharia do mesmo jeito e só empilharia um
+          // segundo aviso em cima deste.
+          resync = exception is! ApiException || !exception.isNetworkError;
+      }
+    } catch (_) {
+      _message = _unassignFailed;
+    } finally {
+      _unassigningParticipantId = null;
       notifyListeners();
     }
 

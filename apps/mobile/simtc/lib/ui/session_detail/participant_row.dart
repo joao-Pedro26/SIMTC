@@ -20,6 +20,7 @@ class ParticipantRow extends StatelessWidget {
     this.meta,
     this.blockedNote,
     this.action,
+    this.menu,
     this.onTap,
     this.accentColor = AppColors.border,
     this.muted = false,
@@ -39,6 +40,10 @@ class ParticipantRow extends StatelessWidget {
   /// Botão sob a linha — hoje, só o "Atribuir a mim".
   final Widget? action;
 
+  /// O ⋮ do ADMIN (Fase 6B), no lugar do chevron: um alvo de 48dp que a tela
+  /// monta.
+  final Widget? menu;
+
   /// Nulo = a linha não abre nada, e o chevron some.
   final VoidCallback? onTap;
 
@@ -48,15 +53,17 @@ class ParticipantRow extends StatelessWidget {
   /// Fundo apagado para quem está com outro consultor.
   final bool muted;
 
+  // O recuo lateral é de cada parte da linha, e não do contêiner: o cabeçalho
+  // com o menu tem um recuo próprio à direita.
+  static const EdgeInsets _sides =
+      EdgeInsets.symmetric(horizontal: AppSpacing.xl);
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl,
-          vertical: AppSpacing.lg - 1,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg - 1),
         decoration: BoxDecoration(
           color: muted ? AppColors.background : AppColors.surface,
           border: Border(top: BorderSide(color: accentColor, width: 0.8)),
@@ -67,11 +74,14 @@ class ParticipantRow extends StatelessWidget {
             _buildHeader(),
             if (blockedNote != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Text(blockedNote!, style: AppTypography.meta),
+              Padding(
+                padding: _sides,
+                child: Text(blockedNote!, style: AppTypography.meta),
+              ),
             ],
             if (action != null) ...[
               const SizedBox(height: AppSpacing.md),
-              action!,
+              Padding(padding: _sides, child: action!),
             ],
           ],
         ),
@@ -80,16 +90,27 @@ class ParticipantRow extends StatelessWidget {
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        Expanded(child: _buildIdentity()),
-        const SizedBox(width: AppSpacing.md),
-        chip,
-        if (onTap != null) ...[
-          const SizedBox(width: AppSpacing.xs),
-          const Icon(AppIcons.chevronRight, size: 24, color: AppColors.text3),
+    return Padding(
+      // Com o menu, o recuo da direita encolhe: é o ícone do ⋮, e não a área
+      // de toque de 48dp, que fica na margem da lista — como o "adicionar" do
+      // título "Participantes".
+      padding: EdgeInsets.only(
+        left: AppSpacing.xl,
+        right: menu == null ? AppSpacing.xl : AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildIdentity()),
+          const SizedBox(width: AppSpacing.md),
+          chip,
+          if (menu != null)
+            menu!
+          else if (onTap != null) ...[
+            const SizedBox(width: AppSpacing.xs),
+            const Icon(AppIcons.chevronRight, size: 24, color: AppColors.text3),
+          ],
         ],
-      ],
+      ),
     );
   }
 

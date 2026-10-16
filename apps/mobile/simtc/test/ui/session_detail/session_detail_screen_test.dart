@@ -16,12 +16,14 @@ import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
+import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
@@ -765,6 +767,341 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('3 consultores'), findsOneWidget);
       expect(find.byTooltip('Consultores da sessão'), findsOneWidget);
+    });
+  });
+
+  group('o ADMIN desatribui pelo ⋮ da linha (Fase 6B)', () {
+    late SessionParticipant marcos;
+
+    setUp(() {
+      marcos = participant(
+        '3',
+        'Marcos Vinícius Alves',
+        status: ParticipantStatus.emAvaliacao,
+        assignedTo: 'c-outro',
+        assignedName: 'Rafael Lima',
+      );
+      when(() => auth.currentUser).thenReturn(admin);
+      when(() => participants.unassign(any()))
+          .thenAnswer((_) async => const Success<void>(null));
+    });
+
+    Finder menuOf(String id) => find.byKey(ValueKey('menu-$id'));
+
+    PopupMenuButton<Object?> menuButton(WidgetTester tester, String id) =>
+        tester.widget<PopupMenuButton<Object?>>(
+          find.descendant(
+            of: find.byKey(ValueKey('participante-$id')),
+            matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
+          ),
+        );
+
+    /// Abre o ⋮ da linha e escolhe "Desatribuir participante".
+    Future<void> chooseUnassign(WidgetTester tester, String id) async {
+      await tester.tap(menuOf(id));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Desatribuir participante'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('consultor comum não tem o ⋮ na linha de quem está com outro',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(consultora);
+
+      await show(tester, withParticipants: [marcos]);
+
+      expect(find.text('Em avaliação com outro consultor.'), findsOneWidget);
+      expect(find.byIcon(AppIcons.more), findsNothing);
+    });
+
+    testWidgets(
+        'o ADMIN vê o ⋮ só na linha de quem está com outro consultor, num '
+        'alvo de 48dp com o ícone na margem da lista', (tester) async {
+      await show(tester, withParticipants: [
+        participant('1', 'Ana Paula Ribeiro',
+            status: ParticipantStatus.emAvaliacao, assignedTo: 'c-admin'),
+        participant('2', 'Carlos Eduardo Nunes'),
+        marcos,
+        participant('4', 'Juliana Freitas Costa',
+            status: ParticipantStatus.aprovado, score: 86.4),
+      ]);
+
+      expect(find.byIcon(AppIcons.more), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('participante-3')),
+          matching: find.byIcon(AppIcons.more),
+        ),
+        findsOneWidget,
+      );
+      expect(menuButton(tester, '3').enabled, isTrue);
+      expect(find.byTooltip('Mais opções'), findsOneWidget);
+
+      final target = tester.getRect(
+        find.ancestor(of: menuOf('3'), matching: find.byType(SizedBox)).first,
+      );
+      expect(target.size, const Size(48, 48));
+      // A tela de teste tem 420 de largura; a margem da lista é de 20.
+      expect(tester.getRect(find.byIcon(AppIcons.more)).right, 420 - 20);
+      // A nota de baixo continua na margem de sempre.
+      final row = tester.getRect(find.byKey(const ValueKey('participante-3')));
+      final note = tester.getRect(find.text('Em avaliação com outro consultor.'));
+      expect(note.left - row.left, 20);
+      // A linha não abre nada: quem age é o menu.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('participante-3')),
+          matching: find.byIcon(AppIcons.chevronRight),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'as linhas mantêm os recuos de sempre, com ou sem o ⋮: 20 dos lados e '
+        '15 em cima e embaixo', (tester) async {
+      await show(tester, withParticipants: [
+        participant('2', 'Carlos Eduardo Nunes'),
+        marcos,
+      ]);
+
+      // A linha pendente, com o "Atribuir a mim" embaixo.
+      final pending = tester.getRect(find.byKey(const ValueKey('participante-2')));
+      final pendingName = tester.getRect(find.text('Carlos Eduardo Nunes'));
+      final assign = tester.getRect(find.byKey(const ValueKey('atribuir-2')));
+      expect(pendingName.left - pending.left, 20);
+      // 0,8 do traço de cima mais os 15 do recuo.
+      expect(pendingName.top - pending.top, closeTo(15.8, 0.01));
+      expect(assign.left - pending.left, 20);
+      expect(pending.right - assign.right, 20);
+      expect(pending.bottom - assign.bottom, 15);
+
+      // A linha com o ⋮: o nome e a nota na mesma margem.
+      final other = tester.getRect(find.byKey(const ValueKey('participante-3')));
+      final otherName = tester.getRect(find.text('Marcos Vinícius Alves'));
+      final note = tester.getRect(find.text('Em avaliação com outro consultor.'));
+      expect(otherName.left - other.left, 20);
+      expect(other.bottom - note.bottom, 15);
+    });
+
+    testWidgets(
+        'o menu oferece "Desatribuir participante", e a confirmação diz com '
+        'quem está e para onde volta', (tester) async {
+      await show(tester, withParticipants: [marcos]);
+
+      await tester.tap(menuOf('3'));
+      await tester.pumpAndSettle();
+      expect(find.text('Desatribuir participante'), findsOneWidget);
+
+      await tester.tap(find.text('Desatribuir participante'));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(AlertDialog);
+      expect(
+        find.descendant(
+          of: dialog,
+          matching: find.text('Desatribuir Marcos Vinícius Alves?'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: dialog,
+          matching: find.text(
+            'Está em avaliação com Rafael Lima. Ao desatribuir, volta para '
+            'Pendente e pode ser avaliado por outro consultor.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(TextButton, 'Voltar'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Desatribuir'), findsOneWidget);
+      verifyNever(() => participants.unassign(any()));
+    });
+
+    testWidgets('numa reavaliação, a confirmação diz que volta para Não '
+        'recomendado', (tester) async {
+      await show(tester, withParticipants: [
+        participant(
+          '3',
+          'Marcos Vinícius Alves',
+          status: ParticipantStatus.emAvaliacao,
+          assignedTo: 'c-outro',
+          assignedName: 'Rafael Lima',
+          score: 62,
+        ),
+      ]);
+
+      await chooseUnassign(tester, '3');
+
+      expect(
+        find.text(
+          'Está em avaliação com Rafael Lima. Ao desatribuir, volta para Não '
+          'recomendado e pode ser avaliado por outro consultor.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sem o nome do consultor no aparelho, a confirmação fala em '
+        'outro consultor', (tester) async {
+      await show(tester, withParticipants: [
+        participant('3', 'Marcos Vinícius Alves',
+            status: ParticipantStatus.emAvaliacao, assignedTo: 'c-outro'),
+      ]);
+
+      await chooseUnassign(tester, '3');
+
+      expect(
+        find.text(
+          'Está em avaliação com outro consultor. Ao desatribuir, volta para '
+          'Pendente e pode ser avaliado por outro consultor.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('"Voltar" fecha a confirmação sem desatribuir', (tester) async {
+      await show(tester, withParticipants: [marcos]);
+      await chooseUnassign(tester, '3');
+
+      await tester.tap(find.widgetWithText(TextButton, 'Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      verifyNever(() => participants.unassign(any()));
+    });
+
+    testWidgets('confirmando, desatribui e avisa com o nome do participante',
+        (tester) async {
+      await show(tester, withParticipants: [marcos]);
+      await chooseUnassign(tester, '3');
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
+      await tester.pumpAndSettle();
+
+      verify(() => participants.unassign('3')).called(1);
+      expect(find.text('Marcos Vinícius Alves foi desatribuído.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'com a resposta demorando: a linha gira no lugar do ⋮, e o ⋮ das '
+        'outras linhas não abre', (tester) async {
+      final reply = Completer<Result<void>>();
+      when(() => participants.unassign('3')).thenAnswer((_) => reply.future);
+      final bruno = participant(
+        '7',
+        'Bruno Lima',
+        status: ParticipantStatus.emAvaliacao,
+        assignedTo: 'c-outro',
+        assignedName: 'Rafael Lima',
+      );
+      await show(tester, withParticipants: [marcos, bruno]);
+      await chooseUnassign(tester, '3');
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
+      await tester.pump();
+      // Um quadro no meio do envio.
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byKey(const ValueKey('desatribuindo-3')), findsOneWidget);
+      expect(menuOf('3'), findsNothing);
+      expect(menuButton(tester, '7').enabled, isFalse);
+      expect(find.textContaining('foi desatribuído'), findsNothing);
+
+      reply.complete(const Success<void>(null));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('desatribuindo-3')), findsNothing);
+      expect(menuButton(tester, '7').enabled, isTrue);
+      expect(find.text('Marcos Vinícius Alves foi desatribuído.'), findsOneWidget);
+    });
+
+    testWidgets('recusado pelo servidor: o motivo aparece', (tester) async {
+      when(() => participants.unassign('3')).thenAnswer(
+        (_) async => const Failure(
+          ApiException(
+            message: 'Um ou mais participantes não estão em avaliação',
+            statusCode: 409,
+          ),
+          'Um ou mais participantes não estão em avaliação',
+        ),
+      );
+      await show(tester, withParticipants: [marcos]);
+      await chooseUnassign(tester, '3');
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Um ou mais participantes não estão em avaliação'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('foi desatribuído'), findsNothing);
+    });
+
+    testWidgets('sem conexão, o ⋮ continua à vista, apagado, e não abre',
+        (tester) async {
+      await goOffline();
+
+      await show(tester, withParticipants: [marcos]);
+
+      expect(find.byIcon(AppIcons.more), findsOneWidget);
+      expect(menuButton(tester, '3').enabled, isFalse);
+      expect(
+        tester.widget<Icon>(find.byIcon(AppIcons.more)).color,
+        AppColors.textMuted,
+      );
+      // O motivo é o aviso que a lista já mostra.
+      expect(
+        find.text('Ações administrativas precisam de conexão. A avaliação '
+            'continua funcionando offline.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(menuOf('3'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text('Desatribuir participante'), findsNothing);
+    });
+
+    testWidgets('em sessão concluída, o ⋮ fica apagado', (tester) async {
+      await show(
+        tester,
+        withSession: session(status: SessionStatus.concluido),
+        withParticipants: [marcos],
+      );
+
+      expect(menuButton(tester, '3').enabled, isFalse);
+    });
+
+    testWidgets(
+        'num celular de 360 de largura com a fonte ampliada, a linha com o '
+        'chip e o ⋮ não estoura', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        withProviders(
+          MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: child!,
+            ),
+            home: const SessionDetailScreen(sessionId: 'sess-1'),
+          ),
+        ),
+      );
+      sessionStream.add(session());
+      participantsStream.add([marcos]);
+      localStream.add(const []);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(menuOf('3')).height, 48);
+      expect(tester.getRect(find.byIcon(AppIcons.more)).right, 360 - 20);
     });
   });
 

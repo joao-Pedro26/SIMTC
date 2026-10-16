@@ -467,6 +467,175 @@ void main() {
     });
   });
 
+  group('o ADMIN desatribui quem está com outro consultor (Fase 6B)', () {
+    const admin = AuthUser(
+      id: 'u2',
+      name: 'Rita Alves',
+      email: 'rita@simtc.com.br',
+      role: AppUserRole.admin,
+      consultantId: 'c-admin',
+    );
+    final comOutro = participant(
+      'p1',
+      status: ParticipantStatus.emAvaliacao,
+      assignedTo: 'c-outro',
+    );
+
+    setUp(() {
+      when(() => participants.unassign(any()))
+          .thenAnswer((_) async => const Success<void>(null));
+    });
+
+    test('o menu é só do ADMIN, e só de quem está com outro consultor',
+        () async {
+      final comigo = participant(
+        'p2',
+        status: ParticipantStatus.emAvaliacao,
+        assignedTo: 'c-admin',
+      );
+      final pendente = participant('p3');
+      final aprovado = participant('p4', status: ParticipantStatus.aprovado);
+
+      final vm = await ready(
+        user: admin,
+        withParticipants: [comOutro, comigo, pendente, aprovado],
+      );
+      expect(vm.showsAdminMenu(comOutro), isTrue);
+      expect(vm.showsAdminMenu(comigo), isFalse);
+      expect(vm.showsAdminMenu(pendente), isFalse);
+      expect(vm.showsAdminMenu(aprovado), isFalse);
+
+      final consultor = await ready(withParticipants: [comOutro]);
+      expect(consultor.showsAdminMenu(comOutro), isFalse);
+    });
+
+    test('desatribui, avisa com o nome e baixa o detalhe de novo', () async {
+      final vm = await ready(user: admin, withParticipants: [comOutro]);
+
+      await vm.unassignAsAdmin('p1');
+      await pumpEventQueue();
+
+      verify(() => participants.unassign('p1')).called(1);
+      expect(vm.message, 'Participante p1 foi desatribuído.');
+      expect(vm.unassigningParticipantId, isNull);
+      // O sync da abertura e o de depois de desatribuir.
+      verify(() => participants.syncSession('sess-1')).called(2);
+    });
+
+    test('durante o envio só aquele participante aparece ocupado, e outro '
+        'toque não manda nada', () async {
+      final answer = Completer<Result<void>>();
+      when(() => participants.unassign('p1')).thenAnswer((_) => answer.future);
+      final outro = participant(
+        'p5',
+        status: ParticipantStatus.emAvaliacao,
+        assignedTo: 'c-outro',
+      );
+      final vm = await ready(user: admin, withParticipants: [comOutro, outro]);
+
+      final sending = vm.unassignAsAdmin('p1');
+      await pumpEventQueue();
+
+      expect(vm.unassigningParticipantId, 'p1');
+      expect(vm.message, isNull);
+
+      await vm.unassignAsAdmin('p5');
+      await vm.unassignAsAdmin('p1');
+      verifyNever(() => participants.unassign('p5'));
+
+      answer.complete(const Success<void>(null));
+      await sending;
+
+      verify(() => participants.unassign('p1')).called(1);
+      expect(vm.unassigningParticipantId, isNull);
+    });
+
+    test('recusado pelo servidor: mostra o motivo e baixa o detalhe, para a '
+        'linha se acertar', () async {
+      when(() => participants.unassign('p1')).thenAnswer(
+        (_) async => const Failure(
+          ApiException(
+            message: 'Um ou mais participantes não estão em avaliação',
+            statusCode: 409,
+          ),
+          'Um ou mais participantes não estão em avaliação',
+        ),
+      );
+      final vm = await ready(user: admin, withParticipants: [comOutro]);
+
+      await vm.unassignAsAdmin('p1');
+      await pumpEventQueue();
+
+      expect(vm.message, 'Um ou mais participantes não estão em avaliação');
+      verify(() => participants.syncSession('sess-1')).called(2);
+    });
+
+    test('sem rede, avisa e não tenta baixar de novo', () async {
+      when(() => participants.unassign('p1')).thenAnswer(
+        (_) async => const Failure(
+          ApiException(message: 'Sem conexão com o servidor.', isNetworkError: true),
+          'Sem conexão com o servidor.',
+        ),
+      );
+      final vm = await ready(user: admin, withParticipants: [comOutro]);
+
+      await vm.unassignAsAdmin('p1');
+      await pumpEventQueue();
+
+      expect(vm.message, 'Sem conexão com o servidor.');
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
+    test('uma exceção inesperada vira a mensagem genérica, sem travar a linha',
+        () async {
+      when(() => participants.unassign('p1')).thenThrow(StateError('quebrou'));
+      final vm = await ready(user: admin, withParticipants: [comOutro]);
+
+      await vm.unassignAsAdmin('p1');
+
+      expect(
+        vm.message,
+        'Não foi possível desatribuir o participante. Tente de novo.',
+      );
+      expect(vm.unassigningParticipantId, isNull);
+    });
+
+    test('quem não pode não manda nada: consultor comum, sessão encerrada, e '
+        'participante que não está com outro consultor', () async {
+      final consultor = await ready(withParticipants: [comOutro]);
+      await consultor.unassignAsAdmin('p1');
+
+      final encerrada = await ready(
+        user: admin,
+        withSession: session(status: SessionStatus.concluido),
+        withParticipants: [comOutro],
+      );
+      await encerrada.unassignAsAdmin('p1');
+
+      final pendente = participant('p3');
+      final vm = await ready(user: admin, withParticipants: [pendente]);
+      await vm.unassignAsAdmin('p3');
+      await vm.unassignAsAdmin('nao-existe');
+
+      verifyNever(() => participants.unassign(any()));
+    });
+
+    test('desatribuir que só responde depois do dispose não derruba o app nem '
+        'baixa de novo', () async {
+      final answer = Completer<Result<void>>();
+      when(() => participants.unassign('p1')).thenAnswer((_) => answer.future);
+      final vm = await ready(user: admin, withParticipants: [comOutro]);
+
+      final sending = vm.unassignAsAdmin('p1');
+      vm.dispose();
+      answer.complete(const Success<void>(null));
+      await sending;
+      await pumpEventQueue();
+
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+  });
+
   group('linha "comigo" depois do envio aceito (revisão de 30/09/2026)', () {
     test(
         'sem download novo depois do envio, a linha mostra "Enviada" e não '
