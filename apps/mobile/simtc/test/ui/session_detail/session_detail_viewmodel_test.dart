@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/auth_user.dart';
+import 'package:simtc/data/models/session_consultant.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
@@ -20,6 +22,9 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
 
 class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
+
+class _MockConsultantRepository extends Mock
+    implements SessionConsultantRepository {}
 
 /// Conectividade de mentira: o serviço real conversa com o plugin de
 /// plataforma, que não existe num teste de unidade.
@@ -42,10 +47,12 @@ void main() {
   late _MockSessionRepository sessions;
   late _MockParticipantRepository participants;
   late _MockAssessmentRepository assessments;
+  late _MockConsultantRepository consultants;
   late _FakeConnectivity connectivity;
   late StreamController<TrainingSession?> sessionStream;
   late StreamController<List<SessionParticipant>> participantsStream;
   late StreamController<List<LocalAssessment>> localStream;
+  late StreamController<List<SessionConsultant>> consultantsStream;
 
   const consultora = AuthUser(
     id: 'u1',
@@ -121,6 +128,7 @@ void main() {
       sessionRepository: sessions,
       participantRepository: participants,
       assessmentRepository: assessments,
+      consultantRepository: consultants,
       connectivity: connectivity,
       currentUser: user,
       now: () => DateTime(2026, 9, 23, 14),
@@ -144,13 +152,17 @@ void main() {
     sessions = _MockSessionRepository();
     participants = _MockParticipantRepository();
     assessments = _MockAssessmentRepository();
+    consultants = _MockConsultantRepository();
     connectivity = _FakeConnectivity();
     sessionStream = StreamController<TrainingSession?>.broadcast();
     participantsStream = StreamController<List<SessionParticipant>>.broadcast();
     localStream = StreamController<List<LocalAssessment>>.broadcast();
+    consultantsStream = StreamController<List<SessionConsultant>>.broadcast();
 
     when(() => sessions.watchSession('sess-1'))
         .thenAnswer((_) => sessionStream.stream);
+    when(() => consultants.watchBySession('sess-1'))
+        .thenAnswer((_) => consultantsStream.stream);
     when(() => participants.watchBySession('sess-1'))
         .thenAnswer((_) => participantsStream.stream);
     when(() => participants.syncSession('sess-1'))
@@ -163,6 +175,7 @@ void main() {
     sessionStream.close();
     participantsStream.close();
     localStream.close();
+    consultantsStream.close();
     connectivity.dispose();
   });
 
@@ -393,6 +406,63 @@ void main() {
 
         expect(vm.isAdmin, isTrue);
         expect(vm.adminActionsAllowed, isFalse);
+      });
+    });
+
+    group('"N consultores" do ADMIN (Fase 6B)', () {
+      const admin = AuthUser(
+        id: 'u2',
+        name: 'Rita Alves',
+        email: 'rita@simtc.com.br',
+        role: AppUserRole.admin,
+      );
+      const carla = SessionConsultant(id: 'c-1', name: 'Carla Mendes');
+      const rafael = SessionConsultant(id: 'c-2', name: 'Rafael Lima');
+      const tatiane = SessionConsultant(id: 'c-3', name: 'Tatiane Souza');
+
+      test('conta os consultores que o cache tem, e acompanha as mudanças',
+          () async {
+        final vm = await ready(user: admin);
+        consultantsStream.add(const [carla, rafael, tatiane]);
+        await pumpEventQueue();
+
+        expect(vm.consultantsLabel, '3 consultores');
+
+        consultantsStream.add(const [carla]);
+        await pumpEventQueue();
+
+        expect(vm.consultantsLabel, '1 consultor');
+      });
+
+      test('sem os consultores no aparelho, não há contagem para mostrar',
+          () async {
+        final vm = await ready(user: admin);
+        expect(vm.consultantsLabel, isNull, reason: 'o cache ainda não respondeu');
+
+        consultantsStream.add(const []);
+        await pumpEventQueue();
+
+        expect(vm.consultantsLabel, isNull);
+      });
+
+      test('o consultor comum não vê a contagem, nem assina a lista', () async {
+        final vm = await ready();
+        consultantsStream.add(const [carla, rafael]);
+        await pumpEventQueue();
+
+        expect(vm.consultantsLabel, isNull);
+        verifyNever(() => consultants.watchBySession(any()));
+      });
+
+      test('fechar a tela larga a lista de consultores', () async {
+        final vm = await ready(user: admin);
+        expect(consultantsStream.hasListener, isTrue);
+
+        vm.dispose();
+
+        expect(consultantsStream.hasListener, isFalse);
+        consultantsStream.add(const [carla]);
+        await pumpEventQueue();
       });
     });
   });

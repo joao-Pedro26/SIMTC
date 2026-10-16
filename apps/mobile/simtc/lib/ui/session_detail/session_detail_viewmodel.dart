@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/auth_user.dart';
+import '../../data/models/session_consultant.dart';
 import '../../data/models/session_participant.dart';
 import '../../data/models/training_session.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/participant_repository.dart';
+import '../../data/repositories/session_consultant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
@@ -32,12 +34,14 @@ class SessionDetailViewModel extends ChangeNotifier {
     required SessionRepository sessionRepository,
     required ParticipantRepository participantRepository,
     required AssessmentRepository assessmentRepository,
+    required SessionConsultantRepository consultantRepository,
     required ConnectivityService connectivity,
     required AuthUser? currentUser,
     DateTime Function()? now,
   })  : _sessionRepository = sessionRepository,
         _participantRepository = participantRepository,
         _assessmentRepository = assessmentRepository,
+        _consultantRepository = consultantRepository,
         _connectivity = connectivity,
         _currentUser = currentUser,
         _now = now ?? DateTime.now;
@@ -46,6 +50,7 @@ class SessionDetailViewModel extends ChangeNotifier {
   final SessionRepository _sessionRepository;
   final ParticipantRepository _participantRepository;
   final AssessmentRepository _assessmentRepository;
+  final SessionConsultantRepository _consultantRepository;
   final ConnectivityService _connectivity;
   final AuthUser? _currentUser;
   final DateTime Function() _now;
@@ -60,11 +65,13 @@ class SessionDetailViewModel extends ChangeNotifier {
   StreamSubscription<TrainingSession?>? _sessionSubscription;
   StreamSubscription<List<SessionParticipant>>? _participantsSubscription;
   StreamSubscription<List<LocalAssessment>>? _localSubscription;
+  StreamSubscription<List<SessionConsultant>>? _consultantsSubscription;
   StreamSubscription<void>? _reconnectSubscription;
 
   TrainingSession? _session;
   List<SessionParticipant> _participants = const [];
   Map<String, LocalAssessment> _local = const {};
+  int _consultantCount = 0;
   bool _sessionLoaded = false;
   bool _participantsLoaded = false;
   bool _isRefreshing = false;
@@ -144,6 +151,17 @@ class SessionDetailViewModel extends ChangeNotifier {
   /// planejada ou em andamento. A tela ainda exige conexão.
   bool get adminActionsAllowed =>
       isAdmin && (_session?.status.acceptsChanges ?? false);
+
+  /// "3 consultores", ao lado da data — só o ADMIN vê (canvas "1f"): para o
+  /// consultor, a lista nem é assinada. Nulo enquanto os consultores da
+  /// sessão não foram baixados neste aparelho: a tela não afirma "0
+  /// consultores".
+  String? get consultantsLabel {
+    if (_consultantCount == 0) return null;
+    return _consultantCount == 1
+        ? '1 consultor'
+        : '$_consultantCount consultores';
+  }
 
   /// Há alguém que eu poderia atribuir agora — é quando o aviso de "atribuir
   /// precisa de internet" faz sentido.
@@ -238,6 +256,16 @@ class SessionDetailViewModel extends ChangeNotifier {
           .watchSessionAssessments(sessionId, ownerUserId)
           .listen((rows) {
         _local = {for (final row in rows) row.trainingParticipantId: row};
+        notifyListeners();
+      });
+    }
+
+    // Só o ADMIN vê a contagem de consultores.
+    if (isAdmin) {
+      _consultantsSubscription ??= _consultantRepository
+          .watchBySession(sessionId)
+          .listen((consultants) {
+        _consultantCount = consultants.length;
         notifyListeners();
       });
     }
@@ -378,6 +406,7 @@ class SessionDetailViewModel extends ChangeNotifier {
     _sessionSubscription?.cancel();
     _participantsSubscription?.cancel();
     _localSubscription?.cancel();
+    _consultantsSubscription?.cancel();
     _reconnectSubscription?.cancel();
     super.dispose();
   }

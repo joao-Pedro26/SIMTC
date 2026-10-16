@@ -9,6 +9,7 @@ import '../../data/models/training_session.dart';
 import '../../data/repositories/assessment_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
+import '../../data/repositories/session_consultant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
@@ -47,6 +48,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     sessionRepository: context.read<SessionRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     assessmentRepository: context.read<AssessmentRepository>(),
+    consultantRepository: context.read<SessionConsultantRepository>(),
     connectivity: context.read<ConnectivityService>(),
     currentUser: context.read<AuthRepository>().currentUser,
   )..init();
@@ -98,12 +100,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             AppTopBar(
               title: 'Detalhe da sessão',
               actions: [
-                if (_viewModel.isAdmin)
+                if (_viewModel.isAdmin) ...[
                   AppIconAction(
                     icon: AppIcons.edit,
                     tooltip: 'Editar dados do treinamento',
                     onPressed: _adminActionsEnabled(isOffline) ? _openEdit : null,
                   ),
+                  // Sempre ligado: sem conexão ou com a sessão encerrada, a
+                  // tela de lá abre só para leitura.
+                  AppIconAction(
+                    icon: AppIcons.consultants,
+                    tooltip: 'Consultores da sessão',
+                    onPressed: _openConsultants,
+                  ),
+                ],
               ],
               trailing: SyncStatusIndicator(
                 onTap: () => context.go(AppRoutes.sync),
@@ -135,6 +145,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final saved =
         await context.push<bool>(AppRoutes.sessionEdit(widget.sessionId));
     if (saved == true && mounted) unawaited(_viewModel.refresh());
+  }
+
+  /// Quem entra ou sai por lá muda o cache, e este detalhe lê do cache: não
+  /// há o que fazer na volta.
+  void _openConsultants() {
+    context.push(AppRoutes.sessionConsultants(widget.sessionId));
   }
 
   /// Entrou gente lá: a linha nova já está no cache, e baixar de novo acerta
@@ -225,6 +241,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   Widget _buildMetaRow(TrainingSession session) {
     final date = session.date;
+    final consultants = _viewModel.consultantsLabel;
 
     return Wrap(
       spacing: AppSpacing.lg,
@@ -236,6 +253,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           AppIcons.event,
           date == null ? 'Sem data' : dayMonthYearLabel(date),
         ),
+        if (consultants != null)
+          _buildMetaItem(AppIcons.consultantCount, consultants),
         StatusChip(
           label: session.status.label,
           icon: session.status.icon,

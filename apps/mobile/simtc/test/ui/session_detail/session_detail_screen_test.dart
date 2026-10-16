@@ -7,12 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
+import 'package:simtc/data/models/session_consultant.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
@@ -22,7 +24,9 @@ import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/result/result_screen.dart';
+import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
 import 'package:simtc/ui/session_detail/participant_row.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
@@ -39,6 +43,9 @@ class _MockAssessmentCatalogRepository extends Mock
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
+class _MockConsultantRepository extends Mock
+    implements SessionConsultantRepository {}
+
 class _MockConnectivity extends Mock implements Connectivity {}
 
 void main() {
@@ -47,10 +54,16 @@ void main() {
   late _MockAssessmentRepository assessments;
   late _MockAssessmentCatalogRepository catalog;
   late _MockAuthRepository auth;
+  late _MockConsultantRepository consultants;
   late ConnectivityService connectivity;
   late StreamController<TrainingSession?> sessionStream;
   late StreamController<List<SessionParticipant>> participantsStream;
   late StreamController<List<LocalAssessment>> localStream;
+  late StreamController<List<SessionConsultant>> consultantsStream;
+
+  const carla = SessionConsultant(id: 'c-resp', name: 'Carla Mendes');
+  const rafael = SessionConsultant(id: 'c-outro', name: 'Rafael Lima');
+  const tatiane = SessionConsultant(id: 'c-3', name: 'Tatiane Souza');
 
   const consultora = AuthUser(
     id: 'u1',
@@ -117,13 +130,17 @@ void main() {
     assessments = _MockAssessmentRepository();
     catalog = _MockAssessmentCatalogRepository();
     auth = _MockAuthRepository();
+    consultants = _MockConsultantRepository();
     connectivity = ConnectivityService();
     sessionStream = StreamController<TrainingSession?>.broadcast();
     participantsStream = StreamController<List<SessionParticipant>>.broadcast();
     localStream = StreamController<List<LocalAssessment>>.broadcast();
+    consultantsStream = StreamController<List<SessionConsultant>>.broadcast();
 
     when(() => sessions.watchSession('sess-1'))
         .thenAnswer((_) => sessionStream.stream);
+    when(() => consultants.watchBySession('sess-1'))
+        .thenAnswer((_) => consultantsStream.stream);
     when(() => participants.watchBySession('sess-1'))
         .thenAnswer((_) => participantsStream.stream);
     when(() => assessments.watchSessionAssessments('sess-1', 'u1'))
@@ -152,6 +169,7 @@ void main() {
     sessionStream.close();
     participantsStream.close();
     localStream.close();
+    consultantsStream.close();
     connectivity.dispose();
   });
 
@@ -160,6 +178,7 @@ void main() {
       providers: [
         Provider<SessionRepository>.value(value: sessions),
         Provider<ParticipantRepository>.value(value: participants),
+        Provider<SessionConsultantRepository>.value(value: consultants),
         Provider<AssessmentRepository>.value(value: assessments),
         Provider<AssessmentCatalogRepository>.value(value: catalog),
         ChangeNotifierProvider<AuthRepository>.value(value: auth),
@@ -622,6 +641,133 @@ void main() {
     });
   });
 
+  group('consultores da sessão (Fase 6B)', () {
+    AppIconAction action(WidgetTester tester, IconData icon) =>
+        tester.widget<AppIconAction>(find.widgetWithIcon(AppIconAction, icon));
+
+    testWidgets('consultor comum não vê o ícone de pessoas nem a contagem',
+        (tester) async {
+      await show(tester);
+      consultantsStream.add(const [carla, rafael, tatiane]);
+      await tester.pump();
+
+      expect(find.byTooltip('Consultores da sessão'), findsNothing);
+      expect(find.byIcon(AppIcons.consultants), findsNothing);
+      expect(find.textContaining('consultor'), findsNothing);
+    });
+
+    testWidgets(
+        'ADMIN vê o ícone de pessoas entre o lápis e o indicador de envio, '
+        'como no quadro "1f"', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+
+      expect(action(tester, AppIcons.consultants).onPressed, isNotNull);
+      final edit = tester.getCenter(find.byTooltip('Editar dados do treinamento'));
+      final people = tester.getCenter(find.byTooltip('Consultores da sessão'));
+      final sync = tester.getCenter(find.byType(SyncStatusIndicator));
+      expect(people.dx, greaterThan(edit.dx));
+      expect(people.dx, lessThan(sync.dx));
+      expect(people.dy, edit.dy);
+      expect(
+        tester.getSize(find.widgetWithIcon(AppIconAction, AppIcons.consultants)),
+        const Size(48, 48),
+      );
+    });
+
+    testWidgets(
+        'o ícone de pessoas fica ligado sem conexão e em sessão concluída: a '
+        'tela de lá abre para leitura', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await goOffline();
+
+      await show(tester, withSession: session(status: SessionStatus.concluido));
+
+      expect(action(tester, AppIcons.edit).onPressed, isNull);
+      expect(action(tester, AppIcons.consultants).onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'o cabeçalho do ADMIN mostra "3 consultores" depois da data, com o '
+        'ícone do quadro', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+      expect(find.textContaining('consultor'), findsNothing,
+          reason: 'os consultores ainda não chegaram do cache');
+
+      consultantsStream.add(const [carla, rafael, tatiane]);
+      await tester.pump();
+
+      final label = find.text('3 consultores');
+      expect(label, findsOneWidget);
+      final date = tester.getRect(find.text('12 set 2026'));
+      final count = tester.getRect(label);
+      final chip = tester.getRect(find.text('Em andamento'));
+      // Na ordem de leitura: à direita na mesma linha, ou na linha de baixo
+      // quando não cabe (a fonte de teste é mais larga que a do app).
+      bool comesAfter(Rect later, Rect earlier) =>
+          later.top >= earlier.bottom ||
+          ((later.center.dy - earlier.center.dy).abs() < 2 &&
+              later.left > earlier.right);
+      expect(comesAfter(count, date), isTrue, reason: 'a contagem vem depois da data');
+      expect(comesAfter(chip, count), isTrue, reason: 'o status vem por último');
+
+      // O ícone fica à esquerda do texto, a 5 dele, como os outros dois.
+      final icon = tester.getRect(find.byIcon(AppIcons.consultantCount));
+      expect(count.left - icon.right, 5);
+      expect(icon.width, 17);
+    });
+
+    testWidgets('com um consultor só, o singular; sem nenhum no aparelho, some',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+
+      await show(tester);
+      consultantsStream.add(const [carla]);
+      await tester.pump();
+      expect(find.text('1 consultor'), findsOneWidget);
+
+      consultantsStream.add(const []);
+      await tester.pump();
+      expect(find.textContaining('consultor'), findsNothing);
+      expect(find.byIcon(AppIcons.consultantCount), findsNothing);
+    });
+
+    testWidgets(
+        'num celular de 360 de largura, a barra do ADMIN com os três ícones e '
+        'o cabeçalho com a contagem não estouram', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        withProviders(
+          MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: child!,
+            ),
+            home: const SessionDetailScreen(sessionId: 'sess-1'),
+          ),
+        ),
+      );
+      sessionStream.add(session());
+      participantsStream.add(const []);
+      localStream.add(const []);
+      consultantsStream.add(const [carla, rafael, tatiane]);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('3 consultores'), findsOneWidget);
+      expect(find.byTooltip('Consultores da sessão'), findsOneWidget);
+    });
+  });
+
   group('navegação pelas rotas reais', () {
     /// O detalhe aberto pelo `createRouter` de produção; devolve o router,
     /// para o teste empilhar outra rota real por cima.
@@ -829,6 +975,29 @@ void main() {
 
         expect(find.byType(AddParticipantScreen), findsNothing);
         verify(() => participants.syncSession('sess-1')).called(1);
+      });
+
+      testWidgets('o ícone de pessoas abre "Consultores", e o voltar traz de '
+          'volta ao detalhe', (tester) async {
+        when(() => consultants.watchBySession('sess-1'))
+            .thenAnswer((_) => Stream.value(const [carla, rafael]));
+        when(() => consultants.fetchTeam())
+            .thenAnswer((_) async => const Success([carla, rafael, tatiane]));
+        final router = await showAdmin(tester);
+
+        await tester.tap(find.byTooltip('Consultores da sessão'));
+        await tester.pumpAndSettle();
+
+        final screen = tester.widget<SessionConsultantsScreen>(
+          find.byType(SessionConsultantsScreen),
+        );
+        expect(screen.sessionId, 'sess-1');
+
+        router.pop();
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionConsultantsScreen), findsNothing);
+        expect(find.byType(SessionDetailScreen), findsOneWidget);
       });
 
       testWidgets('fechar "Adicionar participante" sem adicionar não baixa nada',

@@ -70,6 +70,11 @@ abstract final class AppIcons {
   /// O lápis do ADMIN na barra do detalhe da sessão (Fase 6A, canvas "1f").
   static const IconData edit = Icons.edit_outlined;
 
+  /// Os consultores da sessão no detalhe do ADMIN (Fase 6B, canvas "1f"): o
+  /// atalho da barra e a contagem ao lado da data.
+  static const IconData consultants = Icons.group_outlined;
+  static const IconData consultantCount = Icons.badge_outlined;
+
   /// "Adicionar participante" (Fase 6A, canvas "3a"): o campo do CPF, o
   /// cartão "Teórica + prática" e o botão que adiciona.
   static const IconData cpf = Icons.badge_outlined;

@@ -11,6 +11,7 @@ import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/assessment_sync_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
@@ -33,6 +34,9 @@ class _MockAuthRepository extends Mock implements AuthRepository {}
 class _MockCatalogRepository extends Mock implements AssessmentCatalogRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
+
+class _MockConsultantRepository extends Mock
+    implements SessionConsultantRepository {}
 
 class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
 
@@ -976,6 +980,10 @@ void main() {
           Provider<SessionRepository>.value(value: repository),
           Provider<AssessmentCatalogRepository>.value(value: catalog),
           Provider<ParticipantRepository>.value(value: participants),
+          // O detalhe só o usa para o ADMIN; aqui quem abre é a consultora.
+          Provider<SessionConsultantRepository>.value(
+            value: _MockConsultantRepository(),
+          ),
           Provider<AssessmentRepository>.value(value: assessments),
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
