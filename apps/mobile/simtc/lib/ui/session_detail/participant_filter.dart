@@ -1,6 +1,7 @@
 import '../../data/models/session_participant.dart';
 import '../../data/services/local/app_database.dart';
 import '../core/date_labels.dart';
+import '../core/name_sort.dart';
 import '../core/score_labels.dart';
 
 /// Os quatro chips da tela 1.4. Aqui eles filtram de verdade (o canvas tem
@@ -75,27 +76,6 @@ int _groupOf(ParticipantSituation situation) => switch (situation) {
       ParticipantSituation.theoryOnly => 4,
     };
 
-const Map<String, String> _semAcento = {
-  'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
-  'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
-  'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
-  'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
-  'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
-  'ç': 'c',
-};
-
-/// Chave de ordenação por nome que põe "Ângela" junto de "Ana", e não depois
-/// de "Zeca" — o SQLite só ignora caixa em letras sem acento.
-String _nameKey(String name) {
-  final lower = name.toLowerCase();
-  final buffer = StringBuffer();
-  for (final rune in lower.runes) {
-    final char = String.fromCharCode(rune);
-    buffer.write(_semAcento[char] ?? char);
-  }
-  return buffer.toString();
-}
-
 /// A lista na ordem do canvas: por grupo e, dentro do grupo, por nome.
 /// Comparador completo (e não um `sort` estável sobre a ordem do banco),
 /// porque o `List.sort` do Dart não garante estabilidade.
@@ -108,7 +88,7 @@ List<SessionParticipant> sortForDisplay(
     final byGroup = _groupOf(situationOf(a, myConsultantId))
         .compareTo(_groupOf(situationOf(b, myConsultantId)));
     if (byGroup != 0) return byGroup;
-    return _nameKey(a.name).compareTo(_nameKey(b.name));
+    return nameSortKey(a.name).compareTo(nameSortKey(b.name));
   });
   return sorted;
 }
