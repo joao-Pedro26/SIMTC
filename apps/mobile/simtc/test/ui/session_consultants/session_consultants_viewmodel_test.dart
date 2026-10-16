@@ -911,6 +911,136 @@ void main() {
     verify(() => participants.syncSession('sess-1')).called(1);
   });
 
+  group('baixar a sessão de novo', () {
+    /// Um `syncSession` que só responde quando o teste manda: cada chamada vira
+    /// um item da lista, na ordem em que saiu — o tamanho dela é quantos
+    /// downloads já foram pedidos ao servidor.
+    List<Completer<Result<int>>> holdDownloads() {
+      final downloads = <Completer<Result<int>>>[];
+      when(() => participants.syncSession('sess-1')).thenAnswer((_) {
+        final download = Completer<Result<int>>();
+        downloads.add(download);
+        return download.future;
+      });
+      return downloads;
+    }
+
+    test('uma mudança aceita, com o download da abertura ainda no ar, espera '
+        'por ele e baixa uma vez só depois', () async {
+      final downloads = holdDownloads();
+      final vm = await open();
+      expect(downloads, hasLength(1), reason: 'o da abertura');
+
+      await vm.add('c-diego');
+
+      // O POST voltou, mas o GET da abertura pode ter sido respondido antes
+      // dele: se chegasse por último, desfaria a mudança na tela.
+      expect(vm.message, 'Diego Barbosa entrou na sessão.');
+      expect(downloads, hasLength(1));
+
+      downloads.first.complete(const Success(0));
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(2));
+
+      downloads.last.complete(const Success(0));
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(2));
+    });
+
+    test('vários pedidos no meio — a volta da rede, o puxar para atualizar e '
+        'uma mudança aceita — viram um só', () async {
+      final downloads = holdDownloads();
+      final vm = await open();
+
+      connectivity.reconnect();
+      final pulling = vm.refresh();
+      await vm.add('c-diego');
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(1));
+
+      downloads.first.complete(const Success(0));
+      await pumpEventQueue();
+      await pulling;
+
+      expect(downloads, hasLength(2));
+
+      downloads.last.complete(const Success(0));
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(2));
+    });
+
+    test('o enfileirado passa a ser o que está no ar: o pedido que chega '
+        'durante ele espera pelo seguinte', () async {
+      final downloads = holdDownloads();
+      final vm = await open();
+      await vm.add('c-diego');
+      expect(downloads, hasLength(1));
+
+      downloads.first.complete(const Success(0));
+      await pumpEventQueue();
+      expect(downloads, hasLength(2));
+
+      await vm.remove('c-tatiane');
+      expect(downloads, hasLength(2));
+
+      downloads.last.complete(const Success(0));
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(3));
+    });
+
+    test('um download que falha não trava a fila: o enfileirado roda, e o '
+        'próximo pedido baixa na hora', () async {
+      final downloads = holdDownloads();
+      final vm = await open();
+      await vm.add('c-diego');
+      expect(downloads, hasLength(1));
+
+      downloads.first.completeError(StateError('quebrou'));
+      await pumpEventQueue();
+
+      expect(downloads, hasLength(2));
+
+      downloads.last.complete(const Success(0));
+      await pumpEventQueue();
+      await vm.remove('c-tatiane');
+
+      expect(downloads, hasLength(3));
+    });
+
+    test('fechar a tela com um download enfileirado não o cancela: ele ainda '
+        'roda', () async {
+      final downloads = holdDownloads();
+      final vm = SessionConsultantsViewModel(
+        sessionId: 'sess-1',
+        sessionRepository: sessions,
+        participantRepository: participants,
+        consultantRepository: consultants,
+        connectivity: connectivity,
+        currentUser: admin,
+      )..init();
+      sessionStream.add(session());
+      consultantsStream.add(const [carla, rafael, tatiane]);
+      participantsStream.add(const []);
+      await pumpEventQueue();
+
+      await vm.remove('c-rafael');
+      vm.dispose();
+      expect(downloads, hasLength(1));
+
+      downloads.first.complete(const Success(0));
+      await pumpEventQueue();
+
+      // Quem estava com o consultor foi liberado no servidor, e o detalhe, que
+      // ficou embaixo, lê do cache: o último a gravar tem de ser este.
+      expect(downloads, hasLength(2));
+    });
+  });
+
   group('rótulos', () {
     test('consultantMetaLabel', () {
       expect(consultantMetaLabel(total: 0, inProgress: 0), 'Sem participantes');

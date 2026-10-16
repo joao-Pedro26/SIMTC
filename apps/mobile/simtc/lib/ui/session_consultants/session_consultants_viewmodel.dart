@@ -116,6 +116,11 @@ class SessionConsultantsViewModel extends ChangeNotifier {
   bool _teamLoading = false;
   _TeamFailure _teamFailure = _TeamFailure.none;
 
+  /// Um download da sessão está no ar; e se, enquanto isso, chegou outro
+  /// pedido, ele espera. Quantos chegaram no meio não importa: baixa uma vez.
+  bool _isResyncing = false;
+  bool _resyncQueued = false;
+
   String? _busyConsultantId;
   String? _error;
   String? _message;
@@ -338,11 +343,32 @@ class SessionConsultantsViewModel extends ChangeNotifier {
   /// faixa do topo já diz por quê. Não passa pelo estado desta ViewModel — é
   /// só o cache que muda —, e por isso roda mesmo depois de a tela fechar: o
   /// detalhe, que fica embaixo, lê do mesmo cache.
+  ///
+  /// Um download por vez: `syncSession` troca consultores e participantes
+  /// inteiros pelo que o GET trouxe, e um GET pedido antes de uma mudança
+  /// aceita, se respondido depois dela, a desfaria no cache. O pedido que
+  /// chega com outro no ar é enfileirado, não descartado — vários viram um
+  /// só — e roda quando o do ar termina; assim a última gravação é a de
+  /// depois da última mudança.
   Future<void> _resyncSession() async {
+    if (_isResyncing) {
+      _resyncQueued = true;
+      return;
+    }
+
+    _isResyncing = true;
     try {
       await _participantRepository.syncSession(sessionId);
     } catch (_) {
       // `syncSession` já devolve `Result` para todo erro esperado.
+    } finally {
+      _isResyncing = false;
+      // Sem olhar `_disposed`, de propósito: o pedido enfileirado depois de
+      // uma mudança aceita tem de rodar mesmo com a tela já fechada.
+      if (_resyncQueued) {
+        _resyncQueued = false;
+        unawaited(_resyncSession());
+      }
     }
   }
 
