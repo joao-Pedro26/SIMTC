@@ -8,6 +8,7 @@ import 'data/repositories/assessment_catalog_repository.dart';
 import 'data/repositories/assessment_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/participant_repository.dart';
+import 'data/repositories/session_consultant_repository.dart';
 import 'data/repositories/session_repository.dart';
 import 'data/services/api/api_client.dart';
 import 'data/services/assessment_sync_service.dart';
@@ -30,6 +31,7 @@ class AppDependencies {
     required this.authRepository,
     required this.sessionRepository,
     required this.participantRepository,
+    required this.sessionConsultantRepository,
     required this.catalogRepository,
     required this.assessmentRepository,
     required this.connectivityService,
@@ -65,6 +67,10 @@ class AppDependencies {
       apiClient: apiClient,
       database: database,
     );
+    final sessionConsultantRepository = SessionConsultantRepository(
+      apiClient: apiClient,
+      database: database,
+    );
     final catalogRepository = AssessmentCatalogRepository(
       apiClient: apiClient,
       database: database,
@@ -94,6 +100,7 @@ class AppDependencies {
       authRepository: authRepository,
       sessionRepository: sessionRepository,
       participantRepository: participantRepository,
+      sessionConsultantRepository: sessionConsultantRepository,
       catalogRepository: catalogRepository,
       assessmentRepository: assessmentRepository,
       connectivityService: connectivityService,
@@ -108,6 +115,7 @@ class AppDependencies {
   final AuthRepository authRepository;
   final SessionRepository sessionRepository;
   final ParticipantRepository participantRepository;
+  final SessionConsultantRepository sessionConsultantRepository;
   final AssessmentCatalogRepository catalogRepository;
   final AssessmentRepository assessmentRepository;
   final ConnectivityService connectivityService;
@@ -125,6 +133,9 @@ class AppDependencies {
         ChangeNotifierProvider<AuthRepository>.value(value: authRepository),
         Provider<SessionRepository>.value(value: sessionRepository),
         Provider<ParticipantRepository>.value(value: participantRepository),
+        Provider<SessionConsultantRepository>.value(
+          value: sessionConsultantRepository,
+        ),
         Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
         Provider<AssessmentRepository>.value(value: assessmentRepository),
         ChangeNotifierProvider<ConnectivityService>.value(
