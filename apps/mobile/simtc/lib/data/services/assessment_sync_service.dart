@@ -18,6 +18,18 @@ abstract final class SendFailure {
   static const String timeout = 'tempo esgotado';
   static const String serverDown = 'servidor indisponível';
   static const String refused = 'recusada pelo servidor';
+
+  /// O servidor recusou porque o participante não está mais em avaliação com
+  /// quem enviou (Fase 6B): um ADMIN o desatribuiu, ou o consultor saiu da
+  /// sessão, antes de o envio chegar.
+  static const String notAssigned = 'o participante não está mais com você';
+
+  /// O código que o backend manda junto com a recusa de [notAssigned].
+  static const String notAssignedCode = 'NOT_ASSIGNED';
+
+  /// As recusas do servidor: tentar de novo sozinho não resolve, e a aba
+  /// Sincronizar oferece o "Descartar".
+  static const Set<String> refusals = {refused, notAssigned};
 }
 
 /// Envia ao backend a fila de avaliações confirmadas (Fase 5A).
@@ -211,7 +223,10 @@ class AssessmentSyncService extends ChangeNotifier {
   /// A fila se atualiza pelo stream do banco.
   Future<bool> discardRefused(String localAssessmentId) async {
     if (isSending) return false;
-    return _assessments.discardFailed(localAssessmentId, reason: SendFailure.refused);
+    return _assessments.discardFailed(
+      localAssessmentId,
+      reasons: SendFailure.refusals,
+    );
   }
 
   /// Envia a fila agora, sem esperar a próxima tentativa. Sem rede, não tenta:
@@ -345,7 +360,8 @@ class AssessmentSyncService extends ChangeNotifier {
 
   /// `{trainingParticipantId: nulo se aceita, ou o motivo}`, da resposta do
   /// backend: `[{ trainingParticipantId, status: 'fulfilled' | 'rejected',
-  /// error }]`. A mensagem crua da recusa vai só para o log.
+  /// error, code }]`. A mensagem crua da recusa vai só para o log; o `code`,
+  /// quando o app o conhece, vira um motivo próprio.
   static Map<String, String?> _outcomeByParticipant(Object? body) {
     if (body is! List) return const {};
     final outcome = <String, String?>{};
@@ -356,7 +372,9 @@ class AssessmentSyncService extends ChangeNotifier {
         outcome[id] = null;
       } else {
         debugPrint('Avaliação de $id recusada: ${item['error']}');
-        outcome[id] = SendFailure.refused;
+        outcome[id] = item['code'] == SendFailure.notAssignedCode
+            ? SendFailure.notAssigned
+            : SendFailure.refused;
       }
     }
     return outcome;

@@ -454,13 +454,18 @@ class AssessmentRepository {
   }
 
   /// "Descartar" da aba Sincronizar: apaga a avaliação que o envio deixou em
-  /// erro com o motivo [reason] — na prática, "recusada pelo servidor". Se no
-  /// meio do caminho ela foi reenviada e aceita, ou o motivo mudou, devolve
-  /// `false` e não apaga.
-  Future<bool> discardFailed(String localAssessmentId, {required String reason}) {
+  /// erro com um dos motivos de [reasons] — na prática, as recusas do
+  /// servidor. Se no meio do caminho ela foi reenviada e aceita, ou o motivo
+  /// mudou, devolve `false` e não apaga.
+  Future<bool> discardFailed(
+    String localAssessmentId, {
+    required Set<String> reasons,
+  }) {
     return _discardWhere(
       localAssessmentId,
-      (row) => row.syncStatus == LocalSyncStatus.error && row.lastError == reason,
+      (row) =>
+          row.syncStatus == LocalSyncStatus.error &&
+          reasons.contains(row.lastError),
     );
   }
 

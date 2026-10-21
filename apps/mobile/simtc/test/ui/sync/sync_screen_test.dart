@@ -129,6 +129,33 @@ void main() {
     expect(find.text('Marcos Vinícius Alves'), findsNothing);
   });
 
+  testWidgets(
+      'recusada por o participante não estar mais com o consultor: a linha diz '
+      'o motivo e tem o "Descartar"', (tester) async {
+    final released = queuedAssessment(
+      '3',
+      participantName: 'Marcos Vinícius Alves',
+      status: LocalSyncStatus.error,
+      lastAttemptAt: DateTime(2026, 9, 29, 8, 5),
+      lastError: SendFailure.notAssigned,
+    );
+    await pump(tester, queue: [released]);
+
+    expect(
+      find.text('Falhou às 08:05 · o participante não está mais com você'),
+      findsOneWidget,
+    );
+    expect(find.text('Tentar novamente'), findsOneWidget);
+
+    await tester.tap(find.text('Descartar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+    await tester.pumpAndSettle();
+
+    expect(sync.discardCalls, [released.id]);
+    expect(find.text('Marcos Vinícius Alves'), findsNothing);
+  });
+
   group('"Descartar" que não descarta', () {
     const notDiscarded = 'Não foi possível descartar. Tente de novo.';
 

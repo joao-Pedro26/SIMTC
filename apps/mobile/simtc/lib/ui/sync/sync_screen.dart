@@ -258,7 +258,7 @@ class SyncScreen extends StatelessWidget {
     final retry = _RetryButton(
       onPressed: isOffline || sync.isSending ? null : sync.syncNow,
     );
-    if (item.lastError != SendFailure.refused) return retry;
+    if (!SendFailure.refusals.contains(item.lastError)) return retry;
 
     return Row(
       children: [

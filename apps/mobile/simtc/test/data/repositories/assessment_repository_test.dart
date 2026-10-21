@@ -657,21 +657,57 @@ void main() {
       await repository.confirm(queued.id, participantName: 'Bia', score: 90);
 
       expect(
-        await repository.discardFailed(refused.id, reason: 'sem conexão'),
+        await repository.discardFailed(refused.id, reasons: {'sem conexão'}),
         isFalse,
         reason: 'outro motivo',
       );
       expect(
-        await repository.discardFailed(queued.id, reason: 'recusada pelo servidor'),
+        await repository.discardFailed(
+          queued.id,
+          reasons: {'recusada pelo servidor'},
+        ),
         isFalse,
         reason: 'na fila, sem erro',
       );
       expect(
-        await repository.discardFailed(refused.id, reason: 'recusada pelo servidor'),
+        await repository.discardFailed(
+          refused.id,
+          reasons: {'recusada pelo servidor'},
+        ),
         isTrue,
       );
       final rows = await db.select(db.localAssessments).get();
       expect(rows.map((r) => r.id), [queued.id]);
+    });
+
+    test('descartar uma falha aceita qualquer um dos motivos pedidos',
+        () async {
+      final released = await open('tp-1');
+      await repository.confirm(released.id, participantName: 'Ana', score: 90);
+      await repository.saveSendResults(
+        {released.id: 'o participante não está mais com você'},
+        at: DateTime(2026, 9, 30, 9),
+      );
+
+      expect(
+        await repository.discardFailed(
+          released.id,
+          reasons: {'recusada pelo servidor', 'o participante não está mais com você'},
+        ),
+        isTrue,
+      );
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test('sem motivo nenhum pedido, nada é descartado', () async {
+      final refused = await open('tp-1');
+      await repository.confirm(refused.id, participantName: 'Ana', score: 90);
+      await repository.saveSendResults(
+        {refused.id: 'recusada pelo servidor'},
+        at: DateTime(2026, 9, 30, 9),
+      );
+
+      expect(await repository.discardFailed(refused.id, reasons: const {}), isFalse);
     });
 
     test(
@@ -687,7 +723,10 @@ void main() {
       await repository.saveSendResults({resent.id: null}, at: DateTime(2026, 9, 30, 9, 5));
 
       expect(
-        await repository.discardFailed(resent.id, reason: 'recusada pelo servidor'),
+        await repository.discardFailed(
+          resent.id,
+          reasons: {'recusada pelo servidor'},
+        ),
         isFalse,
       );
       expect((await row(resent.id)).syncStatus, LocalSyncStatus.synced);

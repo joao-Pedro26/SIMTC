@@ -371,6 +371,99 @@ void main() {
     expect(await db.select(db.localAssessments).get(), isEmpty);
   });
 
+  group('recusa por o participante não estar mais com o consultor (Fase 6B)', () {
+    /// O backend recusando com o código de "não está mais com você" para
+    /// [released], e com uma recusa comum para os outros.
+    void refuse({required String released}) {
+      when(() => api.post<List<dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((invocation) async {
+        final payload = payloadOf(invocation);
+        sent.add(payload);
+        return Response<List<dynamic>>(
+          requestOptions: RequestOptions(path: AssessmentSyncService.syncPath),
+          statusCode: 201,
+          data: [
+            for (final item in payload)
+              if (item['trainingParticipantId'] == released)
+                {
+                  'trainingParticipantId': released,
+                  'status': 'rejected',
+                  'error': 'Este participante não está mais em avaliação com '
+                      'você. A avaliação não foi registrada.',
+                  'code': 'NOT_ASSIGNED',
+                }
+              else
+                {
+                  'trainingParticipantId': item['trainingParticipantId'],
+                  'status': 'rejected',
+                  'error': 'Participante não encontrado',
+                  'code': null,
+                },
+          ],
+        );
+      });
+    }
+
+    test('ganha o motivo próprio; a recusa sem código continua "recusada pelo '
+        'servidor"', () async {
+      refuse(released: 'tp-1');
+      final released = await confirmed('tp-1');
+      final other = await confirmed('tp-2');
+
+      startService();
+
+      await until(() async =>
+          await statusOf(released.id) == LocalSyncStatus.error &&
+          await statusOf(other.id) == LocalSyncStatus.error);
+      expect((await row(released.id)).lastError, SendFailure.notAssigned);
+      expect((await row(released.id)).lastError,
+          'o participante não está mais com você');
+      expect((await row(other.id)).lastError, SendFailure.refused);
+    });
+
+    test('"Descartar" também apaga a avaliação recusada por esse motivo',
+        () async {
+      refuse(released: 'tp-1');
+      final sync = startService();
+      final released = await confirmed('tp-1');
+      await until(() async => await statusOf(released.id) == LocalSyncStatus.error);
+      expect((await row(released.id)).lastError, SendFailure.notAssigned);
+      await until(() => !sync.isSending);
+
+      expect(await sync.discardRefused(released.id), isTrue);
+
+      await until(() => sync.queue.isEmpty);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    test('um código que o app não conhece é uma recusa comum', () async {
+      when(() => api.post<List<dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((invocation) async {
+        final payload = payloadOf(invocation);
+        sent.add(payload);
+        return Response<List<dynamic>>(
+          requestOptions: RequestOptions(path: AssessmentSyncService.syncPath),
+          statusCode: 201,
+          data: [
+            for (final item in payload)
+              {
+                'trainingParticipantId': item['trainingParticipantId'],
+                'status': 'rejected',
+                'error': 'x',
+                'code': 'OUTRO',
+              },
+          ],
+        );
+      });
+      final refused = await confirmed('tp-1');
+
+      startService();
+
+      await until(() async => await statusOf(refused.id) == LocalSyncStatus.error);
+      expect((await row(refused.id)).lastError, SendFailure.refused);
+    });
+  });
+
   test('"Descartar" não apaga a avaliação que falhou por rede', () async {
     failWith(semRede);
     final sync = startService();
