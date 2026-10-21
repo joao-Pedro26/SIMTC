@@ -125,6 +125,7 @@ void main() {
     expect(progresso.assessed, 2);
     expect(progresso.assessable, 4);
     expect(progresso.label, '2 de 4 participantes avaliados');
+    expect(progresso.shortLabel, '2 de 4 avaliados');
     expect(progresso.percentLabel, '50%');
     expect(progressOf([p('t', type: ParticipationType.somenteTeorica)]).fraction,
         isNull);

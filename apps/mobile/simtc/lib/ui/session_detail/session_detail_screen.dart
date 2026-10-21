@@ -14,6 +14,7 @@ import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -33,10 +34,26 @@ import 'participant_row.dart';
 import 'session_detail_viewmodel.dart';
 
 /// Tela 1.4 — detalhe da sessão, com a lista de participantes.
+///
+/// No tablet, o recuo das laterais passa de 16/20 para 24 (quadros "4c" e
+/// "4e"). Em paisagem a tela é o painel da direita, ao lado da lista
+/// ([embedded]): sem a barra de topo, com as ações do ADMIN na linha da
+/// empresa e o progresso à direita (quadros "4c" e "4d").
 class SessionDetailScreen extends StatefulWidget {
-  const SessionDetailScreen({super.key, required this.sessionId});
+  const SessionDetailScreen({
+    super.key,
+    required this.sessionId,
+    this.embedded = false,
+    this.onBack,
+  });
 
   final String sessionId;
+
+  /// Painel ao lado da lista (tablet em paisagem).
+  final bool embedded;
+
+  /// O voltar da barra de topo. Sem ele, desempilha a tela.
+  final VoidCallback? onBack;
 
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
@@ -89,6 +106,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
+  /// Recuo das laterais da lista: 20 no celular, 24 no tablet.
+  double get _inset => context.isTablet ? AppSpacing.xxl : AppSpacing.xl;
+
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
 
@@ -97,28 +117,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            AppTopBar(
-              title: 'Detalhe da sessão',
-              actions: [
-                if (_viewModel.isAdmin) ...[
-                  AppIconAction(
-                    icon: AppIcons.edit,
-                    tooltip: 'Editar dados do treinamento',
-                    onPressed: _adminActionsEnabled(isOffline) ? _openEdit : null,
-                  ),
-                  // Sempre ligado: sem conexão ou com a sessão encerrada, a
-                  // tela de lá abre só para leitura.
-                  AppIconAction(
-                    icon: AppIcons.consultants,
-                    tooltip: 'Consultores da sessão',
-                    onPressed: _openConsultants,
-                  ),
+            if (!widget.embedded)
+              AppTopBar(
+                title: 'Detalhe da sessão',
+                onBack: widget.onBack,
+                actions: [
+                  if (_viewModel.isAdmin) ..._buildAdminActions(isOffline),
                 ],
-              ],
-              trailing: SyncStatusIndicator(
-                onTap: () => context.go(AppRoutes.sync),
+                trailing: SyncStatusIndicator(
+                  onTap: () => context.go(AppRoutes.sync),
+                ),
               ),
-            ),
             ConnectivityBanner(
               isOffline: isOffline,
               message: offlineDataMessage(
@@ -130,6 +139,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildAdminActions(bool isOffline) {
+    return [
+      AppIconAction(
+        icon: AppIcons.edit,
+        tooltip: 'Editar dados do treinamento',
+        onPressed: _adminActionsEnabled(isOffline) ? _openEdit : null,
+      ),
+      // Sempre ligado: sem conexão ou com a sessão encerrada, a tela de lá
+      // abre só para leitura.
+      AppIconAction(
+        icon: AppIcons.consultants,
+        tooltip: 'Consultores da sessão',
+        onPressed: _openConsultants,
+      ),
+    ];
   }
 
   /// As ações de ADMIN (canvas "1f") precisam de conexão e de uma sessão
@@ -177,9 +203,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
+  /// Tablet: 16 em cima, 18 embaixo, 24 dos lados e 14 entre as partes; no
+  /// celular, 14/16/16 e 12.
   Widget _buildSessionHeader(TrainingSession session, bool isOffline) {
     final notes = session.notes?.trim() ?? '';
     final progress = _viewModel.progress;
+    final tablet = context.isTablet;
+    final gap = tablet ? AppSpacing.md + 2 : AppSpacing.md;
+    // Em paisagem o progresso sai da pilha e vai para a direita (do nome da
+    // empresa, ou da linha de local e data quando há as ações do ADMIN).
+    final inlineProgress = widget.embedded && progress.fraction != null;
 
     return Container(
       width: double.infinity,
@@ -187,28 +220,42 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md + 2,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
+      padding: tablet
+          ? const EdgeInsets.fromLTRB(
+              AppSpacing.xxl,
+              AppSpacing.lg,
+              AppSpacing.xxl,
+              AppSpacing.lg + 2,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md + 2,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildCompanyRow(session),
-          const SizedBox(height: AppSpacing.md),
-          _buildMetaRow(session),
+          _buildCompanyRow(
+            session,
+            isOffline,
+            trailingProgress: inlineProgress && !_viewModel.isAdmin,
+          ),
+          SizedBox(height: gap),
+          _buildMetaRow(
+            session,
+            trailingProgress: inlineProgress && _viewModel.isAdmin,
+          ),
           if (notes.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
+            SizedBox(height: gap),
             InlineNotice(icon: AppIcons.notes, message: notes),
           ],
-          if (progress.fraction != null) ...[
-            const SizedBox(height: AppSpacing.md),
+          if (progress.fraction != null && !inlineProgress) ...[
+            SizedBox(height: gap),
             _buildProgress(progress),
           ],
           if (_viewModel.canStartSession) ...[
-            const SizedBox(height: AppSpacing.md),
+            SizedBox(height: gap),
             _buildStartButton(isOffline),
           ],
         ],
@@ -216,30 +263,81 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildCompanyRow(TrainingSession session) {
+  /// O progresso de 240 de largura do painel em paisagem.
+  static const double _inlineProgressWidth = 240;
+
+  Widget _buildCompanyRow(
+    TrainingSession session,
+    bool isOffline, {
+    required bool trailingProgress,
+  }) {
+    final tablet = context.isTablet;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CompanyLogo.header(
-          companyName: session.companyName,
-          url: session.companyLogoUrl,
-        ),
-        const SizedBox(width: AppSpacing.md),
+        tablet
+            ? CompanyLogo.headerLarge(
+                companyName: session.companyName,
+                url: session.companyLogoUrl,
+              )
+            : CompanyLogo.header(
+                companyName: session.companyName,
+                url: session.companyLogoUrl,
+              ),
+        SizedBox(width: tablet ? AppSpacing.md + 2 : AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(session.companyName, style: AppTypography.detailTitle),
-              const SizedBox(height: AppSpacing.xxs + 1),
-              Text(session.courseName, style: AppTypography.body),
+              Text(
+                session.companyName,
+                style: tablet
+                    ? AppTypography.detailTitleTablet
+                    : AppTypography.detailTitle,
+              ),
+              SizedBox(height: tablet ? AppSpacing.xs : AppSpacing.xxs + 1),
+              Text(
+                session.courseName,
+                style: tablet
+                    ? AppTypography.detailCourseTablet
+                    : AppTypography.body,
+              ),
             ],
           ),
+        ),
+        if (widget.embedded && _viewModel.isAdmin) ...[
+          const SizedBox(width: AppSpacing.md + 2),
+          ..._buildAdminActions(isOffline),
+        ],
+        if (trailingProgress) ...[
+          const SizedBox(width: AppSpacing.md + 2),
+          SizedBox(
+            width: _inlineProgressWidth,
+            child: _buildProgress(_viewModel.progress, short: true),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMetaRow(TrainingSession session, {required bool trailingProgress}) {
+    final wrap = _buildMetaWrap(session);
+    if (!trailingProgress) return wrap;
+
+    return Row(
+      children: [
+        Expanded(child: wrap),
+        const SizedBox(width: AppSpacing.lg),
+        SizedBox(
+          width: _inlineProgressWidth,
+          child: _buildProgress(_viewModel.progress, short: true),
         ),
       ],
     );
   }
 
-  Widget _buildMetaRow(TrainingSession session) {
+  Widget _buildMetaWrap(TrainingSession session) {
     final date = session.date;
     final consultants = _viewModel.consultantsLabel;
 
@@ -275,7 +373,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildProgress(ParticipantProgress progress) {
+  Widget _buildProgress(ParticipantProgress progress, {bool short = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -283,7 +381,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           children: [
             Expanded(
               child: Text(
-                progress.label,
+                short ? progress.shortLabel : progress.label,
                 style: AppTypography.meta.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
@@ -376,6 +474,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         selectedIndex: ParticipantFilter.values.indexOf(_viewModel.filter),
         onSelect: (index) =>
             _viewModel.setFilter(ParticipantFilter.values[index]),
+        horizontalPadding: _inset,
       ),
     );
   }
@@ -395,12 +494,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         children: [
           if (notice != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.md,
-                AppSpacing.xl,
-                0,
-              ),
+              padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
               child: notice,
             ),
           _buildListHeader(isOffline),
@@ -488,8 +582,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final title = Text('Participantes', style: AppTypography.sectionTitle);
     if (!_viewModel.isAdmin) {
       return Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl,
+        padding: EdgeInsets.symmetric(
+          horizontal: _inset,
           vertical: AppSpacing.lg - 1,
         ),
         child: title,
@@ -502,10 +596,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     // distância do topo. O recuo menor à direita alinha o ícone, e não a área
     // de toque, com a margem da lista.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
+      padding: EdgeInsets.fromLTRB(
+        _inset,
         AppSpacing.sm - 1,
-        AppSpacing.sm,
+        _inset - AppSpacing.md,
         AppSpacing.sm - 1,
       ),
       child: Row(
@@ -537,12 +631,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           };
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.md,
-      ),
+      padding: EdgeInsets.fromLTRB(_inset, 0, _inset, AppSpacing.md),
       child: InlineNotice(icon: AppIcons.profile, message: message),
     );
   }
@@ -571,6 +660,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               : assessedAtLabelFor(participant, situation, _viewModel.now),
       blockedNote: blockedNoteFor(participant, situation),
       muted: situation == ParticipantSituation.other,
+      horizontalInset: _inset,
       accentColor: situation == ParticipantSituation.mine
           ? AppColors.primary
           : AppColors.border,

@@ -86,6 +86,15 @@ abstract final class AppTypography {
   static TextStyle get detailTitle =>
       _inter(size: 18, weight: FontWeight.w600, height: 1.25);
 
+  /// O mesmo no tablet (quadros "4c" e "4e")
+  static TextStyle get detailTitleTablet =>
+      _inter(size: 20, weight: FontWeight.w600, height: 1.25);
+
+  /// Nome do curso no cabeçalho do detalhe, no tablet (quadros "4c" e "4e");
+  /// no celular é o `body`
+  static TextStyle get detailCourseTablet =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.35, color: AppColors.text3);
+
   /// Iniciais da empresa no lugar do logo (card da Home, detalhe da sessão)
   static TextStyle get logoInitials =>
       _inter(size: 14, weight: FontWeight.w700, height: 1, color: AppColors.primaryDark);

@@ -32,6 +32,12 @@ class CompanyLogo extends StatelessWidget {
       : _size = AppSpacing.huge - AppSpacing.xs,
         _radius = AppRadius.sm;
 
+  /// 56 de lado, para o cabeçalho do detalhe da sessão no tablet (quadros
+  /// "4c" e "4e").
+  const CompanyLogo.headerLarge({super.key, required this.companyName, this.url})
+      : _size = AppSpacing.huge + AppSpacing.sm,
+        _radius = AppRadius.sm + 2;
+
   /// 52 de lado, para o cabeçalho do detalhe da sessão (tela 1.4).
   const CompanyLogo.header({super.key, required this.companyName, this.url})
       : _size = AppSpacing.huge + AppSpacing.xs,

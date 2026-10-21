@@ -21,6 +21,7 @@ class AppTopBar extends StatelessWidget {
     this.leadingIcon = AppIcons.back,
     this.leadingIconSize = 30,
     this.leadingTooltip = 'Voltar',
+    this.onBack,
   });
 
   final String title;
@@ -34,6 +35,11 @@ class AppTopBar extends StatelessWidget {
   final IconData leadingIcon;
   final double leadingIconSize;
   final String leadingTooltip;
+
+  /// O que o botão da esquerda faz. Sem ele, desempilha a tela — o detalhe
+  /// do tablet em retrato não está empilhado sobre a lista e volta para ela
+  /// pela rota.
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +58,7 @@ class AppTopBar extends StatelessWidget {
               icon: Icon(leadingIcon, size: leadingIconSize, color: AppColors.text),
               // `maybePop` funciona igual sob o go_router e num
               // `MaterialApp` simples de teste.
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: onBack ?? () => Navigator.of(context).maybePop(),
             ),
           ),
           Expanded(

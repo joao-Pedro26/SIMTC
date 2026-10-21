@@ -106,6 +106,10 @@ class ParticipantProgress {
 
   String get label => '$assessed de $assessable participantes avaliados';
 
+  /// A versão curta do painel de detalhe em paisagem, onde o progresso tem
+  /// 240 de largura (quadro "4c").
+  String get shortLabel => '$assessed de $assessable avaliados';
+
   String get percentLabel => '${((fraction ?? 0) * 100).round()}%';
 }
 

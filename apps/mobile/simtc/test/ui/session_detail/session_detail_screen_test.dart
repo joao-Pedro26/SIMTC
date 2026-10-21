@@ -23,9 +23,12 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/app_top_bar.dart';
+import 'package:simtc/ui/core/widgets/company_logo.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
@@ -1349,6 +1352,165 @@ void main() {
         expect(find.byType(SessionDetailScreen), findsOneWidget);
         verifyNever(() => participants.syncSession(any()));
       });
+    });
+  });
+
+  group('tablet (Fase 7A)', () {
+    /// O detalhe num tablet. [embedded]: o painel da direita em paisagem,
+    /// que no app tem 1280 - 116 - 392 - 1 = 771 de largura.
+    Future<void> showTablet(
+      WidgetTester tester, {
+      bool embedded = false,
+      Size size = const Size(800, 2400),
+      VoidCallback? onBack,
+      List<SessionParticipant> withParticipants = const [],
+    }) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        withProviders(
+          FormFactorScope(
+            formFactor: FormFactor.tablet,
+            child: MaterialApp(
+              home: SessionDetailScreen(
+                sessionId: 'sess-1',
+                embedded: embedded,
+                onBack: onBack,
+              ),
+            ),
+          ),
+        ),
+      );
+      sessionStream.add(session());
+      participantsStream.add(withParticipants);
+      localStream.add(const []);
+      await tester.pump();
+    }
+
+    /// A linha (`Row`) mais próxima que tem a barra de progresso dentro.
+    Finder progressRow() => find
+        .ancestor(
+          of: find.byType(LinearProgressIndicator),
+          matching: find.byType(Row),
+        )
+        .first;
+
+    final dois = [
+      participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.aprovado, score: 86.4),
+      participant('2', 'Carlos Eduardo Nunes'),
+    ];
+
+    testWidgets('retrato (quadro "4e"): barra de topo, logo de 56, título de 20 '
+        'e 24 de recuo em tudo', (tester) async {
+      await showTablet(tester, withParticipants: dois);
+
+      expect(find.byType(AppTopBar), findsOneWidget);
+      expect(tester.getSize(find.byType(CompanyLogo)), const Size(56, 56));
+      expect(tester.getRect(find.byType(CompanyLogo)).left, 24);
+      final title = tester.widget<Text>(find.text('Bracell Celulose'));
+      expect(title.style!.fontSize, 20);
+      expect(tester.getRect(find.text('Participantes')).left, 24);
+      expect(tester.getRect(find.text('Ana Paula Ribeiro')).left, 24);
+      expect(tester.getRect(find.text('Todos')).left, greaterThanOrEqualTo(24));
+      expect(find.text('1 de 2 participantes avaliados'), findsOneWidget);
+    });
+
+    testWidgets('celular continua com logo de 52 e recuo de 20', (tester) async {
+      await show(tester, withParticipants: dois);
+
+      expect(tester.getSize(find.byType(CompanyLogo)), const Size(52, 52));
+      expect(tester.getRect(find.text('Ana Paula Ribeiro')).left, 20);
+      expect(
+        tester.widget<Text>(find.text('Bracell Celulose')).style!.fontSize,
+        18,
+      );
+    });
+
+    testWidgets('o voltar da barra chama o onBack, quando ele vem',
+        (tester) async {
+      var backs = 0;
+      await showTablet(tester, onBack: () => backs++);
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await tester.pump();
+
+      expect(backs, 1);
+    });
+
+    testWidgets('painel em paisagem, consultor (quadro "4c"): sem barra de '
+        'topo e o progresso curto, de 240, à direita do nome', (tester) async {
+      await showTablet(
+        tester,
+        embedded: true,
+        size: const Size(771, 2400),
+        withParticipants: dois,
+      );
+
+      expect(find.byType(AppTopBar), findsNothing);
+      expect(find.text('Detalhe da sessão'), findsNothing);
+      expect(find.text('1 de 2 avaliados'), findsOneWidget);
+      expect(find.text('1 de 2 participantes avaliados'), findsNothing);
+      final bar = tester.getRect(find.byType(LinearProgressIndicator));
+      expect(bar.width, 240);
+      expect(bar.right, 771 - 24);
+      expect(
+        find.descendant(of: progressRow(), matching: find.text('Bracell Celulose')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('painel em paisagem, ADMIN (quadro "4d"): lápis e pessoas na '
+        'linha da empresa, progresso na linha de local e data', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await showTablet(
+        tester,
+        embedded: true,
+        size: const Size(771, 2400),
+        withParticipants: dois,
+      );
+
+      final company = tester.getRect(find.text('Bracell Celulose'));
+      final edit = tester.getRect(find.byTooltip('Editar dados do treinamento'));
+      final people = tester.getRect(find.byTooltip('Consultores da sessão'));
+      expect(edit.top, lessThan(company.bottom));
+      expect(people.right, 771 - 24);
+      expect(edit.right, people.left);
+
+      final bar = tester.getRect(find.byType(LinearProgressIndicator));
+      expect(bar.width, 240);
+      expect(bar.right, 771 - 24);
+      expect(
+        find.descendant(of: progressRow(), matching: find.text('Itabira/MG')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: progressRow(), matching: find.text('Bracell Celulose')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('no tablet, o ⋮ do ADMIN fica na margem de 24', (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await showTablet(tester, withParticipants: [
+        participant(
+          '3',
+          'Marcos Vinícius Alves',
+          status: ParticipantStatus.emAvaliacao,
+          assignedTo: 'c-outro',
+          assignedName: 'Rafael Lima',
+        ),
+      ]);
+
+      // O ícone do ⋮ (24) fica na margem; o "adicionar" (22) tem o alvo
+      // de 48 na mesma posição, como no celular.
+      expect(tester.getRect(find.byIcon(AppIcons.more)).right, 800 - 24);
+      expect(
+        tester.getRect(find.byTooltip('Adicionar participante')).right,
+        800 - 12,
+      );
     });
   });
 }

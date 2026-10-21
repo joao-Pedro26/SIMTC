@@ -26,11 +26,15 @@ class FilterChipBar extends StatefulWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelect,
+    this.horizontalPadding = AppSpacing.xl,
   });
 
   final List<FilterChipData> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+
+  /// Recuo das pontas: 20 no celular, 24 no detalhe do tablet.
+  final double horizontalPadding;
 
   @override
   State<FilterChipBar> createState() => _FilterChipBarState();
@@ -73,8 +77,8 @@ class _FilterChipBarState extends State<FilterChipBar> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.horizontalPadding,
         vertical: AppSpacing.sm + 2,
       ),
       child: Row(

@@ -24,6 +24,7 @@ class ParticipantRow extends StatelessWidget {
     this.onTap,
     this.accentColor = AppColors.border,
     this.muted = false,
+    this.horizontalInset = AppSpacing.xl,
   });
 
   final String name;
@@ -53,10 +54,12 @@ class ParticipantRow extends StatelessWidget {
   /// Fundo apagado para quem está com outro consultor.
   final bool muted;
 
+  /// Recuo das laterais: 20 no celular, 24 no tablet (quadros "4c" e "4e").
+  final double horizontalInset;
+
   // O recuo lateral é de cada parte da linha, e não do contêiner: o cabeçalho
   // com o menu tem um recuo próprio à direita.
-  static const EdgeInsets _sides =
-      EdgeInsets.symmetric(horizontal: AppSpacing.xl);
+  EdgeInsets get _sides => EdgeInsets.symmetric(horizontal: horizontalInset);
 
   @override
   Widget build(BuildContext context) {
@@ -95,8 +98,8 @@ class ParticipantRow extends StatelessWidget {
       // de toque de 48dp, que fica na margem da lista — como o "adicionar" do
       // título "Participantes".
       padding: EdgeInsets.only(
-        left: AppSpacing.xl,
-        right: menu == null ? AppSpacing.xl : AppSpacing.sm,
+        left: horizontalInset,
+        right: menu == null ? horizontalInset : horizontalInset - AppSpacing.md,
       ),
       child: Row(
         children: [
