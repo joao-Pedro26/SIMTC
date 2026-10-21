@@ -14420,7 +14420,7 @@ Resolvidas nesta fase: as quatro pendências "6B" do plano da 6A (a tela de Cons
 | Fase | Pendência |
 |---|---|
 | Web | ~~O painel trata o `POST /practical-assessments/sync` como salvo com qualquer resposta 2xx e não lê o resultado item a item (`assessment-drawer.tsx`, linha 182): com a regra nova, uma avaliação recusada aparece como salva. Só acontece se o participante for liberado com o checklist do painel já aberto. Ler `status`, `error` e `code` de cada item.~~ **Resolvida em 21/10/2026** (commit d132803): o painel lê o resultado item a item e mostra o motivo da recusa no aviso de erro, sem dar a avaliação como salva. |
-| Web | O painel não avisa quando tirar um consultor da sessão vai liberar participantes em avaliação com ele (o app avisa). |
+| Web | ~~O painel não avisa quando tirar um consultor da sessão vai liberar participantes em avaliação com ele (o app avisa).~~ **Resolvida em 21/10/2026** (commit 27f0ed6): o painel pede confirmação, com o mesmo texto do app, antes de tirar um consultor que tem avaliação em andamento. |
 | 7 | A tela de Consultores no tablet (quadros `4n` e `4y`: diálogo ancorado e retrato). |
 | 8 | A busca da tela de Consultores (a lupa do quadro `3c`), com as das outras telas. |
 | 8 | As quatro decisões visuais em aberto da 6A (5 a 8 de lá) — e as medidas que a tela de Consultores herdou das mesmas peças: a faixa de contexto, os avisos, as cores dos tons e o contorno do "Remover da sessão" (ver "Ajustes"). |
