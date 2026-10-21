@@ -179,7 +179,11 @@ export function AssessmentDrawer({
         infractionNoteId: sel.infractionNoteId,
       }))
 
-      await clientApi.post('/practical-assessments/sync', [
+      // O sync responde 2xx mesmo quando recusa a avaliação: o resultado vem
+      // item a item (por exemplo, o participante não está mais com quem avalia).
+      const results = await clientApi.post<
+        { trainingParticipantId: string; status: 'fulfilled' | 'rejected'; error?: string; code?: string }[]
+      >('/practical-assessments/sync', [
         {
           trainingParticipantId,
           date: today.toISOString().split('T')[0],
@@ -188,6 +192,11 @@ export function AssessmentDrawer({
           items,
         },
       ])
+
+      const rejected = results?.find((r) => r.status === 'rejected')
+      if (rejected) {
+        throw new Error(rejected.error || 'A avaliação não foi registrada.')
+      }
 
       onSaved()
     } catch (e) {
