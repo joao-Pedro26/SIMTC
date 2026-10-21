@@ -14406,6 +14406,13 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 7. Se algo
 
 ---
 
+## Desvios na execução (21/10/2026)
+
+- A tela de Consultores serializa os seus downloads da sessão (um no ar, os demais viram um só enfileirado), porque um GET pedido antes de uma mudança aceita e respondido depois a desfazia no cache (commit 0150ef5).
+- `addParticipant` e `addConsultant` usam `Icons.person_add_alt_outlined`: o `person_add_outlined` desenha o "+" à esquerda (commit 25b1bb8).
+- Entre telas, o `ParticipantRepository` guarda por sessão o instante da última mudança aceita (consultor que entra ou sai, `assign`, `unassign`) e não grava um GET pedido antes dele; o `SessionConsultantRepository` avisa pelo `onSessionChanged`, ligado em `app_providers.dart` (commit aa4fa79).
+- Com os consultores da sessão ainda não baixados (`notDownloaded`), `canChange` é falso e os "Adicionar" da equipe ficam apagados (commit aa4fa79).
+
 ## Pendências levadas para as fases seguintes
 
 Resolvidas nesta fase: as quatro pendências "6B" do plano da 6A (a tela de Consultores com a contagem e o ícone, liberar os participantes ao remover um consultor, o desatribuir do ADMIN e a avaliação presa que volta pelo "Reavaliar"); as "Decisões em aberto" 1 a 4 da 6A; a pendência "8" de lá sobre a consulta de CPF que não era refeita quando a rede voltava; e, na auditoria da Fase 0, a pendência "5" sobre o `sync` não validar a atribuição e as duas pendências "6" sobre os consultores da sessão.
@@ -14426,6 +14433,7 @@ Resolvidas nesta fase: as quatro pendências "6B" do plano da 6A (a tela de Cons
 | Backend | O `unassign` não confere o status da sessão: pela API, um ADMIN desatribui um participante de uma sessão concluída (o app apaga o ⋮ nesse caso). |
 | Backend | Pela leitura do código, o `PATCH :id` que troca o `responsibleConsultantId` **sem** mandar `additionalConsultantsIds` não recria os vínculos da sessão: o responsável antigo continua como consultor dela (e ninguém é liberado), e o novo pode ficar sem vínculo. Com a lista, vale a lista nova. Não foi exercitado nesta fase. |
 | Backend | `cancelSession` não mexe nos participantes: quem estava "em avaliação" continua assim numa sessão cancelada (pendência da 6A). |
+| Backend | `ConsultantsService.deleteConsultant` (`consultants.service.ts`, ~127-130) deixa participante em avaliação sem consultor; o `participant-release.util.ts` resolveria — regra de negócio a decidir. |
 | Backend | A agenda do consultor ("Sem sessão hoje", "Empilhadeira · Betim 13:00" no quadro `3c`) não existe no contrato. |
 | — | Canvas: a 1.13 com o e-mail no lugar da agenda, sem a lupa, com o diálogo de remover e os estados sem conexão, carregando e sem equipe; o detalhe com o ⋮ e o diálogo de desatribuir; o checklist com a tela de "continuar" e o aviso de liberado; a 1.12 com a pergunta da data antiga. Atualizar no Claude Design. |
 
