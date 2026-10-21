@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/auth_repository.dart';
 import '../../router.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import 'splash_viewmodel.dart';
@@ -49,32 +50,43 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Tablet (quadros "4a" e "4o", iguais nas duas posições): logo de 200 e
+    // barra de 220. O quadro põe a logo numa caixa branca com 30 de recuo
+    // e 36 de vão até a barra — 66 entre a logo e a barra.
+    final tablet = context.isTablet;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildLogo(),
-            const SizedBox(height: AppSpacing.xxl + AppSpacing.xs),
-            _buildProgress(),
+            _buildLogo(height: tablet ? _tabletLogoHeight : 130),
+            SizedBox(
+              height: tablet ? _tabletGap : AppSpacing.xxl + AppSpacing.xs,
+            ),
+            _buildProgress(width: tablet ? _tabletBarWidth : 140),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLogo() {
+  static const double _tabletLogoHeight = 200;
+  static const double _tabletGap = AppSpacing.huge + AppSpacing.lg + 2;
+  static const double _tabletBarWidth = 220;
+
+  Widget _buildLogo({required double height}) {
     return Image.asset(
       'assets/images/logo-simtc.png',
-      height: 130,
+      height: height,
       semanticLabel: 'SIM Treinamentos',
     );
   }
 
-  Widget _buildProgress() {
+  Widget _buildProgress({required double width}) {
     return SizedBox(
-      width: 140,
+      width: width,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: const LinearProgressIndicator(

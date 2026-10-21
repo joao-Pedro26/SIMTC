@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -52,7 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildBody(BuildContext context, LoginViewModel viewModel) {
-    final isOffline = context.watch<ConnectivityService>().isOffline;
+    final form = _buildForm(context, viewModel);
+    if (context.isExpandedLayout) return _buildTabletLandscape(form);
+    if (context.isTablet) return _buildTabletPortrait(form);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -69,33 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _buildLogo(),
               const SizedBox(height: AppSpacing.xxxl),
-              _buildEmailField(viewModel),
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildPasswordField(viewModel),
-              const SizedBox(height: AppSpacing.md),
-              _buildOptionsRow(viewModel),
-              if (viewModel.errorMessage != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                InlineNotice(
-                  icon: AppIcons.needsReview,
-                  message: viewModel.errorMessage!,
-                  tone: NoticeTone.danger,
-                ),
-              ],
-              if (viewModel.infoMessage != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                InlineNotice(
-                  icon: AppIcons.email,
-                  message: viewModel.infoMessage!,
-                  tone: NoticeTone.success,
-                ),
-              ],
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildSubmitButton(context, viewModel),
-              if (isOffline) ...[
-                const SizedBox(height: AppSpacing.xxl),
-                _buildOfflineNotice(),
-              ],
+              form,
             ],
           ),
         ),
@@ -103,11 +80,120 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildLogo() {
+  /// Quadro "4b": a logo num painel de 520 à esquerda; o formulário, com até
+  /// 440 de largura, centrado no resto. Rola quando o teclado sobe.
+  Widget _buildTabletLandscape(Widget form) {
+    return Row(
+      children: [
+        SizedBox(
+          width: _tabletLogoPanelWidth,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _tabletLogoInset),
+            child: Center(child: _buildLogo(height: _tabletLogoHeight)),
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: _tabletFormInset,
+                vertical: AppSpacing.xxl,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _tabletFormWidth),
+                child: form,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Quadro "4p": os dois painéis empilham — a logo em cima (56 de recuo, 32
+  /// embaixo), o formulário na mesma coluna de 440, e o conjunto centrado na
+  /// altura.
+  Widget _buildTabletPortrait(Widget form) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          _tabletFormInset,
+          0,
+          _tabletFormInset,
+          AppSpacing.huge,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                0,
+                _tabletLogoInset,
+                0,
+                AppSpacing.xxxl,
+              ),
+              child: _buildLogo(height: _tabletLogoHeight),
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _tabletFormWidth),
+              child: form,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Medidas dos quadros "4b" e "4p".
+  static const double _tabletLogoHeight = 230;
+  static const double _tabletLogoPanelWidth = 520;
+  static const double _tabletLogoInset = AppSpacing.huge + AppSpacing.sm;
+  static const double _tabletFormWidth = 440;
+  static const double _tabletFormInset = AppSpacing.huge + AppSpacing.lg;
+
+  /// Os campos, o "Entrar" e os avisos — os mesmos em qualquer formato.
+  Widget _buildForm(BuildContext context, LoginViewModel viewModel) {
+    final isOffline = context.watch<ConnectivityService>().isOffline;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildEmailField(viewModel),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildPasswordField(viewModel),
+        const SizedBox(height: AppSpacing.md),
+        _buildOptionsRow(viewModel),
+        if (viewModel.errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          InlineNotice(
+            icon: AppIcons.needsReview,
+            message: viewModel.errorMessage!,
+            tone: NoticeTone.danger,
+          ),
+        ],
+        if (viewModel.infoMessage != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          InlineNotice(
+            icon: AppIcons.email,
+            message: viewModel.infoMessage!,
+            tone: NoticeTone.success,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildSubmitButton(context, viewModel),
+        if (isOffline) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          _buildOfflineNotice(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLogo({double height = 150}) {
     return Center(
       child: Image.asset(
         'assets/images/logo-simtc.png',
-        height: 150,
+        height: height,
         semanticLabel: 'SIM Treinamentos',
       ),
     );
