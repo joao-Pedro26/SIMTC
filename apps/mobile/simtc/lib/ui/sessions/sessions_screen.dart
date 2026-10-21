@@ -9,6 +9,7 @@ import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -27,8 +28,27 @@ import 'session_status_style.dart';
 import 'sessions_list_viewmodel.dart';
 
 /// Tela 1.3 — a Home do app.
+///
+/// No tablet em retrato é a mesma lista do celular, alargada, com a navbar
+/// em pílula do tablet. Em paisagem é o painel da esquerda ([embedded]), ao
+/// lado do detalhe: sem navbar própria (a lateral é da moldura), com o
+/// cabeçalho do quadro "4c" e o card da sessão aberta destacado.
 class SessionsScreen extends StatefulWidget {
-  const SessionsScreen({super.key});
+  const SessionsScreen({
+    super.key,
+    this.embedded = false,
+    this.selectedSessionId,
+    this.onOpenSession,
+  });
+
+  /// Painel da esquerda do tablet em paisagem.
+  final bool embedded;
+
+  /// A sessão aberta ao lado da lista, que o card destaca.
+  final String? selectedSessionId;
+
+  /// O toque no card. Sem ele, o detalhe é empilhado por cima da lista.
+  final ValueChanged<String>? onOpenSession;
 
   @override
   State<SessionsScreen> createState() => _SessionsScreenState();
@@ -230,42 +250,60 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   Widget _buildScaffold(BuildContext context, SessionsListViewModel viewModel) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
+    // Tablet em retrato: a pílula do tablet, posta pela moldura. Em paisagem
+    // quem põe a navbar é a moldura de fora, que envolve os dois painéis.
+    final tabletPortrait = context.isTablet && !widget.embedded;
+    final content = Column(
+      children: [
+        _buildHeader(context),
+        ConnectivityBanner(
+          isOffline: isOffline,
+          message: offlineDataMessage(viewModel.lastSyncedAt),
+        ),
+        _buildFilters(viewModel),
+        Expanded(child: _buildBody(viewModel)),
+      ],
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _buildHeader(context),
-            ConnectivityBanner(
-              isOffline: isOffline,
-              message: offlineDataMessage(viewModel.lastSyncedAt),
-            ),
-            _buildFilters(viewModel),
-            Expanded(child: _buildBody(viewModel)),
-          ],
-        ),
+        bottom: tabletPortrait,
+        child: tabletPortrait
+            ? TabletNavFrame(current: AppTab.sessions, child: content)
+            : content,
       ),
-      bottomNavigationBar: const AppNavBar(current: AppTab.sessions),
+      bottomNavigationBar: context.isTablet
+          ? null
+          : const AppNavBar(current: AppTab.sessions),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
     final user = context.watch<AuthRepository>().currentUser;
     final title = user?.isAdmin == true ? 'Sessões' : 'Minhas sessões';
+    final embedded = widget.embedded;
 
+    // Painel de paisagem (quadro "4c"): 12/12/12/20 de recuo, saudação de 13
+    // e título de 22.
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm + 2,
-        AppSpacing.md,
-        AppSpacing.sm + 2,
-      ),
+      padding: embedded
+          ? const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm + 2,
+              AppSpacing.md,
+              AppSpacing.sm + 2,
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -281,14 +319,19 @@ class _SessionsScreenState extends State<SessionsScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
-          Text(_greeting(user?.name), style: AppTypography.homeGreeting),
+          Text(
+            _greeting(user?.name),
+            style: embedded
+                ? AppTypography.screenSubtitle
+                : AppTypography.homeGreeting,
+          ),
           const SizedBox(height: AppSpacing.xxs),
           // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
           // mesmo texto quando o usuário é ADMIN.
           Text(
             title,
             key: const Key('sessions-title'),
-            style: AppTypography.homeTitle,
+            style: embedded ? AppTypography.screenTitle : AppTypography.homeTitle,
           ),
         ],
       ),
@@ -482,7 +525,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
       ),
       progressValue: session.progress,
       progressLabel: session.progressLabel,
-      onTap: () => context.push(AppRoutes.sessionDetail(session.id)),
+      selected: session.id == widget.selectedSessionId,
+      onTap: () {
+        final open = widget.onOpenSession;
+        if (open != null) {
+          open(session.id);
+        } else {
+          context.push(AppRoutes.sessionDetail(session.id));
+        }
+      },
     );
   }
 

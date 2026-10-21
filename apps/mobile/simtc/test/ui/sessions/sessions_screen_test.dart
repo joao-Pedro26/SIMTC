@@ -17,7 +17,9 @@ import 'package:simtc/data/services/assessment_sync_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
+import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
@@ -89,7 +91,12 @@ void main() {
     connectivity.dispose();
   });
 
-  Future<void> pump(WidgetTester tester, {AssessmentSyncService? sync}) {
+  Future<void> pump(
+    WidgetTester tester, {
+    AssessmentSyncService? sync,
+    FormFactor formFactor = FormFactor.phone,
+    Widget home = const SessionsScreen(),
+  }) {
     return tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -100,7 +107,10 @@ void main() {
           if (sync != null)
             ChangeNotifierProvider<AssessmentSyncService>.value(value: sync),
         ],
-        child: const MaterialApp(home: SessionsScreen()),
+        child: FormFactorScope(
+          formFactor: formFactor,
+          child: MaterialApp(home: home),
+        ),
       ),
     );
   }
@@ -1054,5 +1064,127 @@ void main() {
     await tester.pump();
 
     expect(find.text('Disponível em breve.'), findsOneWidget);
+  });
+
+  group('tablet (Fase 7A)', () {
+    void screen(WidgetTester tester, Size size) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+    }
+
+    testWidgets('retrato: a lista do celular, com a pílula do tablet na base',
+        (tester) async {
+      screen(tester, const Size(800, 1280));
+      await pump(tester, formFactor: FormFactor.tablet);
+      sessions.add([hoje()]);
+      await tester.pump();
+
+      final bar = tester.widget<PillNavBar>(find.byType(PillNavBar));
+      expect(bar.layout, PillNavLayout.tabletBottom);
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar,
+        isNull,
+      );
+      expect(tester.getRect(find.byType(SessionCard)).width, 800);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('sessions-title'))).style!.fontSize,
+        24,
+      );
+    });
+
+    testWidgets('painel de paisagem (quadro "4c"): sem navbar própria, '
+        'saudação de 13 e título de 22', (tester) async {
+      screen(tester, const Size(392, 800));
+      await pump(
+        tester,
+        formFactor: FormFactor.tablet,
+        home: const SessionsScreen(embedded: true),
+      );
+      sessions.add([hoje()]);
+      await tester.pump();
+
+      expect(find.byType(PillNavBar), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('sessions-title'))).style!.fontSize,
+        22,
+      );
+      expect(tester.widget<Text>(find.textContaining('Carla')).style!.fontSize, 13);
+      expect(tester.getRect(find.byKey(const Key('sessions-title'))).left, 20);
+    });
+
+    testWidgets('o card da sessão aberta fica destacado, sem mudar de tamanho',
+        (tester) async {
+      screen(tester, const Size(392, 1600));
+      final outra = TrainingSession(
+        id: 'sess-2',
+        companyName: 'Transportes Vale Norte',
+        courseName: 'Operação de Empilhadeira',
+        city: 'Betim',
+        state: 'MG',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 8,
+        assessableParticipants: 8,
+        assessedParticipants: 0,
+      );
+      await pump(
+        tester,
+        formFactor: FormFactor.tablet,
+        home: const SessionsScreen(embedded: true, selectedSessionId: 'sess-1'),
+      );
+      sessions.add([hoje(), outra]);
+      await tester.pump();
+
+      SessionCard card(String company) => tester.widget<SessionCard>(
+            find.ancestor(
+              of: find.text(company),
+              matching: find.byType(SessionCard),
+            ),
+          );
+      expect(card('Bracell Celulose').selected, isTrue);
+      expect(card('Transportes Vale Norte').selected, isFalse);
+
+      final selected = find.ancestor(
+        of: find.text('Bracell Celulose'),
+        matching: find.byType(Container),
+      );
+      final decoration =
+          tester.widget<Container>(selected.first).decoration! as BoxDecoration;
+      expect(decoration.color, AppColors.categoryExpandedBg);
+      final border = decoration.border! as Border;
+      expect(border.left, const BorderSide(color: AppColors.primary, width: 3));
+      expect(border.top.color, AppColors.selectedCardBorder);
+      expect(border.top.width, 1.5);
+      expect(border.bottom.width, 1.5);
+      final semantics = tester.widget<Semantics>(
+        find
+            .descendant(
+              of: find.byType(SessionCard).first,
+              matching: find.byType(Semantics),
+            )
+            .first,
+      );
+      expect(semantics.properties.selected, isTrue);
+    });
+
+    testWidgets('com onOpenSession, o toque no card avisa em vez de empilhar',
+        (tester) async {
+      screen(tester, const Size(392, 1600));
+      String? opened;
+      await pump(
+        tester,
+        formFactor: FormFactor.tablet,
+        home: SessionsScreen(embedded: true, onOpenSession: (id) => opened = id),
+      );
+      sessions.add([hoje()]);
+      await tester.pump();
+
+      await tester.tap(find.byType(SessionCard));
+      await tester.pump();
+
+      expect(opened, 'sess-1');
+    });
   });
 }

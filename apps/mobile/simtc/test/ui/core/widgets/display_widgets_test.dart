@@ -466,4 +466,36 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  testWidgets('SessionCard destacado tem a mesma altura e o texto no mesmo '
+      'lugar do card comum', (tester) async {
+    Future<(Rect, Rect)> measure(bool selected) async {
+      // Numa lista, como na Home: solto no corpo do Scaffold, o card
+      // esticaria até o fim da tela e a altura nunca mudaria.
+      await _pump(
+        tester,
+        ListView(
+          children: [
+            SessionCard(
+              companyName: 'Bracell',
+              courseName: 'Direção Defensiva',
+              meta: 'Itabira/MG · 07:30',
+              statusChip: const SizedBox(height: 24, width: 80),
+              selected: selected,
+            ),
+          ],
+        ),
+      );
+      return (
+        tester.getRect(find.byType(SessionCard)),
+        tester.getRect(find.text('Bracell')),
+      );
+    }
+
+    final (plainCard, plainText) = await measure(false);
+    final (selectedCard, selectedText) = await measure(true);
+    expect(selectedCard.height, closeTo(plainCard.height, 0.001));
+    expect(selectedText.topLeft.dx, closeTo(plainText.topLeft.dx, 0.001));
+    expect(selectedText.topLeft.dy, closeTo(plainText.topLeft.dy, 0.001));
+  });
 }

@@ -107,6 +107,10 @@ abstract final class AppColors {
   static const Color categoryExpandedBg = Color(0xFFF1FAFB);
   static const Color categoryExpandedBorder = Color(0xFFD6EDF0);
 
+  /// Borda de cima e de baixo do card da sessão aberta ao lado da lista, no
+  /// tablet em paisagem (quadro "4c"). O fundo é o `categoryExpandedBg`.
+  static const Color selectedCardBorder = Color(0xFF7FC9D1);
+
   /// Indicador "salvo" do cabeçalho do checklist (quadro "1b") — um verde
   /// próprio, mais vivo que o `successInk` dos chips.
   static const Color savedInk = Color(0xFF15803D);
