@@ -29,9 +29,13 @@ import 'session_edit_viewmodel.dart';
 /// tem horário), "Local" virou "Cidade" + "UF" (é como o backend guarda) e
 /// sem o contador das observações (o backend não limita).
 class SessionEditScreen extends StatefulWidget {
-  const SessionEditScreen({super.key, required this.sessionId});
+  const SessionEditScreen({super.key, required this.sessionId, this.clock});
 
   final String sessionId;
+
+  /// O relógio da tela — só os testes passam outro. É dele que sai a pergunta
+  /// da data com mais de 90 dias.
+  final DateTime Function()? clock;
 
   @override
   State<SessionEditScreen> createState() => _SessionEditScreenState();
@@ -43,6 +47,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     sessionRepository: context.read<SessionRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     currentUser: context.read<AuthRepository>().currentUser,
+    now: widget.clock,
   )..init();
 
   final TextEditingController _dateController = TextEditingController();
@@ -121,7 +126,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
               ),
               ConnectivityBanner(
                 isOffline: isOffline,
-                message: 'Sem conexão — salvar precisa de internet.',
+                message: 'Sem conexão — salvar e cancelar precisam de internet.',
               ),
               Expanded(child: _buildBody(isOffline)),
               if (_viewModel.session != null)
@@ -355,6 +360,8 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
+    if (_viewModel.dateLeavesTheList && !await _confirmOldDate()) return;
+    if (!mounted) return;
     final saved = await _viewModel.save();
     if (!saved || !mounted) return;
 
@@ -363,6 +370,36 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       const SnackBar(content: Text('Dados do treinamento atualizados.')),
     );
     Navigator.of(context).pop(true);
+  }
+
+  /// Um toque errado no ano tiraria a sessão — mesmo em andamento — da lista
+  /// de todos os aparelhos, sem aviso (decisão de 09/10/2026 — não está no
+  /// canvas). Só pergunta quando a data foi mudada para antes da janela.
+  Future<bool> _confirmOldDate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Esta data é de mais de ${SessionRepository.historyWindowDays} dias '
+          'atrás.',
+        ),
+        content: const Text(
+          'A sessão vai sair da lista do app em todos os aparelhos; depois '
+          'disso, só o painel web consegue alterá-la. Salvar assim mesmo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
   }
 
   /// "Descartar" é um pedido explícito: sai sem perguntar.

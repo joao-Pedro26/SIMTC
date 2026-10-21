@@ -32,14 +32,17 @@ class SessionEditViewModel extends ChangeNotifier {
     required SessionRepository sessionRepository,
     required ParticipantRepository participantRepository,
     required AuthUser? currentUser,
+    DateTime Function()? now,
   })  : _sessionRepository = sessionRepository,
         _participantRepository = participantRepository,
-        _currentUser = currentUser;
+        _currentUser = currentUser,
+        _now = now ?? DateTime.now;
 
   final String sessionId;
   final SessionRepository _sessionRepository;
   final ParticipantRepository _participantRepository;
   final AuthUser? _currentUser;
+  final DateTime Function() _now;
 
   static const String _saveFailed =
       'Não foi possível salvar as alterações. Tente de novo.';
@@ -139,6 +142,22 @@ class SessionEditViewModel extends ChangeNotifier {
 
   bool get canSave =>
       canEdit && isDirty && cityError == null && stateError == null && !isBusy;
+
+  /// A data foi mudada para antes da janela da lista de sessões (decisão de
+  /// 09/10/2026). A lista só baixa as dos últimos
+  /// [SessionRepository.historyWindowDays] dias: com uma data mais antiga, a
+  /// sessão some dela em todos os aparelhos no próximo sync, e só o painel web
+  /// consegue alterá-la depois. A tela pede confirmação antes de salvar. Só
+  /// conta a data que o admin mudou — a que já era antiga não pergunta nada.
+  bool get dateLeavesTheList {
+    final date = _date;
+    if (date == null || !_dateChanged) return false;
+    // O mesmo cálculo do `SessionRepository.syncAll`.
+    final from = _now().subtract(
+      const Duration(days: SessionRepository.historyWindowDays),
+    );
+    return date.isBefore(DateTime(from.year, from.month, from.day));
+  }
 
   /// Assina o cache. Chamado uma vez pela tela.
   void init() {

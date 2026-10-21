@@ -34,7 +34,10 @@ class SessionRepository {
   /// web — baixar o histórico inteiro faria o admin, que recebe todas as sessões
   /// do sistema, estourar o teto de páginas e ficar com uma lista parcial em
   /// silêncio. Decidido com o usuário em 20/09/2026.
-  static const int _historyWindowDays = 90;
+  ///
+  /// Pública porque "Dados do treinamento" usa a mesma janela para avisar
+  /// quando uma data nova tira a sessão desta lista (Fase 6B).
+  static const int historyWindowDays = 90;
 
   static const String _offlineMessage =
       'Não foi possível atualizar. Mostrando os dados já baixados.';
@@ -204,7 +207,7 @@ class SessionRepository {
     // Calculado uma vez antes do laço: uma virada de meia-noite no meio do
     // sync não pode mudar o filtro entre páginas.
     final from = DateTime.now().subtract(
-      const Duration(days: _historyWindowDays),
+      const Duration(days: historyWindowDays),
     );
 
     try {

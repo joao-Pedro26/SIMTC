@@ -103,12 +103,14 @@ void main() {
     AuthUser? user = admin,
     TrainingSession? withSession,
     bool missing = false,
+    DateTime Function()? now,
   }) async {
     final vm = SessionEditViewModel(
       sessionId: 'sess-1',
       sessionRepository: sessions,
       participantRepository: participants,
       currentUser: user,
+      now: now,
     )..init();
     addTearDown(vm.dispose);
     sessionStream.add(missing ? null : (withSession ?? session()));
@@ -288,6 +290,108 @@ void main() {
 
       expect(vm.city, 'Betim');
       expect(vm.notes, 'Pátio 3 — portaria B.');
+    });
+  });
+
+  // A lista de sessões só baixa as dos últimos 90 dias: uma data mais antiga
+  // tira a sessão do app em todos os aparelhos (decisão de 09/10/2026).
+  group('data antiga', () {
+    // "Hoje" é 20/01/2027: a janela da lista começa em 22/10/2026.
+    DateTime today() => DateTime(2027, 1, 20, 14, 30);
+
+    test('a janela é a mesma da lista de sessões', () {
+      expect(SessionRepository.historyWindowDays, 90);
+    });
+
+    test('data mudada para antes da janela pede confirmação', () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2027, 1, 10)),
+        now: today,
+      );
+      expect(vm.dateLeavesTheList, isFalse, reason: 'nada mudou ainda');
+
+      vm.setDate(DateTime(2026, 10, 21));
+
+      expect(vm.dateLeavesTheList, isTrue);
+      expect(vm.canSave, isTrue, reason: 'a pergunta é da tela; salvar pode');
+    });
+
+    test('o primeiro dia da janela ainda está na lista; a véspera, não',
+        () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2027, 1, 10)),
+        now: today,
+      );
+
+      vm.setDate(DateTime(2026, 10, 22));
+      expect(vm.dateLeavesTheList, isFalse);
+
+      vm.setDate(DateTime(2026, 10, 21));
+      expect(vm.dateLeavesTheList, isTrue);
+    });
+
+    test('data recente ou futura não pergunta nada', () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2027, 1, 10)),
+        now: today,
+      );
+
+      vm.setDate(DateTime(2027, 1, 5));
+      expect(vm.dateLeavesTheList, isFalse);
+
+      vm.setDate(DateTime(2027, 6, 1));
+      expect(vm.dateLeavesTheList, isFalse);
+    });
+
+    test('sessão que já tinha data antiga não pergunta ao mudar só outro campo',
+        () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2026, 5, 3)),
+        now: today,
+      );
+
+      vm.setCity('Betim');
+
+      expect(vm.isDirty, isTrue);
+      expect(vm.dateLeavesTheList, isFalse);
+    });
+
+    test('escolher de novo o mesmo dia antigo não é mudança', () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2026, 5, 3)),
+        now: today,
+      );
+
+      vm.setDate(DateTime(2026, 5, 3, 9));
+
+      expect(vm.dateLeavesTheList, isFalse);
+    });
+
+    test('trocar uma data antiga por outra data antiga pergunta', () async {
+      final vm = await open(
+        withSession: session(date: DateTime(2026, 5, 3)),
+        now: today,
+      );
+
+      vm.setDate(DateTime(2026, 5, 4));
+
+      expect(vm.dateLeavesTheList, isTrue);
+    });
+
+    test('sessão sem data, sem data escolhida: nada a perguntar', () async {
+      final vm = await open(withSession: session(withoutDate: true), now: today);
+
+      vm.setCity('Betim');
+
+      expect(vm.dateLeavesTheList, isFalse);
+    });
+
+    test('sessão sem data que ganha uma data antiga pergunta', () async {
+      final vm = await open(withSession: session(withoutDate: true), now: today);
+
+      vm.setDate(DateTime(2026, 3, 1));
+
+      expect(vm.dateLeavesTheList, isTrue);
     });
   });
 

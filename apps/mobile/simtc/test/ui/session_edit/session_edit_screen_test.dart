@@ -148,6 +148,7 @@ void main() {
     WidgetTester tester, {
     Size screen = const Size(412, 1400),
     double textScale = 1,
+    DateTime Function()? clock,
   }) async {
     tester.view.physicalSize = screen;
     tester.view.devicePixelRatio = 1.0;
@@ -171,6 +172,7 @@ void main() {
           path: '/sessions/:sessionId/edit',
           builder: (context, state) => SessionEditScreen(
             sessionId: state.pathParameters['sessionId']!,
+            clock: clock,
           ),
         ),
       ],
@@ -301,6 +303,114 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(sentBody(), {'date': '2026-09-15'});
+  });
+
+  // A lista de sessões só baixa as dos últimos 90 dias (decisão de
+  // 09/10/2026). A sessão dos testes é de 12/09/2026.
+  group('data com mais de 90 dias', () {
+    const title = 'Esta data é de mais de 90 dias atrás.';
+    const warning =
+        'A sessão vai sair da lista do app em todos os aparelhos; depois '
+        'disso, só o painel web consegue alterá-la. Salvar assim mesmo?';
+
+    /// Troca a data para o dia 15 do mês da sessão e toca em "Salvar
+    /// alterações".
+    Future<void> pickDay15AndSave(WidgetTester tester) async {
+      await tester.tapAt(tester.getCenter(find.text('12 set 2026')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('15'));
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Salvar alterações'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('mudar a data para antes da janela pergunta antes de salvar; '
+        '"Voltar" não salva e deixa a tela como estava', (tester) async {
+      await seedSession();
+      patchAnswers();
+      // Em 20/01/2027, a janela começa em 22/10/2026.
+      await pumpEdit(tester, clock: () => DateTime(2027, 1, 20, 9));
+
+      await pickDay15AndSave(tester);
+
+      final dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.text(title)), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text(warning)), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(SessionEditScreen), findsOneWidget);
+      expect(find.text('15 set 2026'), findsOneWidget);
+      expect(saveButton(tester).onPressed, isNotNull);
+      verifyNever(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')));
+    });
+
+    testWidgets('confirmando, salva a data antiga e fecha a tela', (tester) async {
+      await seedSession();
+      patchAnswers();
+      await pumpEdit(tester, clock: () => DateTime(2027, 1, 20, 9));
+
+      await pickDay15AndSave(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
+      await tester.pumpAndSettle();
+
+      expect(sentBody(), {'date': '2026-09-15'});
+      expect(find.text('origem'), findsOneWidget);
+      expect(find.text('Dados do treinamento atualizados.'), findsOneWidget);
+    });
+
+    testWidgets('data dentro da janela salva direto, sem perguntar',
+        (tester) async {
+      await seedSession();
+      patchAnswers();
+      // Em 20/09/2026, 15/09 é da semana passada.
+      await pumpEdit(tester, clock: () => DateTime(2026, 9, 20, 9));
+
+      await pickDay15AndSave(tester);
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(sentBody(), {'date': '2026-09-15'});
+      expect(find.text('origem'), findsOneWidget);
+    });
+
+    testWidgets(
+        'a data antiga já estava lá: mudar só a cidade salva direto, sem '
+        'perguntar', (tester) async {
+      await seedSession();
+      patchAnswers();
+      await pumpEdit(tester, clock: () => DateTime(2027, 1, 20, 9));
+
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+      await tester.tap(find.text('Salvar alterações'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(sentBody(), {'city': 'Betim'});
+    });
+
+    testWidgets(
+        'num celular de 360x640 com a fonte ampliada, a pergunta cabe na tela',
+        (tester) async {
+      await seedSession();
+      patchAnswers();
+      await pumpEdit(
+        tester,
+        screen: const Size(360, 640),
+        textScale: 1.3,
+        clock: () => DateTime(2027, 1, 20, 9),
+      );
+
+      await pickDay15AndSave(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(title), findsOneWidget);
+      final save = tester.getRect(find.widgetWithText(FilledButton, 'Salvar'));
+      expect(save.bottom, lessThanOrEqualTo(640));
+    });
   });
 
   testWidgets(
@@ -683,7 +793,10 @@ void main() {
     await tester.enterText(field('campo-cidade'), 'Betim');
     await tester.pump();
 
-    expect(find.text('Sem conexão — salvar precisa de internet.'), findsOneWidget);
+    expect(
+      find.text('Sem conexão — salvar e cancelar precisam de internet.'),
+      findsOneWidget,
+    );
     expect(find.text('Disponível quando houver conexão'), findsOneWidget);
     expect(saveButton(tester).onPressed, isNull);
     expect(cancelButton(tester).onPressed, isNull);
@@ -706,7 +819,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Disponível quando houver conexão'), findsNothing);
     // O motivo segue escrito na faixa do topo, e os botões seguem apagados.
-    expect(find.text('Sem conexão — salvar precisa de internet.'), findsOneWidget);
+    expect(
+      find.text('Sem conexão — salvar e cancelar precisam de internet.'),
+      findsOneWidget,
+    );
     expect(saveButton(tester).onPressed, isNull);
     expect(find.widgetWithText(AppTextButton, 'Descartar'), findsOneWidget);
 
@@ -735,7 +851,7 @@ void main() {
     changes.add([ConnectivityResult.mobile]);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sem conexão — salvar precisa de internet.'), findsNothing);
+    expect(find.textContaining('Sem conexão'), findsNothing);
     expect(find.text('Betim'), findsOneWidget);
     expect(saveButton(tester).onPressed, isNotNull);
     expect(cancelButton(tester).onPressed, isNotNull);
