@@ -14412,6 +14412,7 @@ Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 7. Se algo
 - `addParticipant` e `addConsultant` usam `Icons.person_add_alt_outlined`: o `person_add_outlined` desenha o "+" à esquerda (commit 25b1bb8).
 - Entre telas, o `ParticipantRepository` guarda por sessão o instante da última mudança aceita (consultor que entra ou sai, `assign`, `unassign`) e não grava um GET pedido antes dele; o `SessionConsultantRepository` avisa pelo `onSessionChanged`, ligado em `app_providers.dart` (commit aa4fa79).
 - Com os consultores da sessão ainda não baixados (`notDownloaded`), `canChange` é falso e os "Adicionar" da equipe ficam apagados (commit aa4fa79).
+- O "Adicionar" da equipe tem recuo lateral de 14 (o `OutlinedButton` não soma o contorno), 1,5 a menos de cada lado que o quadro `3c`: divergência aprovada pelo usuário em 21/10/2026, sem correção.
 
 ## Pendências levadas para as fases seguintes
 
