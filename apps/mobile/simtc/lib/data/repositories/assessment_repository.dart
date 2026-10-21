@@ -71,10 +71,17 @@ class AssessmentRepository {
   /// [consultantId] é o `Consultant.id` de [ownerUserId]: é com ele que a
   /// atribuição do participante é conferida. Sem perfil de consultor (nulo),
   /// nenhum participante está com o usuário, e nada bloqueia.
+  ///
+  /// Com [startedAfter], só conta o rascunho iniciado depois desse instante.
+  /// É a regra de quem volta a uma avaliação antiga (Fase 6B): o participante
+  /// foi liberado com ela pela metade, o consultor começou outra, e o
+  /// primeiro voltou para ele. Entre duas em andamento, vale a que começou
+  /// por último — a antiga espera.
   Future<LocalAssessment?> findInProgressOther({
     required String ownerUserId,
     required String? consultantId,
     required String exceptTrainingParticipantId,
+    DateTime? startedAfter,
   }) async {
     if (consultantId == null) return null;
 
@@ -86,6 +93,9 @@ class AssessmentRepository {
           ..orderBy([(t) => OrderingTerm.asc(t.startTime)]))
         .get();
     for (final draft in drafts) {
+      if (startedAfter != null && !draft.startTime.isAfter(startedAfter)) {
+        continue;
+      }
       if (await _canStillOpen(draft, consultantId)) return draft;
     }
     return null;
@@ -120,13 +130,15 @@ class AssessmentRepository {
   /// "Iniciar avaliação": cria o rascunho de [ownerUserId] com `startTime`
   /// agora — a hora de início mostrada e enviada vem daqui. Se a
   /// avaliação já está em andamento ([findCurrent]), devolve a mesma, sem
-  /// recomeçar: um segundo toque não muda a hora de início.
+  /// recomeçar: um segundo toque não muda a hora de início — e é assim que
+  /// uma avaliação antiga continua de onde parou (Fase 6B).
   ///
   /// Só uma avaliação em andamento por consultor, em todas as sessões: se
   /// [ownerUserId] já tem um rascunho com outro participante — e ainda
   /// consegue abri-lo ([findInProgressOther], que confere a atribuição com
   /// [consultantId]) —, lança [EvaluationInProgressException] e não grava
-  /// nada.
+  /// nada. Para o rascunho que já existia, só conta o outro que começou
+  /// depois dele.
   ///
   /// `date` é a data de calendário da sessão (como `TrainingSession.date`,
   /// meia-noite local); sessão sem data, ou fora do cache, usa a de hoje.
@@ -140,7 +152,21 @@ class AssessmentRepository {
       trainingParticipantId: trainingParticipantId,
       ownerUserId: ownerUserId,
     );
-    if (current != null) return current;
+    if (current != null) {
+      // A avaliação confirmada não espera ninguém: é só leitura.
+      if (current.syncStatus == LocalSyncStatus.draft) {
+        final newer = await findInProgressOther(
+          ownerUserId: ownerUserId,
+          consultantId: consultantId,
+          exceptTrainingParticipantId: trainingParticipantId,
+          startedAfter: current.startTime,
+        );
+        if (newer != null) {
+          throw EvaluationInProgressException(newer.trainingParticipantId);
+        }
+      }
+      return current;
+    }
 
     final existing = await findByParticipant(trainingParticipantId);
     final session = await (_db.select(_db.sessions)

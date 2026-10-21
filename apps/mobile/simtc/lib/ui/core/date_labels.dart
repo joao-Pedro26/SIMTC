@@ -57,12 +57,19 @@ String atLabel(DateTime moment, DateTime now) {
 String startedLabel(DateTime start, DateTime now) =>
     'Iniciada ${atLabel(start, now)}';
 
+/// "08/10 às 08:12" — o dia e a hora de algo que pode não ter sido hoje: a
+/// idade dos dados na faixa de offline, e o início de uma avaliação que ficou
+/// parada.
+String dayAndClockLabel(DateTime moment) {
+  final d = moment.toLocal();
+  return '${_dois(d.day)}/${_dois(d.month)} '
+      'às ${_dois(d.hour)}:${_dois(d.minute)}';
+}
+
 /// Texto da faixa de offline: sem conexão, o consultor precisa saber a idade
 /// do que está vendo — uma lista de ontem parece igualzinha a uma de agora.
 /// Nulo quando nunca houve sync (aí a faixa usa a mensagem padrão dela).
 String? offlineDataMessage(DateTime? syncedAt) {
   if (syncedAt == null) return null;
-  final d = syncedAt.toLocal();
-  return 'Sem conexão — dados de ${_dois(d.day)}/${_dois(d.month)} '
-      'às ${_dois(d.hour)}:${_dois(d.minute)}.';
+  return 'Sem conexão — dados de ${dayAndClockLabel(syncedAt)}.';
 }

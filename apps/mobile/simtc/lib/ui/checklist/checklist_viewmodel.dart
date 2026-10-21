@@ -25,6 +25,11 @@ import 'checklist_sections.dart';
 /// que reserva o participante, e no "Desatribuir participante" ([unassign]),
 /// que libera a reserva. Se ele recusar um ou outro, a sessão é baixada de
 /// novo.
+///
+/// Uma avaliação que ficou parada (Fase 6B) — o participante saiu das mãos do
+/// consultor com ela pela metade — não abre sozinha: a tela oferece o
+/// "Continuar avaliação" ([isResumable]), e é o [start] que a reabre, com as
+/// respostas e a hora de início de antes.
 class ChecklistViewModel extends ChangeNotifier {
   ChecklistViewModel({
     required this.sessionId,
@@ -78,6 +83,10 @@ class ChecklistViewModel extends ChangeNotifier {
   String? _assessmentId;
   DateTime? _startTime;
   LocalSyncStatus? _status;
+
+  /// A avaliação deste participante que ficou parada e ainda não foi
+  /// reaberta: ver [isResumable].
+  LocalAssessment? _resumable;
   String? _message;
   SessionParticipant? _participant;
   List<CatalogCategory> _catalog = const [];
@@ -104,9 +113,32 @@ class ChecklistViewModel extends ChangeNotifier {
   /// outro caminho.
   bool get isConfirmed => _status != null && _status != LocalSyncStatus.draft;
 
-  /// "Descartar avaliação" do menu ⋮: só com a avaliação iniciada e ainda em
-  /// rascunho.
-  bool get canDiscard => isStarted && !isConfirmed;
+  /// Há uma avaliação deste participante começada antes e que ficou parada
+  /// (decisão de 09/10/2026): ele saiu das mãos do consultor com ela pela
+  /// metade, ou outra avaliação começou depois dela. A tela mostra o
+  /// "Continuar avaliação" no lugar do checklist; as respostas e a hora de
+  /// início voltam quando o consultor continuar.
+  bool get isResumable => !isStarted && _resumable != null;
+
+  /// "08/10 às 08:12": quando a avaliação parada começou.
+  String? get resumableStartedAt {
+    final resumable = _resumable;
+    return resumable == null ? null : dayAndClockLabel(resumable.startTime);
+  }
+
+  /// O participante está com o consultor logado — ou a linha não diz com
+  /// quem, e vale o que o servidor disse por último.
+  bool get isWithMe => !_needsReservation;
+
+  /// O participante saiu das mãos do consultor com o checklist aberto (um
+  /// ADMIN o desatribuiu, ou o consultor foi tirado da sessão): as marcações
+  /// ficam, mas não dá para finalizar — o servidor recusaria o envio. Quando
+  /// ele for atribuído de novo, a avaliação continua de onde parou.
+  bool get isReleased => isStarted && !isConfirmed && _needsReservation;
+
+  /// "Descartar avaliação" do menu ⋮: com a avaliação iniciada e ainda em
+  /// rascunho — ou parada, para quem prefere começar limpo.
+  bool get canDiscard => (isStarted && !isConfirmed) || isResumable;
 
   /// O "Descartar avaliação" está apagando.
   bool get isDiscarding => _discarding;
@@ -159,9 +191,10 @@ class ChecklistViewModel extends ChangeNotifier {
   bool get hasCatalog => sections.isNotEmpty;
 
   /// "Iniciada às 08:12" — a hora do "Iniciar avaliação"; nula antes dele.
-  /// Não há cronômetro: o app só registra quando começou (30/09/2026).
+  /// Não há cronômetro: o app só registra quando começou (30/09/2026). A
+  /// avaliação parada também diz quando começou.
   String? get startedText {
-    final start = _startTime;
+    final start = _startTime ?? _resumable?.startTime;
     return start == null ? null : startedLabel(start, _now());
   }
 
@@ -181,19 +214,34 @@ class ChecklistViewModel extends ChangeNotifier {
     if (_disposed) return;
     // As marcações primeiro: o stream as entrega enquanto o catálogo carrega,
     // e a tela já abre com elas.
-    if (current != null) {
-      _attach(current);
-    } else {
+    if (current == null) {
       await _checkBlock();
-      if (_disposed) return;
+    } else if (await _waits(current)) {
+      _resumable = current;
+    } else {
+      _attach(current);
     }
+    if (_disposed) return;
 
     _catalog = await _catalogRepository.loadCatalog();
     if (_disposed) return;
-    if (current != null) _openFirstCategory();
+    if (isStarted) _openFirstCategory();
 
     _loading = false;
     notifyListeners();
+  }
+
+  /// Uma avaliação que já existe só abre direto se nada mudou enquanto ela
+  /// esteve fechada. Ela espera — e a tela mostra o "Continuar avaliação" —
+  /// se o participante saiu das mãos do consultor, ou se outra avaliação
+  /// começou depois dela: só uma por vez, e vale a mais nova. A avaliação já
+  /// confirmada não espera nada: é só leitura.
+  Future<bool> _waits(LocalAssessment current) async {
+    if (current.syncStatus != LocalSyncStatus.draft) return false;
+    // O stream do participante pode ainda não ter entregado nada.
+    _participant = await _participantRepository.findParticipant(participantId);
+    await _checkBlock(startedAfter: current.startTime);
+    return _needsReservation || _blockingParticipantId != null;
   }
 
   /// O participante ainda não está reservado para este consultor: é o caso
@@ -221,8 +269,18 @@ class ChecklistViewModel extends ChangeNotifier {
     _starting = true;
     notifyListeners();
     try {
-      if (_needsReservation && !await _reserve()) return;
+      if (_needsReservation) {
+        if (!await _reserve()) return;
+        // A linha já mudou no banco, mas o stream só avisa no próximo turno:
+        // até lá a tela acharia que o participante ainda não está com o
+        // consultor.
+        _participant =
+            await _participantRepository.findParticipant(participantId) ??
+                _participant;
+      }
       if (_disposed) return;
+      // Com uma avaliação parada, devolve a mesma: as respostas e a hora de
+      // início de antes.
       final assessment = await _assessmentRepository.openDraft(
         trainingParticipantId: participantId,
         sessionId: sessionId,
@@ -230,7 +288,12 @@ class ChecklistViewModel extends ChangeNotifier {
         consultantId: consultantId,
       );
       if (_disposed) return;
+      _resumable = null;
       _attach(assessment);
+      // As respostas de uma avaliação parada voltam junto com a tela, sem
+      // esperar o stream entregar.
+      _items = await _assessmentRepository.loadItems(assessment.id);
+      if (_disposed) return;
       _openFirstCategory();
     } on EvaluationInProgressException catch (e) {
       // Outro participante começou depois de a tela abrir.
@@ -276,7 +339,7 @@ class ChecklistViewModel extends ChangeNotifier {
   /// marcações, e a tela volta a "não iniciada" — o participante continua com
   /// o consultor. A tela pede confirmação antes.
   Future<void> discard() async {
-    final assessmentId = _assessmentId;
+    final assessmentId = _assessmentId ?? _resumable?.id;
     if (assessmentId == null || !canDiscard || _busy) return;
 
     _discarding = true;
@@ -288,6 +351,7 @@ class ChecklistViewModel extends ChangeNotifier {
         _message = _discardFailed;
         return;
       }
+      _resumable = null;
       _detach();
       await _checkBlock();
     } catch (_) {
@@ -320,7 +384,7 @@ class ChecklistViewModel extends ChangeNotifier {
           }
           return false;
         case Success():
-          final assessmentId = _assessmentId;
+          final assessmentId = _assessmentId ?? _resumable?.id;
           if (assessmentId != null) {
             try {
               final discarded = await _assessmentRepository.discardDraft(assessmentId);
@@ -329,6 +393,7 @@ class ChecklistViewModel extends ChangeNotifier {
               _message = _draftNotDiscarded;
             }
             // O participante foi liberado: a tela não segura mais a avaliação.
+            _resumable = null;
             _detach();
           }
           return true;
@@ -350,14 +415,17 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// Só uma avaliação por vez: confere se outro participante do consultor
   /// está em andamento, para o aviso e o "Iniciar" desabilitado. Só conta a
-  /// avaliação que ele ainda consegue abrir — a "presa" não bloqueia.
-  Future<void> _checkBlock() async {
+  /// avaliação que ele ainda consegue abrir — a "presa" não bloqueia. Para
+  /// uma avaliação parada, [startedAfter] é o início dela: só a que começou
+  /// depois a faz esperar.
+  Future<void> _checkBlock({DateTime? startedAfter}) async {
     _blockingParticipantId = null;
     _blockingName = null;
     final inProgress = await _assessmentRepository.findInProgressOther(
       ownerUserId: ownerUserId,
       consultantId: consultantId,
       exceptTrainingParticipantId: participantId,
+      startedAfter: startedAfter,
     );
     if (inProgress != null) await _block(inProgress.trainingParticipantId);
   }

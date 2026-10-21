@@ -22,6 +22,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/inline_notice.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
@@ -638,6 +639,310 @@ void main() {
     expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
     expect(find.text('Finalizar avaliação'), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  // O participante saiu das mãos do consultor com a avaliação pela metade e
+  // depois voltou: continua de onde parou (decisão de 09/10/2026).
+  group('avaliação antiga que volta', () {
+    const assignPath = '/practical-assessments/assign';
+    const released =
+        'Este participante não está mais com você. Atribua de novo para continuar.';
+
+    /// A avaliação começada às 08:12 de 25/09, com a nota PM marcada.
+    Future<void> seedOldDraft({String participantId = 'tp-1', int minute = 12}) async {
+      final id = 'draft-$participantId';
+      final at = DateTime(2026, 9, 25, 8, minute);
+      await db.into(db.localAssessments).insert(
+            LocalAssessmentsCompanion.insert(
+              id: id,
+              trainingParticipantId: participantId,
+              sessionId: 'sess-1',
+              date: DateTime(2026, 9, 25),
+              startTime: at,
+              syncStatus: LocalSyncStatus.draft,
+              createdAt: at,
+              updatedAt: at,
+              ownerUserId: const Value('user-1'),
+            ),
+          );
+      if (participantId == 'tp-1') {
+        await assessmentRepository.mark(
+          localAssessmentId: id,
+          infractionId: 'inf-1',
+          infractionNoteId: 'note-pm',
+        );
+      }
+    }
+
+    Future<void> setParticipant({required String status, String? consultant}) {
+      return (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(
+        ParticipantsCompanion(
+          status: Value(status),
+          assignedConsultantId: Value(consultant),
+        ),
+      );
+    }
+
+    AppCtaButton cta(WidgetTester tester, String label) =>
+        tester.widget<AppCtaButton>(find.widgetWithText(AppCtaButton, label));
+
+    testWidgets(
+        'fora das mãos do consultor, a tela oferece continuar: diz quando '
+        'começou e que as respostas voltam', (tester) async {
+      await seedOldDraft();
+      await setParticipant(status: 'NAO_RECOMENDADO');
+
+      await pumpScreen(tester, started: false);
+
+      expect(
+        find.text('Você começou esta avaliação em 25/09 às 08:12.'),
+        findsOneWidget,
+      );
+      expect(find.text('As respostas voltam ao continuar.'), findsOneWidget);
+      expect(cta(tester, 'Continuar avaliação').onPressed, isNotNull);
+      // No lugar do que a tela diz de quem nem começou.
+      expect(find.text('A avaliação ainda não começou.'), findsNothing);
+      expect(find.textContaining('A hora de início é registrada'), findsNothing);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+      expect(find.text('não iniciada'), findsNothing);
+      expect(find.textContaining('Iniciada em 25 set'), findsOneWidget);
+      // Ainda é a tela de antes do checklist: sem as notas, sem "salvo".
+      expect(find.byKey(const Key('checklist-not-started')), findsOneWidget);
+      expect(find.text('O que será avaliado'), findsOneWidget);
+      expect(find.text('PM'), findsNothing);
+      expect(find.text('salvo'), findsNothing);
+      expect(find.text('Finalizar avaliação'), findsNothing);
+    });
+
+    testWidgets(
+        '"Continuar avaliação" reserva o participante e abre o checklist com '
+        'as respostas de antes', (tester) async {
+      await seedOldDraft();
+      await setParticipant(status: 'NAO_RECOMENDADO');
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: assignPath),
+          statusCode: 201,
+          data: const {},
+        ),
+      );
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.text('Continuar avaliação'));
+      await tester.pumpAndSettle();
+
+      verify(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .called(1);
+      expect(find.text('Excesso de velocidade'), findsOneWidget);
+      // A observação da nota PM só aparece com a nota marcada.
+      expect(find.text(pmComment), findsOneWidget);
+      expect(find.textContaining('Iniciada em 25 set'), findsOneWidget);
+      expect(find.text('salvo'), findsOneWidget);
+      expect(cta(tester, 'Finalizar avaliação').onPressed, isNotNull);
+      expect(find.text(released), findsNothing);
+      expect(await db.select(db.localAssessments).get(), hasLength(1));
+    });
+
+    testWidgets('com a reserva demorando, o botão gira e o checklist ainda não '
+        'abre', (tester) async {
+      await seedOldDraft();
+      await setParticipant(status: 'NAO_RECOMENDADO');
+      final reply = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer((_) => reply.future);
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.text('Continuar avaliação'));
+      await tester.pump();
+      // Um quadro no meio do envio.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(tester.widget<AppCtaButton>(find.byType(AppCtaButton)).isLoading, isTrue);
+      expect(find.text('Excesso de velocidade'), findsNothing);
+      expect(
+        find.text('Você começou esta avaliação em 25/09 às 08:12.'),
+        findsOneWidget,
+      );
+
+      reply.complete(
+        Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: assignPath),
+          statusCode: 201,
+          data: const {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excesso de velocidade'), findsOneWidget);
+      expect(find.text(pmComment), findsOneWidget);
+    });
+
+    testWidgets(
+        'com outra avaliação começada depois, o continuar fica travado, com o '
+        'aviso de sempre', (tester) async {
+      await seedOldDraft();
+      await assignToMe();
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-eu'),
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      await seedOldDraft(participantId: 'tp-2', minute: 30);
+
+      await pumpScreen(tester, started: false);
+
+      expect(
+        find.text('Você já está avaliando Marina Lopes. Finalize ou descarte '
+            'essa avaliação para iniciar outra.'),
+        findsOneWidget,
+      );
+      expect(cta(tester, 'Continuar avaliação').onPressed, isNull);
+      expect(find.text('Excesso de velocidade'), findsNothing);
+    });
+
+    testWidgets(
+        'o ⋮ oferece "Descartar avaliação" para começar limpo — sem dizer que '
+        'o participante continua com você', (tester) async {
+      await seedOldDraft();
+      await setParticipant(status: 'PENDENTE');
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.byKey(const Key('checklist-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('As marcações e a hora de início de Ana Paula Ribeiro serão '
+            'apagadas.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('continua com você'), findsNothing);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('A avaliação ainda não começou.'), findsOneWidget);
+      expect(find.text('não iniciada'), findsOneWidget);
+      expect(cta(tester, 'Iniciar avaliação').onPressed, isNotNull);
+      expect(find.text('Continuar avaliação'), findsNothing);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+    });
+
+    testWidgets(
+        'participante liberado com o checklist aberto: o "Finalizar avaliação" '
+        'desabilita, com o aviso — e volta quando ele é atribuído de novo',
+        (tester) async {
+      await assignToMe();
+      await pumpScreen(tester);
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+      expect(cta(tester, 'Finalizar avaliação').onPressed, isNotNull);
+      expect(find.text(released), findsNothing);
+
+      // Um ADMIN desatribuiu, e o detalhe (embaixo) baixou a sessão de novo.
+      await setParticipant(status: 'PENDENTE');
+      await tester.pumpAndSettle();
+
+      final notice = tester.widget<InlineNotice>(
+        find.widgetWithText(InlineNotice, released),
+      );
+      expect(notice.tone, NoticeTone.warning);
+      expect(cta(tester, 'Finalizar avaliação').onPressed, isNull);
+      // As marcações continuam na tela.
+      expect(find.text(pmComment), findsOneWidget);
+
+      await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
+      await tester.pumpAndSettle();
+
+      expect(find.text(released), findsNothing);
+      expect(cta(tester, 'Finalizar avaliação').onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'num celular de 360x640 com a fonte ampliada, a tela de continuar e o '
+        'rodapé com o aviso de liberado não estouram', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await seedOldDraft();
+      await setParticipant(status: 'PENDENTE');
+
+      Future<void> pumpLarge() async {
+        await tester.pumpWidget(withProviders(
+          MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: child!,
+            ),
+            home: const ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+          ),
+        ));
+        await tester.pumpAndSettle();
+      }
+
+      await pumpLarge();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Continuar avaliação'), findsOneWidget);
+      expect(
+        find.text('Você começou esta avaliação em 25/09 às 08:12.'),
+        findsOneWidget,
+      );
+
+      // Agora com o checklist aberto e o participante liberado.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
+      await pumpLarge();
+      await setParticipant(status: 'PENDENTE');
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(released), findsOneWidget);
+      final footer = tester.getRect(find.widgetWithText(AppCtaButton, 'Finalizar avaliação'));
+      expect(footer.bottom, lessThanOrEqualTo(640));
+    });
+
+    testWidgets(
+        'desatribuir com a avaliação antiga à espera avisa que ela será '
+        'descartada', (tester) async {
+      await seedOldDraft();
+      await assignToMe();
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-eu'),
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      await seedOldDraft(participantId: 'tp-2', minute: 30);
+      await pumpScreen(tester, started: false);
+
+      await tester.tap(find.byKey(const Key('checklist-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Desatribuir participante'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('A avaliação iniciada será descartada.'),
+        findsOneWidget,
+      );
+    });
   });
 
   group('antes do "Iniciar avaliação"', () {

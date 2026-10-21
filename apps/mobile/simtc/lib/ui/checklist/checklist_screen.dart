@@ -236,8 +236,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     final status = participant?.hasPreviousAssessment == true
         ? 'Não recomendado'
         : 'Pendente';
-    final discardNote =
-        _viewModel.isStarted ? ' A avaliação iniciada será descartada.' : '';
+    final discardNote = _viewModel.isStarted || _viewModel.isResumable
+        ? ' A avaliação iniciada será descartada.'
+        : '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -273,13 +274,15 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     final name = _viewModel.participant?.name;
     // "de Ana Paula Ribeiro" ou, sem o nome no aparelho, "deste participante".
     final whose = name == null ? 'deste participante' : 'de $name';
+    // A avaliação parada pode ser de quem já não está com o consultor.
+    final stays =
+        _viewModel.isWithMe ? ' O participante continua com você.' : '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Descartar a avaliação?'),
         content: Text(
-          'As marcações e a hora de início $whose serão apagadas. O '
-          'participante continua com você.',
+          'As marcações e a hora de início $whose serão apagadas.$stays',
         ),
         actions: [
           TextButton(
@@ -304,7 +307,17 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         children: [
           const Icon(AppIcons.timer, size: 14, color: AppColors.text3),
           const SizedBox(width: AppSpacing.xs),
-          Text('não iniciada', style: AppTypography.meta),
+          // A avaliação parada (Fase 6B) já tem hora de início.
+          Flexible(
+            child: Text(
+              _viewModel.isResumable
+                  ? _viewModel.startedText ?? ''
+                  : 'não iniciada',
+              style: AppTypography.meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       );
     }
@@ -439,9 +452,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             AppSpacing.sm + 2,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('O que será avaliado', style: AppTypography.sectionTitle),
+              // Encolhe com reticências: num celular estreito com a fonte
+              // ampliada, o título e a contagem não cabem inteiros na linha.
+              Expanded(
+                child: Text(
+                  'O que será avaliado',
+                  style: AppTypography.sectionTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               Text(_itemsLabel(items), style: AppTypography.categoryCount),
             ],
           ),
@@ -459,7 +481,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  /// Com uma avaliação parada (decisão de 09/10/2026), o bloco diz quando
+  /// ela começou, e o botão do rodapé vira "Continuar avaliação".
   Widget _buildNotStartedHero() {
+    final startedAt = _viewModel.resumableStartedAt;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xxl,
@@ -475,13 +501,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           const Icon(AppIcons.timer, size: 40, color: AppColors.textMuted),
           const SizedBox(height: AppSpacing.sm + 6),
           Text(
-            'A avaliação ainda não começou.',
+            startedAt == null
+                ? 'A avaliação ainda não começou.'
+                : 'Você começou esta avaliação em $startedAt.',
             style: AppTypography.notStartedTitle,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'A hora de início é registrada quando você tocar em "Iniciar avaliação".',
+            startedAt == null
+                ? 'A hora de início é registrada quando você tocar em '
+                    '"Iniciar avaliação".'
+                : 'As respostas voltam ao continuar.',
             style: AppTypography.notStartedBody,
             textAlign: TextAlign.center,
           ),
@@ -701,11 +732,31 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         AppSpacing.lg,
       ),
       child: _viewModel.isStarted
-          ? AppCtaButton(
-              label: 'Finalizar avaliação',
-              icon: AppIcons.finish,
-              size: AppCtaSize.large,
-              onPressed: _isBusy ? null : _openSummary,
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // O participante saiu das mãos do consultor com o checklist
+                // aberto: o servidor recusaria o envio (decisão de
+                // 09/10/2026). As marcações ficam.
+                if (_viewModel.isReleased) ...[
+                  const InlineNotice(
+                    icon: AppIcons.lockedByOther,
+                    tone: NoticeTone.warning,
+                    message: 'Este participante não está mais com você. '
+                        'Atribua de novo para continuar.',
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                AppCtaButton(
+                  label: 'Finalizar avaliação',
+                  icon: AppIcons.finish,
+                  size: AppCtaSize.large,
+                  onPressed: _isBusy || _viewModel.isReleased
+                      ? null
+                      : _openSummary,
+                ),
+              ],
             )
           : Column(
               mainAxisSize: MainAxisSize.min,
@@ -720,7 +771,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   const SizedBox(height: AppSpacing.md),
                 ],
                 AppCtaButton(
-                  label: 'Iniciar avaliação',
+                  label: _viewModel.isResumable
+                      ? 'Continuar avaliação'
+                      : 'Iniciar avaliação',
                   icon: AppIcons.startEvaluation,
                   size: AppCtaSize.large,
                   isLoading: _viewModel.isStarting,

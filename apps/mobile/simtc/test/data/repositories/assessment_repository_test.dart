@@ -44,6 +44,7 @@ void main() {
     String participantId, {
     String owner = 'user-1',
     String sessionId = 'sess-1',
+    DateTime? startTime,
   }) async {
     final id = 'draft-$participantId-$owner';
     await db.into(db.localAssessments).insert(
@@ -52,7 +53,7 @@ void main() {
             trainingParticipantId: participantId,
             sessionId: sessionId,
             date: DateTime(2026, 9, 29),
-            startTime: DateTime(2026, 9, 29, 8),
+            startTime: startTime ?? DateTime(2026, 9, 29, 8),
             syncStatus: LocalSyncStatus.draft,
             createdAt: DateTime(2026, 9, 29, 8),
             updatedAt: DateTime(2026, 9, 29, 8),
@@ -399,6 +400,92 @@ void main() {
         final rows = await db.select(db.localAssessments).get();
         expect(rows.map((r) => r.id), unorderedEquals([a.id, next.id]),
             reason: 'o preso continua guardado');
+      });
+    });
+
+    // O participante foi liberado com a avaliação pela metade, o consultor
+    // começou outra, e o primeiro voltou para ele: são duas em andamento, e
+    // vale a que começou por último (decisão de 09/10/2026).
+    group('avaliação antiga que volta', () {
+      late LocalAssessment old;
+      late LocalAssessment recent;
+
+      setUp(() async {
+        await seedParticipant('tp-2');
+        old = await insertDraft('tp-1', startTime: DateTime(2026, 9, 29, 8, 12));
+        recent = await insertDraft('tp-2', startTime: DateTime(2026, 9, 29, 8, 30));
+      });
+
+      Future<LocalAssessment?> otherAfter(String except, DateTime startedAfter) {
+        return repository.findInProgressOther(
+          ownerUserId: 'user-1',
+          consultantId: 'c-1',
+          exceptTrainingParticipantId: except,
+          startedAfter: startedAfter,
+        );
+      }
+
+      test('só a avaliação que começou depois faz a outra esperar', () async {
+        expect((await otherAfter('tp-1', old.startTime))?.id, recent.id);
+        expect(await otherAfter('tp-2', recent.startTime), isNull);
+      });
+
+      test('sem o corte de horário, qualquer outra em andamento conta — é a '
+          'regra de quem vai iniciar uma avaliação nova', () async {
+        expect((await other('tp-1'))?.id, recent.id);
+        expect((await other('tp-2'))?.id, old.id);
+        // A que começou primeiro vem primeiro.
+        expect((await other('tp-3'))?.id, old.id);
+      });
+
+      test('continuar a antiga é recusado enquanto a mais nova está em '
+          'andamento, e nada muda', () async {
+        await expectLater(
+          open('tp-1'),
+          throwsA(isA<EvaluationInProgressException>()
+              .having((e) => e.trainingParticipantId, 'trainingParticipantId', 'tp-2')),
+        );
+
+        expect((await row(old.id)).startTime, old.startTime);
+      });
+
+      test('a mais nova continua abrindo, sem esperar pela antiga', () async {
+        final again = await open('tp-2');
+
+        expect(again.id, recent.id);
+        expect(again.startTime, recent.startTime);
+      });
+
+      test('com a mais nova confirmada ou descartada, a antiga volta a abrir, '
+          'com a mesma hora de início', () async {
+        await repository.confirm(recent.id, participantName: 'B', score: 90);
+
+        final again = await open('tp-1');
+
+        expect(again.id, old.id);
+        expect(again.startTime, old.startTime);
+      });
+
+      test('a mais nova que ficou presa não segura a antiga', () async {
+        await (db.update(db.participants)..where((t) => t.id.equals('tp-2')))
+            .write(const ParticipantsCompanion(
+          status: Value('PENDENTE'),
+          assignedConsultantId: Value(null),
+        ));
+
+        final again = await open('tp-1');
+
+        expect(again.id, old.id);
+      });
+
+      test('avaliação na fila não espera ninguém: abre mesmo com outra mais '
+          'nova em andamento', () async {
+        await repository.confirm(old.id, participantName: 'A', score: 90);
+
+        final again = await open('tp-1');
+
+        expect(again.id, old.id);
+        expect(again.syncStatus, LocalSyncStatus.pendingSync);
       });
     });
   });

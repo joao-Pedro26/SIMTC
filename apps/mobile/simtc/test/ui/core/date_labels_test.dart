@@ -53,4 +53,9 @@ void main() {
     expect(startedLabel(DateTime(2026, 9, 23, 8, 12), agora), 'Iniciada às 08:12');
     expect(startedLabel(DateTime(2026, 9, 22, 8, 12), agora), 'Iniciada em 22 set 08:12');
   });
+
+  test('dayAndClockLabel diz o dia, o mês e a hora, com dois dígitos', () {
+    expect(dayAndClockLabel(DateTime(2026, 10, 8, 8, 12)), '08/10 às 08:12');
+    expect(dayAndClockLabel(DateTime(2026, 1, 25, 17, 5)), '25/01 às 17:05');
+  });
 }

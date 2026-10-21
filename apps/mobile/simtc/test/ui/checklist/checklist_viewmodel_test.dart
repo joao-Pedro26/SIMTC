@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
 import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
@@ -14,6 +15,22 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/ui/checklist/checklist_viewmodel.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
+
+/// O participante só chega pelo stream quando o teste mandar: no aparelho, o
+/// stream pode entregar depois de a tela já ter lido a avaliação do banco.
+class _LateStreamParticipantRepository extends ParticipantRepository {
+  _LateStreamParticipantRepository({
+    required super.apiClient,
+    required super.database,
+  });
+
+  final StreamController<SessionParticipant?> late =
+      StreamController<SessionParticipant?>();
+
+  @override
+  Stream<SessionParticipant?> watchParticipant(String participantId) =>
+      late.stream;
+}
 
 void main() {
   late _MockApiClient api;
@@ -501,6 +518,461 @@ void main() {
         rows.map((r) => r.trainingParticipantId),
         unorderedEquals(['tp-1', 'tp-2']),
       );
+    });
+  });
+
+  // O participante saiu das mãos do consultor com a avaliação pela metade
+  // (um ADMIN o desatribuiu, ou o consultor foi tirado da sessão) e depois
+  // voltou: continua de onde parou (decisão de 09/10/2026).
+  group('avaliação antiga que volta', () {
+    const assignPath = '/practical-assessments/assign';
+    const detailPath = '/training-sessions/sess-1';
+
+    Response<Map<String, dynamic>> ok(String path) {
+      return Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: path),
+        statusCode: 201,
+        data: const {},
+      );
+    }
+
+    /// A avaliação começada às 08:12 de 25/09, com a nota PM marcada.
+    Future<LocalAssessment> seedOldDraft({String participantId = 'tp-1'}) async {
+      final id = 'draft-$participantId';
+      final at = DateTime(2026, 9, 25, 8, 12);
+      await db.into(db.localAssessments).insert(
+            LocalAssessmentsCompanion.insert(
+              id: id,
+              trainingParticipantId: participantId,
+              sessionId: 'sess-1',
+              date: DateTime(2026, 9, 25),
+              startTime: at,
+              syncStatus: LocalSyncStatus.draft,
+              createdAt: at,
+              updatedAt: at,
+              ownerUserId: const Value('user-1'),
+            ),
+          );
+      await assessmentRepository.mark(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-pm',
+      );
+      return (db.select(db.localAssessments)..where((t) => t.id.equals(id)))
+          .getSingle();
+    }
+
+    /// Outro participante do mesmo consultor, com a avaliação começada às
+    /// 08:30 — depois da antiga.
+    Future<void> seedNewerDraft() async {
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-eu'),
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      final at = DateTime(2026, 9, 25, 8, 30);
+      await db.into(db.localAssessments).insert(
+            LocalAssessmentsCompanion.insert(
+              id: 'draft-tp-2',
+              trainingParticipantId: 'tp-2',
+              sessionId: 'sess-1',
+              date: DateTime(2026, 9, 25),
+              startTime: at,
+              syncStatus: LocalSyncStatus.draft,
+              createdAt: at,
+              updatedAt: at,
+              ownerUserId: const Value('user-1'),
+            ),
+          );
+    }
+
+    Future<void> setParticipant({required String status, String? consultant}) {
+      return (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(
+        ParticipantsCompanion(
+          status: Value(status),
+          assignedConsultantId: Value(consultant),
+        ),
+      );
+    }
+
+    Future<ChecklistViewModel> open() async {
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 26, 9));
+      addTearDown(vm.dispose);
+      await vm.init();
+      return vm;
+    }
+
+    test('de volta com o consultor (pela linha): abre direto na avaliação '
+        'antiga, com as respostas e a hora de início', () async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      await seedOldDraft();
+
+      final vm = await open();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isResumable, isFalse);
+      expect(vm.isReleased, isFalse);
+      expect(vm.startedText, 'Iniciada em 25 set 08:12');
+      expect(vm.sections.single.infractions.single.selectedNoteId, 'note-pm');
+      expect(vm.expandedCategoryId, 'cat-1');
+    });
+
+    for (final (status, consultant, why) in const [
+      ('NAO_RECOMENDADO', null, 'chegou pelo "Reavaliar"'),
+      ('PENDENTE', null, 'foi liberado'),
+      ('EM_AVALIACAO', 'c-outro', 'está com outro consultor'),
+    ]) {
+      test('ainda fora das mãos do consultor ($why): a tela oferece continuar, '
+          'sem abrir as respostas', () async {
+        await seedParticipant(status: status, assignedConsultantId: consultant);
+        await seedCatalog();
+        await seedOldDraft();
+
+        final vm = await open();
+
+        expect(vm.isLoading, isFalse);
+        expect(vm.isStarted, isFalse);
+        expect(vm.isResumable, isTrue);
+        expect(vm.isBlocked, isFalse);
+        expect(vm.resumableStartedAt, '25/09 às 08:12');
+        expect(vm.startedText, 'Iniciada em 25 set 08:12');
+        expect(vm.isWithMe, isFalse);
+        // As respostas só voltam ao continuar.
+        expect(vm.sections.single.infractions.single.selectedNoteId, isNull);
+        expect(vm.expandedCategoryId, isNull);
+        verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+      });
+    }
+
+    test('a decisão de esperar não depende de o stream do participante já '
+        'ter entregado', () async {
+      await seedParticipant(status: 'PENDENTE');
+      await seedCatalog();
+      await seedOldDraft();
+      final slow = _LateStreamParticipantRepository(apiClient: api, database: db);
+      addTearDown(slow.late.close);
+      final vm = ChecklistViewModel(
+        sessionId: 'sess-1',
+        participantId: 'tp-1',
+        ownerUserId: 'user-1',
+        consultantId: 'c-eu',
+        consultantName: 'Carla Souza',
+        assessmentRepository: assessmentRepository,
+        participantRepository: slow,
+        catalogRepository: catalogRepository,
+      );
+      addTearDown(vm.dispose);
+
+      await vm.init();
+
+      expect(vm.isResumable, isTrue);
+      expect(vm.isStarted, isFalse);
+      expect(vm.participant?.name, 'Carlos Eduardo Nunes');
+    });
+
+    test('depois de reservar, a tela já sabe que o participante está com o '
+        'consultor, sem esperar o stream', () async {
+      await seedParticipant(status: 'NAO_RECOMENDADO');
+      await seedCatalog();
+      await seedOldDraft();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer((_) async => ok(assignPath));
+      final slow = _LateStreamParticipantRepository(apiClient: api, database: db);
+      addTearDown(slow.late.close);
+      final vm = ChecklistViewModel(
+        sessionId: 'sess-1',
+        participantId: 'tp-1',
+        ownerUserId: 'user-1',
+        consultantId: 'c-eu',
+        consultantName: 'Carla Souza',
+        assessmentRepository: assessmentRepository,
+        participantRepository: slow,
+        catalogRepository: catalogRepository,
+      );
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      await vm.start();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isReleased, isFalse);
+      expect(vm.isWithMe, isTrue);
+    });
+
+    test('"Continuar avaliação" reserva o participante e reabre a antiga: a '
+        'mesma hora de início, as mesmas respostas, nenhuma avaliação nova',
+        () async {
+      await seedParticipant(status: 'NAO_RECOMENDADO');
+      await seedCatalog();
+      final old = await seedOldDraft();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenAnswer((_) async => ok(assignPath));
+      final vm = await open();
+
+      await vm.start();
+
+      final sent = verify(
+        () => api.post<Map<String, dynamic>>(assignPath, data: captureAny(named: 'data')),
+      ).captured.single;
+      expect(sent, {
+        'participantIds': ['tp-1'],
+      });
+      expect(vm.isStarted, isTrue);
+      expect(vm.isResumable, isFalse);
+      expect(vm.resumableStartedAt, isNull, reason: 'não está mais parada');
+      // Já no fim do toque: a tela não acusa "não está mais com você".
+      expect(vm.isReleased, isFalse);
+      expect(vm.isWithMe, isTrue);
+      expect(vm.message, isNull);
+      expect(vm.expandedCategoryId, 'cat-1');
+      expect(vm.sections.single.infractions.single.selectedNoteId, 'note-pm');
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.id), [old.id]);
+      expect(rows.single.startTime, old.startTime);
+    });
+
+    test('sem rede, o continuar não reabre: avisa, e a avaliação antiga '
+        'continua guardada', () async {
+      await seedParticipant(status: 'NAO_RECOMENDADO');
+      await seedCatalog();
+      final old = await seedOldDraft();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+        isNetworkError: true,
+      ));
+      final vm = await open();
+
+      await vm.start();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.isResumable, isTrue);
+      expect(
+        vm.message,
+        'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+      );
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.id), [old.id]);
+      expect(await assessmentRepository.loadItems(old.id), hasLength(1));
+    });
+
+    test('recusado (409, outro consultor ficou com ele): avisa, baixa a '
+        'sessão, e a avaliação antiga continua guardada', () async {
+      await seedParticipant(status: 'NAO_RECOMENDADO');
+      await seedCatalog();
+      final old = await seedOldDraft();
+      when(() => api.post<Map<String, dynamic>>(assignPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Um ou mais participantes já estão em avaliação com outro consultor',
+        statusCode: 409,
+      ));
+      when(() => api.get<Map<String, dynamic>>(detailPath))
+          .thenThrow(const ApiException(message: 'x', statusCode: 500));
+      final vm = await open();
+
+      await vm.start();
+      await pumpEventQueue();
+
+      expect(vm.isStarted, isFalse);
+      expect(vm.isResumable, isTrue);
+      expect(
+        vm.message,
+        'Um ou mais participantes já estão em avaliação com outro consultor',
+      );
+      verify(() => api.get<Map<String, dynamic>>(detailPath)).called(1);
+      expect((await db.select(db.localAssessments).get()).map((r) => r.id), [old.id]);
+    });
+
+    group('uma por vez', () {
+      test('com outra avaliação começada depois, a antiga espera — mesmo com '
+          'o participante de volta', () async {
+        await seedParticipant(assignedConsultantId: 'c-eu');
+        await seedCatalog();
+        await seedOldDraft();
+        await seedNewerDraft();
+
+        final vm = await open();
+
+        expect(vm.isStarted, isFalse);
+        expect(vm.isResumable, isTrue);
+        expect(vm.isBlocked, isTrue);
+        expect(vm.blockingParticipantName, 'Marina Lopes');
+        expect(vm.isWithMe, isTrue);
+
+        await vm.start();
+
+        expect(vm.isStarted, isFalse);
+        verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+      });
+
+      test('a avaliação mais nova abre sem esperar pela antiga', () async {
+        await seedParticipant(assignedConsultantId: 'c-eu');
+        await seedCatalog();
+        await seedOldDraft();
+        await seedNewerDraft();
+        final vm = ChecklistViewModel(
+          sessionId: 'sess-1',
+          participantId: 'tp-2',
+          ownerUserId: 'user-1',
+          consultantId: 'c-eu',
+          consultantName: 'Carla Souza',
+          assessmentRepository: assessmentRepository,
+          participantRepository: participantRepository,
+          catalogRepository: catalogRepository,
+        );
+        addTearDown(vm.dispose);
+
+        await vm.init();
+
+        expect(vm.isStarted, isTrue);
+        expect(vm.isResumable, isFalse);
+        expect(vm.isBlocked, isFalse);
+      });
+
+      test('com a outra confirmada, a antiga volta a abrir direto', () async {
+        await seedParticipant(assignedConsultantId: 'c-eu');
+        await seedCatalog();
+        await seedOldDraft();
+        await seedNewerDraft();
+        await assessmentRepository.confirm(
+          'draft-tp-2',
+          participantName: 'Marina Lopes',
+          score: 90,
+        );
+
+        final vm = await open();
+
+        expect(vm.isStarted, isTrue);
+        expect(vm.isBlocked, isFalse);
+        expect(vm.sections.single.infractions.single.selectedNoteId, 'note-pm');
+      });
+
+      test('fora das mãos do consultor e com outra em andamento: o continuar '
+          'fica travado, sem reservar ninguém', () async {
+        await seedParticipant(status: 'NAO_RECOMENDADO');
+        await seedCatalog();
+        await seedOldDraft();
+        await seedNewerDraft();
+
+        final vm = await open();
+        expect(vm.isResumable, isTrue);
+        expect(vm.isBlocked, isTrue);
+
+        await vm.start();
+
+        expect(vm.isStarted, isFalse);
+        verifyNever(() => api.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+      });
+
+      test('se a outra começou depois de a tela abrir, o continuar é recusado '
+          'e a tela passa a avisar', () async {
+        await seedParticipant(assignedConsultantId: 'c-eu');
+        await seedCatalog();
+        await seedOldDraft();
+        // Na abertura, a antiga espera por estar fora das mãos do consultor.
+        await setParticipant(status: 'PENDENTE');
+        final vm = await open();
+        expect(vm.isResumable, isTrue);
+        expect(vm.isBlocked, isFalse);
+        // O participante volta, e outra avaliação começa nesse meio-tempo.
+        await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
+        await seedNewerDraft();
+        await pumpEventQueue();
+
+        await vm.start();
+
+        expect(vm.isStarted, isFalse);
+        expect(vm.isBlocked, isTrue);
+        expect(vm.blockingParticipantName, 'Marina Lopes');
+      });
+    });
+
+    test('descartar a avaliação antiga começa limpo: some o continuar, e o '
+        '"Iniciar avaliação" volta a valer', () async {
+      await seedParticipant(status: 'PENDENTE');
+      await seedCatalog();
+      final old = await seedOldDraft();
+      final vm = await open();
+      expect(vm.canDiscard, isTrue);
+
+      await vm.discard();
+
+      expect(vm.isResumable, isFalse);
+      expect(vm.canDiscard, isFalse);
+      expect(vm.resumableStartedAt, isNull);
+      expect(vm.startedText, isNull);
+      expect(await db.select(db.localAssessments).get(), isEmpty);
+      expect(await assessmentRepository.loadItems(old.id), isEmpty);
+    });
+
+    test('avaliação já confirmada não vira "continuar", mesmo com o '
+        'participante fora das mãos do consultor', () async {
+      await seedParticipant(status: 'PENDENTE');
+      await seedCatalog();
+      final old = await seedOldDraft();
+      await assessmentRepository.confirm(old.id, participantName: 'Carlos', score: 80);
+
+      final vm = await open();
+
+      expect(vm.isStarted, isTrue);
+      expect(vm.isConfirmed, isTrue);
+      expect(vm.isResumable, isFalse);
+      expect(vm.isReleased, isFalse);
+    });
+
+    test('participante liberado com o checklist aberto: não dá mais para '
+        'finalizar — e volta a dar quando ele é atribuído de novo', () async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      await seedOldDraft();
+      final vm = await open();
+      expect(vm.isReleased, isFalse);
+
+      await setParticipant(status: 'PENDENTE');
+      await pumpEventQueue();
+
+      expect(vm.isStarted, isTrue, reason: 'as marcações continuam na tela');
+      expect(vm.isReleased, isTrue);
+      expect(vm.isWithMe, isFalse);
+
+      await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-outro');
+      await pumpEventQueue();
+      expect(vm.isReleased, isTrue, reason: 'com outro consultor');
+
+      await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
+      await pumpEventQueue();
+      expect(vm.isReleased, isFalse);
+    });
+
+    test('desatribuir com a avaliação antiga à espera também a apaga',
+        () async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      await seedOldDraft();
+      await seedNewerDraft();
+      when(() => api.post<Map<String, dynamic>>(
+            '/practical-assessments/unassign',
+            data: any(named: 'data'),
+          )).thenAnswer((_) async => ok('/practical-assessments/unassign'));
+      final vm = await open();
+      expect(vm.isResumable, isTrue);
+      expect(vm.canUnassign, isTrue);
+
+      final released = await vm.unassign();
+
+      expect(released, isTrue);
+      expect(vm.isResumable, isFalse);
+      final rows = await db.select(db.localAssessments).get();
+      expect(rows.map((r) => r.trainingParticipantId), ['tp-2']);
     });
   });
 
