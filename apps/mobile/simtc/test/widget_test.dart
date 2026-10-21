@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/app.dart';
 import 'package:simtc/data/services/local/app_database.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/splash/splash_screen.dart';
 
 void main() {
@@ -26,6 +27,29 @@ void main() {
     expect(
       Localizations.localeOf(tester.element(find.byType(SplashScreen))),
       const Locale('pt', 'BR'),
+    );
+  });
+
+  testWidgets('o formato do aparelho chega às telas; sem ele, vale celular',
+      (tester) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(SimtcApp(database: database));
+    await tester.pump();
+    expect(
+      FormFactorScope.of(tester.element(find.byType(SplashScreen))),
+      FormFactor.phone,
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(
+      SimtcApp(database: database, formFactor: FormFactor.tablet),
+    );
+    await tester.pump();
+    expect(
+      FormFactorScope.of(tester.element(find.byType(SplashScreen))),
+      FormFactor.tablet,
     );
   });
 }

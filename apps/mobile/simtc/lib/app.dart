@@ -7,13 +7,21 @@ import 'package:provider/provider.dart';
 import 'app_providers.dart';
 import 'data/services/local/app_database.dart';
 import 'router.dart';
+import 'ui/core/form_factor.dart';
 import 'ui/core/app_localization.dart';
 import 'ui/core/theme/app_theme.dart';
 
 class SimtcApp extends StatefulWidget {
-  const SimtcApp({super.key, required this.database});
+  const SimtcApp({
+    super.key,
+    required this.database,
+    this.formFactor = FormFactor.phone,
+  });
 
   final AppDatabase database;
+
+  /// Decidido em `main`, pela tela física do aparelho.
+  final FormFactor formFactor;
 
   @override
   State<SimtcApp> createState() => _SimtcAppState();
@@ -48,14 +56,17 @@ class _SimtcAppState extends State<SimtcApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: _dependencies.providers,
-      child: MaterialApp.router(
-        title: 'SIMTC',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        locale: AppLocalization.locale,
-        supportedLocales: AppLocalization.supportedLocales,
-        localizationsDelegates: AppLocalization.delegates,
-        routerConfig: _router,
+      child: FormFactorScope(
+        formFactor: widget.formFactor,
+        child: MaterialApp.router(
+          title: 'SIMTC',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          locale: AppLocalization.locale,
+          supportedLocales: AppLocalization.supportedLocales,
+          localizationsDelegates: AppLocalization.delegates,
+          routerConfig: _router,
+        ),
       ),
     );
   }
