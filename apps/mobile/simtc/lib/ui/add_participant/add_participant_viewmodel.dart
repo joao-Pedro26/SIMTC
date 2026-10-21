@@ -9,6 +9,7 @@ import '../../data/models/training_session.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
+import '../../data/services/connectivity_service.dart';
 import '../../utils/cpf.dart';
 import '../../utils/result.dart';
 
@@ -32,6 +33,10 @@ enum CpfCheck {
   /// Válido, mas a consulta falhou: a tela segue como formulário simples, e
   /// o backend resolve o CPF repetido.
   unverified,
+
+  /// Válido, mas o aparelho está sem conexão: a consulta fica para quando a
+  /// rede voltar, sem aviso de falha — a faixa do topo já diz o motivo.
+  offline,
 }
 
 /// Estado da tela 1.11 "Adicionar participante" (Fase 6A), só para ADMIN.
@@ -42,21 +47,38 @@ enum CpfCheck {
 /// Os campos continuam editáveis — o que estiver na tela ao adicionar é o que
 /// o backend grava no cadastro, como já fazia.
 ///
+/// A consulta (decisões de 09/10/2026): enquanto está no ar, nome e e-mail
+/// ficam travados — o cadastro não troca o texto sob o cursor de quem está
+/// digitando; tem limite de tempo próprio ([lookupTimeout]); não roda sem
+/// conexão; e roda sozinha quando a rede volta.
+///
 /// O CPF inteiro só existe aqui, em memória, enquanto a tela está aberta.
 class AddParticipantViewModel extends ChangeNotifier {
   AddParticipantViewModel({
     required this.sessionId,
     required SessionRepository sessionRepository,
     required ParticipantRepository participantRepository,
+    required ConnectivityService connectivity,
     required AuthUser? currentUser,
+    this.lookupTimeout = defaultLookupTimeout,
   })  : _sessionRepository = sessionRepository,
         _participantRepository = participantRepository,
+        _connectivity = connectivity,
         _currentUser = currentUser;
+
+  /// Quanto a consulta do CPF pode demorar. O limite da API é bem maior (é o
+  /// de qualquer chamada), e até lá os campos ficariam travados.
+  static const Duration defaultLookupTimeout = Duration(seconds: 8);
 
   final String sessionId;
   final SessionRepository _sessionRepository;
   final ParticipantRepository _participantRepository;
+  final ConnectivityService _connectivity;
   final AuthUser? _currentUser;
+
+  /// Passou disso, a consulta conta como falha: os campos destravam, e a
+  /// resposta que chegar depois é ignorada.
+  final Duration lookupTimeout;
 
   static const String _addFailed =
       'Não foi possível adicionar o participante. Tente de novo.';
@@ -66,6 +88,7 @@ class AddParticipantViewModel extends ChangeNotifier {
   static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   StreamSubscription<TrainingSession?>? _sessionSubscription;
+  StreamSubscription<void>? _reconnectSubscription;
 
   bool _disposed = false;
   bool _loaded = false;
@@ -102,6 +125,9 @@ class AddParticipantViewModel extends ChangeNotifier {
   String get email => _email;
   ParticipationType get participationType => _type;
   CpfCheck get cpfCheck => _cpfCheck;
+
+  /// A consulta está no ar: nome e e-mail ficam travados até ela responder.
+  bool get isCheckingCpf => _cpfCheck == CpfCheck.checking;
 
   /// Nome e/ou e-mail vieram do cadastro de outro treinamento.
   bool get filledFromRegistry => _filledFromRegistry;
@@ -182,7 +208,8 @@ class AddParticipantViewModel extends ChangeNotifier {
       _name.trim().isNotEmpty &&
       isEmailValid;
 
-  /// Assina o cache da sessão. Chamado uma vez pela tela.
+  /// Assina o cache da sessão e a volta da conexão. Chamado uma vez pela
+  /// tela.
   void init() {
     _sessionSubscription ??=
         _sessionRepository.watchSession(sessionId).listen((session) {
@@ -190,6 +217,20 @@ class AddParticipantViewModel extends ChangeNotifier {
       _loaded = true;
       notifyListeners();
     });
+
+    _reconnectSubscription ??=
+        _connectivity.onReconnected.listen((_) => _lookupAgain());
+  }
+
+  /// A rede voltou: o CPF que ficou sem consulta — digitado sem conexão, ou
+  /// cuja consulta falhou — é consultado sozinho.
+  void _lookupAgain() {
+    if (_cpfCheck != CpfCheck.offline && _cpfCheck != CpfCheck.unverified) {
+      return;
+    }
+    _cpfCheck = CpfCheck.checking;
+    notifyListeners();
+    unawaited(_lookup(_cpf));
   }
 
   /// Aceita o CPF com ou sem máscara. Completo e válido, dispara a consulta.
@@ -207,6 +248,10 @@ class AddParticipantViewModel extends ChangeNotifier {
       _cpfCheck = CpfCheck.incomplete;
     } else if (!isValidCpf(cpf)) {
       _cpfCheck = CpfCheck.invalid;
+    } else if (_connectivity.isOffline) {
+      // A consulta falharia, e o aviso de falha convidaria a adicionar o que
+      // não dá para adicionar agora. Fica para a volta da rede.
+      _cpfCheck = CpfCheck.offline;
     } else {
       _cpfCheck = CpfCheck.checking;
       unawaited(_lookup(cpf));
@@ -237,8 +282,11 @@ class AddParticipantViewModel extends ChangeNotifier {
   Future<void> _lookup(String cpf) async {
     Result<CpfLookup> result;
     try {
-      result = await _participantRepository.lookupCpf(sessionId, cpf);
+      result = await _participantRepository
+          .lookupCpf(sessionId, cpf)
+          .timeout(lookupTimeout);
     } catch (error) {
+      // O tempo esgotado também cai aqui.
       result = Failure(Exception('$error'));
     }
     // Resposta atrasada: a tela fechou, ou o CPF já é outro.
@@ -371,6 +419,7 @@ class AddParticipantViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sessionSubscription?.cancel();
+    _reconnectSubscription?.cancel();
     super.dispose();
   }
 }

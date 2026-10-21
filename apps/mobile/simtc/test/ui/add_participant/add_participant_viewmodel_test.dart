@@ -9,6 +9,7 @@ import 'package:simtc/data/models/training_session.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
+import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/ui/add_participant/add_participant_viewmodel.dart';
 import 'package:simtc/utils/result.dart';
 
@@ -16,9 +17,41 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
 
+/// Conectividade de mentira: o serviço real conversa com o plugin de
+/// plataforma, que não existe num teste de unidade.
+class _FakeConnectivity extends ConnectivityService {
+  final _reconnected = StreamController<void>.broadcast();
+
+  bool offline = false;
+
+  @override
+  bool get isOffline => offline;
+
+  @override
+  bool get isOnline => !offline;
+
+  @override
+  Stream<void> get onReconnected => _reconnected.stream;
+
+  bool get hasReconnectListener => _reconnected.hasListener;
+
+  /// A rede volta.
+  void reconnect() {
+    offline = false;
+    _reconnected.add(null);
+  }
+
+  @override
+  void dispose() {
+    _reconnected.close();
+    super.dispose();
+  }
+}
+
 void main() {
   late _MockSessionRepository sessions;
   late _MockParticipantRepository participants;
+  late _FakeConnectivity connectivity;
   late StreamController<TrainingSession?> sessionStream;
 
   // Dois CPFs com os dígitos verificadores certos.
@@ -93,6 +126,7 @@ void main() {
   setUp(() {
     sessions = _MockSessionRepository();
     participants = _MockParticipantRepository();
+    connectivity = _FakeConnectivity();
     sessionStream = StreamController<TrainingSession?>.broadcast();
 
     when(() => sessions.watchSession('sess-1'))
@@ -104,19 +138,25 @@ void main() {
     addAnswers(Success(added()));
   });
 
-  tearDown(() => sessionStream.close());
+  tearDown(() {
+    sessionStream.close();
+    connectivity.dispose();
+  });
 
   /// A tela aberta, com a sessão já lida do cache.
   Future<AddParticipantViewModel> open({
     AuthUser? user = admin,
     TrainingSession? withSession,
     bool missing = false,
+    Duration lookupTimeout = AddParticipantViewModel.defaultLookupTimeout,
   }) async {
     final vm = AddParticipantViewModel(
       sessionId: 'sess-1',
       sessionRepository: sessions,
       participantRepository: participants,
+      connectivity: connectivity,
       currentUser: user,
+      lookupTimeout: lookupTimeout,
     )..init();
     addTearDown(vm.dispose);
     sessionStream.add(missing ? null : (withSession ?? session()));
@@ -349,6 +389,209 @@ void main() {
       answer.complete(const Success(free));
       await pumpEventQueue();
       expect(vm.canSubmit, isTrue);
+    });
+  });
+
+  // Decisões de 09/10/2026: a consulta trava o nome e o e-mail, tem limite de
+  // tempo próprio, não roda sem conexão e roda sozinha quando a rede volta.
+  group('consulta: trava, limite de tempo e conexão', () {
+    test('enquanto consulta, nome e e-mail ficam travados; a resposta '
+        'destrava', () async {
+      final answer = Completer<Result<CpfLookup>>();
+      when(() => participants.lookupCpf('sess-1', cpf))
+          .thenAnswer((_) => answer.future);
+      final vm = await open();
+      expect(vm.isCheckingCpf, isFalse);
+
+      vm.setCpf(cpf);
+
+      expect(vm.isCheckingCpf, isTrue);
+      expect(vm.cpfHelper, 'Consultando o CPF…');
+
+      answer.complete(const Success(registered));
+      await pumpEventQueue();
+
+      expect(vm.isCheckingCpf, isFalse);
+      expect(vm.name, 'Fernanda Lopes Meireles');
+    });
+
+    test('o limite da consulta é de 8 segundos', () {
+      expect(
+        AddParticipantViewModel.defaultLookupTimeout,
+        const Duration(seconds: 8),
+      );
+    });
+
+    test('consulta que não responde no limite: destrava com o aviso, e a '
+        'resposta que chegar depois é ignorada', () async {
+      final answer = Completer<Result<CpfLookup>>();
+      when(() => participants.lookupCpf('sess-1', cpf))
+          .thenAnswer((_) => answer.future);
+      final vm = await open(lookupTimeout: const Duration(milliseconds: 30));
+
+      vm.setCpf(cpf);
+      expect(vm.isCheckingCpf, isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 90));
+
+      expect(vm.isCheckingCpf, isFalse);
+      expect(vm.cpfCheck, CpfCheck.unverified);
+      expect(
+        vm.cpfHelper,
+        'Não foi possível consultar o CPF. Preencha os dados e adicione assim mesmo.',
+      );
+      vm.setName('Digitado À Mão');
+      expect(vm.canSubmit, isTrue);
+
+      answer.complete(const Success(registered));
+      await pumpEventQueue();
+
+      expect(vm.cpfCheck, CpfCheck.unverified);
+      expect(vm.name, 'Digitado À Mão', reason: 'o cadastro chegou tarde demais');
+      expect(vm.filledFromRegistry, isFalse);
+    });
+
+    test('sem conexão não consulta e não mostra aviso de falha', () async {
+      connectivity.offline = true;
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      vm.setName('Fernanda Lopes Meireles');
+
+      verifyNever(() => participants.lookupCpf(any(), any()));
+      expect(vm.cpfCheck, CpfCheck.offline);
+      expect(vm.isCheckingCpf, isFalse);
+      expect(vm.cpfHelper, isNull);
+      expect(vm.cpfError, isNull);
+      // Adicionar precisa de conexão de qualquer jeito.
+      expect(vm.canSubmit, isFalse);
+    });
+
+    test('sem conexão, o CPF com dígito errado continua sendo acusado',
+        () async {
+      connectivity.offline = true;
+      final vm = await open();
+
+      vm.setCpf('52998224726');
+
+      expect(vm.cpfCheck, CpfCheck.invalid);
+      expect(vm.cpfError, 'CPF inválido.');
+    });
+
+    test('quando a rede volta, o CPF do campo é consultado sozinho', () async {
+      lookupAnswers(registered);
+      connectivity.offline = true;
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      connectivity.reconnect();
+      await pumpEventQueue();
+
+      verify(() => participants.lookupCpf('sess-1', cpf)).called(1);
+      expect(vm.cpfCheck, CpfCheck.available);
+      expect(vm.name, 'Fernanda Lopes Meireles');
+      expect(vm.email, 'fernanda@empresa.com.br');
+    });
+
+    test('a consulta de quando a rede volta também trava os campos', () async {
+      final answer = Completer<Result<CpfLookup>>();
+      when(() => participants.lookupCpf('sess-1', cpf))
+          .thenAnswer((_) => answer.future);
+      connectivity.offline = true;
+      final vm = await open();
+      vm.setCpf(cpf);
+
+      connectivity.reconnect();
+      await pumpEventQueue();
+
+      expect(vm.isCheckingCpf, isTrue);
+
+      answer.complete(const Success(free));
+      await pumpEventQueue();
+      expect(vm.isCheckingCpf, isFalse);
+    });
+
+    test('a consulta que falhou é refeita quando a rede volta', () async {
+      when(() => participants.lookupCpf('sess-1', cpf)).thenAnswer(
+        (_) async => Failure<CpfLookup>(Exception('sem rede'), 'x'),
+      );
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      expect(vm.cpfCheck, CpfCheck.unverified);
+
+      lookupAnswers(free);
+      connectivity.reconnect();
+      await pumpEventQueue();
+
+      verify(() => participants.lookupCpf('sess-1', cpf)).called(2);
+      expect(vm.cpfCheck, CpfCheck.available);
+    });
+
+    test('a rede voltar não refaz a consulta que já respondeu, nem consulta '
+        'CPF incompleto, inválido ou já inscrito', () async {
+      final vm = await open();
+
+      connectivity.reconnect();
+      await pumpEventQueue();
+      verifyNever(() => participants.lookupCpf(any(), any()));
+
+      vm.setCpf('5299822');
+      connectivity.reconnect();
+      vm.setCpf('52998224726');
+      connectivity.reconnect();
+      await pumpEventQueue();
+      verifyNever(() => participants.lookupCpf(any(), any()));
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      expect(vm.cpfCheck, CpfCheck.available);
+      connectivity.reconnect();
+      await pumpEventQueue();
+      verify(() => participants.lookupCpf('sess-1', cpf)).called(1);
+
+      lookupAnswers(
+        const CpfLookup(registered: true, enrolled: true, name: 'Ana'),
+        forCpf: otherCpf,
+      );
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+      expect(vm.cpfCheck, CpfCheck.enrolled);
+      connectivity.reconnect();
+      await pumpEventQueue();
+      verify(() => participants.lookupCpf('sess-1', otherCpf)).called(1);
+    });
+
+    test('a rede voltar no meio de uma consulta não dispara outra', () async {
+      final answer = Completer<Result<CpfLookup>>();
+      when(() => participants.lookupCpf('sess-1', cpf))
+          .thenAnswer((_) => answer.future);
+      final vm = await open();
+      vm.setCpf(cpf);
+
+      connectivity.reconnect();
+      await pumpEventQueue();
+
+      verify(() => participants.lookupCpf('sess-1', cpf)).called(1);
+      answer.complete(const Success(free));
+      await pumpEventQueue();
+      expect(vm.cpfCheck, CpfCheck.available);
+    });
+
+    test('fechar a tela larga o aviso de volta da rede', () async {
+      final vm = AddParticipantViewModel(
+        sessionId: 'sess-1',
+        sessionRepository: sessions,
+        participantRepository: participants,
+        connectivity: connectivity,
+        currentUser: admin,
+      )..init();
+      expect(connectivity.hasReconnectListener, isTrue);
+
+      vm.dispose();
+
+      expect(connectivity.hasReconnectListener, isFalse);
     });
   });
 
@@ -744,6 +987,7 @@ void main() {
       sessionId: 'sess-1',
       sessionRepository: sessions,
       participantRepository: participants,
+      connectivity: connectivity,
       currentUser: admin,
     )..init();
     sessionStream.add(session());

@@ -45,6 +45,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     sessionId: widget.sessionId,
     sessionRepository: context.read<SessionRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
+    connectivity: context.read<ConnectivityService>(),
     currentUser: context.read<AuthRepository>().currentUser,
   )..init();
 
@@ -95,6 +96,12 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   void _onEmailFocusChange() => setState(() {});
 
   bool get _fieldsEnabled => _viewModel.canAdd && !_viewModel.isSubmitting;
+
+  /// Nome e e-mail ficam travados enquanto o CPF é consultado (decisão de
+  /// 09/10/2026): o cadastro pode preenchê-los, e não troca o texto sob o
+  /// cursor de quem está digitando. O CPF continua editável.
+  bool get _registryFieldsEnabled =>
+      _fieldsEnabled && !_viewModel.isCheckingCpf;
 
   bool get _showEmailError => !_emailFocus.hasFocus && !_viewModel.isEmailValid;
 
@@ -249,7 +256,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
       icon: AppIcons.profile,
       textCapitalization: TextCapitalization.words,
       textInputAction: TextInputAction.next,
-      enabled: _fieldsEnabled,
+      enabled: _registryFieldsEnabled,
       onChanged: _viewModel.setName,
     );
   }
@@ -265,7 +272,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
       hintText: 'para enviar o certificado',
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.done,
-      enabled: _fieldsEnabled,
+      enabled: _registryFieldsEnabled,
       errorText: _showEmailError ? 'E-mail inválido.' : null,
       onChanged: _viewModel.setEmail,
     );

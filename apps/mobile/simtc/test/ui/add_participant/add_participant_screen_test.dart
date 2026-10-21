@@ -444,6 +444,103 @@ void main() {
     );
   });
 
+  testWidgets(
+      'enquanto o CPF é consultado, nome e e-mail ficam travados e o CPF '
+      'continua editável; a resposta destrava e preenche', (tester) async {
+    await seedSession();
+    final reply = Completer<Response<Map<String, dynamic>>>();
+    when(() => api.post<Map<String, dynamic>>(lookupPath, data: any(named: 'data')))
+        .thenAnswer((_) => reply.future);
+    await pumpAdd(tester);
+    expect(tester.widget<TextField>(field('campo-nome')).enabled, isTrue);
+
+    await tester.enterText(field('campo-cpf'), cpf);
+    await tester.pump();
+    // Um quadro no meio da consulta.
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Consultando o CPF…'), findsOneWidget);
+    expect(tester.widget<TextField>(field('campo-nome')).enabled, isFalse);
+    expect(tester.widget<TextField>(field('campo-email')).enabled, isFalse);
+    expect(tester.widget<TextField>(field('campo-cpf')).enabled, isTrue);
+
+    reply.complete(
+      Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: lookupPath),
+        statusCode: 200,
+        data: {
+          'registered': true,
+          'name': 'Fernanda Lopes Meireles',
+          'email': 'fernanda@empresa.com.br',
+          'enrolled': false,
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(field('campo-nome')).enabled, isTrue);
+    expect(tester.widget<TextField>(field('campo-email')).enabled, isTrue);
+    expect(textOf(tester, 'campo-nome'), 'Fernanda Lopes Meireles');
+    expect(textOf(tester, 'campo-email'), 'fernanda@empresa.com.br');
+  });
+
+  testWidgets(
+      'sem conexão, o CPF completo não é consultado e não aparece o aviso de '
+      'falha da consulta: ficam a faixa e a dica do botão', (tester) async {
+    await seedSession();
+    cpfIsFree();
+    await goOffline();
+    await pumpAdd(tester);
+
+    await typeCpf(tester);
+
+    verifyNever(
+      () => api.post<Map<String, dynamic>>(lookupPath, data: any(named: 'data')),
+    );
+    expect(find.textContaining('Não foi possível consultar o CPF'), findsNothing);
+    expect(find.text('Consultando o CPF…'), findsNothing);
+    expect(
+      find.text('Sem conexão — adicionar participante precisa de internet.'),
+      findsOneWidget,
+    );
+    expect(find.text('Disponível quando houver conexão'), findsOneWidget);
+    // Dá para ir preenchendo o resto.
+    expect(tester.widget<TextField>(field('campo-nome')).enabled, isTrue);
+  });
+
+  testWidgets(
+      'quando a conexão volta, o CPF que estava no campo é consultado '
+      'sozinho, e o cadastro preenche os campos', (tester) async {
+    await seedSession();
+    lookupAnswers({
+      'registered': true,
+      'name': 'Fernanda Lopes Meireles',
+      'email': null,
+      'enrolled': false,
+    });
+    final changes = StreamController<List<ConnectivityResult>>();
+    addTearDown(changes.close);
+    final plugin = _MockConnectivity();
+    when(plugin.checkConnectivity).thenAnswer((_) async => [ConnectivityResult.none]);
+    when(() => plugin.onConnectivityChanged).thenAnswer((_) => changes.stream);
+    connectivity.dispose();
+    connectivity = ConnectivityService(connectivity: plugin);
+    await connectivity.initialize();
+    await pumpAdd(tester);
+    await typeCpf(tester);
+    expect(textOf(tester, 'campo-nome'), '');
+
+    changes.add([ConnectivityResult.wifi]);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => api.post<Map<String, dynamic>>(lookupPath, data: any(named: 'data')),
+    ).called(1);
+    expect(find.textContaining('Sem conexão'), findsNothing);
+    expect(textOf(tester, 'campo-nome'), 'Fernanda Lopes Meireles');
+    expect(find.textContaining('Já cadastrado em outro treinamento'), findsOneWidget);
+  });
+
   testWidgets('consulta que falha: avisa e segue como formulário simples',
       (tester) async {
     await seedSession();
