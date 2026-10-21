@@ -70,6 +70,7 @@ class AppDependencies {
     final sessionConsultantRepository = SessionConsultantRepository(
       apiClient: apiClient,
       database: database,
+      onSessionChanged: participantRepository.markSessionChanged,
     );
     final catalogRepository = AssessmentCatalogRepository(
       apiClient: apiClient,

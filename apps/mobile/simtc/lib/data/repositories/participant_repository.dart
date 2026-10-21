@@ -31,6 +31,12 @@ class ParticipantRepository {
   final AppDatabase _db;
   final DateTime Function() _now;
 
+  /// Por sessão, o instante da última mudança aceita pelo backend (consultor
+  /// que entrou ou saiu, participante atribuído ou liberado). Um GET pedido
+  /// antes dela traz o estado de antes: se fosse gravado, desfaria a mudança
+  /// no cache — e as telas baixam a mesma sessão em paralelo.
+  final Map<String, DateTime> _lastAcceptedChange = {};
+
   static const String _assignPath = '/practical-assessments/assign';
   static const String _unassignPath = '/practical-assessments/unassign';
 
@@ -78,6 +84,12 @@ class ParticipantRepository {
     return row == null ? null : SessionParticipant.fromRow(row);
   }
 
+  /// Registra que o backend acabou de aceitar uma mudança nesta sessão. Os
+  /// downloads pedidos antes deste instante não são mais gravados.
+  void markSessionChanged(String sessionId) {
+    _lastAcceptedChange[sessionId] = _now();
+  }
+
   /// Baixa `GET /training-sessions/:id` e regrava a sessão, os participantes e
   /// os consultores dela numa transação só. Devolve quantos participantes
   /// ficaram.
@@ -109,6 +121,14 @@ class ParticipantRepository {
           .map((json) => SessionParticipant.fromJson(json, sessionId: sessionId))
           .where((p) => p.id.isNotEmpty)
           .toList(growable: false);
+
+      // Um GET pedido antes de uma mudança aceita traz o estado de antes dela:
+      // não se grava (o cache já tem o depois), e para quem chamou segue como
+      // sucesso — o dado que importa está no cache.
+      final changedAt = _lastAcceptedChange[sessionId];
+      if (changedAt != null && requestedAt.isBefore(changedAt)) {
+        return Success(participants.length);
+      }
 
       await _write(
         session,
@@ -229,6 +249,10 @@ class ParticipantRepository {
     }
 
     try {
+      final row = await (_db.select(_db.participants)
+            ..where((t) => t.id.equals(participantId)))
+          .getSingleOrNull();
+      if (row != null) markSessionChanged(row.sessionId);
       await (_db.update(_db.participants)
             ..where((t) => t.id.equals(participantId)))
           .write(
@@ -303,6 +327,7 @@ class ParticipantRepository {
       final row = await (_db.select(_db.participants)
             ..where((t) => t.id.equals(participantId)))
           .getSingleOrNull();
+      if (row != null) markSessionChanged(row.sessionId);
       final score = row?.score;
       await (_db.update(_db.participants)
             ..where((t) => t.id.equals(participantId)))

@@ -17,11 +17,17 @@ class SessionConsultantRepository {
   SessionConsultantRepository({
     required ApiClient apiClient,
     required AppDatabase database,
+    this.onSessionChanged,
   })  : _api = apiClient,
         _db = database;
 
   final ApiClient _api;
   final AppDatabase _db;
+
+  /// Avisado, com o id da sessão, quando o backend aceita uma mudança de
+  /// consultor — o `ParticipantRepository` usa para não gravar por cima dela
+  /// um download pedido antes.
+  final void Function(String sessionId)? onSessionChanged;
 
   static const String _teamPath = '/consultants';
 
@@ -127,6 +133,8 @@ class SessionConsultantRepository {
     } catch (error) {
       return Failure(Exception('$error'), fallback);
     }
+
+    onSessionChanged?.call(sessionId);
 
     try {
       final consultants =

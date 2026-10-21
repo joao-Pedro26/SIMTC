@@ -261,8 +261,10 @@ class SessionConsultantsViewModel extends ChangeNotifier {
   }
 
   /// O backend só aceita mexer nos consultores de uma sessão planejada ou em
-  /// andamento, e só de um ADMIN. A tela ainda exige conexão.
-  bool get canChange => !isLoading && lockedReason == null;
+  /// andamento, e só de um ADMIN. A tela ainda exige conexão. Sem os
+  /// consultores da sessão baixados ([notDownloaded]) a equipe inteira
+  /// pareceria disponível, inclusive quem já está na sessão: nada muda.
+  bool get canChange => !isLoading && !notDownloaded && lockedReason == null;
 
   /// O consultor que está entrando ou saindo agora — um de cada vez.
   String? get busyConsultantId => _busyConsultantId;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
@@ -7,6 +9,7 @@ import 'package:simtc/data/models/cpf_lookup.dart';
 import 'package:simtc/data/models/remote_assessment.dart';
 import 'package:simtc/data/models/session_participant.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
+import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/local/app_database.dart';
@@ -332,6 +335,127 @@ void main() {
         isA<Failure<int>>().having((f) => f.message, 'message',
             'Não foi possível atualizar. Mostrando os dados já baixados.'),
       );
+    });
+  });
+
+  group('download velho depois de mudança aceita', () {
+    late DateTime clock;
+    late Completer<Response<Map<String, dynamic>>> oldGet;
+    const assignPath = '/practical-assessments/assign';
+    const consultantsPath = '/training-sessions/sess-1/consultants/c-2';
+
+    Future<List<String>> cachedConsultantIds() async {
+      final rows = await db.select(db.sessionConsultants).get();
+      return rows.map((r) => r.consultantId).toList();
+    }
+
+    setUp(() async {
+      clock = DateTime(2026, 10, 21, 9);
+      repository = ParticipantRepository(
+        apiClient: api,
+        database: db,
+        now: () => clock,
+      );
+      await seedSession();
+      oldGet = Completer<Response<Map<String, dynamic>>>();
+      // O primeiro GET fica no ar; o segundo traz o estado depois da mudança.
+      var calls = 0;
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer((_) {
+        calls++;
+        if (calls == 1) return oldGet.future;
+        return Future.value(ok(detailJson(
+          [participantJson('tp-1', status: 'EM_AVALIACAO')],
+          consultants: [consultantLink('c-1', 'Carla Souza')],
+        )));
+      });
+    });
+
+    test('um GET pedido antes de um assign aceito não grava por cima dele',
+        () async {
+      when(() => api.post<Map<String, dynamic>>(assignPath,
+          data: any(named: 'data'))).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: assignPath),
+          statusCode: 201,
+          data: {'assigned': 1},
+        ),
+      );
+
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-1',
+              sessionId: 'sess-1',
+              name: 'Ana Paula Ribeiro',
+              cpf: '042.118.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'PENDENTE',
+              cachedAt: DateTime(2026, 9, 22, 8),
+            ),
+          );
+
+      final older = repository.syncSession('sess-1');
+      clock = clock.add(const Duration(seconds: 5));
+      await repository.assign('tp-1',
+          consultantId: 'c-1', consultantName: 'Carla Souza');
+      clock = clock.add(const Duration(seconds: 5));
+      await repository.syncSession('sess-1');
+
+      oldGet.complete(ok(detailJson(
+        [participantJson('tp-1')],
+        consultants: [consultantLink('c-1', 'Carla Souza'), consultantLink('c-2', 'Rafael Lima')],
+      )));
+      final olderResult = await older;
+
+      expect(olderResult.isSuccess, isTrue);
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'EM_AVALIACAO');
+      expect(await cachedConsultantIds(), ['c-1']);
+    });
+
+    test('o mesmo vale para a remoção de consultor aceita', () async {
+      final consultants = SessionConsultantRepository(
+        apiClient: api,
+        database: db,
+        onSessionChanged: repository.markSessionChanged,
+      );
+      when(() => api.delete<Map<String, dynamic>>(consultantsPath)).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: consultantsPath),
+          statusCode: 200,
+          data: {
+            'responsibleConsultantId': 'c-resp',
+            'consultants': [consultantLink('c-1', 'Carla Souza')],
+          },
+        ),
+      );
+
+      final older = repository.syncSession('sess-1');
+      clock = clock.add(const Duration(seconds: 5));
+      await consultants.remove('sess-1', 'c-2');
+      clock = clock.add(const Duration(seconds: 5));
+      await repository.syncSession('sess-1');
+
+      oldGet.complete(ok(detailJson(
+        [participantJson('tp-1')],
+        consultants: [consultantLink('c-1', 'Carla Souza'), consultantLink('c-2', 'Rafael Lima')],
+      )));
+      await older;
+
+      expect(await cachedConsultantIds(), ['c-1']);
+    });
+
+    test('um GET pedido depois da mudança grava normalmente', () async {
+      repository.markSessionChanged('sess-1');
+      clock = clock.add(const Duration(seconds: 5));
+      oldGet.complete(ok(detailJson(
+        [participantJson('tp-1', status: 'EM_AVALIACAO')],
+      )));
+
+      final result = await repository.syncSession('sess-1');
+
+      expect(result.isSuccess, isTrue);
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'EM_AVALIACAO');
     });
   });
 

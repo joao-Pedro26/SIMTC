@@ -244,6 +244,18 @@ void main() {
       expect(vm.notDownloaded, isTrue);
     });
 
+    test('sem os consultores no aparelho, nada pode mudar: a equipe fica com '
+        'Adicionar apagado', () async {
+      final vm = await open(inSession: const []);
+
+      expect(vm.notDownloaded, isTrue);
+      expect(vm.canChange, isFalse);
+
+      await vm.add('c-rafael');
+
+      verifyNever(() => consultants.add(any(), any()));
+    });
+
     test('com os consultores no aparelho, não há o que baixar', () async {
       final vm = await open();
 

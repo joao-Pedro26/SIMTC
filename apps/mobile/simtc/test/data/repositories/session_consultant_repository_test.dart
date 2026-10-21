@@ -76,6 +76,31 @@ void main() {
 
   tearDown(() => db.close());
 
+  group('aviso de mudança aceita', () {
+    test('add e remove aceitos avisam a sessão; a recusa não', () async {
+      final changedSessions = <String>[];
+      repository = SessionConsultantRepository(
+        apiClient: api,
+        database: db,
+        onSessionChanged: changedSessions.add,
+      );
+      when(() => api.post<Map<String, dynamic>>(addPath, data: any(named: 'data')))
+          .thenAnswer((_) async => changed([link('c-2', 'Rafael Lima')]));
+      when(() => api.delete<Map<String, dynamic>>(removePath))
+          .thenAnswer((_) async => changed([]));
+
+      await repository.add('sess-1', 'c-2');
+      await repository.remove('sess-1', 'c-2');
+      expect(changedSessions, ['sess-1', 'sess-1']);
+
+      when(() => api.delete<Map<String, dynamic>>(removePath)).thenThrow(
+        const ApiException(message: 'Sessão concluída', statusCode: 403),
+      );
+      await repository.remove('sess-1', 'c-2');
+      expect(changedSessions, hasLength(2));
+    });
+  });
+
   test('watchBySession traz só os consultores da sessão pedida, por nome',
       () async {
     await seedSession('sess-1');
