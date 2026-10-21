@@ -118,6 +118,9 @@ abstract final class AppColors {
   /// Sombra da navbar flutuante
   static const Color navShadow = Color(0x4715172A);
 
+  /// Sombra da navbar do tablet, lateral e em pílula (quadros "4c" e "4u")
+  static const Color navShadowTablet = Color(0x2E0F172A);
+
   /// Trilho da barra de progresso da abertura
   static const Color progressTrack = Color(0x24000000);
 }

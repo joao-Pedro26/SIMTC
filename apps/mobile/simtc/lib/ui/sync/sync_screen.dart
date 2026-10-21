@@ -11,7 +11,7 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
-import '../core/widgets/pill_nav_bar.dart';
+import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/status_chip.dart';
 import 'sync_queue_labels.dart';
 
@@ -65,7 +65,7 @@ class SyncScreen extends StatelessWidget {
             ],
           ),
         ),
-        bottomNavigationBar: _buildNavBar(context, queue.length),
+        bottomNavigationBar: const AppNavBar(current: AppTab.sync),
       ),
     );
   }
@@ -361,25 +361,6 @@ class SyncScreen extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildNavBar(BuildContext context, int queued) {
-    return PillNavBar(
-      currentIndex: 1,
-      items: [
-        const PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
-        PillNavItem(icon: AppIcons.sync, label: 'Sincronizar', badgeCount: queued),
-        const PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
-      ],
-      onSelect: (index) {
-        if (index == 0) context.go(AppRoutes.home);
-        if (index == 2) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Disponível em breve.')),
-          );
-        }
-      },
     );
   }
 }

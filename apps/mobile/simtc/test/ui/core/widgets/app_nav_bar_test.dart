@@ -1,0 +1,153 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:simtc/data/services/assessment_sync_service.dart';
+import 'package:simtc/router.dart';
+import 'package:simtc/ui/core/form_factor.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
+import 'package:simtc/ui/core/widgets/app_nav_bar.dart';
+import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
+
+import '../../../support/fake_assessment_sync_service.dart';
+
+void main() {
+  void screen(WidgetTester tester, Size size) {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
+  /// A aba [current] dentro da moldura do tablet, com as rotas das duas abas.
+  Future<GoRouter> pumpFrame(
+    WidgetTester tester, {
+    AppTab current = AppTab.sessions,
+    int queued = 0,
+  }) async {
+    Widget tab(AppTab tab) => Scaffold(
+          body: TabletNavFrame(
+            current: tab,
+            child: ColoredBox(
+              key: const Key('conteudo'),
+              color: Colors.white,
+              child: Text('aba ${tab.name}'),
+            ),
+          ),
+        );
+    final router = GoRouter(
+      initialLocation:
+          current == AppTab.sessions ? AppRoutes.home : AppRoutes.sync,
+      routes: [
+        GoRoute(
+            path: AppRoutes.home, builder: (_, __) => tab(AppTab.sessions)),
+        GoRoute(path: AppRoutes.sync, builder: (_, __) => tab(AppTab.sync)),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AssessmentSyncService>.value(
+        value: FakeAssessmentSyncService(
+          queue: [for (var i = 0; i < queued; i++) queuedAssessment('$i')],
+        ),
+        child: FormFactorScope(
+          formFactor: FormFactor.tablet,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    return router;
+  }
+
+  group('paisagem (quadro "4c")', () {
+    testWidgets('coluna de 88 a 14 da borda, centrada na altura; o conteúdo '
+        'começa em 116', (tester) async {
+      screen(tester, const Size(1280, 800));
+      await pumpFrame(tester);
+
+      final bar = tester.getRect(find.byType(PillNavBar));
+      expect(bar.left, 14);
+      expect(bar.width, 88);
+      expect(bar.center.dy, 400);
+      expect(tester.getRect(find.byKey(const Key('conteudo'))).left, 116);
+    });
+
+    testWidgets('itens de 64 por 64, "Sincr." no lugar de "Sincronizar"',
+        (tester) async {
+      screen(tester, const Size(1280, 800));
+      await pumpFrame(tester, queued: 3);
+
+      expect(find.text('Sincr.'), findsOneWidget);
+      expect(find.text('Sincronizar'), findsNothing);
+      expect(find.text('3'), findsOneWidget);
+      final item = find.ancestor(
+        of: find.text('Sessões'),
+        matching: find.byType(InkWell),
+      );
+      expect(tester.getSize(item), const Size(64, 64));
+    });
+
+    testWidgets('o item ativo usa primarySurface e primaryDark',
+        (tester) async {
+      screen(tester, const Size(1280, 800));
+      await pumpFrame(tester);
+
+      final label = tester.widget<Text>(find.text('Sessões'));
+      expect(label.style!.color, AppColors.primaryDark);
+      expect(label.style!.fontSize, 10);
+      final other = tester.widget<Text>(find.text('Perfil'));
+      expect(other.style!.color, AppColors.text3);
+    });
+
+    testWidgets('a lateral leva de uma aba à outra', (tester) async {
+      screen(tester, const Size(1280, 800));
+      await pumpFrame(tester);
+
+      await tester.tap(find.text('Sincr.'));
+      await tester.pumpAndSettle();
+      expect(find.text('aba sync'), findsOneWidget);
+
+      await tester.tap(find.text('Sessões'));
+      await tester.pumpAndSettle();
+      expect(find.text('aba sessions'), findsOneWidget);
+    });
+  });
+
+  group('retrato (quadro "4u")', () {
+    testWidgets('pílula de 68 a 120 das laterais e 16 do fundo; o conteúdo '
+        'termina 100 acima', (tester) async {
+      screen(tester, const Size(800, 1280));
+      await pumpFrame(tester, current: AppTab.sync, queued: 2);
+
+      final bar = tester.getRect(find.byType(PillNavBar));
+      expect(bar, const Rect.fromLTRB(120, 1196, 680, 1264));
+      expect(tester.getRect(find.byKey(const Key('conteudo'))).bottom, 1180);
+      expect(find.text('Sincronizar'), findsOneWidget);
+      expect(tester.widget<Text>(find.text('Sincronizar')).style!.fontSize, 11);
+      final item = find.ancestor(
+        of: find.text('Sessões'),
+        matching: find.byType(InkWell),
+      );
+      expect(tester.getSize(item).height, 56);
+    });
+
+    testWidgets('em janela estreita (tela dividida) a pílula volta aos 16',
+        (tester) async {
+      screen(tester, const Size(500, 900));
+      await pumpFrame(tester);
+
+      final bar = tester.getRect(find.byType(PillNavBar));
+      expect(bar.left, 16);
+      expect(bar.right, 484);
+    });
+  });
+
+  testWidgets('"Perfil" avisa que chega numa próxima versão', (tester) async {
+    screen(tester, const Size(1280, 800));
+    await pumpFrame(tester);
+
+    await tester.tap(find.text('Perfil'));
+    await tester.pump();
+    expect(find.text('Disponível em breve.'), findsOneWidget);
+  });
+}

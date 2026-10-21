@@ -144,9 +144,13 @@ abstract final class AppTypography {
   static TextStyle get optionLabel =>
       _inter(size: 14, weight: FontWeight.w400, height: 1.2, color: AppColors.text2);
 
-  /// Rótulo de item da navbar
+  /// Rótulo de item da navbar (também a lateral do tablet, quadro "4c")
   static TextStyle get navLabel =>
       _inter(size: 10, weight: FontWeight.w600, height: 1);
+
+  /// Rótulo de item da pílula do tablet em retrato (quadro "4u")
+  static TextStyle get navLabelTabletBottom =>
+      _inter(size: 11, weight: FontWeight.w600, height: 1);
 
   /// Número do badge da fila no indicador do cabeçalho (canvas "2c")
   static TextStyle get headerBadge =>

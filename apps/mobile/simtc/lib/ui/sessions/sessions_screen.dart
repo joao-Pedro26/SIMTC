@@ -6,7 +6,6 @@ import '../../data/models/training_session.dart';
 import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/session_repository.dart';
-import '../../data/services/assessment_sync_service.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
@@ -14,11 +13,11 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/filter_chip_bar.dart';
 import '../core/widgets/inline_notice.dart';
-import '../core/widgets/pill_nav_bar.dart';
 import '../core/widgets/session_card.dart';
 import '../core/widgets/skeleton.dart';
 import '../core/widgets/status_chip.dart';
@@ -248,7 +247,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildNavBar(context),
+      bottomNavigationBar: const AppNavBar(current: AppTab.sessions),
     );
   }
 
@@ -508,28 +507,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildNavBar(BuildContext context) {
-    // O mesmo número do indicador do cabeçalho: a fila de envio.
-    final queued = context.watch<AssessmentSyncService?>()?.queue.length ?? 0;
-
-    return PillNavBar(
-      currentIndex: 0,
-      items: [
-        const PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
-        PillNavItem(icon: AppIcons.sync, label: 'Sincronizar', badgeCount: queued),
-        const PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
-      ],
-      onSelect: (index) {
-        if (index == 1) context.go(AppRoutes.sync);
-        if (index == 2) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Disponível em breve.')),
-          );
-        }
-      },
     );
   }
 }
