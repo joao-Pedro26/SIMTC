@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import '../../data/services/assessment_sync_service.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../data/services/local/app_database.dart';
 import '../../router.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -35,6 +38,15 @@ class SyncScreen extends StatelessWidget {
     final isOffline = context.watch<ConnectivityService>().isOffline;
     final now = (clock ?? DateTime.now)();
     final queue = sync.queue;
+    final tablet = context.isTablet;
+    final content = Column(
+      children: [
+        _buildHeader(sync, now, tablet: tablet),
+        Expanded(
+          child: _buildList(context, sync, queue, isOffline, now, tablet: tablet),
+        ),
+      ],
+    );
 
     // É uma aba, não uma tela empilhada: o voltar do Android leva para
     // Sessões, em vez de fechar o app.
@@ -46,49 +58,96 @@ class SyncScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.surface,
         body: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(sync, now),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                  children: [
-                    if (isOffline && queue.isNotEmpty) _buildOfflineCard(queue.length),
-                    if (queue.isEmpty)
-                      _buildEmpty()
-                    else
-                      _buildQueue(context, sync, queue, isOffline, now),
-                    _buildSyncNow(sync, queue, isOffline),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: tablet
+              ? TabletNavFrame(current: AppTab.sync, child: content)
+              : content,
         ),
-        bottomNavigationBar: const AppNavBar(current: AppTab.sync),
+        bottomNavigationBar:
+            tablet ? null : const AppNavBar(current: AppTab.sync),
       ),
     );
   }
 
-  Widget _buildHeader(AssessmentSyncService sync, DateTime now) {
+  /// No tablet (quadros "4j" e "4u"), a fila fica numa coluna de no máximo
+  /// 820 de texto, centrada — os itens trazem os próprios 20 de recuo, por
+  /// isso a coluna tem 860 e nunca menos de 4 de margem (24 no total, o
+  /// recuo do quadro em retrato).
+  static const double _tabletColumnWidth = 860;
+
+  Widget _buildList(
+    BuildContext context,
+    AssessmentSyncService sync,
+    List<LocalAssessment> queue,
+    bool isOffline,
+    DateTime now, {
+    required bool tablet,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = tablet
+            ? math.max(
+                AppSpacing.xs,
+                (constraints.maxWidth - _tabletColumnWidth) / 2,
+              )
+            : 0.0;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            side,
+            tablet ? AppSpacing.xl : AppSpacing.lg,
+            side,
+            tablet ? AppSpacing.xxl + AppSpacing.xs : AppSpacing.lg,
+          ),
+          children: [
+            if (isOffline && queue.isNotEmpty) _buildOfflineCard(queue.length),
+            if (queue.isEmpty)
+              _buildEmpty()
+            else
+              _buildQueue(context, sync, queue, isOffline, now),
+            _buildSyncNow(sync, queue, isOffline),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Tablet: 14 em cima e embaixo, 24 dos lados, título de 24 e linha de
+  /// 13,5 (quadros "4j" e "4u").
+  Widget _buildHeader(
+    AssessmentSyncService sync,
+    DateTime now, {
+    required bool tablet,
+  }) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm + 2,
-      ),
+      padding: tablet
+          ? const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+              vertical: AppSpacing.md + 2,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.sm,
+              AppSpacing.sm,
+              AppSpacing.sm + 2,
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Sincronizar', style: AppTypography.screenTitle),
+          Text(
+            'Sincronizar',
+            style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
+          ),
           const SizedBox(height: AppSpacing.xxs),
-          Text(lastSyncLabel(sync.lastSyncedAt, now), style: AppTypography.screenSubtitle),
+          Text(
+            lastSyncLabel(sync.lastSyncedAt, now),
+            style: tablet
+                ? AppTypography.screenSubtitleTablet
+                : AppTypography.screenSubtitle,
+          ),
         ],
       ),
     );

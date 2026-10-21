@@ -8,6 +8,9 @@ import 'package:simtc/data/services/assessment_sync_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
+import 'package:simtc/ui/core/form_factor.dart';
+import 'package:simtc/ui/core/theme/app_typography.dart';
+import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/sync/sync_screen.dart';
 
@@ -40,8 +43,10 @@ void main() {
     List<LocalAssessment> queue = const [],
     Set<String> sendingIds = const {},
     DateTime? lastSyncedAt,
+    Size size = const Size(420, 1600),
+    FormFactor formFactor = FormFactor.phone,
   }) async {
-    tester.view.physicalSize = const Size(420, 1600);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -72,7 +77,10 @@ void main() {
           ChangeNotifierProvider<AssessmentSyncService>.value(value: sync),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: FormFactorScope(
+          formFactor: formFactor,
+          child: MaterialApp.router(routerConfig: router),
+        ),
       ),
     );
     await tester.pump();
@@ -348,5 +356,74 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('home'), findsOneWidget);
+  });
+
+  group('tablet', () {
+    PillNavBar navBar(WidgetTester tester) =>
+        tester.widget<PillNavBar>(find.byType(PillNavBar));
+    Rect item(WidgetTester tester, String id) =>
+        tester.getRect(find.byKey(ValueKey('sync-item-$id')));
+
+    testWidgets('paisagem (quadro "4j"): navbar na lateral e a fila numa '
+        'coluna de 860 centrada à direita dela', (tester) async {
+      await pump(
+        tester,
+        queue: filaDoCanvas(),
+        size: const Size(1280, 800),
+        formFactor: FormFactor.tablet,
+      );
+
+      expect(navBar(tester).layout, PillNavLayout.rail);
+      final id = filaDoCanvas().first.id;
+      expect(item(tester, id).width, 860);
+      expect(item(tester, id).center.dx, 116 + (1280 - 116) / 2);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('retrato (quadro "4u"): pílula na base e a fila com 24 de '
+        'recuo do texto', (tester) async {
+      await pump(
+        tester,
+        queue: filaDoCanvas(),
+        size: const Size(800, 1280),
+        formFactor: FormFactor.tablet,
+      );
+
+      expect(navBar(tester).layout, PillNavLayout.tabletBottom);
+      final id = filaDoCanvas().first.id;
+      expect(item(tester, id).left, 4);
+      expect(item(tester, id).right, 796);
+      final title = find.descendant(
+        of: find.byKey(ValueKey('sync-item-$id')),
+        matching: find.byType(Text),
+      );
+      expect(tester.getRect(title.first).left, 24);
+    });
+
+    testWidgets('cabeçalho com título de 24 e 24 de recuo', (tester) async {
+      await pump(
+        tester,
+        size: const Size(800, 1280),
+        formFactor: FormFactor.tablet,
+      );
+
+      final title = find.text('Sincronizar').first;
+      expect(tester.widget<Text>(title).style!.fontSize,
+          AppTypography.homeTitle.fontSize);
+      expect(tester.getRect(title).left, 24);
+    });
+
+    testWidgets('"Sessões" na pílula leva para a Home', (tester) async {
+      await pump(
+        tester,
+        size: const Size(800, 1280),
+        formFactor: FormFactor.tablet,
+      );
+
+      await tester.tap(find.text('Sessões'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('home'), findsOneWidget);
+    });
   });
 }

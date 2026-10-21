@@ -56,6 +56,10 @@ abstract final class AppTypography {
   static TextStyle get screenSubtitle =>
       _inter(size: 13, weight: FontWeight.w400, height: 1.2, color: AppColors.text3);
 
+  /// A mesma linha na aba Sincronizar do tablet (quadros "4j" e "4u")
+  static TextStyle get screenSubtitleTablet =>
+      _inter(size: 13.5, weight: FontWeight.w400, height: 1.2, color: AppColors.text3);
+
   /// Título do cartão âmbar da fila sem rede ("3 avaliações na fila")
   static TextStyle get queueNoticeTitle =>
       _inter(size: 16, weight: FontWeight.w600, height: 1.25, color: AppColors.noteCommentInk);
