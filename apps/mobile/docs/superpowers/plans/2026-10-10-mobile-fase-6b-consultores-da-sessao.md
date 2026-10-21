@@ -14400,7 +14400,9 @@ Visual (ver "Ajustes feitos ao preparar o plano"):
 
 **Não verificável neste aparelho, e por quê:** dois toques rápidos e o voltar com o envio no ar dependem de uma resposta lenta que a rede local não dá — ficam cobertos pelos testes das Tasks 7, 8 e 10; a recusa do servidor com a tela aberta (alguém conclui a sessão, ou desativa o consultor, entre abrir a tela e tocar no botão) depende de coordenar dois aparelhos no mesmo segundo — Task 7; o limite de 8 segundos da consulta de CPF só aparece com o servidor lento — Task 13; o reenvio de uma avaliação já aceita cuja resposta se perdeu não tem como ser provocado pela interface — Task 3; a tela de Consultores aberta por quem não é ADMIN não tem caminho pela interface — Tasks 7 e 8; e dois ADMINs mexendo nos consultores ao mesmo tempo — Task 1 (um consultor por chamada).
 
-- [ ] **Step 4: Registrar o resultado**
+- [x] **Step 4: Registrar o resultado**
+
+**Validado em 21/10/2026, no aparelho físico, pelo usuário: o roteiro passou inteiro. As quatro decisões visuais em aberto da 6A seguem em aberto. Aval dado para planejar a Fase 7.**
 
 Se tudo passar, avisar o usuário e pedir o aval para planejar a Fase 7. Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio ou de contrato do backend, parar e perguntar.
 
