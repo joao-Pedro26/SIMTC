@@ -139,6 +139,9 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   // Gestão de colaboradores
   const [consultorToAdd, setConsultorToAdd] = useState('')
   const [consultorBusy, setConsultorBusy] = useState(false)
+  const [consultorToRemove, setConsultorToRemove] = useState<
+    { id: string; name: string; inProgress: BackendParticipant[] } | null
+  >(null)
 
   // Adicionar participante
   const [showAddParticipant, setShowAddParticipant] = useState(false)
@@ -229,7 +232,24 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
     }
   }
 
+  /**
+   * Tirar um consultor da sessão libera, no backend, quem estava em avaliação
+   * com ele (volta para Pendente, ou para o status da nota anterior). Nesse
+   * caso, confirma antes, como o app faz.
+   */
+  function requestRemoveConsultor(id: string, name: string) {
+    const inProgress = (session?.participants ?? []).filter(
+      (p) => p.status === 'EM_AVALIACAO' && p.assignedConsultantId === id,
+    )
+    if (inProgress.length === 0) {
+      void handleRemoveConsultor(id)
+      return
+    }
+    setConsultorToRemove({ id, name, inProgress })
+  }
+
   async function handleRemoveConsultor(id: string) {
+    setConsultorToRemove(null)
     if (!session) return
     setConsultorBusy(true)
     setSaveError('')
@@ -531,7 +551,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                         {isAdmin && session.status !== 'CONCLUIDO' && session.status !== 'CANCELADO' && (
                           <button
                             className={styles.collaboratorRemove}
-                            onClick={() => handleRemoveConsultor(sc.consultant.id)}
+                            onClick={() => requestRemoveConsultor(sc.consultant.id, sc.consultant.name)}
                             disabled={consultorBusy}
                             title="Remover colaborador"
                           >
@@ -702,6 +722,40 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           onClose={() => { setAssessmentOpen(false); setAssessmentParticipant(null) }}
           onSaved={handleAssessmentSaved}
         />
+      )}
+
+      {/* Confirmação: tirar da sessão um consultor com avaliação em andamento */}
+      {consultorToRemove && (
+        <div className={styles.completeOverlay} role="dialog" aria-modal="true" aria-labelledby="remove-consultor-title">
+          <div className={styles.completeDialog}>
+            <p id="remove-consultor-title" className={styles.completeDialogTitle}>
+              Remover {consultorToRemove.name} da sessão?
+            </p>
+            <p className={styles.completeDialogBody}>
+              {consultorToRemove.inProgress.length === 1
+                ? `Tem 1 avaliação em andamento. Remover devolve ${consultorToRemove.inProgress[0].participant.name} para ${
+                    consultorToRemove.inProgress[0].assessment != null ? 'Não recomendado' : 'Pendente'
+                  }.`
+                : `Tem ${consultorToRemove.inProgress.length} avaliações em andamento. Remover libera esses participantes para outro consultor.`}
+            </p>
+            <div className={styles.completeDialogActions}>
+              <button
+                className={styles.completeDialogKeep}
+                onClick={() => setConsultorToRemove(null)}
+                disabled={consultorBusy}
+              >
+                Voltar
+              </button>
+              <button
+                className={styles.completeDialogConfirm}
+                onClick={() => handleRemoveConsultor(consultorToRemove.id)}
+                disabled={consultorBusy}
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Confirmação: concluir treinamento (mensagem varia conforme haja ou não participante não aprovado) */}
