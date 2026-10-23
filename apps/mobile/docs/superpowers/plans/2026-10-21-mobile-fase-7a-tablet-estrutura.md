@@ -4681,6 +4681,8 @@ git commit -m "docs(mobile): registra a validacao da fase 7a no emulador e no ap
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
 
+**Validado em 23/10/2026: tablet no emulador e celular no aparelho físico; roteiro inteiro passou. Aval dado para planejar a 7B.**
+
 ---
 
 ## Pendências levadas para a 7B e a 8
