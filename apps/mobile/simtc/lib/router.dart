@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/repositories/auth_repository.dart';
 import 'ui/add_participant/add_participant_screen.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/checklist/checklist_screen.dart';
+import 'ui/core/form_factor.dart';
 import 'ui/debug/ds_gallery_screen.dart';
 import 'ui/result/result_screen.dart';
 import 'ui/session_consultants/session_consultants_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
 import 'ui/session_edit/session_edit_screen.dart';
 import 'ui/sessions/sessions_screen.dart';
+import 'ui/sessions/sessions_split_view.dart';
 import 'ui/splash/splash_screen.dart';
 import 'ui/summary/summary_screen.dart';
 import 'ui/sync/sync_screen.dart';
@@ -64,6 +67,27 @@ abstract final class AppRoutes {
       '${justConfirmed ? '?confirmada=1' : ''}';
 }
 
+/// No tablet, `/home` e `/sessions/:id` são a mesma página (a lista e o
+/// detalhe juntos, `SessionsSplitView`): a chave igual faz o `Navigator`
+/// atualizar a página em vez de trocar uma por outra, e o estado de lista e
+/// detalhe atravessa a troca de rota e o giro do aparelho.
+const ValueKey<String> _sessionsSplitPageKey = ValueKey('sessions-split');
+
+Page<void> _sessionsPage(
+  BuildContext context,
+  GoRouterState state, {
+  required Widget phone,
+  String? selectedSessionId,
+}) {
+  if (FormFactorScope.of(context) == FormFactor.tablet) {
+    return NoTransitionPage<void>(
+      key: _sessionsSplitPageKey,
+      child: SessionsSplitView(selectedSessionId: selectedSessionId),
+    );
+  }
+  return MaterialPage<void>(key: state.pageKey, child: phone);
+}
+
 /// Rotas do app. O redirecionamento observa o `AuthRepository`: entrar ou sair
 /// da sessão troca a tela sem nenhuma navegação manual espalhada pelo código.
 ///
@@ -87,7 +111,8 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: AppRoutes.home,
-        builder: (context, state) => const SessionsScreen(),
+        pageBuilder: (context, state) =>
+            _sessionsPage(context, state, phone: const SessionsScreen()),
       ),
       GoRoute(
         path: AppRoutes.sync,
@@ -95,9 +120,15 @@ GoRouter createRouter(
       ),
       GoRoute(
         path: '/sessions/:sessionId',
-        builder: (context, state) => SessionDetailScreen(
-          sessionId: state.pathParameters['sessionId']!,
-        ),
+        pageBuilder: (context, state) {
+          final sessionId = state.pathParameters['sessionId']!;
+          return _sessionsPage(
+            context,
+            state,
+            phone: SessionDetailScreen(sessionId: sessionId),
+            selectedSessionId: sessionId,
+          );
+        },
         routes: [
           GoRoute(
             path: 'edit',
