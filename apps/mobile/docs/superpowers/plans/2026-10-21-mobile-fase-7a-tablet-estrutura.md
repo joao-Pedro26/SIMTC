@@ -4659,6 +4659,10 @@ Com um usuário CONSULTANT que tenha sessões de hoje, e depois com um ADMIN:
 9. **Sem conexão** (desligar a rede do emulador): a faixa de aviso nos dois painéis; as ações de ADMIN apagadas, com o motivo.
 10. **Tela dividida:** abrir o app junto com outro app em tela dividida (botão de apps recentes → ícone do app → "Dividir tela"): o app continua funcionando, numa tela por vez, sem travar em retrato.
 
+11. **Abrir a frio já deitado** (fechar o app, girar o emulador para paisagem e abrir): ele abre como tablet, com a navbar lateral, e gira. Se abrir como celular (travado em retrato, pílula do celular), parar: o formato é lido antes do primeiro quadro (`lib/main.dart`), e a correção é uma guarda ali.
+12. **Nome de empresa longo** no painel de paisagem: o nome quebra de linha sem empurrar o progresso para fora.
+13. **Navegação do sistema:** em retrato, a pílula não fica cortada nem sobreposta à barra do Android, com navegação por gestos e com os 3 botões (Configurações → Sistema → Navegação).
+14. **TalkBack** (opcional): o card da sessão aberta é anunciado como selecionado.
 - [ ] **Step 4: Roteiro no celular (aparelho físico)**
 
 Instalar no celular de sempre (`flutter run -d <id do celular>`, como nas fases anteriores) e conferir:
