@@ -1,26 +1,17 @@
 /// Configuração de ambiente, resolvida em tempo de compilação.
 ///
-/// Desenvolvimento (padrão): o app fala com o backend rodando no PC, alcançado
-/// pelo aparelho via `adb reverse tcp:3001` (ver README).
-///
-/// Produção:
+/// Padrão: a API de produção, também no `flutter run` — por enquanto ela é um
+/// ambiente de teste (decisão de 24/10/2026). Para falar com o backend do PC,
+/// alcançado pelo aparelho via `adb reverse tcp:3001` (ver README):
 /// ```
-/// flutter build apk --release \
-///   --dart-define=API_BASE_URL=https://api.simtc.com.br/api \
-///   --dart-define=APP_ENV=prod
+/// flutter run --dart-define=API_BASE_URL=http://localhost:3001/api
 /// ```
+/// Trocar de endereço apaga os dados do aparelho na abertura seguinte (ver
+/// `DeviceDataService.resetIfServerChanged`).
 abstract final class AppConfig {
   /// URL base da API, sempre sem barra no final.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3001/api',
+    defaultValue: 'https://api.simtc.com.br/api',
   );
-
-  /// Nome do ambiente: `dev` ou `prod`.
-  static const String environment = String.fromEnvironment(
-    'APP_ENV',
-    defaultValue: 'dev',
-  );
-
-  static bool get isProduction => environment == 'prod';
 }

@@ -109,6 +109,44 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// "Limpar cache local" do Perfil (Fase 8A): apaga o que foi baixado do
+  /// servidor — sessões, participantes, consultores e catálogo —, sem tocar
+  /// na fila nem nos rascunhos.
+  Future<void> clearDownloadedData() {
+    return transaction(() async {
+      await delete(sessionConsultants).go();
+      await delete(participants).go();
+      await delete(sessions).go();
+      // Notas antes das infrações, e infrações antes das categorias: a mesma
+      // ordem das chaves estrangeiras.
+      await delete(infractionNotes).go();
+      await delete(infractions).go();
+      await delete(assessmentCategories).go();
+    });
+  }
+
+  /// Apaga tudo, inclusive a fila e os rascunhos: a troca de servidor
+  /// (decisão de 24/10/2026, ver `DeviceDataService.resetIfServerChanged`).
+  Future<void> clearAll() {
+    return transaction(() async {
+      await delete(localAssessmentItems).go();
+      await delete(localAssessments).go();
+      await clearDownloadedData();
+    });
+  }
+
+  /// O espaço que o banco ocupa, em bytes, sem as páginas livres: depois de
+  /// um [clearDownloadedData], o número cai sem precisar de `VACUUM`.
+  Future<int> usedBytes() async {
+    Future<int> pragma(String name) async {
+      final row = await customSelect('PRAGMA $name').getSingle();
+      return row.read<int>(name);
+    }
+
+    final pages = await pragma('page_count') - await pragma('freelist_count');
+    return pages * await pragma('page_size');
+  }
+
   /// Troca os consultores de uma sessão no cache pelos de [rows] (Fase 6B).
   ///
   /// Tem transação própria, e entra na de quem chama quando há uma aberta: o

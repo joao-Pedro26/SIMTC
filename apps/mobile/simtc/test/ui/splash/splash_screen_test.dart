@@ -6,18 +6,25 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/repositories/auth_repository.dart';
+import 'package:simtc/data/services/device_data_service.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/splash/splash_screen.dart';
 import 'package:simtc/utils/result.dart';
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
+class _MockDeviceData extends Mock implements DeviceDataService {}
+
 void main() {
   late _MockAuthRepository auth;
+  late _MockDeviceData deviceData;
   late Completer<Result<AuthUser>> restore;
 
   setUp(() {
     auth = _MockAuthRepository();
+    deviceData = _MockDeviceData();
+    when(() => deviceData.resetIfServerChanged(any()))
+        .thenAnswer((_) async => false);
     // A retomada fica no ar: a abertura não sai da tela durante o teste.
     restore = Completer<Result<AuthUser>>();
     when(auth.restoreSession).thenAnswer((_) => restore.future);
@@ -33,8 +40,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      ChangeNotifierProvider<AuthRepository>.value(
-        value: auth,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          Provider<DeviceDataService>.value(value: deviceData),
+        ],
         child: FormFactorScope(
           formFactor: formFactor,
           child: const MaterialApp(home: SplashScreen()),

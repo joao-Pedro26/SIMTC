@@ -14,6 +14,7 @@ import 'data/services/api/api_client.dart';
 import 'data/services/assessment_sync_service.dart';
 import 'data/services/auth_session.dart';
 import 'data/services/connectivity_service.dart';
+import 'data/services/device_data_service.dart';
 import 'data/services/local/app_database.dart';
 import 'data/services/local/token_storage.dart';
 
@@ -36,6 +37,7 @@ class AppDependencies {
     required this.assessmentRepository,
     required this.connectivityService,
     required this.assessmentSyncService,
+    required this.deviceDataService,
   });
 
   factory AppDependencies.create({required AppDatabase database}) {
@@ -106,6 +108,10 @@ class AppDependencies {
       assessmentRepository: assessmentRepository,
       connectivityService: connectivityService,
       assessmentSyncService: assessmentSyncService,
+      deviceDataService: DeviceDataService(
+        database: database,
+        storage: tokenStorage,
+      ),
     );
   }
 
@@ -121,6 +127,7 @@ class AppDependencies {
   final AssessmentRepository assessmentRepository;
   final ConnectivityService connectivityService;
   final AssessmentSyncService assessmentSyncService;
+  final DeviceDataService deviceDataService;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
   ///
@@ -145,6 +152,7 @@ class AppDependencies {
         ChangeNotifierProvider<AssessmentSyncService>.value(
           value: assessmentSyncService,
         ),
+        Provider<DeviceDataService>.value(value: deviceDataService),
       ];
 
   void dispose() {

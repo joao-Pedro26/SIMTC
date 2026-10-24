@@ -17,6 +17,7 @@ class TokenStorage {
   static const String _refreshKey = 'auth.refreshToken';
   static const String _keepSignedInKey = 'auth.keepSignedIn';
   static const String _userKey = 'auth.user';
+  static const String _apiBaseUrlKey = 'app.apiBaseUrl';
 
   Future<String?> readAccess() => _storage.read(key: _accessKey);
 
@@ -46,6 +47,14 @@ class TokenStorage {
     await _storage.delete(key: _refreshKey);
     await _storage.delete(key: _userKey);
   }
+
+  /// O endereço da API com que o app falou na última abertura (ver
+  /// `DeviceDataService.resetIfServerChanged`). Fica fora do [clear]: sair da
+  /// conta não muda de servidor.
+  Future<String?> readApiBaseUrl() => _storage.read(key: _apiBaseUrlKey);
+
+  Future<void> saveApiBaseUrl(String url) =>
+      _storage.write(key: _apiBaseUrlKey, value: url);
 
   /// Padrão: manter conectado (app de campo, usado várias vezes por dia).
   Future<bool> readKeepSignedIn() async {

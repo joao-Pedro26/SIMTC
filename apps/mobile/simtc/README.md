@@ -23,14 +23,16 @@ dart run build_runner build --delete-conflicting-outputs   # depois de mudar tab
 
 ## Ambientes
 
-A URL da API é resolvida em tempo de compilação por `--dart-define`:
+A URL da API é resolvida em tempo de compilação por `--dart-define`. Desde a Fase 8A (24/10/2026) o padrão é a API de produção, que por enquanto é um ambiente de teste:
 
 | Ambiente | Comando | URL |
 |---|---|---|
-| Desenvolvimento (padrão) | `flutter run -d <ID>` | `http://localhost:3001/api` (backend do PC, via `adb reverse`) |
-| Produção | `flutter build apk --release --dart-define=API_BASE_URL=https://api.simtc.com.br/api --dart-define=APP_ENV=prod` | `https://api.simtc.com.br/api` |
+| Produção (padrão) | `flutter run -d <ID>` ou `flutter build apk --release` | `https://api.simtc.com.br/api` |
+| Backend do PC | `flutter run -d <ID> --dart-define=API_BASE_URL=http://localhost:3001/api` (com o `adb reverse` abaixo) | `http://localhost:3001/api` |
 
-Sem `--dart-define`, o app sempre aponta para o backend local — nenhuma build de desenvolvimento fala com produção por engano.
+**Trocar de endereço apaga os dados do aparelho.** Na abertura, o app compara o endereço da API com o da abertura anterior; se for outro, apaga sessões, catálogo, fila, rascunhos, logos e o login, e pede para entrar de novo. Sem isso, uma avaliação feita contra um servidor seria enviada ao outro. A primeira abertura depois da Fase 8A também passa por essa limpeza.
+
+O APK de release continua assinado com a chave de debug enquanto o app não for distribuído: assim o `flutter run` e o APK instalam um por cima do outro, sem desinstalar (e sem perder a fila).
 
 ## Rodar no aparelho via USB
 
@@ -80,7 +82,7 @@ adb -s <ID_DO_APARELHO> reverse tcp:3001 tcp:3001
 adb -s <ID_DO_APARELHO> reverse --list    # deve listar tcp:3001 tcp:3001
 ```
 
-Com isso, `http://localhost:3001/api` **no aparelho** chega ao backend do PC. Para um teste rápido, abra `http://localhost:3001/docs` no Chrome do aparelho: deve aparecer o Swagger da API.
+Com isso, `http://localhost:3001/api` **no aparelho** chega ao backend do PC (só para quem roda com o `--dart-define` do backend do PC, ver "Ambientes"). Para um teste rápido, abra `http://localhost:3001/docs` no Chrome do aparelho: deve aparecer o Swagger da API.
 
 - O redirecionamento some quando o aparelho desconecta do `adb`. Rode o `reverse` de novo depois de reconectar.
 - O redirecionamento é por conexão, não por aparelho: ao passar do cabo para o Wi-Fi, refaça o `reverse` usando o id novo (`<IP>:5555`). Funciona igual nos dois casos.

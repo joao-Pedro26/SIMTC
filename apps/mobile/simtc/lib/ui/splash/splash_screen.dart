@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/device_data_service.dart';
 import '../../router.dart';
 import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
@@ -28,6 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _decide() async {
     final viewModel = SplashViewModel(
       authRepository: context.read<AuthRepository>(),
+      deviceData: context.read<DeviceDataService>(),
     );
 
     var isSignedIn = false;

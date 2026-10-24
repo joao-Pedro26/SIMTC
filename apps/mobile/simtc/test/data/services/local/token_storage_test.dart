@@ -20,6 +20,28 @@ void main() {
     verify(() => secure.delete(key: 'auth.user')).called(1);
   });
 
+  test(
+      'o endereço da API tem chave própria, que o clear não apaga — sair da '
+      'conta não muda de servidor', () async {
+    final secure = _MockSecureStorage();
+    when(() => secure.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+    when(() => secure.write(key: any(named: 'key'), value: any(named: 'value')))
+        .thenAnswer((_) async {});
+    when(() => secure.read(key: 'app.apiBaseUrl'))
+        .thenAnswer((_) async => 'https://api.simtc.com.br/api');
+    final storage = TokenStorage(storage: secure);
+
+    await storage.saveApiBaseUrl('https://api.simtc.com.br/api');
+    expect(await storage.readApiBaseUrl(), 'https://api.simtc.com.br/api');
+    await storage.clear();
+
+    verify(() => secure.write(
+          key: 'app.apiBaseUrl',
+          value: 'https://api.simtc.com.br/api',
+        )).called(1);
+    verifyNever(() => secure.delete(key: 'app.apiBaseUrl'));
+  });
+
   test('deleteUser apaga só o perfil salvo, sem mexer nos tokens', () async {
     final secure = _MockSecureStorage();
     when(() => secure.delete(key: any(named: 'key'))).thenAnswer((_) async {});
