@@ -66,7 +66,8 @@ class AssessmentSyncService extends ChangeNotifier {
     required String? Function() currentUserId,
     DateTime Function()? now,
     this.retryDelays = defaultRetryDelays,
-  })  : _api = apiClient,
+  })  : assert(retryDelays.isNotEmpty, 'retryDelays não pode ser vazia'),
+        _api = apiClient,
         _assessments = assessments,
         _participants = participants,
         _connectivity = connectivity,
@@ -109,6 +110,9 @@ class AssessmentSyncService extends ChangeNotifier {
   bool _disposed = false;
   String? _userId;
   int _failures = 0;
+
+  /// A rodada de envio no ar, com as repetições pedidas no meio dela
+  /// ([_again]): quem chama [syncNow] durante uma rodada espera até a última.
   Future<void>? _running;
   bool _again = false;
 
@@ -182,16 +186,32 @@ class AssessmentSyncService extends ChangeNotifier {
   }
 
   Future<void> _follow(String userId) async {
-    await _assessments.claimUnowned(userId);
+    try {
+      await _assessments.claimUnowned(userId);
+    } catch (error) {
+      // Uma falha do banco ao dar dono às avaliações antigas (da Fase 4) não
+      // pode deixar a fila sem ser seguida: a aba diria "Tudo o que você
+      // confirmou já chegou ao servidor" com a fila cheia. As sem dono ficam
+      // para a próxima entrada.
+      debugPrint('Não foi possível dar dono às avaliações antigas: $error');
+    }
     if (_disposed || _userId != userId) return;
 
     _firstQueueEmission = true;
-    _queueSubscription = _assessments.watchQueue(userId).listen(_onQueue);
-    _lastSyncedSubscription =
-        _assessments.watchLastSyncedAt(userId).listen((at) {
-      _lastSyncedAt = at;
-      notifyListeners();
-    });
+    // Com `onError`, um erro numa leitura não derruba a assinatura: a
+    // próxima mudança na fila chega normalmente.
+    _queueSubscription = _assessments.watchQueue(userId).listen(
+          _onQueue,
+          onError: (Object error) => debugPrint('Leitura da fila falhou: $error'),
+        );
+    _lastSyncedSubscription = _assessments.watchLastSyncedAt(userId).listen(
+      (at) {
+        _lastSyncedAt = at;
+        notifyListeners();
+      },
+      onError: (Object error) =>
+          debugPrint('Leitura da última sincronização falhou: $error'),
+    );
   }
 
   void _onQueue(List<LocalAssessment> queue) {
@@ -231,9 +251,10 @@ class AssessmentSyncService extends ChangeNotifier {
 
   /// Envia a fila agora, sem esperar a próxima tentativa. Sem rede, não tenta:
   /// a volta da rede chama de novo. Com um envio já no ar, repete no fim
-  /// dele, para levar o que entrou na fila no meio do caminho.
-  Future<void> syncNow() async {
-    if (_disposed) return;
+  /// dele, para levar o que entrou na fila no meio do caminho — e quem chamou
+  /// espera até essa repetição terminar.
+  Future<void> syncNow() {
+    if (_disposed) return Future<void>.value();
 
     final running = _running;
     if (running != null) {
@@ -241,25 +262,31 @@ class AssessmentSyncService extends ChangeNotifier {
       return running;
     }
 
-    final sending = _sendQueue();
-    _running = sending;
+    final round = _runRounds();
+    _running = round;
     notifyListeners();
+    return round;
+  }
+
+  Future<void> _runRounds() async {
     try {
-      await sending;
-    } catch (error) {
-      // Rede de segurança: os erros esperados já viram motivo na fila. Um
-      // erro inesperado (do banco, por exemplo) não pode travar o envio.
-      debugPrint('Envio da fila falhou: $error');
-      _scheduleRetry();
+      do {
+        _again = false;
+        try {
+          await _sendQueue();
+        } catch (error) {
+          // Rede de segurança: os erros esperados já viram motivo na fila. Um
+          // erro inesperado (do banco, por exemplo) não pode travar o envio.
+          debugPrint('Envio da fila falhou: $error');
+          _scheduleRetry();
+        } finally {
+          _sendingIds = const {};
+          notifyListeners();
+        }
+      } while (_again && !_disposed);
     } finally {
       _running = null;
-      _sendingIds = const {};
       notifyListeners();
-    }
-
-    if (_again && !_disposed) {
-      _again = false;
-      await syncNow();
     }
   }
 
@@ -285,6 +312,10 @@ class AssessmentSyncService extends ChangeNotifier {
     final results = <String, String?>{};
     try {
       final payload = await _assessments.syncPayload(batch);
+      // Quem saiu (e quem entrou) no meio da montagem do lote: o POST levaria
+      // o token de quem está logado agora, com a fila de quem saiu — e o
+      // servidor recusaria tudo como "não está mais com você".
+      if (_userId != userId) return;
       final response = await _api.post<List<dynamic>>(syncPath, data: payload);
       final outcome = _outcomeByParticipant(response.data);
       for (final assessment in batch) {
@@ -293,9 +324,14 @@ class AssessmentSyncService extends ChangeNotifier {
             outcome.containsKey(id) ? outcome[id] : SendFailure.refused;
       }
     } on ApiException catch (error) {
-      // Sessão encerrada no meio do envio: nada falhou por culpa da
-      // avaliação. A fila espera o dono entrar de novo.
-      if (error.statusCode == 401) return;
+      // 401: nada falhou por culpa da avaliação, e a fila não ganha erro. Se
+      // a sessão acabou de vez, o usuário já saiu (o `ApiClient` avisou) e a
+      // fila espera o dono entrar de novo. Se ele continua logado (a
+      // renovação passou e o servidor recusou de novo), tenta mais tarde.
+      if (error.statusCode == 401) {
+        if (_userId == userId) _scheduleRetry();
+        return;
+      }
       final reason = _reasonFor(error);
       for (final assessment in batch) {
         results[assessment.id] = reason;

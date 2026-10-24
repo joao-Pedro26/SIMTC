@@ -22,6 +22,40 @@ class _MockParticipantRepository extends Mock implements ParticipantRepository {
 
 class _MockConnectivity extends Mock implements Connectivity {}
 
+/// O repositório de verdade, com uma falha ao entrar: o `claimUnowned` e a
+/// primeira leitura da fila podem quebrar (erro do banco local).
+class _FailingEntryRepository extends AssessmentRepository {
+  _FailingEntryRepository({
+    required super.database,
+    this.failClaim = false,
+    this.failFirstQueueRead = false,
+  });
+
+  final bool failClaim;
+  final bool failFirstQueueRead;
+
+  @override
+  Future<void> claimUnowned(String ownerUserId) async {
+    if (failClaim) throw Exception('disco cheio');
+    return super.claimUnowned(ownerUserId);
+  }
+
+  @override
+  Stream<List<LocalAssessment>> watchQueue(String ownerUserId) {
+    final real = super.watchQueue(ownerUserId);
+    if (!failFirstQueueRead) return real;
+    return Stream<List<LocalAssessment>>.multi((controller) {
+      controller.addError(Exception('leitura falhou'));
+      final subscription = real.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
+  }
+}
+
 void main() {
   late AppDatabase db;
   late AssessmentRepository assessments;
@@ -117,10 +151,11 @@ void main() {
 
   AssessmentSyncService startService({
     List<Duration> retryDelays = const [Duration(hours: 1)],
+    AssessmentRepository? repository,
   }) {
     final started = AssessmentSyncService(
       apiClient: api,
-      assessments: assessments,
+      assessments: repository ?? assessments,
       participants: participants,
       connectivity: connectivity,
       authChanges: user,
@@ -296,6 +331,76 @@ void main() {
     expect((await row(a.id)).lastError, isNull);
   });
 
+  test(
+      '401 com o usuário ainda logado (a renovação passou e o servidor recusou '
+      'de novo) tenta mais tarde, sem esperar outro gatilho', () async {
+    failWith(const ApiException(message: 'Unauthorized', statusCode: 401));
+    startService(retryDelays: const [Duration(milliseconds: 20)]);
+
+    final a = await confirmed('tp-1');
+    await until(() => sent.length >= 2);
+
+    expect(await statusOf(a.id), LocalSyncStatus.pendingSync);
+    expect((await row(a.id)).lastError, isNull);
+  });
+
+  test(
+      'trocar de usuário com o envio a caminho não manda a fila de quem saiu '
+      'no nome de quem entrou', () async {
+    failWith(semRede);
+    final sync = startService();
+    final a = await confirmed('tp-1');
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.error);
+    acceptAll();
+    sent.clear();
+
+    final sending = sync.syncNow();
+    user.value = 'user-2';
+    await sending;
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(sent, isEmpty);
+    expect(await statusOf(a.id), LocalSyncStatus.error);
+  });
+
+  test('uma falha ao entrar (dar dono às avaliações antigas) não impede '
+      'seguir a fila', () async {
+    final sync = startService(
+      repository: _FailingEntryRepository(database: db, failClaim: true),
+    );
+
+    final a = await confirmed('tp-1');
+
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+    expect(sync.queue, isEmpty);
+  });
+
+  test('uma leitura da fila que falha não para de seguir a fila', () async {
+    final sync = startService(
+      repository: _FailingEntryRepository(database: db, failFirstQueueRead: true),
+    );
+    failWith(semRede);
+
+    await confirmed('tp-1');
+
+    await until(() => sync.queue.length == 1);
+  });
+
+  test('a espera entre tentativas não pode ser uma lista vazia', () {
+    expect(
+      () => AssessmentSyncService(
+        apiClient: api,
+        assessments: assessments,
+        participants: participants,
+        connectivity: connectivity,
+        authChanges: user,
+        currentUserId: () => user.value,
+        retryDelays: const [],
+      ),
+      throwsAssertionError,
+    );
+  });
+
   test('"Sincronizar agora" não espera a próxima tentativa', () async {
     failWith(semRede);
     final sync = startService(retryDelays: const [Duration(hours: 1)]);
@@ -353,6 +458,30 @@ void main() {
     expect(sent, hasLength(2));
     expect(sent[1].map((p) => p['trainingParticipantId']), ['tp-2']);
     await until(() => !sync.isSending);
+  });
+
+  test(
+      'quem espera o "Sincronizar agora" com um envio no ar espera também a '
+      'rodada repetida', () async {
+    final gate = Completer<void>();
+    when(() => api.post<List<dynamic>>(any(), data: any(named: 'data')))
+        .thenAnswer((invocation) async {
+      final payload = payloadOf(invocation);
+      sent.add(payload);
+      if (sent.length == 1) await gate.future;
+      return reply(payload, (_) => null);
+    });
+    final sync = startService();
+    await confirmed('tp-1');
+    await until(() => sent.length == 1);
+    final second = await confirmed('tp-2');
+
+    final done = sync.syncNow();
+    gate.complete();
+    await done;
+
+    expect(await statusOf(second.id), LocalSyncStatus.synced);
+    expect(sync.isSending, isFalse);
   });
 
   test('"Descartar" apaga a avaliação que o servidor recusou e tira da fila',
