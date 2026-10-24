@@ -265,17 +265,19 @@ class _SessionsScreenState extends State<SessionsScreen> {
       ],
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: SafeArea(
-        bottom: tabletPortrait,
-        child: tabletPortrait
-            ? TabletNavFrame(current: AppTab.sessions, child: content)
-            : content,
+    return TabSnackBarArea(
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          bottom: tabletPortrait,
+          child: tabletPortrait
+              ? TabletNavFrame(current: AppTab.sessions, child: content)
+              : content,
+        ),
+        bottomNavigationBar: context.isTablet
+            ? null
+            : const AppNavBar(current: AppTab.sessions),
       ),
-      bottomNavigationBar: context.isTablet
-          ? null
-          : const AppNavBar(current: AppTab.sessions),
     );
   }
 

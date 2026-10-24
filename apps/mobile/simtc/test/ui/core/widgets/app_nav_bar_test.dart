@@ -142,6 +142,65 @@ void main() {
     });
   });
 
+  group('aviso passageiro (SnackBar)', () {
+    /// Uma aba com a navbar do tablet, mostrando um aviso.
+    Future<void> pumpWithSnackBar(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AssessmentSyncService>.value(
+          value: FakeAssessmentSyncService(),
+          child: FormFactorScope(
+            formFactor: FormFactor.tablet,
+            child: MaterialApp(
+              home: TabSnackBarArea(
+                child: Scaffold(
+                  body: Builder(
+                    builder: (context) => TabletNavFrame(
+                      current: AppTab.sessions,
+                      child: TextButton(
+                        onPressed: () => ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(content: Text('aviso'))),
+                        child: const Text('mostrar'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('mostrar'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('no tablet em retrato, flutua acima da pílula, sem cobri-la',
+        (tester) async {
+      screen(tester, const Size(800, 1280));
+      await pumpWithSnackBar(tester);
+
+      // O corpo do aviso: o `SnackBar` inclui o recuo em volta.
+      final snack = tester.getRect(find
+          .descendant(of: find.byType(SnackBar), matching: find.byType(Material))
+          .first);
+      final bar = tester.getRect(find.byType(PillNavBar));
+      expect(snack.bottom, lessThanOrEqualTo(bar.top - 8));
+      expect(snack.left, 120);
+      expect(snack.right, 800 - 120);
+    });
+
+    testWidgets('em paisagem, com a navbar na lateral, fica embaixo, como sempre',
+        (tester) async {
+      screen(tester, const Size(1280, 800));
+      await pumpWithSnackBar(tester);
+
+      final snack = tester.getRect(find
+          .descendant(of: find.byType(SnackBar), matching: find.byType(Material))
+          .first);
+      expect(snack.bottom, 800);
+      expect(snack.width, 1280);
+    });
+  });
+
   testWidgets('"Perfil" avisa que chega numa próxima versão', (tester) async {
     screen(tester, const Size(1280, 800));
     await pumpFrame(tester);

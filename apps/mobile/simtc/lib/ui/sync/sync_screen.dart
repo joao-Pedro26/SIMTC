@@ -55,15 +55,17 @@ class SyncScreen extends StatelessWidget {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) context.go(AppRoutes.home);
       },
-      child: Scaffold(
-        backgroundColor: AppColors.surface,
-        body: SafeArea(
-          child: tablet
-              ? TabletNavFrame(current: AppTab.sync, child: content)
-              : content,
+      child: TabSnackBarArea(
+        child: Scaffold(
+          backgroundColor: AppColors.surface,
+          body: SafeArea(
+            child: tablet
+                ? TabletNavFrame(current: AppTab.sync, child: content)
+                : content,
+          ),
+          bottomNavigationBar:
+              tablet ? null : const AppNavBar(current: AppTab.sync),
         ),
-        bottomNavigationBar:
-            tablet ? null : const AppNavBar(current: AppTab.sync),
       ),
     );
   }

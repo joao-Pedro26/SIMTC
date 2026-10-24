@@ -12,6 +12,43 @@ import 'pill_nav_bar.dart';
 /// As abas que têm tela. "Perfil" ainda não tem (Fase 8).
 enum AppTab { sessions, sync }
 
+/// Em volta do `Scaffold` de uma aba: no tablet com a pílula na base, o aviso
+/// passageiro (SnackBar) flutua acima dela, em vez de cobri-la (decisão de
+/// 23/10/2026). O `Theme` fica sempre na árvore — girar não pode recriar o
+/// `Scaffold` de dentro.
+class TabSnackBarArea extends StatelessWidget {
+  const TabSnackBarArea({super.key, required this.child});
+
+  final Widget child;
+
+  /// Folga entre o aviso e a pílula.
+  static const double gap = AppSpacing.sm;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (!context.isTablet || context.isExpandedLayout) {
+      return Theme(data: theme, child: child);
+    }
+
+    final side = TabletNavFrame.sideFor(MediaQuery.sizeOf(context).width);
+    return Theme(
+      data: theme.copyWith(
+        snackBarTheme: theme.snackBarTheme.copyWith(
+          behavior: SnackBarBehavior.floating,
+          insetPadding: EdgeInsets.fromLTRB(
+            side,
+            0,
+            side,
+            TabletNavFrame.bottomInset + gap,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 /// A navbar do app, com os três itens e o destino de cada um — a mesma nas
 /// abas Sessões e Sincronizar, em qualquer formato.
 class AppNavBar extends StatelessWidget {
@@ -85,6 +122,11 @@ class TabletNavFrame extends StatelessWidget {
   static const double railLeft = AppSpacing.md + 2;
   static const double bottomSide = 120;
 
+  /// Recuo da pílula às laterais numa janela de [width]: 120, ou os 16 do
+  /// celular numa janela mais estreita que 600 (tela dividida).
+  static double sideFor(double width) =>
+      width >= AppBreakpoints.tabletShortestSide ? bottomSide : AppSpacing.lg;
+
   @override
   Widget build(BuildContext context) {
     if (context.isExpandedLayout) {
@@ -108,10 +150,7 @@ class TabletNavFrame extends StatelessWidget {
       );
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final side = width >= AppBreakpoints.tabletShortestSide
-        ? bottomSide
-        : AppSpacing.lg;
+    final side = sideFor(MediaQuery.sizeOf(context).width);
     return Stack(
       fit: StackFit.expand,
       children: [
