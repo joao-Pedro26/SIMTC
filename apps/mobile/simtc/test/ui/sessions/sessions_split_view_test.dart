@@ -19,8 +19,11 @@ import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
+import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/form_factor.dart';
+import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
@@ -440,6 +443,141 @@ void main() {
       // A tela mostra o que está gravado: a categoria vale 10 (dois itens de
       // até 5), e PM (3) + M (5) deixam 2 — 20%.
       expect(find.text('20,0%'), findsWidgets);
+    });
+  });
+
+  group('janelas de admin', () {
+    setUp(() {
+      when(() => auth.currentUser).thenReturn(const AuthUser(
+        id: 'user-1',
+        name: 'Carla Souza',
+        email: 'carla@simtc.com.br',
+        role: AppUserRole.admin,
+        consultantId: 'c-eu',
+      ));
+    });
+
+    Finder dialog() => find.byKey(const Key('admin-dialog'));
+
+    bool highlighted(WidgetTester tester, String tooltip) => tester
+        .widget<AppIconAction>(find.ancestor(
+          of: find.byTooltip(tooltip),
+          matching: find.byType(AppIconAction),
+        ))
+        .highlighted;
+
+    Finder nameField() => find.descendant(
+          of: find.byKey(const Key('campo-nome')),
+          matching: find.byType(EditableText),
+        );
+
+    testWidgets(
+        'em paisagem, "Adicionar participante" abre numa janela de 560 ancorada '
+        'à direita, por cima do lado a lado, com o botão marcado (quadro "4l")',
+        (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      expect(highlighted(tester, 'Adicionar participante'), isFalse);
+
+      await tester.tap(find.byTooltip('Adicionar participante'));
+      await settle(tester);
+
+      expect(find.byType(AddParticipantScreen), findsOneWidget);
+      final rect = tester.getRect(dialog());
+      expect(rect.width, 560);
+      expect(rect.right, 1280 - 40);
+      expect(rect.top, 80);
+      expect(rect.height, lessThanOrEqualTo(640));
+      expect(find.byType(SessionsScreen), findsOneWidget, reason: 'o lado a lado fica embaixo');
+      expect(find.text('Escolha uma sessão na lista'), findsNothing);
+      expect(highlighted(tester, 'Adicionar participante'), isTrue);
+      expect(find.text('Bracell · Direção Defensiva · ${dayMonthLabel(DateTime.now())}'),
+          findsOneWidget, reason: 'a empresa e a sessão no subtítulo');
+      final cta = find.widgetWithText(AppCtaButton, 'Adicionar participante');
+      expect(tester.getSize(cta).height, 52);
+      expect(tester.getTopRight(cta).dx, rect.right - 24);
+      expect(
+        tester.getCenter(find.text('Salvar e adicionar outro')).dy,
+        tester.getCenter(cta).dy,
+        reason: 'o rodapé é uma linha só',
+      );
+    });
+
+    testWidgets(
+        'em retrato, a janela fica no centro, com 640 de largura (quadro "4w")',
+        (tester) async {
+      await pumpApp(tester, location: AppRoutes.addParticipant('sess-1'), size: _portrait);
+
+      final rect = tester.getRect(dialog());
+      expect(rect.width, 640);
+      expect(rect.center.dx, 400);
+      expect(rect.center.dy, 640);
+    });
+
+    testWidgets(
+        'girar várias vezes com o formulário preenchido não perde o que foi '
+        'digitado', (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Adicionar participante'));
+      await settle(tester);
+      final form = tester.state(find.byType(AddParticipantScreen));
+
+      await tester.enterText(nameField(), 'Fernanda Lopes Meireles');
+      await tester.pump();
+
+      for (final size in [_portrait, _landscape, _portrait, _landscape]) {
+        await rotate(tester, size);
+        expect(identical(tester.state(find.byType(AddParticipantScreen)), form), isTrue,
+            reason: 'a janela não pode ser recriada ao girar');
+        expect(find.text('Fernanda Lopes Meireles'), findsOneWidget);
+      }
+      expect(highlighted(tester, 'Adicionar participante'), isTrue,
+          reason: 'o botão continua marcado depois de girar');
+    });
+
+    testWidgets(
+        'tocar no fundo é o mesmo que o X: com algo preenchido, pergunta antes; '
+        'descartando, a janela fecha e o botão desmarca', (tester) async {
+      final router = await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Adicionar participante'));
+      await settle(tester);
+      await tester.enterText(nameField(), 'Fernanda');
+      await tester.pump();
+
+      await tester.tapAt(const Offset(200, 400));
+      await settle(tester);
+
+      expect(find.text('Descartar o que foi preenchido?'), findsOneWidget);
+      await tester.tap(find.text('Descartar'));
+      await settle(tester);
+
+      expect(dialog(), findsNothing);
+      expect(location(router), AppRoutes.sessionDetail('sess-1'));
+      expect(highlighted(tester, 'Adicionar participante'), isFalse);
+    });
+
+    testWidgets('sem nada preenchido, tocar no fundo fecha a janela', (tester) async {
+      final router = await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Adicionar participante'));
+      await settle(tester);
+
+      await tester.tapAt(const Offset(200, 400));
+      await settle(tester);
+
+      expect(dialog(), findsNothing);
+      expect(location(router), AppRoutes.sessionDetail('sess-1'));
+    });
+
+    testWidgets(
+        'com o teclado aberto em paisagem, a janela encolhe acima dele e nada '
+        'estoura', (tester) async {
+      await pumpApp(tester, location: AppRoutes.addParticipant('sess-1'));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 400);
+      addTearDown(tester.view.resetViewInsets);
+      await settle(tester);
+
+      final rect = tester.getRect(dialog());
+      expect(rect.bottom, lessThanOrEqualTo(800 - 400));
+      expect(tester.takeException(), isNull);
     });
   });
 }

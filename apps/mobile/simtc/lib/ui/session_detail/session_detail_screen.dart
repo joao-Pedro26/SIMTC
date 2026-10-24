@@ -146,6 +146,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       AppIconAction(
         icon: AppIcons.edit,
         tooltip: 'Editar dados do treinamento',
+        highlighted: _openAdmin == _AdminScreen.edit,
         onPressed: _adminActionsEnabled(isOffline) ? _openEdit : null,
       ),
       // Sempre ligado: sem conexão ou com a sessão encerrada, a tela de lá
@@ -153,9 +154,24 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       AppIconAction(
         icon: AppIcons.consultants,
         tooltip: 'Consultores da sessão',
+        highlighted: _openAdmin == _AdminScreen.consultants,
         onPressed: _openConsultants,
       ),
     ];
+  }
+
+  /// A tela de admin aberta a partir deste detalhe. No tablet, ela é uma
+  /// janela por cima, e o botão que a abriu fica marcado (quadros "4l", "4m"
+  /// e "4n").
+  _AdminScreen? _openAdmin;
+
+  Future<T?> _pushAdmin<T>(_AdminScreen screen, String location) async {
+    setState(() => _openAdmin = screen);
+    try {
+      return await context.push<T>(location);
+    } finally {
+      if (mounted) setState(() => _openAdmin = null);
+    }
   }
 
   /// As ações de ADMIN (canvas "1f") precisam de conexão e de uma sessão
@@ -168,22 +184,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   /// servidor. (Se a sessão foi cancelada, a tela de lá já levou o ADMIN para
   /// a lista, e este detalhe nem existe mais.)
   Future<void> _openEdit() async {
-    final saved =
-        await context.push<bool>(AppRoutes.sessionEdit(widget.sessionId));
+    final saved = await _pushAdmin<bool>(
+      _AdminScreen.edit,
+      AppRoutes.sessionEdit(widget.sessionId),
+    );
     if (saved == true && mounted) unawaited(_viewModel.refresh());
   }
 
   /// Quem entra ou sai por lá muda o cache, e este detalhe lê do cache: não
   /// há o que fazer na volta.
-  void _openConsultants() {
-    context.push(AppRoutes.sessionConsultants(widget.sessionId));
+  Future<void> _openConsultants() async {
+    await _pushAdmin<Object?>(
+      _AdminScreen.consultants,
+      AppRoutes.sessionConsultants(widget.sessionId),
+    );
   }
 
   /// Entrou gente lá: a linha nova já está no cache, e baixar de novo acerta
   /// os contadores.
   Future<void> _openAddParticipant() async {
-    final added =
-        await context.push<bool>(AppRoutes.addParticipant(widget.sessionId));
+    final added = await _pushAdmin<bool>(
+      _AdminScreen.addParticipant,
+      AppRoutes.addParticipant(widget.sessionId),
+    );
     if (added == true && mounted) unawaited(_viewModel.refresh());
   }
 
@@ -608,6 +631,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           AppIconAction(
             icon: AppIcons.addParticipant,
             tooltip: 'Adicionar participante',
+            highlighted: _openAdmin == _AdminScreen.addParticipant,
             onPressed:
                 _adminActionsEnabled(isOffline) ? _openAddParticipant : null,
           ),
@@ -856,3 +880,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
 /// O que o ⋮ de uma linha oferece ao ADMIN.
 enum _RowAction { unassign }
+
+/// As telas de admin que o detalhe abre (ver `_openAdmin`).
+enum _AdminScreen { edit, consultants, addParticipant }

@@ -146,6 +146,10 @@ enum AppCtaSize {
   /// 48dp, texto 15 — a ação no cabeçalho do checklist no tablet
   /// ("Finalizar avaliação", quadros "4f" e "4q").
   header,
+
+  /// 52dp, texto 15 — a ação principal das janelas de admin no tablet
+  /// ("Adicionar participante", quadro "4l").
+  dialog,
 }
 
 /// Botão de chamada para ação em laranja. No tamanho `compact`, é a ação de
@@ -180,8 +184,12 @@ class AppCtaButton extends StatelessWidget {
   /// Altura do [AppCtaSize.tabletLarge].
   static const double tabletLargeHeight = 60;
 
+  /// Altura do [AppCtaSize.dialog].
+  static const double dialogHeight = 52;
+
   double get _height => switch (size) {
         AppCtaSize.compact || AppCtaSize.header => AppSpacing.touchTarget,
+        AppCtaSize.dialog => dialogHeight,
         AppCtaSize.large => AppSpacing.controlHeight,
         AppCtaSize.tabletLarge => tabletLargeHeight,
       };
@@ -190,18 +198,20 @@ class AppCtaButton extends StatelessWidget {
         AppCtaSize.compact => AppTypography.buttonCompact,
         AppCtaSize.large => AppTypography.button,
         AppCtaSize.tabletLarge => AppTypography.buttonTablet,
-        AppCtaSize.header => AppTypography.buttonHeader,
+        AppCtaSize.header || AppCtaSize.dialog => AppTypography.buttonHeader,
       };
 
   double get _iconSize => switch (size) {
         AppCtaSize.compact => 19,
-        AppCtaSize.header => 21,
+        AppCtaSize.header || AppCtaSize.dialog => 21,
         AppCtaSize.large => 22,
         AppCtaSize.tabletLarge => 24,
       };
 
-  double get _trailingIconSize =>
-      size == AppCtaSize.compact || size == AppCtaSize.header ? 21 : 25;
+  double get _trailingIconSize => switch (size) {
+        AppCtaSize.compact || AppCtaSize.header || AppCtaSize.dialog => 21,
+        AppCtaSize.large || AppCtaSize.tabletLarge => 25,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +228,11 @@ class AppCtaButton extends StatelessWidget {
               isLoading ? AppColors.ctaInk : AppColors.textMuted,
           elevation: 0,
           padding: EdgeInsets.symmetric(
-            horizontal: size == AppCtaSize.header ? AppSpacing.xl : AppSpacing.lg,
+            horizontal: switch (size) {
+              AppCtaSize.header => AppSpacing.xl,
+              AppCtaSize.dialog => AppSpacing.xxl,
+              _ => AppSpacing.lg,
+            },
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -227,8 +241,27 @@ class AppCtaButton extends StatelessWidget {
           // `foregroundColor`. Daqui só saem o tamanho e o peso.
           textStyle: _textStyle,
         ),
-        child: isLoading ? _buildSpinner() : _buildContent(),
+        child: isLoading ? _buildLoading() : _buildContent(),
       ),
+    );
+  }
+
+  /// Sem [fullWidth], o botão guarda a largura do rótulo enquanto gira — não
+  /// encolhe no meio do rodapé.
+  Widget _buildLoading() {
+    if (fullWidth) return _buildSpinner();
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Visibility(
+          visible: false,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: _buildContent(),
+        ),
+        _buildSpinner(),
+      ],
     );
   }
 
@@ -447,11 +480,16 @@ class AppTextButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.tone = AppTextButtonTone.primary,
+    this.alignStart = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final AppTextButtonTone tone;
+
+  /// O rótulo encostado à esquerda — a ação secundária do rodapé das janelas
+  /// de admin no tablet (quadro "4l").
+  final bool alignStart;
 
   @override
   Widget build(BuildContext context) {
@@ -469,6 +507,8 @@ class AppTextButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           textStyle: AppTypography.textAction,
+          alignment: alignStart ? Alignment.centerLeft : Alignment.center,
+          padding: alignStart ? EdgeInsets.zero : null,
         ),
         child: Text(label, overflow: TextOverflow.ellipsis),
       ),
@@ -486,16 +526,29 @@ class AppIconAction extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     this.onPressed,
+    this.highlighted = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
 
+  /// A janela que este botão abriu está aberta: o botão fica marcado atrás
+  /// do fundo escurecido (quadros "4l", "4m" e "4n").
+  final bool highlighted;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: AppSpacing.touchTarget,
+    return Container(
+      width: AppSpacing.touchTarget,
+      height: AppSpacing.touchTarget,
+      decoration: highlighted
+          ? BoxDecoration(
+              color: AppColors.primarySurface,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 1.5),
+            )
+          : null,
       child: IconButton(
         tooltip: tooltip,
         icon: Icon(icon, size: 22),

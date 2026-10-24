@@ -125,6 +125,12 @@ abstract final class AppColors {
   /// Sombra da navbar do tablet, lateral e em pílula (quadros "4c" e "4u")
   static const Color navShadowTablet = Color(0x2E0F172A);
 
+  /// Fundo escurecido atrás das janelas de admin do tablet (42%, quadro "4l")
+  static const Color scrim = Color(0x6B0F172A);
+
+  /// Sombra das janelas de admin do tablet (34%, quadro "4l")
+  static const Color dialogShadow = Color(0x570F172A);
+
   /// Trilho da barra de progresso da abertura
   static const Color progressTrack = Color(0x24000000);
 }

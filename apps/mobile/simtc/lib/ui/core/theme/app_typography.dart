@@ -140,6 +140,15 @@ abstract final class AppTypography {
   static TextStyle get fieldOptional =>
       _inter(size: 11.5, weight: FontWeight.w400, height: 1.2, color: AppColors.textMuted);
 
+  /// Título da janela de admin no tablet ("Adicionar participante", quadro
+  /// "4l")
+  static TextStyle get dialogTitle =>
+      _inter(size: 19, weight: FontWeight.w600, height: 1.25);
+
+  /// Subtítulo da janela de admin no tablet
+  static TextStyle get dialogSubtitle =>
+      _inter(size: 13, weight: FontWeight.w400, height: 1.35, color: AppColors.text3);
+
   /// Empresa na faixa de contexto dos formulários de ADMIN (canvas "3b")
   static TextStyle get contextTitle =>
       _inter(size: 15, weight: FontWeight.w600, height: 1.25);
@@ -187,7 +196,8 @@ abstract final class AppTypography {
       _inter(size: 17, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
 
   /// Texto do "Finalizar avaliação" no cabeçalho do checklist no tablet
-  /// (quadros "4f" e "4q")
+  /// (quadros "4f" e "4q") e do botão principal das janelas de admin (quadro
+  /// "4l")
   static TextStyle get buttonHeader =>
       _inter(size: 15, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
 

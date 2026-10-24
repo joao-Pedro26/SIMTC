@@ -7,6 +7,7 @@ import 'ui/add_participant/add_participant_screen.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/checklist/checklist_screen.dart';
 import 'ui/core/form_factor.dart';
+import 'ui/core/widgets/admin_dialog.dart';
 import 'ui/debug/ds_gallery_screen.dart';
 import 'ui/result/result_screen.dart';
 import 'ui/session_consultants/session_consultants_screen.dart';
@@ -88,6 +89,20 @@ Page<void> _sessionsPage(
   return MaterialPage<void>(key: state.pageKey, child: phone);
 }
 
+/// As telas de admin: no tablet, uma janela por cima do detalhe (decisão de
+/// 21/10/2026); no celular, uma tela cheia, como antes.
+Page<void> _adminPage(
+  BuildContext context,
+  GoRouterState state,
+  AdminDialogSize size,
+  Widget child,
+) {
+  if (FormFactorScope.of(context) == FormFactor.tablet) {
+    return AdminDialogPage<void>(key: state.pageKey, size: size, child: child);
+  }
+  return MaterialPage<void>(key: state.pageKey, child: child);
+}
+
 /// Rotas do app. O redirecionamento observa o `AuthRepository`: entrar ou sair
 /// da sessão troca a tela sem nenhuma navegação manual espalhada pelo código.
 ///
@@ -138,8 +153,11 @@ GoRouter createRouter(
           ),
           GoRoute(
             path: 'participants/new',
-            builder: (context, state) => AddParticipantScreen(
-              sessionId: state.pathParameters['sessionId']!,
+            pageBuilder: (context, state) => _adminPage(
+              context,
+              state,
+              AdminDialogSize.addParticipant,
+              AddParticipantScreen(sessionId: state.pathParameters['sessionId']!),
             ),
           ),
           GoRoute(

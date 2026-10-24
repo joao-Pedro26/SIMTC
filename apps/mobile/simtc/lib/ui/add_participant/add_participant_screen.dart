@@ -9,10 +9,12 @@ import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../core/cpf_input_formatter.dart';
 import '../core/date_labels.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
@@ -125,30 +127,55 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: Scaffold(
-        backgroundColor: AppColors.surface,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Sem toque: abrir a aba Sincronizar daqui largaria o formulário.
-              const AppTopBar(
-                title: 'Adicionar participante',
-                leadingIcon: AppIcons.close,
-                leadingIconSize: 26,
-                leadingTooltip: 'Fechar',
-                trailing: SyncStatusIndicator(),
-              ),
-              ConnectivityBanner(
-                isOffline: isOffline,
-                message: 'Sem conexão — adicionar participante precisa de internet.',
-              ),
-              Expanded(child: _buildBody()),
-              if (_viewModel.session != null)
-                _buildFooter(isOffline, keyboardOpen),
-            ],
-          ),
+      child: context.isTablet
+          ? _buildDialog(isOffline, keyboardOpen)
+          : _buildPage(isOffline, keyboardOpen),
+    );
+  }
+
+  Widget _buildPage(bool isOffline, bool keyboardOpen) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Sem toque: abrir a aba Sincronizar daqui largaria o formulário.
+            const AppTopBar(
+              title: 'Adicionar participante',
+              leadingIcon: AppIcons.close,
+              leadingIconSize: 26,
+              leadingTooltip: 'Fechar',
+              trailing: SyncStatusIndicator(),
+            ),
+            ConnectivityBanner(
+              isOffline: isOffline,
+              message: 'Sem conexão — adicionar participante precisa de internet.',
+            ),
+            Expanded(child: _buildBody()),
+            if (_viewModel.session != null)
+              _buildFooter(isOffline, keyboardOpen),
+          ],
         ),
       ),
+    );
+  }
+
+  /// No tablet, a tela é uma janela por cima do detalhe (quadros "4l" e
+  /// "4w"): a empresa e a sessão vão para o subtítulo, e o rodapé fica numa
+  /// linha só. Os campos são os do celular.
+  Widget _buildDialog(bool isOffline, bool keyboardOpen) {
+    final session = _viewModel.session;
+
+    return AdminDialogFrame(
+      title: 'Adicionar participante',
+      subtitle: session == null ? '' : '${session.companyName} · ${_contextLine(session)}',
+      onClose: _close,
+      banner: ConnectivityBanner(
+        isOffline: isOffline,
+        message: 'Sem conexão — adicionar participante precisa de internet.',
+      ),
+      body: _buildBody(),
+      footer: session == null ? null : _buildDialogFooter(isOffline, keyboardOpen),
     );
   }
 
@@ -165,6 +192,40 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     }
 
     final registryNotice = _viewModel.registryNotice;
+    final form = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (lockedReason != null) ...[
+          InlineNotice(icon: AppIcons.lockedByOther, message: lockedReason),
+          const SizedBox(height: AppSpacing.lg + 2),
+        ],
+        _buildCpfField(),
+        if (registryNotice != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          InlineNotice(icon: AppIcons.profile, message: registryNotice),
+        ],
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildNameField(),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildEmailField(),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildTypeSelector(),
+      ],
+    );
+
+    // Na janela do tablet, sem a faixa da empresa (o subtítulo diz a
+    // sessão), com 20 em cima e embaixo e 24 dos lados.
+    if (context.isTablet) {
+      return ListView(
+        shrinkWrap: true,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxl,
+          vertical: AppSpacing.xl,
+        ),
+        children: [form],
+      );
+    }
 
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -175,29 +236,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
           subtitle: _contextLine(session),
           muted: true,
         ),
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (lockedReason != null) ...[
-                InlineNotice(icon: AppIcons.lockedByOther, message: lockedReason),
-                const SizedBox(height: AppSpacing.lg + 2),
-              ],
-              _buildCpfField(),
-              if (registryNotice != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                InlineNotice(icon: AppIcons.profile, message: registryNotice),
-              ],
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildNameField(),
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildEmailField(),
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildTypeSelector(),
-            ],
-          ),
-        ),
+        Padding(padding: const EdgeInsets.all(AppSpacing.xl), child: form),
       ],
     );
   }
@@ -429,6 +468,39 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
             onPressed: canSubmit ? () => _submit(addAnother: true) : null,
           ),
         ],
+      ),
+    );
+  }
+
+  /// O rodapé da janela do tablet: "Salvar e adicionar outro" à esquerda e
+  /// o botão principal à direita, com as mesmas regras do rodapé do celular.
+  Widget _buildDialogFooter(bool isOffline, bool keyboardOpen) {
+    final canSubmit = _viewModel.canSubmit && !isOffline;
+    final error = _viewModel.errorMessage;
+
+    return AdminDialogFooter(
+      notice: error != null && !keyboardOpen
+          ? InlineNotice(
+              icon: AppIcons.needsReview,
+              message: error,
+              tone: NoticeTone.danger,
+            )
+          : null,
+      caption: isOffline && _viewModel.canAdd && !keyboardOpen
+          ? 'Disponível quando houver conexão'
+          : null,
+      secondary: AppTextButton(
+        label: 'Salvar e adicionar outro',
+        alignStart: true,
+        onPressed: canSubmit ? () => _submit(addAnother: true) : null,
+      ),
+      primary: AppCtaButton(
+        label: 'Adicionar participante',
+        icon: AppIcons.addParticipant,
+        size: AppCtaSize.dialog,
+        fullWidth: false,
+        isLoading: _viewModel.isSubmitting,
+        onPressed: canSubmit ? () => _submit(addAnother: false) : null,
       ),
     );
   }
