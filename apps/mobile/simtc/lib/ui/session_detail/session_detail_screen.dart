@@ -166,7 +166,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   _AdminScreen? _openAdmin;
 
   Future<T?> _pushAdmin<T>(_AdminScreen screen, String location) async {
-    setState(() => _openAdmin = screen);
+    // No celular, a tela de admin cobre o detalhe: não há o que marcar.
+    if (context.isTablet) setState(() => _openAdmin = screen);
     try {
       return await context.push<T>(location);
     } finally {

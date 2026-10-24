@@ -185,6 +185,7 @@ void main() {
     WidgetTester tester, {
     required String location,
     Size size = _landscape,
+    FormFactor formFactor = FormFactor.tablet,
   }) async {
     screen(tester, size);
     addTearDown(tester.view.resetPhysicalSize);
@@ -212,7 +213,7 @@ void main() {
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
         ],
         child: FormFactorScope(
-          formFactor: FormFactor.tablet,
+          formFactor: formFactor,
           child: MaterialApp.router(routerConfig: router),
         ),
       ),
@@ -565,6 +566,23 @@ void main() {
 
       expect(dialog(), findsNothing);
       expect(location(router), AppRoutes.sessionDetail('sess-1'));
+    });
+
+    testWidgets(
+        'no celular, a tela de admin abre por cima, em tela cheia, e o botão '
+        'não fica marcado', (tester) async {
+      await pumpApp(
+        tester,
+        location: AppRoutes.sessionDetail('sess-1'),
+        size: const Size(412, 915),
+        formFactor: FormFactor.phone,
+      );
+
+      await tester.tap(find.byTooltip('Adicionar participante'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(highlighted(tester, 'Adicionar participante'), isFalse);
     });
 
     testWidgets(

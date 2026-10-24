@@ -569,6 +569,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   Widget _buildSkeleton() {
     return ListView(
       key: const Key('add-participant-skeleton'),
+      shrinkWrap: context.isTablet,
       children: const [SkeletonListItem(), SkeletonListItem(), SkeletonListItem()],
     );
   }
