@@ -36,11 +36,12 @@ class TabSnackBarArea extends StatelessWidget {
       data: theme.copyWith(
         snackBarTheme: theme.snackBarTheme.copyWith(
           behavior: SnackBarBehavior.floating,
+          // O topo da pílula fica 16 abaixo de onde o conteúdo termina.
           insetPadding: EdgeInsets.fromLTRB(
             side,
             0,
             side,
-            TabletNavFrame.bottomInset + gap,
+            TabletNavFrame.bottomInset - AppSpacing.lg + gap,
           ),
         ),
       ),

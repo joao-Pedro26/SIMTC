@@ -183,7 +183,7 @@ void main() {
           .descendant(of: find.byType(SnackBar), matching: find.byType(Material))
           .first);
       final bar = tester.getRect(find.byType(PillNavBar));
-      expect(snack.bottom, lessThanOrEqualTo(bar.top - 8));
+      expect(snack.bottom, bar.top - 8);
       expect(snack.left, 120);
       expect(snack.right, 800 - 120);
     });
