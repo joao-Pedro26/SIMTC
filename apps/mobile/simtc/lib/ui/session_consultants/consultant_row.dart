@@ -21,6 +21,7 @@ class ConsultantRow extends StatelessWidget {
     this.metaWraps = false,
     this.note,
     this.action,
+    this.horizontalInset = AppSpacing.xl,
   });
 
   final String name;
@@ -43,14 +44,17 @@ class ConsultantRow extends StatelessWidget {
   /// "Remover da sessão" — o responsável não tem.
   final Widget? action;
 
+  /// Recuo das laterais: 20 no celular, 24 na janela do tablet (quadro "4n").
+  final double horizontalInset;
+
   // O vão entre o cabeçalho, o aviso e a ação (10 no canvas).
   static const double _gap = AppSpacing.md - AppSpacing.xxs;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalInset,
         vertical: AppSpacing.lg - 1,
       ),
       // O quadro desenha o contorno em cima e embaixo de cada linha: entre

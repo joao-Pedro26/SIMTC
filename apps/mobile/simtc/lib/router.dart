@@ -165,8 +165,11 @@ GoRouter createRouter(
           ),
           GoRoute(
             path: 'consultants',
-            builder: (context, state) => SessionConsultantsScreen(
-              sessionId: state.pathParameters['sessionId']!,
+            pageBuilder: (context, state) => _adminPage(
+              context,
+              state,
+              AdminDialogSize.consultants,
+              SessionConsultantsScreen(sessionId: state.pathParameters['sessionId']!),
             ),
           ),
           GoRoute(

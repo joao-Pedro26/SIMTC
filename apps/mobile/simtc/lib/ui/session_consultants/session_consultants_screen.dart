@@ -7,10 +7,12 @@ import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_consultant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/connectivity_banner.dart';
@@ -84,9 +86,12 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
     );
   }
 
+  /// Recuo das laterais: 20 no celular, 24 na janela do tablet (quadro "4n").
+  double get _inset => context.isTablet ? AppSpacing.xxl : AppSpacing.xl;
+
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
-    final error = _viewModel.errorMessage;
+    if (context.isTablet) return _buildDialog(isOffline);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -94,31 +99,50 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         child: Column(
           children: [
             const AppTopBar(title: 'Consultores'),
-            ConnectivityBanner(
-              isOffline: isOffline,
-              message: 'Sem conexão — mudar os consultores precisa de internet.',
-            ),
-            // Fora da rolagem: a falha de um botão do fim da lista não pode
-            // ficar escondida lá em cima.
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.md,
-                  AppSpacing.xl,
-                  AppSpacing.md,
-                ),
-                child: InlineNotice(
-                  icon: AppIcons.needsReview,
-                  message: error,
-                  tone: NoticeTone.danger,
-                ),
-              ),
+            ..._buildBanners(isOffline),
             Expanded(child: _buildBody(isOffline)),
           ],
         ),
       ),
     );
+  }
+
+  /// No tablet, a tela é uma janela por cima do detalhe (quadros "4n" e
+  /// "4y"), sem rodapé: cada toque vale na hora. A lista é a do celular.
+  Widget _buildDialog(bool isOffline) {
+    return AdminDialogFrame(
+      title: 'Consultores da sessão',
+      subtitle: 'Cada toque vale na hora — não há botão de salvar.',
+      onClose: () => Navigator.of(context).maybePop(),
+      banner: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: _buildBanners(isOffline),
+      ),
+      body: _buildBody(isOffline),
+    );
+  }
+
+  /// A faixa de sem conexão e a falha do último toque — fora da rolagem: a
+  /// falha de um botão do fim da lista não pode ficar escondida lá em cima.
+  List<Widget> _buildBanners(bool isOffline) {
+    final error = _viewModel.errorMessage;
+
+    return [
+      ConnectivityBanner(
+        isOffline: isOffline,
+        message: 'Sem conexão — mudar os consultores precisa de internet.',
+      ),
+      if (error != null)
+        Padding(
+          padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, AppSpacing.md),
+          child: InlineNotice(
+            icon: AppIcons.needsReview,
+            message: error,
+            tone: NoticeTone.danger,
+          ),
+        ),
+    ];
   }
 
   Widget _buildBody(bool isOffline) {
@@ -143,6 +167,8 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         _viewModel.busyConsultantId == null;
     final notice = _buildNotice();
 
+    final tablet = context.isTablet;
+
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: _viewModel.refresh,
@@ -150,22 +176,22 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         // Explícito pelo mesmo motivo do detalhe: puxar para atualizar precisa
         // funcionar mesmo quando a lista é mais curta que a tela.
         physics: const AlwaysScrollableScrollPhysics(),
+        // Na janela do tablet, a lista tem a altura do que mostra.
+        shrinkWrap: tablet,
         children: [
-          SessionContextHeader(
-            companyName: session.companyName,
-            logoUrl: session.companyLogoUrl,
-            title: _viewModel.contextTitle,
-            subtitle: _viewModel.contextSubtitle,
-            muted: true,
-          ),
+          // Na janela do tablet, sem a faixa da empresa: a janela fica por
+          // cima do detalhe da sessão.
+          if (!tablet)
+            SessionContextHeader(
+              companyName: session.companyName,
+              logoUrl: session.companyLogoUrl,
+              title: _viewModel.contextTitle,
+              subtitle: _viewModel.contextSubtitle,
+              muted: true,
+            ),
           if (notice != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.md,
-                AppSpacing.xl,
-                0,
-              ),
+              padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
               child: notice,
             ),
           _buildSessionTitle(),
@@ -197,8 +223,8 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
 
   Widget _buildSessionTitle() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
+      padding: EdgeInsets.symmetric(
+        horizontal: _inset,
         vertical: AppSpacing.lg - 1,
       ),
       child: Text('Na sessão', style: AppTypography.sectionTitle),
@@ -211,6 +237,7 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
       name: item.displayName,
       meta: item.meta,
       metaWraps: true,
+      horizontalInset: _inset,
       trailing: LabelPill(
         label: item.isResponsible ? 'Responsável' : 'Consultor',
         tone: item.isResponsible ? StatusTone.info : StatusTone.neutral,
@@ -233,10 +260,10 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
   /// "Disponíveis na equipe", com o nome da equipe à direita (canvas "3c").
   Widget _buildTeamTitle() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
+      padding: EdgeInsets.fromLTRB(
+        _inset,
         AppSpacing.xl + AppSpacing.xxs,
-        AppSpacing.xl,
+        _inset,
         AppSpacing.md - AppSpacing.xxs,
       ),
       child: Row(
@@ -275,7 +302,7 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
     if (notice != null) {
       return [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          padding: EdgeInsets.symmetric(horizontal: _inset),
           child: InlineNotice(icon: AppIcons.info, message: notice),
         ),
       ];
@@ -294,6 +321,7 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
       // O e-mail, e não a agenda do quadro: o backend não tem agenda de
       // consultor (decisão de 09/10/2026).
       meta: consultant.email,
+      horizontalInset: _inset,
       trailing: AppCompactOutlineButton(
         key: ValueKey('adicionar-${consultant.id}'),
         label: 'Adicionar',
@@ -305,14 +333,9 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
   }
 
   Widget _buildFooterNote() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.xl,
-        AppSpacing.xxl,
-      ),
-      child: InlineNotice(
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_inset, AppSpacing.lg, _inset, AppSpacing.xxl),
+      child: const InlineNotice(
         icon: AppIcons.syncDone,
         message: 'Entrar e sair da sessão vale na hora e precisa de conexão. '
             'Offline, a lista fica só de leitura.',
@@ -354,6 +377,7 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
   Widget _buildSkeleton() {
     return ListView(
       key: const Key('session-consultants-skeleton'),
+      shrinkWrap: context.isTablet,
       children: const [SkeletonListItem(), SkeletonListItem(), SkeletonListItem()],
     );
   }

@@ -23,11 +23,13 @@ import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/form_factor.dart';
+import 'package:simtc/ui/core/widgets/admin_dialog.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
+import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
@@ -653,6 +655,47 @@ void main() {
 
       expect(dialog(), findsNothing);
       expect(highlighted(tester, 'Editar dados do treinamento'), isFalse);
+    });
+
+    testWidgets(
+        'em paisagem, "Consultores da sessão" abre numa janela de 600, a 68 do '
+        'topo, sem rodapé e com o ícone de pessoas marcado (quadro "4n")',
+        (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+
+      await tester.tap(find.byTooltip('Consultores da sessão'));
+      await settle(tester);
+
+      expect(find.byType(SessionConsultantsScreen), findsOneWidget);
+      final rect = tester.getRect(dialog());
+      expect(rect.width, 600);
+      expect(rect.right, 1280 - 40);
+      expect(rect.top, 68);
+      expect(highlighted(tester, 'Consultores da sessão'), isTrue);
+      expect(find.text('Cada toque vale na hora — não há botão de salvar.'), findsOneWidget);
+      expect(find.descendant(of: dialog(), matching: find.byType(AdminDialogFooter)), findsNothing,
+          reason: 'sem rodapé');
+      expect(tester.getTopLeft(find.text('Na sessão')).dx, rect.left + 24);
+    });
+
+    testWidgets(
+        'em retrato, consultores fica no centro, com 640, e atravessa o giro '
+        'sem ser recriada (quadro "4y")', (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Consultores da sessão'));
+      await settle(tester);
+      final screen = tester.state(find.byType(SessionConsultantsScreen));
+
+      await rotate(tester, _portrait);
+
+      final rect = tester.getRect(dialog());
+      expect(rect.width, 640);
+      expect(rect.center.dx, 400);
+      expect(identical(tester.state(find.byType(SessionConsultantsScreen)), screen), isTrue);
+
+      await tester.tapAt(const Offset(400, 60));
+      await settle(tester);
+      expect(dialog(), findsNothing, reason: 'tocar no fundo fecha');
     });
   });
 }
