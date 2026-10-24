@@ -1371,5 +1371,19 @@ void main() {
 
       expect(find.text('Conferir e finalizar'), findsOneWidget);
     });
+
+    testWidgets(
+        'girar com o menu ⋮ aberto não perde a escolha', (tester) async {
+      await pumpTablet(tester, _landscape);
+
+      await tester.tap(find.byKey(const Key('checklist-menu')));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = _portrait;
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Descartar a avaliação?'), findsOneWidget);
+    });
   });
 }

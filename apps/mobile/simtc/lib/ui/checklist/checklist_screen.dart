@@ -65,6 +65,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// Cabeçalho da categoria aberta — há no máximo uma, então uma chave basta.
   final GlobalKey _openHeaderKey = GlobalKey();
 
+  /// O menu ⋮ muda de lugar no cabeçalho ao girar (linha única em paisagem,
+  /// duas faixas em retrato): a chave leva o estado junto, e a escolha feita
+  /// com o menu aberto durante o giro não se perde.
+  final GlobalKey _menuKey = GlobalKey(debugLabel: 'menu-do-checklist');
+
   /// Coluna do "não iniciada" no tablet em paisagem (quadro "6b").
   static const double notStartedMaxWidth = 760;
 
@@ -308,39 +313,42 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// precisa de rede — offline, aparece desabilitado e diz por quê. Com um
   /// desatribuir ou um descarte no ar, o menu não abre.
   Widget _buildMenu(bool isOffline) {
-    return SizedBox.square(
-      dimension: AppSpacing.touchTarget,
-      child: PopupMenuButton<_MenuAction>(
-        key: const Key('checklist-menu'),
-        tooltip: 'Mais opções',
-        enabled: !_isBusy,
-        icon: const Icon(AppIcons.more, color: AppColors.text),
-        onSelected: (action) => switch (action) {
-          _MenuAction.discard => _confirmDiscard(),
-          _MenuAction.unassign => _confirmUnassign(),
-        },
-        itemBuilder: (context) => [
-          if (_viewModel.canDiscard)
-            const PopupMenuItem(
-              value: _MenuAction.discard,
-              child: Text('Descartar avaliação'),
-            ),
-          if (_viewModel.canUnassign)
-            PopupMenuItem(
-              value: _MenuAction.unassign,
-              enabled: !isOffline,
-              child: isOffline
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Desatribuir participante'),
-                        Text('Disponível quando houver conexão', style: AppTypography.meta),
-                      ],
-                    )
-                  : const Text('Desatribuir participante'),
-            ),
-        ],
+    return KeyedSubtree(
+      key: _menuKey,
+      child: SizedBox.square(
+        dimension: AppSpacing.touchTarget,
+        child: PopupMenuButton<_MenuAction>(
+          key: const Key('checklist-menu'),
+          tooltip: 'Mais opções',
+          enabled: !_isBusy,
+          icon: const Icon(AppIcons.more, color: AppColors.text),
+          onSelected: (action) => switch (action) {
+            _MenuAction.discard => _confirmDiscard(),
+            _MenuAction.unassign => _confirmUnassign(),
+          },
+          itemBuilder: (context) => [
+            if (_viewModel.canDiscard)
+              const PopupMenuItem(
+                value: _MenuAction.discard,
+                child: Text('Descartar avaliação'),
+              ),
+            if (_viewModel.canUnassign)
+              PopupMenuItem(
+                value: _MenuAction.unassign,
+                enabled: !isOffline,
+                child: isOffline
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Desatribuir participante'),
+                          Text('Disponível quando houver conexão', style: AppTypography.meta),
+                        ],
+                      )
+                    : const Text('Desatribuir participante'),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -940,10 +948,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  /// O rodapé do checklist. No tablet em paisagem, antes do "Iniciar", o
-  /// botão fica no fim da coluna (quadro "6b") e não há rodapé; em retrato,
-  /// o rodapé tem 16 em cima e embaixo, 32 dos lados e o fundo cinza-claro
-  /// (quadro "6c").
   /// A linha de infração no tablet (quadros "4f" e "4q", spec "4z"): o
   /// número, a descrição (com a observação embaixo) e os botões B/PM/M à
   /// direita, em 312 de largura em paisagem e 264 em retrato.
@@ -1018,6 +1022,10 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  /// O rodapé do checklist. No tablet em paisagem, antes do "Iniciar", o
+  /// botão fica no fim da coluna (quadro "6b") e não há rodapé; em retrato,
+  /// o rodapé tem 16 em cima e embaixo, 32 dos lados e o fundo cinza-claro
+  /// (quadro "6c").
   Widget? _buildFooter() {
     if (_viewModel.isLoading || !_viewModel.hasCatalog || _viewModel.isConfirmed) {
       return null;
