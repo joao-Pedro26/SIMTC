@@ -4969,6 +4969,8 @@ git commit -m "docs(mobile): registra a validacao da fase 8a contra a producao"
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
 
+**Validado em 24/10/2026: celular no aparelho físico e tablet no emulador, contra a produção; roteiro inteiro passou. Aval dado para planejar a 8B.** A produção foi publicada pelo avanço direto da `feat/frontend-backend-integration` até `d5e4b9c` (sem PR: o `gh` não está instalado), e o usuário confirmou o login no web. Durante a execução entraram duas correções de revisão: a renovação de token que termina depois do "Sair" não grava os tokens de volta (`8760e00`), e a fila espera o catálogo antes de enviar depois do "Limpar cache local" (`3485f22`). Suíte final: 1074 testes.
+
 ---
 
 ## Pendências levadas para a 8B, a 8C e a 8D
