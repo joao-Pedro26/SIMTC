@@ -125,6 +125,14 @@ class ApiClient {
         return const _Refresh.expired();
       }
 
+      // A sessão acabou enquanto a renovação estava no ar (o "Sair", ou outro
+      // login): gravar os tokens novos traria de volta quem saiu na próxima
+      // abertura do app (Fase 8A). Nada é gravado, e quem chamou recebe o
+      // 401 original — a sessão já foi encerrada por quem a encerrou.
+      if (await readRefreshToken() != refreshToken) {
+        return const _Refresh.expired();
+      }
+
       await onTokensRenewed(accessToken, newRefreshToken);
       return _Refresh.renewed(accessToken);
     } on DioException catch (refreshError) {

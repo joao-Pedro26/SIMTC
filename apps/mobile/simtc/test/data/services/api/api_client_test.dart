@@ -198,6 +198,28 @@ void main() {
     expect(adapter.requests, hasLength(2));
   });
 
+  test(
+      'a renovação que termina depois de a sessão acabar (o "Sair" no meio '
+      'dela, ou outro login) não grava os tokens de volta', () async {
+    final client = buildRoutedClient();
+    accessToken = 'expirado';
+
+    final request = client.get<Map<String, dynamic>>('/training-sessions');
+    // O refresh está no ar (o adaptador o segura por 50 ms): a sessão acaba.
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    accessToken = null;
+    refreshToken = null;
+
+    await expectLater(
+      request,
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+    );
+    expect(renewedTokens, isEmpty);
+    expect(accessToken, isNull);
+    expect(refreshToken, isNull);
+    expect(sessionExpiredCalls, 0);
+  });
+
   group('renovação sem resposta do servidor mantém a sessão', () {
     test(
         'sem rede na renovação, a chamada falha como falta de conexão e a '
