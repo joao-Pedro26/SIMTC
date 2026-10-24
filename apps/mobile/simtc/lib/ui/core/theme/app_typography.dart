@@ -78,6 +78,11 @@ abstract final class AppTypography {
   static TextStyle get appBarTitle =>
       _inter(size: 17, weight: FontWeight.w600, height: 1.25);
 
+  /// O mesmo no tablet, onde também é o nome do participante no cabeçalho
+  /// do checklist (quadros "6b", "4f" e "4g")
+  static TextStyle get appBarTitleTablet =>
+      _inter(size: 18, weight: FontWeight.w600, height: 1.25);
+
   /// Título de item de lista (nome da empresa, nome do participante)
   static TextStyle get cardTitle =>
       _inter(size: 16, weight: FontWeight.w600, height: 1.3);
@@ -114,6 +119,10 @@ abstract final class AppTypography {
   /// Cabeçalho de seção de lista ("Hoje · 23 set", "Concluídas")
   static TextStyle get sectionTitle =>
       _inter(size: 13, weight: FontWeight.w700, height: 1.3, color: AppColors.text3);
+
+  /// "O que será avaliado" no tablet (quadros "6b" e "6c")
+  static TextStyle get sectionTitleTablet =>
+      _inter(size: 13.5, weight: FontWeight.w700, height: 1.2, color: AppColors.text3);
 
   /// Rótulo de campo de formulário
   static TextStyle get fieldLabel =>
@@ -173,6 +182,10 @@ abstract final class AppTypography {
   static TextStyle get button =>
       _inter(size: 16, weight: FontWeight.w700, height: 1.2, color: AppColors.surface);
 
+  /// Texto do botão principal da avaliação no tablet (quadros "6b" e "4g")
+  static TextStyle get buttonTablet =>
+      _inter(size: 17, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
+
   /// Texto de botão compacto, dentro de uma linha de lista ("Atribuir a mim")
   static TextStyle get buttonCompact =>
       _inter(size: 14, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
@@ -220,6 +233,22 @@ abstract final class AppTypography {
   static TextStyle get notStartedBody =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.5, color: AppColors.text2);
 
+  /// "A avaliação ainda não começou." no tablet em paisagem (quadro "6b")
+  static TextStyle get notStartedTitleExpanded =>
+      _inter(size: 18, weight: FontWeight.w700, height: 1.3);
+
+  /// O mesmo no tablet em retrato (quadro "6c")
+  static TextStyle get notStartedTitleTablet =>
+      _inter(size: 19, weight: FontWeight.w700, height: 1.3);
+
+  /// A explicação no tablet em paisagem (quadro "6b")
+  static TextStyle get notStartedBodyExpanded =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.5, color: AppColors.text3);
+
+  /// A explicação no tablet em retrato (quadro "6c")
+  static TextStyle get notStartedBodyTablet =>
+      _inter(size: 14.5, weight: FontWeight.w400, height: 1.5, color: AppColors.text3);
+
   /// Código da categoria no chip do acordeão ("CV")
   static TextStyle get categoryCode =>
       _mono(size: 11, weight: FontWeight.w700, height: 1.2, letterSpacing: 0.44);
@@ -227,6 +256,10 @@ abstract final class AppTypography {
   /// Nome da categoria no acordeão ("Controle do Veículo")
   static TextStyle get categoryName =>
       _inter(size: 15, weight: FontWeight.w600, height: 1.25);
+
+  /// O mesmo no tablet (quadros "6b", "4f" e "4g")
+  static TextStyle get categoryNameTablet =>
+      _inter(size: 16, weight: FontWeight.w600, height: 1.25);
 
   /// "6 itens", na categoria fechada
   static TextStyle get categoryCount =>

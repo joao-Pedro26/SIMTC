@@ -20,7 +20,9 @@ import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
+import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/inline_notice.dart';
 import 'package:simtc/ui/result/result_screen.dart';
@@ -37,6 +39,12 @@ LinearProgressIndicator scoreBar(WidgetTester tester) =>
 
 Color scoreBarColor(WidgetTester tester) =>
     (scoreBar(tester).valueColor! as AlwaysStoppedAnimation<Color>).value;
+
+const _landscape = Size(1280, 800);
+const _portrait = Size(800, 1280);
+
+double fontSizeOf(WidgetTester tester, String text) =>
+    tester.widget<Text>(find.text(text)).style!.fontSize!;
 
 void main() {
   late _MockApiClient api;
@@ -1083,6 +1091,130 @@ void main() {
 
       expect(find.byKey(const Key('checklist-no-catalog')), findsOneWidget);
       expect(find.text('Iniciar avaliação'), findsNothing);
+    });
+  });
+
+  group('no tablet', () {
+    /// O checklist num tablet de [size], com o formato que o app decide na
+    /// abertura.
+    Future<void> pumpTablet(
+      WidgetTester tester,
+      Size size, {
+      bool started = true,
+    }) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      if (started) await startEvaluation();
+      await tester.pumpWidget(withProviders(
+        const FormFactorScope(
+          formFactor: FormFactor.tablet,
+          child: MaterialApp(
+            home: ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'em paisagem, antes do "Iniciar": uma coluna de 760 centrada, com o '
+        'botão de 420×60 no fim dela, sem rodapé (quadro "6b")', (tester) async {
+      await addSecondCategory();
+      await pumpTablet(tester, _landscape, started: false);
+
+      final column = tester.getRect(find.byKey(const Key('checklist-not-started-column')));
+      expect(column.width, 760);
+      expect(column.center.dx, 640);
+
+      final cta = find.widgetWithText(AppCtaButton, 'Iniciar avaliação');
+      expect(tester.getSize(cta), const Size(420, 60));
+      expect(tester.getCenter(cta).dx, 640);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('checklist-not-started')),
+          matching: cta,
+        ),
+        findsOneWidget,
+        reason: 'o botão está na rolagem, no fim da coluna',
+      );
+      expect(
+        tester.getTopLeft(cta).dy,
+        greaterThan(tester.getBottomLeft(find.text('Respeito às Regras')).dy),
+      );
+
+      expect(tester.getTopLeft(find.text('CV')).dx - column.left, 7,
+          reason: 'a linha não tem recuo próprio: o chip começa na coluna (7 é o recuo do chip)');
+      expect(fontSizeOf(tester, 'Ana Paula Ribeiro'), 18);
+      expect(fontSizeOf(tester, 'A avaliação ainda não começou.'), 18);
+      expect(fontSizeOf(tester, 'O que será avaliado'), 13.5);
+      expect(fontSizeOf(tester, 'Controle do Veículo'), 16);
+      expect(tester.getSize(find.byIcon(AppIcons.timer).last).height, 44);
+    });
+
+    testWidgets(
+        'em retrato, antes do "Iniciar": recuo de 32 e o botão no rodapé, na '
+        'largura toda, com 60 de altura (quadro "6c")', (tester) async {
+      await pumpTablet(tester, _portrait, started: false);
+
+      expect(find.byKey(const Key('checklist-not-started-column')), findsNothing);
+      expect(tester.getTopLeft(find.text('CV')).dx, 32 + 7);
+      expect(tester.getTopLeft(find.text('O que será avaliado')).dx, 32);
+
+      final cta = find.widgetWithText(AppCtaButton, 'Iniciar avaliação');
+      expect(tester.getSize(cta), const Size(800 - 2 * 32, 60));
+      expect(tester.getBottomLeft(cta).dy, 1280 - 16);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('checklist-not-started')),
+          matching: cta,
+        ),
+        findsNothing,
+        reason: 'o botão fica fora da rolagem',
+      );
+      expect(fontSizeOf(tester, 'A avaliação ainda não começou.'), 19);
+      expect(tester.getSize(find.byIcon(AppIcons.timer).last).height, 48);
+    });
+
+    testWidgets(
+        'em paisagem, com outra avaliação em andamento, o aviso fica acima do '
+        'botão, na coluna', (tester) async {
+      await db.into(db.participants).insert(
+            ParticipantsCompanion.insert(
+              id: 'tp-2',
+              sessionId: 'sess-1',
+              name: 'Marina Lopes',
+              cpf: '111.222.***-**',
+              participationType: 'TEORICA_E_PRATICA',
+              status: 'EM_AVALIACAO',
+              assignedConsultantId: const Value('c-eu'),
+              cachedAt: DateTime(2026, 9, 25, 8),
+            ),
+          );
+      await assessmentRepository.openDraft(
+        trainingParticipantId: 'tp-2',
+        sessionId: 'sess-1',
+        ownerUserId: 'user-1',
+        consultantId: 'c-eu',
+      );
+
+      await pumpTablet(tester, _landscape, started: false);
+
+      final notice = find.byType(InlineNotice);
+      final cta = find.widgetWithText(AppCtaButton, 'Iniciar avaliação');
+      expect(tester.getBottomLeft(notice).dy + 12, tester.getTopLeft(cta).dy);
+      expect(tester.getSize(notice).width, 760);
+      expect(tester.widget<AppCtaButton>(cta).onPressed, isNull);
+    });
+
+    testWidgets('"Iniciar avaliação" no tablet começa a avaliação', (tester) async {
+      await pumpTablet(tester, _landscape, started: false);
+
+      await tester.tap(find.text('Iniciar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Excesso de velocidade'), findsOneWidget);
+      expect(find.text('salvo'), findsOneWidget);
     });
   });
 }

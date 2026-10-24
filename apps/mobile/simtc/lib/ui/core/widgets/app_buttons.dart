@@ -138,6 +138,10 @@ enum AppCtaSize {
   /// 56dp, texto 16 — ação principal isolada no rodapé ("Finalizar
   /// avaliação", quadro "1b").
   large,
+
+  /// 60dp, texto 17 — a ação principal da avaliação no tablet ("Iniciar
+  /// avaliação", quadros "6b" e "6c").
+  tabletLarge,
 }
 
 /// Botão de chamada para ação em laranja. No tamanho `compact`, é a ação de
@@ -164,12 +168,33 @@ class AppCtaButton extends StatelessWidget {
   final IconData? trailingIcon;
   final AppCtaSize size;
 
-  bool get _large => size == AppCtaSize.large;
+  /// Altura do [AppCtaSize.tabletLarge].
+  static const double tabletLargeHeight = 60;
+
+  double get _height => switch (size) {
+        AppCtaSize.compact => AppSpacing.touchTarget,
+        AppCtaSize.large => AppSpacing.controlHeight,
+        AppCtaSize.tabletLarge => tabletLargeHeight,
+      };
+
+  TextStyle get _textStyle => switch (size) {
+        AppCtaSize.compact => AppTypography.buttonCompact,
+        AppCtaSize.large => AppTypography.button,
+        AppCtaSize.tabletLarge => AppTypography.buttonTablet,
+      };
+
+  double get _iconSize => switch (size) {
+        AppCtaSize.compact => 19,
+        AppCtaSize.large => 22,
+        AppCtaSize.tabletLarge => 24,
+      };
+
+  double get _trailingIconSize => size == AppCtaSize.compact ? 21 : 25;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: _large ? AppSpacing.controlHeight : AppSpacing.touchTarget,
+      height: _height,
       width: double.infinity,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
@@ -186,7 +211,7 @@ class AppCtaButton extends StatelessWidget {
           ),
           // A cor do `textStyle` não vale num botão — quem pinta o rótulo é o
           // `foregroundColor`. Daqui só saem o tamanho e o peso.
-          textStyle: _large ? AppTypography.button : AppTypography.buttonCompact,
+          textStyle: _textStyle,
         ),
         child: isLoading ? _buildSpinner() : _buildContent(),
       ),
@@ -211,13 +236,13 @@ class AppCtaButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: _large ? 22 : 19),
+          Icon(icon, size: _iconSize),
           const SizedBox(width: AppSpacing.sm),
         ],
         Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
         if (trailingIcon != null) ...[
           const SizedBox(width: AppSpacing.xs),
-          Icon(trailingIcon, size: _large ? 25 : 21),
+          Icon(trailingIcon, size: _trailingIconSize),
         ],
       ],
     );

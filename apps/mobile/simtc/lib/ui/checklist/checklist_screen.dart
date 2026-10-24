@@ -8,6 +8,7 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
+import '../core/form_factor.dart';
 import '../core/score_labels.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
@@ -64,6 +65,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// Cabeçalho da categoria aberta — há no máximo uma, então uma chave basta.
   final GlobalKey _openHeaderKey = GlobalKey();
 
+  /// Coluna do "não iniciada" no tablet em paisagem (quadro "6b").
+  static const double notStartedMaxWidth = 760;
+
+  /// Largura do botão no fim dessa coluna.
+  static const double notStartedCtaWidth = 420;
+
   /// Um desatribuir (que espera o backend) ou um descarte no ar: o menu ⋮ e o
   /// "Finalizar avaliação" ficam desabilitados até terminar — outra rota
   /// aberta por cima faria o fechamento do desatribuir fechar a tela errada.
@@ -105,6 +112,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
+    final footer = _buildFooter();
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -117,25 +125,33 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               message: 'Sem conexão — as marcações continuam sendo salvas no aparelho.',
             ),
             Expanded(child: _buildBody()),
-            if (!_viewModel.isLoading && _viewModel.hasCatalog && !_viewModel.isConfirmed)
-              _buildFooter(),
+            if (footer != null) footer,
           ],
         ),
       ),
     );
   }
 
+  /// No tablet (quadros "6b" e "6c"), o cabeçalho tem 12 embaixo e recua 24
+  /// à direita em paisagem e 20 em retrato; o nome tem 18.
   Widget _buildHeader(BuildContext context, bool isOffline) {
+    final tablet = context.isTablet;
+    final double right = !tablet
+        ? AppSpacing.sm
+        : context.isExpandedLayout
+            ? AppSpacing.xxl
+            : AppSpacing.xl;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.sm,
         AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm + 2,
+        right,
+        tablet ? AppSpacing.md : AppSpacing.sm + 2,
       ),
       child: Column(
         children: [
@@ -149,7 +165,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
               ),
-              const SizedBox(width: AppSpacing.xs),
+              SizedBox(width: tablet ? AppSpacing.md : AppSpacing.xs),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,7 +173,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   children: [
                     Text(
                       _viewModel.participant?.name ?? '',
-                      style: AppTypography.checklistParticipantName,
+                      style: tablet
+                          ? AppTypography.appBarTitleTablet
+                          : AppTypography.checklistParticipantName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -436,45 +454,87 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// rastro. Segue o quadro "6a" do canvas (1.4.1): o aviso, o que será
   /// avaliado (só leitura, sem pontos — o app não tem pontos) e, no rodapé, o
   /// botão.
+  ///
+  /// No tablet em paisagem (quadro "6b"), tudo numa coluna de até 760,
+  /// centrada, com o botão no fim dela; em retrato (quadro "6c"), recuo de 32
+  /// e o botão no rodapé.
   Widget _buildNotStarted() {
     final sections = _viewModel.sections;
     final items = sections.fold<int>(0, (sum, s) => sum + s.infractions.length);
+    final tablet = context.isTablet;
+    final expanded = context.isExpandedLayout;
+    final double inset = expanded
+        ? 0
+        : tablet
+            ? AppSpacing.xxxl
+            : AppSpacing.xl;
+
+    final children = [
+      _buildNotStartedHero(),
+      Padding(
+        padding: EdgeInsets.fromLTRB(
+          inset,
+          tablet && !expanded ? AppSpacing.xl : AppSpacing.lg,
+          inset,
+          AppSpacing.sm + 2,
+        ),
+        child: Row(
+          children: [
+            // Encolhe com reticências: num celular estreito com a fonte
+            // ampliada, o título e a contagem não cabem inteiros na linha.
+            Expanded(
+              child: Text(
+                'O que será avaliado',
+                style: tablet
+                    ? AppTypography.sectionTitleTablet
+                    : AppTypography.sectionTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Text(_itemsLabel(items), style: AppTypography.categoryCount),
+          ],
+        ),
+      ),
+      DecoratedBox(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border.symmetric(horizontal: BorderSide(color: AppColors.border)),
+        ),
+        child: Column(
+          children: [
+            for (final category in sections) _buildPreviewCategory(category, inset),
+          ],
+        ),
+      ),
+    ];
+
+    if (!expanded) {
+      return ListView(key: const Key('checklist-not-started'), children: children);
+    }
 
     return ListView(
       key: const Key('checklist-not-started'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.huge,
+        AppSpacing.sm,
+        AppSpacing.huge,
+        AppSpacing.xxxl,
+      ),
       children: [
-        _buildNotStartedHero(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
-            AppSpacing.lg,
-            AppSpacing.xl,
-            AppSpacing.sm + 2,
-          ),
-          child: Row(
-            children: [
-              // Encolhe com reticências: num celular estreito com a fonte
-              // ampliada, o título e a contagem não cabem inteiros na linha.
-              Expanded(
-                child: Text(
-                  'O que será avaliado',
-                  style: AppTypography.sectionTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(_itemsLabel(items), style: AppTypography.categoryCount),
-            ],
-          ),
-        ),
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border.symmetric(horizontal: BorderSide(color: AppColors.border)),
-          ),
-          child: Column(
-            children: [for (final category in sections) _buildPreviewCategory(category)],
+        Center(
+          child: ConstrainedBox(
+            key: const Key('checklist-not-started-column'),
+            constraints: const BoxConstraints(maxWidth: notStartedMaxWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...children,
+                const SizedBox(height: AppSpacing.xxl),
+                _buildStartActions(ctaWidth: notStartedCtaWidth),
+              ],
+            ),
           ),
         ),
       ],
@@ -485,26 +545,60 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// ela começou, e o botão do rodapé vira "Continuar avaliação".
   Widget _buildNotStartedHero() {
     final startedAt = _viewModel.resumableStartedAt;
+    final tablet = context.isTablet;
+    final expanded = context.isExpandedLayout;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
+    // Quadros "6a" (celular), "6b" (paisagem) e "6c" (retrato).
+    final EdgeInsets padding;
+    final double iconSize;
+    final TextStyle titleStyle;
+    final TextStyle bodyStyle;
+    if (expanded) {
+      padding = const EdgeInsets.fromLTRB(
+        AppSpacing.xxl,
+        AppSpacing.xxl + 4,
+        AppSpacing.xxl,
+        AppSpacing.xxl,
+      );
+      iconSize = 44;
+      titleStyle = AppTypography.notStartedTitleExpanded;
+      bodyStyle = AppTypography.notStartedBodyExpanded;
+    } else if (tablet) {
+      padding = const EdgeInsets.fromLTRB(
+        AppSpacing.xxxl,
+        AppSpacing.huge,
+        AppSpacing.xxxl,
+        AppSpacing.xxxl + AppSpacing.sm,
+      );
+      iconSize = 48;
+      titleStyle = AppTypography.notStartedTitleTablet;
+      bodyStyle = AppTypography.notStartedBodyTablet;
+    } else {
+      padding = const EdgeInsets.fromLTRB(
         AppSpacing.xxl,
         AppSpacing.xxxl,
         AppSpacing.xxl,
         AppSpacing.xxl + 4,
-      ),
+      );
+      iconSize = 40;
+      titleStyle = AppTypography.notStartedTitle;
+      bodyStyle = AppTypography.notStartedBody;
+    }
+
+    return Container(
+      padding: padding,
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Column(
         children: [
-          const Icon(AppIcons.timer, size: 40, color: AppColors.textMuted),
+          Icon(AppIcons.timer, size: iconSize, color: AppColors.textMuted),
           const SizedBox(height: AppSpacing.sm + 6),
           Text(
             startedAt == null
                 ? 'A avaliação ainda não começou.'
                 : 'Você começou esta avaliação em $startedAt.',
-            style: AppTypography.notStartedTitle,
+            style: titleStyle,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -513,7 +607,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 ? 'A hora de início é registrada quando você tocar em '
                     '"Iniciar avaliação".'
                 : 'As respostas voltam ao continuar.',
-            style: AppTypography.notStartedBody,
+            style: bodyStyle,
             textAlign: TextAlign.center,
           ),
         ],
@@ -523,9 +617,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   /// Uma categoria da lista "O que será avaliado": o código, o nome e quantos
   /// itens tem. Só leitura — a lista abre depois do "Iniciar".
-  Widget _buildPreviewCategory(ChecklistCategory category) {
+  Widget _buildPreviewCategory(ChecklistCategory category, double inset) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: EdgeInsets.symmetric(horizontal: inset, vertical: AppSpacing.xl),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
       ),
@@ -536,7 +630,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           Expanded(
             child: Text(
               category.name,
-              style: AppTypography.categoryName,
+              style: context.isTablet
+                  ? AppTypography.categoryNameTablet
+                  : AppTypography.categoryName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -719,18 +815,35 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  Widget _buildFooter() {
+  /// O rodapé do checklist. No tablet em paisagem, antes do "Iniciar", o
+  /// botão fica no fim da coluna (quadro "6b") e não há rodapé; em retrato,
+  /// o rodapé tem 16 em cima e embaixo, 32 dos lados e o fundo cinza-claro
+  /// (quadro "6c").
+  Widget? _buildFooter() {
+    if (_viewModel.isLoading || !_viewModel.hasCatalog || _viewModel.isConfirmed) {
+      return null;
+    }
+
+    final tablet = context.isTablet;
+    if (!_viewModel.isStarted && context.isExpandedLayout) return null;
+    final tabletStart = tablet && !_viewModel.isStarted;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: tabletStart ? AppColors.background : AppColors.surface,
+        border: const Border(top: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
+      padding: tabletStart
+          ? const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxxl,
+              vertical: AppSpacing.lg,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
       child: _viewModel.isStarted
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -758,29 +871,38 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 ),
               ],
             )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_viewModel.isBlocked) ...[
-                  InlineNotice(
-                    icon: AppIcons.timer,
-                    tone: NoticeTone.warning,
-                    message: _blockedMessage(),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
-                AppCtaButton(
-                  label: _viewModel.isResumable
-                      ? 'Continuar avaliação'
-                      : 'Iniciar avaliação',
-                  icon: AppIcons.startEvaluation,
-                  size: AppCtaSize.large,
-                  isLoading: _viewModel.isStarting,
-                  onPressed: _viewModel.isBlocked ? null : _viewModel.start,
-                ),
-              ],
-            ),
+          : _buildStartActions(),
+    );
+  }
+
+  /// O aviso de outra avaliação em andamento e o "Iniciar avaliação". Com
+  /// [ctaWidth], o botão tem essa largura e fica centrado (quadro "6b").
+  Widget _buildStartActions({double? ctaWidth}) {
+    final button = AppCtaButton(
+      label: _viewModel.isResumable ? 'Continuar avaliação' : 'Iniciar avaliação',
+      icon: AppIcons.startEvaluation,
+      size: context.isTablet ? AppCtaSize.tabletLarge : AppCtaSize.large,
+      isLoading: _viewModel.isStarting,
+      onPressed: _viewModel.isBlocked ? null : _viewModel.start,
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_viewModel.isBlocked) ...[
+          InlineNotice(
+            icon: AppIcons.timer,
+            tone: NoticeTone.warning,
+            message: _blockedMessage(),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        if (ctaWidth == null)
+          button
+        else
+          Center(child: SizedBox(width: ctaWidth, child: button)),
+      ],
     );
   }
 
