@@ -46,4 +46,8 @@ COPY --from=builder /app/packages ./packages
 RUN npx prisma generate
 
 EXPOSE 3000
-CMD ["node", "dist/src/main"]
+
+# Aplica as migrations pendentes antes de subir a API. Usa DIRECT_URL
+# (ver prisma.config.ts). Se a migration falhar, a API não sobe: melhor
+# do que rodar o código novo sobre o banco no formato antigo.
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/src/main"]
