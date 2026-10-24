@@ -751,6 +751,20 @@ void main() {
     });
   });
 
+  test(
+      'countDrafts conta as iniciadas e não confirmadas do dono, inclusive as '
+      'presas', () async {
+    await insertDraft('tp-1');
+    await insertDraft('tp-2', sessionId: 'sess-concluida');
+    final confirmed = await insertDraft('tp-3');
+    await repository.confirm(confirmed.id, participantName: 'P', score: 90);
+    await insertDraft('tp-4', owner: 'user-2');
+
+    expect(await repository.countDrafts('user-1'), 2);
+    expect(await repository.countDrafts('user-2'), 1);
+    expect(await repository.countDrafts('ninguem'), 0);
+  });
+
   group('fila', () {
     test(
         'só as confirmadas e ainda não aceitas do dono, na ordem do Confirmar',

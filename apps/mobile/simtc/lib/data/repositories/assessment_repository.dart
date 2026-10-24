@@ -329,6 +329,18 @@ class AssessmentRepository {
   Future<List<LocalAssessment>> loadQueue(String ownerUserId) =>
       _queueOf(ownerUserId).get();
 
+  /// Quantas avaliações [ownerUserId] iniciou e ainda não confirmou — todas,
+  /// inclusive as presas (sessão concluída, participante liberado): a
+  /// confirmação do "Sair" avisa que elas ficam no aparelho (Fase 8A).
+  Future<int> countDrafts(String ownerUserId) async {
+    final drafts = await (_db.select(_db.localAssessments)
+          ..where((t) =>
+              t.ownerUserId.equals(ownerUserId) &
+              t.syncStatus.equalsValue(LocalSyncStatus.draft)))
+        .get();
+    return drafts.length;
+  }
+
   SimpleSelectStatement<$LocalAssessmentsTable, LocalAssessment> _queueOf(
     String ownerUserId,
   ) {

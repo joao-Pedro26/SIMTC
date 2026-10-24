@@ -46,6 +46,9 @@ dependencies:
   connectivity_plus: ^6.0.5
   uuid: ^4.4.2
 
+  # Versão do app na tela de Perfil (Fase 8A)
+  package_info_plus: ^9.0.1
+
   # Visualizar relatórios PDF
   pdfx: ^2.7.0
 
