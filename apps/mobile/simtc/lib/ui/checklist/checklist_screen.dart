@@ -71,10 +71,39 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// Largura do botão no fim dessa coluna.
   static const double notStartedCtaWidth = 420;
 
+  /// Largura máxima da nota no cabeçalho do tablet em paisagem (quadro "4f").
+  static const double headerProgressMaxWidth = 360;
+
+  /// Largura máxima do nome no cabeçalho do tablet em paisagem: a nota fica
+  /// com o resto.
+  static const double headerNameMaxWidth = 320;
+
+  /// Largura dos três botões B/PM/M ao lado da descrição, no tablet em
+  /// paisagem (quadro "4f") e em retrato (quadro "4q").
+  static const double notesWidthExpanded = 312;
+  static const double notesWidthTablet = 264;
+
+  /// Largura do número do item, no tablet.
+  static const double numberWidthTablet = 18;
+
+  /// Largura máxima da observação da nota, no tablet em paisagem.
+  static const double commentMaxWidthExpanded = 620;
+
   /// Um desatribuir (que espera o backend) ou um descarte no ar: o menu ⋮ e o
   /// "Finalizar avaliação" ficam desabilitados até terminar — outra rota
   /// aberta por cima faria o fechamento do desatribuir fechar a tela errada.
   bool get _isBusy => _viewModel.isUnassigning || _viewModel.isDiscarding;
+
+  /// O checklist largo do tablet (quadros "4f" e "4q"): o "Finalizar
+  /// avaliação" no cabeçalho e os botões B/PM/M ao lado da descrição. Numa
+  /// janela mais estreita que 600 (tela dividida), o botão volta ao rodapé e
+  /// os botões B/PM/M voltam para baixo da descrição, como no celular.
+  bool get _wideLayout =>
+      context.isTablet &&
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.tabletShortestSide;
+
+  bool get _finishInHeader =>
+      _wideLayout && _showsProgress && !_viewModel.isConfirmed;
 
   @override
   void initState() {
@@ -133,14 +162,55 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   /// No tablet (quadros "6b" e "6c"), o cabeçalho tem 12 embaixo e recua 24
-  /// à direita em paisagem e 20 em retrato; o nome tem 18.
+  /// à direita em paisagem e 20 em retrato; o nome tem 18. Com a avaliação
+  /// iniciada, o "Finalizar avaliação" entra no cabeçalho: em paisagem, numa
+  /// linha com o nome e a nota (quadro "4f"); em retrato, ao lado do nome, com
+  /// a nota numa segunda faixa (quadro "4q").
   Widget _buildHeader(BuildContext context, bool isOffline) {
     final tablet = context.isTablet;
+    final expanded = context.isExpandedLayout;
     final double right = !tablet
         ? AppSpacing.sm
-        : context.isExpandedLayout
+        : expanded
             ? AppSpacing.xxl
             : AppSpacing.xl;
+    final showsProgress = _showsProgress;
+
+    if (expanded && _finishInHeader) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        padding: EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, right, AppSpacing.md),
+        child: Row(
+          children: [
+            _buildBackButton(context),
+            const SizedBox(width: AppSpacing.lg),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: headerNameMaxWidth),
+              child: _buildNameAndTimer(),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: headerProgressMaxWidth),
+                  child: _buildProgress(),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            _buildHeaderFinish(),
+            if (!_viewModel.isLoading &&
+                (_viewModel.canDiscard || _viewModel.canUnassign)) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _buildMenu(isOffline),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Container(
       decoration: const BoxDecoration(
@@ -157,50 +227,79 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         children: [
           Row(
             children: [
-              SizedBox.square(
-                dimension: AppSpacing.touchTarget,
-                child: IconButton(
-                  tooltip: 'Voltar',
-                  icon: const Icon(AppIcons.back, size: 30, color: AppColors.text),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-              ),
+              _buildBackButton(context),
               SizedBox(width: tablet ? AppSpacing.md : AppSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _viewModel.participant?.name ?? '',
-                      style: tablet
-                          ? AppTypography.appBarTitleTablet
-                          : AppTypography.checklistParticipantName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpacing.xxs - 1),
-                    _buildTimerRow(),
-                  ],
-                ),
-              ),
+              Expanded(child: _buildNameAndTimer()),
+              if (_finishInHeader) ...[
+                const SizedBox(width: AppSpacing.md),
+                _buildHeaderFinish(),
+              ],
               if (!_viewModel.isLoading &&
-                  (_viewModel.canDiscard || _viewModel.canUnassign))
+                  (_viewModel.canDiscard || _viewModel.canUnassign)) ...[
+                if (_finishInHeader) const SizedBox(width: AppSpacing.sm),
                 _buildMenu(isOffline),
+              ],
             ],
           ),
-          if (!_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted)
+          if (showsProgress)
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.sm,
-                AppSpacing.sm + 2,
-                AppSpacing.sm,
-                0,
-              ),
+              padding: tablet
+                  ? const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 0)
+                  : const EdgeInsets.fromLTRB(
+                      AppSpacing.sm,
+                      AppSpacing.sm + 2,
+                      AppSpacing.sm,
+                      0,
+                    ),
               child: _buildProgress(),
             ),
         ],
       ),
+    );
+  }
+
+  bool get _showsProgress =>
+      !_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted;
+
+  Widget _buildBackButton(BuildContext context) {
+    return SizedBox.square(
+      dimension: AppSpacing.touchTarget,
+      child: IconButton(
+        tooltip: 'Voltar',
+        icon: const Icon(AppIcons.back, size: 30, color: AppColors.text),
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+    );
+  }
+
+  Widget _buildNameAndTimer() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _viewModel.participant?.name ?? '',
+          style: context.isTablet
+              ? AppTypography.appBarTitleTablet
+              : AppTypography.checklistParticipantName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: AppSpacing.xxs - 1),
+        _buildTimerRow(),
+      ],
+    );
+  }
+
+  /// O "Finalizar avaliação" do cabeçalho do tablet: as mesmas regras do
+  /// botão do rodapé do celular.
+  Widget _buildHeaderFinish() {
+    return AppCtaButton(
+      label: 'Finalizar avaliação',
+      icon: AppIcons.finish,
+      size: AppCtaSize.header,
+      fullWidth: false,
+      onPressed: _isBusy || _viewModel.isReleased ? null : _openSummary,
     );
   }
 
@@ -428,26 +527,61 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       if (after.isNotEmpty) _buildCollapsedGroup(after),
     ];
 
+    // No tablet (quadros "4f" e "4q"), os blocos começam no topo e ficam
+    // colados, e os avisos vão para o topo da lista, com o recuo de 24.
+    final tablet = context.isTablet;
+    final double inset = tablet ? AppSpacing.xxl : AppSpacing.xl;
+
     return ListView(
-      padding: const EdgeInsets.only(top: AppSpacing.md),
+      padding: EdgeInsets.only(top: tablet ? 0 : AppSpacing.md),
       children: [
         // Só leitura (decisão de 01/10/2026): a avaliação confirmada espera o
         // envio, e o que foi confirmado não muda mais.
         if (_viewModel.isConfirmed)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.md),
-            child: InlineNotice(
+          Padding(
+            padding: tablet
+                ? EdgeInsets.fromLTRB(inset, AppSpacing.md, inset, AppSpacing.md)
+                : EdgeInsets.fromLTRB(inset, 0, inset, AppSpacing.md),
+            child: const InlineNotice(
               icon: AppIcons.finish,
               message: 'Avaliação confirmada — não pode mais ser alterada.',
             ),
           ),
+        // No celular, o aviso fica no rodapé, acima do botão.
+        if (_wideLayout && _viewModel.isReleased)
+          Padding(
+            padding: EdgeInsets.fromLTRB(inset, AppSpacing.md, inset, AppSpacing.md),
+            child: _buildReleasedNotice(),
+          ),
         for (var i = 0; i < blocks.length; i++) ...[
-          if (i > 0) const SizedBox(height: AppSpacing.sm + 2),
+          if (i > 0 && !tablet) const SizedBox(height: AppSpacing.sm + 2),
           blocks[i],
         ],
       ],
     );
   }
+
+  /// O participante saiu das mãos do consultor com o checklist aberto: o
+  /// servidor recusaria o envio (decisão de 09/10/2026). As marcações ficam.
+  Widget _buildReleasedNotice() {
+    return const InlineNotice(
+      icon: AppIcons.lockedByOther,
+      tone: NoticeTone.warning,
+      message: 'Este participante não está mais com você. '
+          'Atribua de novo para continuar.',
+    );
+  }
+
+  /// Recuo das linhas e cabeçalhos de categoria: 20 no celular, 24 no tablet.
+  EdgeInsets get _categoryPadding => context.isTablet
+      ? const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.xl)
+      : const EdgeInsets.all(AppSpacing.xl);
+
+  /// Vão entre as partes da linha de categoria: 10 no celular, 12 no tablet.
+  double get _categoryGap => context.isTablet ? AppSpacing.md : AppSpacing.sm + 2;
+
+  TextStyle get _categoryNameStyle =>
+      context.isTablet ? AppTypography.categoryNameTablet : AppTypography.categoryName;
 
   /// Antes do "Iniciar avaliação" (decisão de 29/09/2026): o consultor pode ter
   /// aberto o participante sem querer — nada foi gravado, e voltar não deixa
@@ -659,29 +793,31 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildCollapsedCategory(ChecklistCategory category) {
+    final gap = _categoryGap;
+
     return InkWell(
       key: ValueKey('category-${category.id}'),
       onTap: () => _openCategory(category.id),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: _categoryPadding,
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
         ),
         child: Row(
           children: [
             CategoryCodeChip(code: category.code),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             Expanded(
               child: Text(
                 category.name,
-                style: AppTypography.categoryName,
+                style: _categoryNameStyle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             Text(_itemsLabel(category.infractions.length), style: AppTypography.categoryCount),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             const Icon(AppIcons.expandMore, size: 22, color: AppColors.text3),
           ],
         ),
@@ -724,11 +860,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildExpandedHeader(ChecklistCategory category) {
+    final gap = _categoryGap;
+
     return InkWell(
       key: _openHeaderKey,
       onTap: () => _viewModel.toggleCategory(category.id),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: _categoryPadding,
         decoration: const BoxDecoration(
           color: AppColors.categoryExpandedBg,
           border: Border(bottom: BorderSide(color: AppColors.categoryExpandedBorder)),
@@ -740,18 +878,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               background: AppColors.primary,
               ink: AppColors.surface,
             ),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             Expanded(
               child: Text(
                 category.name,
-                style: AppTypography.categoryName,
+                style: _categoryNameStyle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             ScoreBadge(score: category.score),
-            const SizedBox(width: AppSpacing.sm + 2),
+            SizedBox(width: gap),
             const Icon(AppIcons.expandLess, size: 22, color: AppColors.text3),
           ],
         ),
@@ -760,6 +898,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildInfractionRow(ChecklistInfraction infraction) {
+    if (_wideLayout) return _buildWideInfractionRow(infraction);
+
     final comment = infraction.selectedComment;
 
     return Container(
@@ -790,22 +930,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
-          Row(
-            children: [
-              for (var i = 0; i < infraction.notes.length; i++) ...[
-                if (i > 0) const SizedBox(width: AppSpacing.sm - 2),
-                Expanded(
-                  child: _NoteButton(
-                    note: infraction.notes[i],
-                    selected: infraction.selectedNoteId == infraction.notes[i].id,
-                    onTap: _viewModel.isConfirmed
-                        ? null
-                        : () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          _buildNoteButtons(infraction),
           if (comment != null) ...[
             const SizedBox(height: AppSpacing.sm + 2),
             _NoteComment(comment),
@@ -819,6 +944,80 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// botão fica no fim da coluna (quadro "6b") e não há rodapé; em retrato,
   /// o rodapé tem 16 em cima e embaixo, 32 dos lados e o fundo cinza-claro
   /// (quadro "6c").
+  /// A linha de infração no tablet (quadros "4f" e "4q", spec "4z"): o
+  /// número, a descrição (com a observação embaixo) e os botões B/PM/M à
+  /// direita, em 312 de largura em paisagem e 264 em retrato.
+  Widget _buildWideInfractionRow(ChecklistInfraction infraction) {
+    final comment = infraction.selectedComment;
+    final expanded = context.isExpandedLayout;
+    final double gap = expanded ? AppSpacing.xxl : AppSpacing.lg;
+
+    return Container(
+      key: ValueKey('infraction-${infraction.id}'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xxl,
+        vertical: AppSpacing.md + 3,
+      ),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: numberWidthTablet,
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxs),
+              child: Text('${infraction.order}', style: AppTypography.infractionNumber),
+            ),
+          ),
+          SizedBox(width: gap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(infraction.description, style: AppTypography.infractionDescription),
+                if (comment != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: expanded ? commentMaxWidthExpanded : double.infinity,
+                    ),
+                    child: _NoteComment(comment),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(width: gap),
+          SizedBox(
+            width: expanded ? notesWidthExpanded : notesWidthTablet,
+            child: _buildNoteButtons(infraction),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoteButtons(ChecklistInfraction infraction) {
+    return Row(
+      children: [
+        for (var i = 0; i < infraction.notes.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.sm - 2),
+          Expanded(
+            child: _NoteButton(
+              note: infraction.notes[i],
+              selected: infraction.selectedNoteId == infraction.notes[i].id,
+              onTap: _viewModel.isConfirmed
+                  ? null
+                  : () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget? _buildFooter() {
     if (_viewModel.isLoading || !_viewModel.hasCatalog || _viewModel.isConfirmed) {
       return null;
@@ -826,6 +1025,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
     final tablet = context.isTablet;
     if (!_viewModel.isStarted && context.isExpandedLayout) return null;
+    // No tablet, o "Finalizar avaliação" fica no cabeçalho.
+    if (_viewModel.isStarted && _wideLayout) return null;
     final tabletStart = tablet && !_viewModel.isStarted;
 
     return Container(
@@ -853,12 +1054,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 // aberto: o servidor recusaria o envio (decisão de
                 // 09/10/2026). As marcações ficam.
                 if (_viewModel.isReleased) ...[
-                  const InlineNotice(
-                    icon: AppIcons.lockedByOther,
-                    tone: NoticeTone.warning,
-                    message: 'Este participante não está mais com você. '
-                        'Atribua de novo para continuar.',
-                  ),
+                  _buildReleasedNotice(),
                   const SizedBox(height: AppSpacing.md),
                 ],
                 AppCtaButton(

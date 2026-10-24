@@ -43,8 +43,13 @@ Color scoreBarColor(WidgetTester tester) =>
 const _landscape = Size(1280, 800);
 const _portrait = Size(800, 1280);
 
-double fontSizeOf(WidgetTester tester, String text) =>
-    tester.widget<Text>(find.text(text)).style!.fontSize!;
+/// O tamanho da fonte de um texto — o do próprio `Text` ou, num botão, o
+/// que o botão passa adiante.
+double fontSizeOf(WidgetTester tester, String text) {
+  final finder = find.text(text);
+  return tester.widget<Text>(finder).style?.fontSize ??
+      DefaultTextStyle.of(tester.element(finder)).style.fontSize!;
+}
 
 void main() {
   late _MockApiClient api;
@@ -1215,6 +1220,156 @@ void main() {
 
       expect(find.text('Excesso de velocidade'), findsOneWidget);
       expect(find.text('salvo'), findsOneWidget);
+    });
+
+    Finder finish() => find.widgetWithText(AppCtaButton, 'Finalizar avaliação');
+
+    testWidgets(
+        'em paisagem, "Finalizar avaliação" fica no cabeçalho, numa linha com '
+        'o nome e a nota, e não há rodapé (quadro "4f")', (tester) async {
+      await pumpTablet(tester, _landscape);
+
+      final button = finish();
+      expect(tester.getSize(button).height, 48);
+      expect(tester.getCenter(button).dy, tester.getCenter(find.byTooltip('Voltar')).dy);
+      expect(tester.getTopRight(find.byKey(const Key('checklist-menu'))).dx, 1280 - 24,
+          reason: 'o ⋮ fica na ponta, a 24 da borda');
+      expect(
+        tester.getTopLeft(find.byKey(const Key('checklist-menu'))).dx -
+            tester.getTopRight(button).dx,
+        8,
+      );
+      expect(tester.getSize(find.byType(LinearProgressIndicator)).width, 360);
+      final bar = tester.getRect(find.byType(LinearProgressIndicator));
+      expect(bar.left, greaterThan(tester.getTopRight(find.text('Ana Paula Ribeiro')).dx));
+      expect(bar.right, lessThan(tester.getTopLeft(button).dx));
+      expect(tester.getBottomLeft(button).dy, lessThan(100),
+          reason: 'nada de botão no rodapé');
+      expect(fontSizeOf(tester, 'Finalizar avaliação'), 15);
+    });
+
+    testWidgets(
+        'em retrato, o cabeçalho tem duas faixas: nome e "Finalizar" em cima, a '
+        'nota embaixo, com 12 de recuo (quadro "4q")', (tester) async {
+      await pumpTablet(tester, _portrait);
+
+      final button = finish();
+      final bar = tester.getRect(find.byType(LinearProgressIndicator));
+      expect(bar.left, 8 + 12);
+      expect(bar.right, 800 - 20 - 12);
+      expect(bar.top, greaterThan(tester.getBottomLeft(button).dy));
+      expect(tester.getCenter(button).dy, tester.getCenter(find.byTooltip('Voltar')).dy);
+      expect(tester.getTopRight(find.byKey(const Key('checklist-menu'))).dx, 800 - 20);
+    });
+
+    testWidgets(
+        'a linha de infração no tablet: B/PM/M à direita da descrição, em 312 '
+        'de largura em paisagem e 264 em retrato (quadros "4f" e "4q")', (tester) async {
+      await pumpTablet(tester, _landscape);
+
+      Rect notes() => tester.getRect(find.ancestor(
+            of: find.text('PM'),
+            matching: find.byWidgetPredicate(
+              (w) => w is SizedBox && (w.width == 312 || w.width == 264),
+            ),
+          ));
+
+      expect(notes().width, 312);
+      expect(notes().right, 1280 - 24);
+      expect(tester.getSize(find.text('B')).height, lessThan(56));
+      expect(
+        tester.getSize(find.ancestor(of: find.text('B'), matching: find.byType(InkWell)).first).height,
+        56,
+      );
+      expect(tester.getTopLeft(find.text('Excesso de velocidade')).dx, 24 + 18 + 24);
+      expect(tester.getTopLeft(find.text('Excesso de velocidade')).dy, notes().top,
+          reason: 'a descrição e os botões começam na mesma altura');
+      expect(tester.getTopLeft(find.text('CV')).dx, 24 + 7);
+      expect(fontSizeOf(tester, 'Controle do Veículo'), 16);
+
+      tester.view.physicalSize = _portrait;
+      await tester.pumpAndSettle();
+
+      expect(notes().width, 264);
+      expect(notes().right, 800 - 24);
+      expect(tester.getTopLeft(find.text('Excesso de velocidade')).dx, 24 + 18 + 16);
+    });
+
+    testWidgets(
+        'a observação da nota fica embaixo da descrição, com no máximo 620 em '
+        'paisagem', (tester) async {
+      await pumpTablet(tester, _landscape);
+
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+
+      final comment = find.ancestor(of: find.text(pmComment), matching: find.byType(Container)).first;
+      expect(tester.getSize(comment).width, 620);
+      expect(tester.getTopLeft(comment).dy,
+          greaterThan(tester.getBottomLeft(find.text('Excesso de velocidade')).dy));
+    });
+
+    testWidgets(
+        'participante que saiu das mãos do consultor: o aviso vai para o topo '
+        'da lista e o "Finalizar" do cabeçalho fica desabilitado', (tester) async {
+      await assignToMe();
+      await pumpTablet(tester, _landscape);
+      await (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(const ParticipantsCompanion(status: Value('PENDENTE')));
+      await tester.pumpAndSettle();
+
+      const released =
+          'Este participante não está mais com você. Atribua de novo para continuar.';
+      expect(find.text(released), findsOneWidget);
+      expect(tester.getTopLeft(find.text(released)).dy,
+          lessThan(tester.getTopLeft(find.text('Controle do Veículo')).dy));
+      expect(tester.widget<AppCtaButton>(finish()).onPressed, isNull);
+    });
+
+    testWidgets(
+        'numa janela estreita (tela dividida), o checklist volta ao do '
+        'celular: botões embaixo da descrição e "Finalizar" no rodapé', (tester) async {
+      await pumpTablet(tester, const Size(500, 800));
+
+      expect(
+        tester.getTopLeft(find.text('PM')).dy,
+        greaterThan(tester.getBottomLeft(find.text('Excesso de velocidade')).dy),
+      );
+      expect(tester.getBottomLeft(finish()).dy, 800 - 16);
+      expect(tester.getSize(finish()).width, 500 - 2 * 16);
+    });
+
+    testWidgets(
+        '"Finalizar avaliação" do cabeçalho abre a conferência', (tester) async {
+      tester.view.physicalSize = _landscape;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await startEvaluation();
+      final router = GoRouter(
+        initialLocation: AppRoutes.participantChecklist('sess-1', 'tp-1'),
+        routes: [
+          GoRoute(
+            path: AppRoutes.participantChecklist('sess-1', 'tp-1'),
+            builder: (context, state) =>
+                const ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+          ),
+          GoRoute(
+            path: AppRoutes.participantSummary('sess-1', 'tp-1'),
+            builder: (context, state) => const SummaryScreen(participantId: 'tp-1'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(withProviders(FormFactorScope(
+        formFactor: FormFactor.tablet,
+        child: MaterialApp.router(routerConfig: router),
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(finish());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Conferir e finalizar'), findsOneWidget);
     });
   });
 }

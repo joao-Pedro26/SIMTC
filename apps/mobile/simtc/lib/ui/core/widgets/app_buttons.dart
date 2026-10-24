@@ -142,6 +142,10 @@ enum AppCtaSize {
   /// 60dp, texto 17 — a ação principal da avaliação no tablet ("Iniciar
   /// avaliação", quadros "6b" e "6c").
   tabletLarge,
+
+  /// 48dp, texto 15 — a ação no cabeçalho do checklist no tablet
+  /// ("Finalizar avaliação", quadros "4f" e "4q").
+  header,
 }
 
 /// Botão de chamada para ação em laranja. No tamanho `compact`, é a ação de
@@ -157,12 +161,17 @@ class AppCtaButton extends StatelessWidget {
     this.icon,
     this.trailingIcon,
     this.size = AppCtaSize.compact,
+    this.fullWidth = true,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
   final IconData? icon;
+
+  /// Sem ele, o botão tem a largura do rótulo — o "Finalizar avaliação" do
+  /// cabeçalho do tablet, numa linha com o nome e a nota.
+  final bool fullWidth;
 
   /// Ícone depois do rótulo — o "›" do "Próximo participante" (canvas "2g").
   final IconData? trailingIcon;
@@ -172,7 +181,7 @@ class AppCtaButton extends StatelessWidget {
   static const double tabletLargeHeight = 60;
 
   double get _height => switch (size) {
-        AppCtaSize.compact => AppSpacing.touchTarget,
+        AppCtaSize.compact || AppCtaSize.header => AppSpacing.touchTarget,
         AppCtaSize.large => AppSpacing.controlHeight,
         AppCtaSize.tabletLarge => tabletLargeHeight,
       };
@@ -181,21 +190,24 @@ class AppCtaButton extends StatelessWidget {
         AppCtaSize.compact => AppTypography.buttonCompact,
         AppCtaSize.large => AppTypography.button,
         AppCtaSize.tabletLarge => AppTypography.buttonTablet,
+        AppCtaSize.header => AppTypography.buttonHeader,
       };
 
   double get _iconSize => switch (size) {
         AppCtaSize.compact => 19,
+        AppCtaSize.header => 21,
         AppCtaSize.large => 22,
         AppCtaSize.tabletLarge => 24,
       };
 
-  double get _trailingIconSize => size == AppCtaSize.compact ? 21 : 25;
+  double get _trailingIconSize =>
+      size == AppCtaSize.compact || size == AppCtaSize.header ? 21 : 25;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: _height,
-      width: double.infinity,
+      width: fullWidth ? double.infinity : null,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
         style: FilledButton.styleFrom(
@@ -205,7 +217,9 @@ class AppCtaButton extends StatelessWidget {
           disabledForegroundColor:
               isLoading ? AppColors.ctaInk : AppColors.textMuted,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          padding: EdgeInsets.symmetric(
+            horizontal: size == AppCtaSize.header ? AppSpacing.xl : AppSpacing.lg,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -232,14 +246,16 @@ class AppCtaButton extends StatelessWidget {
   Widget _buildContent() {
     // Sem `style` no `Text`: a cor vem do botão, e assim o rótulo fica cinza
     // junto com o fundo quando o botão está desabilitado (offline).
+    final text = Text(label, overflow: TextOverflow.ellipsis);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (icon != null) ...[
           Icon(icon, size: _iconSize),
           const SizedBox(width: AppSpacing.sm),
         ],
-        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+        if (fullWidth) Flexible(child: text) else text,
         if (trailingIcon != null) ...[
           const SizedBox(width: AppSpacing.xs),
           Icon(trailingIcon, size: _trailingIconSize),

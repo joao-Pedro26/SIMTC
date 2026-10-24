@@ -186,6 +186,11 @@ abstract final class AppTypography {
   static TextStyle get buttonTablet =>
       _inter(size: 17, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
 
+  /// Texto do "Finalizar avaliação" no cabeçalho do checklist no tablet
+  /// (quadros "4f" e "4q")
+  static TextStyle get buttonHeader =>
+      _inter(size: 15, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);
+
   /// Texto de botão compacto, dentro de uma linha de lista ("Atribuir a mim")
   static TextStyle get buttonCompact =>
       _inter(size: 14, weight: FontWeight.w700, height: 1.2, color: AppColors.ctaInk);

@@ -386,11 +386,15 @@ void main() {
   });
 
   group('checklist (o que reprova a fase)', () {
+    // A linha inteira da infração (`infraction-<id>`): no tablet, os botões
+    // B/PM/M ficam ao lado da descrição, fora da coluna dela.
     Finder note(String infraction, String note) => find.descendant(
           of: find.ancestor(
             of: find.text(infraction),
-            matching: find.byType(Column),
-          ).first,
+            matching: find.byWidgetPredicate((w) =>
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith('infraction-')),
+          ),
           matching: find.text(note),
         );
 
