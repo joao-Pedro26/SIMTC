@@ -9,8 +9,8 @@ import '../theme/app_icons.dart';
 import '../theme/app_spacing.dart';
 import 'pill_nav_bar.dart';
 
-/// As abas que têm tela. "Perfil" ainda não tem (Fase 8).
-enum AppTab { sessions, sync }
+/// As três abas da navbar, na ordem dos itens.
+enum AppTab { sessions, sync, profile }
 
 /// Em volta do `Scaffold` de uma aba: no tablet com a pílula na base, o aviso
 /// passageiro (SnackBar) flutua acima dela, em vez de cobri-la (decisão de
@@ -51,7 +51,7 @@ class TabSnackBarArea extends StatelessWidget {
 }
 
 /// A navbar do app, com os três itens e o destino de cada um — a mesma nas
-/// abas Sessões e Sincronizar, em qualquer formato.
+/// três abas, em qualquer formato.
 class AppNavBar extends StatelessWidget {
   const AppNavBar({
     super.key,
@@ -87,10 +87,8 @@ class AppNavBar extends StatelessWidget {
         if (index == AppTab.sync.index && current != AppTab.sync) {
           context.go(AppRoutes.sync);
         }
-        if (index == 2) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Disponível em breve.')),
-          );
+        if (index == AppTab.profile.index && current != AppTab.profile) {
+          context.go(AppRoutes.profile);
         }
       },
     );

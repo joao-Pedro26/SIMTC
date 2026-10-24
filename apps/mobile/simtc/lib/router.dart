@@ -9,6 +9,7 @@ import 'ui/checklist/checklist_screen.dart';
 import 'ui/core/form_factor.dart';
 import 'ui/core/widgets/admin_dialog.dart';
 import 'ui/debug/ds_gallery_screen.dart';
+import 'ui/profile/profile_screen.dart';
 import 'ui/result/result_screen.dart';
 import 'ui/session_consultants/session_consultants_screen.dart';
 import 'ui/session_detail/session_detail_screen.dart';
@@ -27,6 +28,9 @@ abstract final class AppRoutes {
 
   /// Aba "Sincronizar" (tela 1.9, Fase 5A).
   static const String sync = '/sync';
+
+  /// Aba "Perfil" (tela 1.10, Fase 8A).
+  static const String profile = '/profile';
 
   /// Detalhe da sessão (tela 1.4).
   static String sessionDetail(String sessionId) => '/sessions/$sessionId';
@@ -132,6 +136,10 @@ GoRouter createRouter(
       GoRoute(
         path: AppRoutes.sync,
         builder: (context, state) => const SyncScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/sessions/:sessionId',

@@ -60,6 +60,24 @@ abstract final class AppTypography {
   static TextStyle get screenSubtitleTablet =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.2, color: AppColors.text3);
 
+  // ─── Perfil (quadro "2i" do canvas) ───────────────────────────────────────
+
+  /// E-mail embaixo do nome
+  static TextStyle get profileEmail =>
+      _inter(size: 13, weight: FontWeight.w400, height: 1.3, color: AppColors.text3);
+
+  /// Rótulo de uma linha ("Perfil de acesso")
+  static TextStyle get profileRowLabel =>
+      _inter(size: 15, weight: FontWeight.w500, height: 1.3);
+
+  /// Valor de uma linha ("Consultor", "hoje 07:12")
+  static TextStyle get profileRowValue =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.3);
+
+  /// O texto embaixo do "Sair da conta"
+  static TextStyle get profileNote =>
+      _inter(size: 12.5, weight: FontWeight.w400, height: 1.45, color: AppColors.text3);
+
   /// Título do cartão âmbar da fila sem rede ("3 avaliações na fila")
   static TextStyle get queueNoticeTitle =>
       _inter(size: 16, weight: FontWeight.w600, height: 1.25, color: AppColors.noteCommentInk);

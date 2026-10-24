@@ -84,6 +84,11 @@ abstract final class AppIcons {
   /// Tela "Consultores" (Fase 6B, canvas "3c"): o aviso de uma linha, e os
   /// botões de entrar e de sair da sessão.
   static const IconData info = Icons.info_outlined;
+
+  /// Perfil (Fase 8A, canvas "2i"): a linha "Perfil de acesso" e a "Limpar
+  /// cache local".
+  static const IconData accessRole = Icons.badge_outlined;
+  static const IconData clearCache = Icons.delete_sweep_outlined;
   static const IconData addConsultant = Icons.person_add_alt_outlined;
   static const IconData removeConsultant = Icons.person_remove_outlined;
 }

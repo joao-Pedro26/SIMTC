@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:simtc/data/models/auth_user.dart';
 import 'package:simtc/data/models/session_participant.dart';
@@ -15,6 +16,7 @@ import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/assessment_sync_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/device_data_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/form_factor.dart';
@@ -22,6 +24,7 @@ import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
+import 'package:simtc/ui/profile/profile_screen.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/ui/sync/sync_screen.dart';
@@ -41,6 +44,8 @@ class _MockConsultantRepository extends Mock
     implements SessionConsultantRepository {}
 
 class _MockAssessmentRepository extends Mock implements AssessmentRepository {}
+
+class _MockDeviceData extends Mock implements DeviceDataService {}
 
 void main() {
   late _MockSessionRepository repository;
@@ -1054,16 +1059,48 @@ void main() {
     expect(find.byType(SyncScreen), findsOneWidget);
   });
 
-  testWidgets('"Perfil" continua avisando que chega numa próxima versão',
+  testWidgets('"Perfil" na navbar abre a aba, e "Sessões" volta',
       (tester) async {
-    await pump(tester);
+    PackageInfo.setMockInitialValues(
+      appName: 'SIMTC',
+      packageName: 'br.com.simtc.app',
+      version: '1.0.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+    final deviceData = _MockDeviceData();
+    when(deviceData.downloadedBytes).thenAnswer((_) async => 0);
+    when(() => auth.isAuthenticated).thenReturn(true);
+    final router = createRouter(auth, initialLocation: AppRoutes.home);
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<SessionRepository>.value(value: repository),
+          Provider<AssessmentCatalogRepository>.value(value: catalog),
+          Provider<AssessmentRepository>.value(value: _MockAssessmentRepository()),
+          Provider<DeviceDataService>.value(value: deviceData),
+          ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+          ChangeNotifierProvider<AssessmentSyncService>.value(
+            value: FakeAssessmentSyncService(),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     sessions.add([hoje()]);
     await tester.pump();
 
     await tester.tap(find.text('Perfil'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileScreen), findsOneWidget);
 
-    expect(find.text('Disponível em breve.'), findsOneWidget);
+    await tester.tap(find.text('Sessões'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SessionsScreen), findsOneWidget);
   });
 
   group('tablet (Fase 7A)', () {

@@ -19,7 +19,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  /// A aba [current] dentro da moldura do tablet, com as rotas das duas abas.
+  /// A aba [current] dentro da moldura do tablet, com as rotas das três abas.
   Future<GoRouter> pumpFrame(
     WidgetTester tester, {
     AppTab current = AppTab.sessions,
@@ -36,12 +36,17 @@ void main() {
           ),
         );
     final router = GoRouter(
-      initialLocation:
-          current == AppTab.sessions ? AppRoutes.home : AppRoutes.sync,
+      initialLocation: switch (current) {
+        AppTab.sessions => AppRoutes.home,
+        AppTab.sync => AppRoutes.sync,
+        AppTab.profile => AppRoutes.profile,
+      },
       routes: [
         GoRoute(
             path: AppRoutes.home, builder: (_, __) => tab(AppTab.sessions)),
         GoRoute(path: AppRoutes.sync, builder: (_, __) => tab(AppTab.sync)),
+        GoRoute(
+            path: AppRoutes.profile, builder: (_, __) => tab(AppTab.profile)),
       ],
     );
     addTearDown(router.dispose);
@@ -201,12 +206,19 @@ void main() {
     });
   });
 
-  testWidgets('"Perfil" avisa que chega numa próxima versão', (tester) async {
+  testWidgets('"Perfil" leva à aba Perfil, que fica marcada; Sessões volta',
+      (tester) async {
     screen(tester, const Size(1280, 800));
     await pumpFrame(tester);
 
     await tester.tap(find.text('Perfil'));
-    await tester.pump();
-    expect(find.text('Disponível em breve.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('aba profile'), findsOneWidget);
+    expect(tester.widget<PillNavBar>(find.byType(PillNavBar)).currentIndex, 2);
+    expect(find.text('Disponível em breve.'), findsNothing);
+
+    await tester.tap(find.text('Sessões'));
+    await tester.pumpAndSettle();
+    expect(find.text('aba sessions'), findsOneWidget);
   });
 }
