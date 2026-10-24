@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../form_factor.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_spacing.dart';
@@ -64,7 +65,10 @@ class AppTopBar extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: AppTypography.appBarTitle,
+              // 18 no tablet (quadros "4e", "4g" e "4i").
+              style: context.isTablet
+                  ? AppTypography.appBarTitleTablet
+                  : AppTypography.appBarTitle,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

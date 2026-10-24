@@ -9,6 +9,8 @@ import 'package:simtc/data/repositories/assessment_repository.dart';
 import 'package:simtc/data/repositories/participant_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/local/app_database.dart';
+import 'package:simtc/ui/core/form_factor.dart';
+import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -130,10 +132,18 @@ void main() {
   }
 
   /// A tela 1.6 empilhada sobre uma origem, guardando como ela fechou.
+  ///
+  /// Com [tablet], num tablet desse tamanho.
   Future<void> pumpSummary(
     WidgetTester tester, {
     AssessmentRepository? assessments,
+    Size? tablet,
   }) async {
+    if (tablet != null) {
+      tester.view.physicalSize = tablet;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -143,19 +153,22 @@ void main() {
           Provider<ParticipantRepository>.value(value: participantRepository),
           Provider<AssessmentCatalogRepository>.value(value: catalogRepository),
         ],
-        child: MaterialApp(
-          home: Builder(
-            builder: (context) => Center(
-              child: ElevatedButton(
-                onPressed: () async {
-                  exit = await Navigator.of(context).push<SummaryExit>(
-                    MaterialPageRoute(
-                      builder: (_) => const SummaryScreen(participantId: 'tp-1'),
-                    ),
-                  );
-                  closed = true;
-                },
-                child: const Text('abrir'),
+        child: FormFactorScope(
+          formFactor: tablet == null ? FormFactor.phone : FormFactor.tablet,
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    exit = await Navigator.of(context).push<SummaryExit>(
+                      MaterialPageRoute(
+                        builder: (_) => const SummaryScreen(participantId: 'tp-1'),
+                      ),
+                    );
+                    closed = true;
+                  },
+                  child: const Text('abrir'),
+                ),
               ),
             ),
           ),
@@ -268,5 +281,89 @@ void main() {
         findsOneWidget);
     expect(find.byType(SummaryScreen), findsOneWidget);
     expect(closed, isFalse);
+  });
+
+  group('no tablet', () {
+    double fontSizeOf(WidgetTester tester, String text) {
+      final finder = find.text(text);
+      return tester.widget<Text>(finder).style?.fontSize ??
+          DefaultTextStyle.of(tester.element(finder)).style.fontSize!;
+    }
+
+    Finder confirm() => find.widgetWithText(AppCtaButton, 'Confirmar');
+
+    testWidgets(
+        'em paisagem: uma coluna de 940 centrada, com o "Confirmar" de 420×60 '
+        'no fim dela, à esquerda, e sem rodapé (quadro "4g")', (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(1280, 800));
+
+      final column = tester.getRect(find.byKey(const Key('summary-column')));
+      expect(column.width, 940);
+      expect(column.center.dx, 640);
+      expect(tester.getSize(confirm()), const Size(420, 60));
+      expect(tester.getTopLeft(confirm()).dx, column.left);
+      expect(
+        tester.getTopLeft(confirm()).dy,
+        greaterThan(tester.getBottomLeft(find.text('Respeito às Regras')).dy),
+      );
+      expect(tester.getTopLeft(find.text('Pontuação final')).dx, column.left);
+      expect(fontSizeOf(tester, '85,0%'), 48);
+      expect(fontSizeOf(tester, 'Pontuação final'), 13.5);
+      expect(fontSizeOf(tester, 'Aprovado'), 14);
+      expect(fontSizeOf(tester, 'Conferir e finalizar'), 18);
+      expect(fontSizeOf(tester, 'Controle do Veículo'), 16);
+      expect(fontSizeOf(tester, 'Confirmar'), 17);
+      // Paisagem: o nome e as infrações lado a lado.
+      expect(tester.getCenter(find.text('1 infração')).dy,
+          tester.getCenter(find.text('Controle do Veículo')).dy);
+      final row = find.byKey(const ValueKey('summary-category-cat-1'));
+      expect(tester.getSize(row).height, greaterThanOrEqualTo(76));
+    });
+
+    testWidgets(
+        'em retrato: recuo de 32, o nome e as infrações um embaixo do outro e o '
+        '"Confirmar" no rodapé, na largura toda (quadro "4r")', (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(800, 1280));
+
+      expect(find.byKey(const Key('summary-column')), findsNothing);
+      expect(tester.getTopLeft(find.text('Pontuação final')).dx, 32);
+      expect(tester.getSize(confirm()), const Size(800 - 2 * 32, 60));
+      expect(tester.getBottomLeft(confirm()).dy, 1280 - 16);
+      expect(tester.getTopLeft(find.text('1 infração')).dy,
+          greaterThan(tester.getBottomLeft(find.text('Controle do Veículo')).dy));
+      expect(tester.getTopRight(find.byKey(const ValueKey('summary-category-cat-1'))).dx,
+          800 - 32);
+    });
+
+    testWidgets('em paisagem, "Confirmar" do fim da coluna confirma e fecha',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(1280, 800));
+
+      await tester.tap(confirm());
+      await tester.pumpAndSettle();
+
+      expect(closed, isTrue);
+      expect(exit, isA<SummaryConfirmed>());
+    });
+
+    testWidgets('em paisagem, o erro de confirmar aparece acima do botão',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(
+        tester,
+        assessments: _FailingConfirmRepository(database: db),
+        tablet: const Size(1280, 800),
+      );
+
+      await tester.tap(confirm());
+      await tester.pumpAndSettle();
+
+      const error = 'Não foi possível confirmar a avaliação. Tente de novo.';
+      expect(tester.getBottomLeft(find.text(error)).dy,
+          lessThan(tester.getTopLeft(confirm()).dy));
+    });
   });
 }

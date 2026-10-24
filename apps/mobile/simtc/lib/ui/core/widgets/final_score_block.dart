@@ -15,7 +15,13 @@ class FinalScoreBlock extends StatelessWidget {
     required this.score,
     required this.approved,
     this.details = const [],
+    this.scale = FinalScoreScale.phone,
+    this.padding = const EdgeInsets.all(AppSpacing.xl),
   });
+
+  /// Os tamanhos do bloco: o do celular ou o da conferência no tablet.
+  final FinalScoreScale scale;
+  final EdgeInsetsGeometry padding;
 
   /// Nulo quando não há nota a mostrar: aparece "—".
   final double? score;
@@ -31,9 +37,10 @@ class FinalScoreBlock extends StatelessWidget {
     final score = this.score;
     final approved = this.approved;
     final lines = details.where((line) => line.isNotEmpty).toList(growable: false);
+    final tablet = scale == FinalScoreScale.summaryTablet;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: padding,
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -47,24 +54,34 @@ class FinalScoreBlock extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Pontuação final', style: AppTypography.summaryScoreLabel),
+                    Text(
+                      'Pontuação final',
+                      style: tablet
+                          ? AppTypography.summaryScoreLabelTablet
+                          : AppTypography.summaryScoreLabel,
+                    ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
                       score == null ? '—' : percentLabel(score),
-                      style: AppTypography.summaryScore,
+                      style: tablet
+                          ? AppTypography.summaryScoreTablet
+                          : AppTypography.summaryScore,
                     ),
                   ],
                 ),
               ),
               if (approved != null) ...[
                 const SizedBox(width: AppSpacing.md),
-                _ResultPill(approved: approved),
+                _ResultPill(approved: approved, large: tablet),
               ],
             ],
           ),
           for (var i = 0; i < lines.length; i++) ...[
             SizedBox(height: i == 0 ? AppSpacing.md + 2 : AppSpacing.xs),
-            Text(lines[i], style: AppTypography.summaryDetail),
+            Text(
+              lines[i],
+              style: tablet ? AppTypography.summaryDetailTablet : AppTypography.summaryDetail,
+            ),
           ],
         ],
       ),
@@ -72,12 +89,25 @@ class FinalScoreBlock extends StatelessWidget {
   }
 }
 
+/// Os tamanhos do [FinalScoreBlock].
+enum FinalScoreScale {
+  /// Celular (quadros "2e" e "2g").
+  phone,
+
+  /// Conferir e finalizar no tablet (quadros "4g" e "4r"): % de 48.
+  summaryTablet,
+}
+
 /// "Aprovado" ou "Não recomendado", ao lado do % — o corte de 70% do
 /// backend. As cores são as dos chips de status do detalhe da sessão.
 class _ResultPill extends StatelessWidget {
-  const _ResultPill({required this.approved});
+  const _ResultPill({required this.approved, this.large = false});
 
   final bool approved;
+
+  /// A pílula da conferência no tablet (quadro "4g"): 8/15/8/12 de recuo,
+  /// ícone de 18 e texto de 14.
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -98,12 +128,19 @@ class _ResultPill extends StatelessWidget {
           );
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm + 2,
-        AppSpacing.xs + 2,
-        AppSpacing.md,
-        AppSpacing.xs + 2,
-      ),
+      padding: large
+          ? const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md + 3,
+              AppSpacing.sm,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.sm + 2,
+              AppSpacing.xs + 2,
+              AppSpacing.md,
+              AppSpacing.xs + 2,
+            ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -112,9 +149,13 @@ class _ResultPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: ink),
-          const SizedBox(width: AppSpacing.xs + 1),
-          Text(label, style: AppTypography.resultPill.copyWith(color: ink)),
+          Icon(icon, size: large ? 18 : 16, color: ink),
+          SizedBox(width: large ? AppSpacing.xs + 2 : AppSpacing.xs + 1),
+          Text(
+            label,
+            style: (large ? AppTypography.resultPillTablet : AppTypography.resultPill)
+                .copyWith(color: ink),
+          ),
         ],
       ),
     );
