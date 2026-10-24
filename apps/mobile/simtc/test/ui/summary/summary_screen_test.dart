@@ -322,6 +322,17 @@ void main() {
     });
 
     testWidgets(
+        'em paisagem numa janela de 900, a coluna fica com 48 de cada lado',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(900, 700));
+
+      final column = tester.getRect(find.byKey(const Key('summary-column')));
+      expect(column.left, 48);
+      expect(column.right, 900 - 48);
+    });
+
+    testWidgets(
         'em retrato: recuo de 32, o nome e as infrações um embaixo do outro e o '
         '"Confirmar" no rodapé, na largura toda (quadro "4r")', (tester) async {
       await draftWith({'inf-1': 'inf-1-PM'});

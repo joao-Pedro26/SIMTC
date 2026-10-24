@@ -152,6 +152,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
 
     if (expanded) {
       return ListView(
+        // Em janelas de 840 a ~1040, a coluna não encosta nas bordas (o mesmo recuo do "não iniciada").
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.huge),
         children: [
           Center(
             child: ConstrainedBox(
