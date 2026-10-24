@@ -178,8 +178,73 @@ backend local e voltar (confere a limpeza da decisão 5).
 
 As lupas do canvas: Home (1.3), lista de participantes do detalhe (1.4) e Consultores
 da sessão (1.13, quadro `3c`). Busca **local**, nos dados já baixados (não existe
-endpoint de busca). Comportamento (campos buscados, onde o campo abre, como convive com
-os chips e as âncoras da Home) a desenhar com o usuário no início da 8B.
+endpoint de busca).
+
+### Desenho da 8B (conversa de 24/10/2026, depois da validação da 8A)
+
+O canvas só desenha as lupas (quadros `2c` linha 774, `1e`/`1f` linhas 904/994, `3c`
+linha 625; no tablet, `4c`, `4d`, `4e`, `4n`, `4y`) — nenhum quadro mostra o campo aberto
+nem o resultado. O comportamento abaixo foi decidido em chat, com desenhos no navegador.
+
+**Decisões do usuário:**
+
+1. **O que cada lupa busca:**
+   - **Detalhe da sessão:** participantes, por **nome ou CPF**.
+   - **Home:** sessões, pela **empresa**.
+   - **Consultores da sessão (ADMIN):** consultores, pelo **nome**.
+2. **Como a busca abre (o "jeito A", como o canvas desenha):** tocar na lupa troca a faixa
+   onde ela mora por um campo de busca, com o teclado aberto; a lista filtra enquanto se
+   digita; o X fecha a busca e a tela volta ao que era.
+   - **Detalhe:** o campo toma o lugar da barra dos filtros (chips). A busca procura em
+     **todos** os participantes, ignorando o filtro que estava marcado; ao fechar, o filtro
+     de antes volta. Embaixo da lista, "N de M participantes".
+   - **Home:** o campo toma o lugar do título e dos chips. As três seções (Hoje, Esta
+     semana, Concluídas) continuam, só com as sessões da empresa buscada.
+   - **Consultores:** o campo abre embaixo do cabeçalho e filtra as duas listas (quem está
+     na sessão e quem pode entrar).
+3. **CPF: comparar os primeiros dígitos digitados com os 6 que o aparelho já guarda** desde
+   a Fase 3 (`maskCpf`: `123.456.***-**`). Com 6 dígitos ou mais digitados (inclusive o CPF
+   inteiro, que o participante dita), compara os 6 primeiros; com menos, compara o que foi
+   digitado com o começo do CPF guardado. **Nada novo é guardado** e o banco não muda.
+   Numa sessão, os 6 primeiros praticamente identificam a pessoa; no caso raro de dois
+   participantes com o mesmo começo, os dois aparecem e o nome desempata. (Uma primeira
+   proposta, guardar uma "impressão" do CPF inteiro, foi descartada: somada aos 6 dígitos
+   guardados, ela deixaria só ~1.000 combinações — seria o mesmo que guardar o CPF.)
+4. **As regras gerais abaixo (marcadas "minhas") foram mostradas no navegador e aceitas.**
+
+**Escolhas minhas (aceitas pelo usuário, sem objeção):**
+
+- Não diferencia maiúscula nem acento ("jose" acha "José"); o trecho pode estar em qualquer
+  parte do nome ou da empresa ("ana" acha "Mariana").
+- No CPF, só os dígitos contam (pontos e traço são ignorados). O campo aceita o CPF com ou
+  sem máscara. Um texto que tem letras é busca por nome; um texto só de dígitos (e
+  pontuação de CPF) é busca por CPF.
+- Sem resultado: "Nenhum participante encontrado para “xyz”." (e "Nenhuma sessão…",
+  "Nenhum consultor…" nas outras).
+- Funciona sem rede, sobre o que já está no aparelho.
+- No tablet vale o mesmo jeito em cada painel: a lupa da lista da esquerda (Home), a da
+  barra de filtros do detalhe e a do cabeçalho da janela de Consultores.
+
+**Escolhas minhas depois da revisão do desenho (a conferir na leitura):**
+
+- **Cabeçalho da Home com a busca aberta:** a linha do logo e do indicador de sincronização
+  continua em cima (o indicador é a entrada da aba Sincronizar e mostra a fila); o campo
+  toma o lugar da saudação, do título e dos chips; o X fica dentro do campo. O mesmo no
+  painel da lista do tablet.
+- **Vazios durante a busca:** a seção (Home) ou a lista (Consultores) sem resultado some,
+  com o título; se tudo ficar vazio, aparece a frase "Nenhum… encontrado para “xyz”.". Em
+  Consultores, os avisos próprios da lista de disponíveis (sem conexão, todos já na sessão)
+  continuam valendo e vencem a busca.
+- **Quanto a busca dura:** o texto vive na ViewModel da tela — continua ao abrir um
+  resultado e voltar, e ao girar o tablet; trocar de aba recria a tela e fecha a busca.
+
+**Fora da 8B:** buscar participante em todas as sessões a partir da Home; buscar por
+curso ou cidade; busca no servidor.
+
+**Deixado para quem planeja:** a aparência do campo (sem quadro no canvas: usar os tokens do Design System e levar os
+desenhos ao usuário na revisão do plano), o comportamento do botão voltar do Android com a
+busca aberta, e o que acontece com as âncoras/chips da Home e a paginação de exibição
+("ver mais") durante a busca.
 
 ## 8C — Telas e acessibilidade
 
