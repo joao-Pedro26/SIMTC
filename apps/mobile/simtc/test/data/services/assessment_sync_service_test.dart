@@ -363,6 +363,44 @@ void main() {
     expect(await statusOf(a.id), LocalSyncStatus.error);
   });
 
+  test(
+      'sem o catálogo no aparelho (depois do "Limpar cache local"), a '
+      'avaliação com marcações não sai vazia: espera o catálogo voltar',
+      () async {
+    final sync = startService(retryDelays: const [Duration(milliseconds: 20)]);
+    final draft = await assessments.openDraft(
+      trainingParticipantId: 'tp-1',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+      consultantId: 'c-eu',
+    );
+    await assessments.mark(
+      localAssessmentId: draft.id,
+      infractionId: 'inf-1',
+      infractionNoteId: 'note-m',
+    );
+    await assessments.confirm(draft.id, participantName: 'P tp-1', score: 70);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    expect(sent, isEmpty);
+    expect(await statusOf(draft.id), LocalSyncStatus.pendingSync);
+    expect((await row(draft.id)).lastError, isNull);
+    expect(sync.queue, hasLength(1));
+
+    // A Home baixa o catálogo de novo: a próxima tentativa leva a marcação.
+    await db.into(db.assessmentCategories).insert(
+        AssessmentCategoriesCompanion.insert(id: 'cat-1', code: 'A', name: 'Antes', order: 1));
+    await db.into(db.infractions).insert(InfractionsCompanion.insert(
+        id: 'inf-1', categoryId: 'cat-1', description: 'Cinto', order: 1));
+    await db.into(db.infractionNotes).insert(InfractionNotesCompanion.insert(
+        id: 'note-m', infractionId: 'inf-1', noteType: 'M', deduction: 3));
+
+    await until(() async => await statusOf(draft.id) == LocalSyncStatus.synced);
+    expect(sent.single.single['items'], [
+      {'infractionNoteId': 'note-m'},
+    ]);
+  });
+
   test('uma falha ao entrar (dar dono às avaliações antigas) não impede '
       'seguir a fila', () async {
     final sync = startService(

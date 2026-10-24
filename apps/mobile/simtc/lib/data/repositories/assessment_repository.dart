@@ -329,6 +329,24 @@ class AssessmentRepository {
   Future<List<LocalAssessment>> loadQueue(String ownerUserId) =>
       _queueOf(ownerUserId).get();
 
+  /// O lote tem marcações e o catálogo não está no aparelho — o "Limpar
+  /// cache local" apagou e a Home ainda não baixou de novo (Fase 8A).
+  /// Montar o envio agora mandaria as avaliações sem nenhuma nota, porque
+  /// [syncPayload] só leva as que existem no catálogo, e o servidor as
+  /// aprovaria com 100%. Avaliação sem marcação nenhuma não precisa dele.
+  Future<bool> waitsForCatalog(List<LocalAssessment> assessments) async {
+    final note = await (_db.select(_db.infractionNotes)..limit(1))
+        .getSingleOrNull();
+    if (note != null) return false;
+
+    final ids = [for (final assessment in assessments) assessment.id];
+    final item = await (_db.select(_db.localAssessmentItems)
+          ..where((t) => t.localAssessmentId.isIn(ids))
+          ..limit(1))
+        .getSingleOrNull();
+    return item != null;
+  }
+
   /// Quantas avaliações [ownerUserId] iniciou e ainda não confirmou — todas,
   /// inclusive as presas (sessão concluída, participante liberado): a
   /// confirmação do "Sair" avisa que elas ficam no aparelho (Fase 8A).

@@ -305,6 +305,12 @@ class AssessmentSyncService extends ChangeNotifier {
       _failures = 0;
       return;
     }
+    if (await _assessments.waitsForCatalog(batch)) {
+      // Ver `AssessmentRepository.waitsForCatalog`: a fila espera, sem erro,
+      // e tenta de novo pela espera crescente — até a Home baixar o catálogo.
+      _scheduleRetry();
+      return;
+    }
 
     _sendingIds = {for (final a in batch) a.id};
     notifyListeners();
