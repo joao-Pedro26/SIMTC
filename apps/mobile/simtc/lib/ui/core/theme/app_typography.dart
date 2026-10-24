@@ -345,6 +345,36 @@ abstract final class AppTypography {
   static TextStyle get resultNoteBadge =>
       _inter(size: 10, weight: FontWeight.w700, height: 1, color: AppColors.surface);
 
+  // ─── Resultado no tablet (quadros "4i" e "4t") ────────────────────────────
+
+  /// O % geral
+  static TextStyle get resultScoreTablet =>
+      _inter(size: 44, weight: FontWeight.w800, height: 1, letterSpacing: -0.88);
+
+  /// A linha de detalhe embaixo do %
+  static TextStyle get resultDetailTablet =>
+      _inter(size: 13.5, weight: FontWeight.w400, height: 1.45, color: AppColors.text3);
+
+  /// Nome da categoria em "Desempenho por categoria"
+  static TextStyle get resultPerformanceNameTablet =>
+      _inter(size: 14, weight: FontWeight.w600, height: 1.25);
+
+  /// Nome da categoria no cabeçalho de grupo de "Infrações registradas"
+  static TextStyle get resultGroupNameTablet =>
+      _inter(size: 15.5, weight: FontWeight.w600, height: 1.25);
+
+  /// "2 infrações", no cabeçalho de grupo
+  static TextStyle get resultGroupCountTablet =>
+      _inter(size: 12.5, weight: FontWeight.w500, height: 1.2, color: AppColors.textMuted);
+
+  /// Descrição da infração registrada
+  static TextStyle get resultInfractionTablet =>
+      _inter(size: 15.5, weight: FontWeight.w400, height: 1.4);
+
+  /// A nota no selo da infração registrada
+  static TextStyle get resultNoteBadgeTablet =>
+      _inter(size: 12, weight: FontWeight.w700, height: 1, color: AppColors.surface);
+
   /// Campo de senha mascarado
   static TextStyle get passwordDots =>
       _mono(size: 18, weight: FontWeight.w600, height: 1.3, letterSpacing: 2.5);

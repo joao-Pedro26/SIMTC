@@ -38,6 +38,7 @@ class FinalScoreBlock extends StatelessWidget {
     final approved = this.approved;
     final lines = details.where((line) => line.isNotEmpty).toList(growable: false);
     final tablet = scale == FinalScoreScale.summaryTablet;
+    final result = scale == FinalScoreScale.resultTablet;
 
     return Container(
       padding: padding,
@@ -65,7 +66,9 @@ class FinalScoreBlock extends StatelessWidget {
                       score == null ? '—' : percentLabel(score),
                       style: tablet
                           ? AppTypography.summaryScoreTablet
-                          : AppTypography.summaryScore,
+                          : result
+                              ? AppTypography.resultScoreTablet
+                              : AppTypography.summaryScore,
                     ),
                   ],
                 ),
@@ -80,7 +83,11 @@ class FinalScoreBlock extends StatelessWidget {
             SizedBox(height: i == 0 ? AppSpacing.md + 2 : AppSpacing.xs),
             Text(
               lines[i],
-              style: tablet ? AppTypography.summaryDetailTablet : AppTypography.summaryDetail,
+              style: tablet
+                  ? AppTypography.summaryDetailTablet
+                  : result
+                      ? AppTypography.resultDetailTablet
+                      : AppTypography.summaryDetail,
             ),
           ],
         ],
@@ -96,6 +103,10 @@ enum FinalScoreScale {
 
   /// Conferir e finalizar no tablet (quadros "4g" e "4r"): % de 48.
   summaryTablet,
+
+  /// Resultado no tablet (quadros "4i" e "4t"): % de 44 e a pílula do
+  /// celular.
+  resultTablet,
 }
 
 /// "Aprovado" ou "Não recomendado", ao lado do % — o corte de 70% do

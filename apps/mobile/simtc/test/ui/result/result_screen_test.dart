@@ -19,6 +19,7 @@ import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/checklist/checklist_screen.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
@@ -224,8 +225,15 @@ void main() {
 
   /// O Resultado empilhado sobre uma origem, pelas rotas reais do Resultado,
   /// do checklist e da conferência.
-  Future<void> pumpResult(WidgetTester tester, {bool justConfirmed = false}) async {
+  ///
+  /// Com [tablet], num tablet desse tamanho.
+  Future<void> pumpResult(
+    WidgetTester tester, {
+    bool justConfirmed = false,
+    Size? tablet,
+  }) async {
     tallScreen(tester);
+    if (tablet != null) tester.view.physicalSize = tablet;
     final router = GoRouter(
       initialLocation: '/origem',
       routes: [
@@ -256,7 +264,10 @@ void main() {
       ],
     );
     addTearDown(router.dispose);
-    await tester.pumpWidget(withProviders(MaterialApp.router(routerConfig: router)));
+    await tester.pumpWidget(withProviders(FormFactorScope(
+      formFactor: tablet == null ? FormFactor.phone : FormFactor.tablet,
+      child: MaterialApp.router(routerConfig: router),
+    )));
     router.push(AppRoutes.participantResult('sess-1', 'tp-1', justConfirmed: justConfirmed));
     await tester.pumpAndSettle();
   }
@@ -661,5 +672,109 @@ void main() {
     await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
     expect(find.text('origem'), findsOneWidget);
+  });
+
+  group('no tablet', () {
+    double fontSizeOf(WidgetTester tester, String text) {
+      final finder = find.text(text);
+      return tester.widget<Text>(finder).style?.fontSize ??
+          DefaultTextStyle.of(tester.element(finder)).style.fontSize!;
+    }
+
+    Finder next() => find.widgetWithText(AppCtaButton, 'Próximo participante');
+
+    testWidgets(
+        'em paisagem: a nota, o desempenho e o "Próximo participante" num '
+        'painel de 452 à esquerda; as infrações à direita (quadro "4i")',
+        (tester) async {
+      await seedParticipant(status: 'EM_AVALIACAO');
+      await confirmedHere({'inf-1': 'inf-1-PM'});
+
+      await pumpResult(tester, justConfirmed: true, tablet: const Size(1280, 800));
+
+      final pane = tester.getRect(find.byKey(const Key('result-summary-pane')));
+      expect(pane.left, 0);
+      expect(pane.width, 452);
+      for (final text in ['Pontuação final', 'Desempenho por categoria']) {
+        expect(
+          find.descendant(of: find.byKey(const Key('result-summary-pane')), matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
+      for (final text in ['Infrações registradas', 'Infração do item 1']) {
+        expect(
+          find.descendant(of: find.byKey(const Key('result-infractions-pane')), matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
+      expect(tester.getTopLeft(find.byKey(const Key('result-infractions-pane'))).dx, 452 + 1);
+      final button = tester.getRect(next());
+      expect(button.left, 24);
+      expect(button.right, 452 - 24);
+      expect(button.height, 60);
+      expect(button.bottom, 800 - 24, reason: 'o botão fica no fim do painel');
+      expect(tester.getTopLeft(find.text('Pontuação final')).dx, 24);
+      expect(fontSizeOf(tester, '85,0%'), 44);
+      expect(fontSizeOf(tester, 'Avaliação concluída'), 18);
+      expect(fontSizeOf(tester, 'Infração do item 1'), 15.5);
+      expect(fontSizeOf(tester, 'Próximo participante'), 17);
+      expect(tester.getSize(find.text('PM')).height, lessThanOrEqualTo(26));
+      expect(
+        tester.getSize(find.ancestor(of: find.text('PM'), matching: find.byType(Container)).first),
+        const Size(34, 26),
+      );
+    });
+
+    testWidgets(
+        'em retrato: uma coluna com 24 de recuo, uma linha antes das infrações '
+        'e o botão no rodapé, na largura toda (quadro "4t")', (tester) async {
+      await seedParticipant(status: 'EM_AVALIACAO');
+      await confirmedHere({'inf-1': 'inf-1-PM'});
+
+      await pumpResult(tester, justConfirmed: true, tablet: const Size(800, 1280));
+
+      expect(find.byKey(const Key('result-summary-pane')), findsNothing);
+      expect(tester.getTopLeft(find.text('Pontuação final')).dx, 24);
+      expect(tester.getTopLeft(find.text('Infrações registradas')).dx, 24);
+      final button = tester.getRect(next());
+      expect(button.width, 800 - 2 * 24);
+      expect(button.height, 60);
+      expect(button.bottom, 1280 - 16);
+    });
+
+    testWidgets(
+        'em paisagem, "Reavaliar" fica no fim do painel da esquerda e, sem '
+        'rede, diz por quê', (tester) async {
+      await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
+      when(() => api.get<Object?>(resultPath)).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+      await goOffline();
+
+      await pumpResult(tester, tablet: const Size(1280, 800));
+
+      final button = find.widgetWithText(AppCtaButton, 'Reavaliar');
+      expect(tester.getRect(button).right, 452 - 24);
+      expect(tester.widget<AppCtaButton>(button).onPressed, isNull);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('result-summary-pane')),
+          matching: find.text('Disponível quando houver conexão'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('em paisagem, "Próximo participante" volta à tela de origem',
+        (tester) async {
+      await seedParticipant(status: 'EM_AVALIACAO');
+      await confirmedHere({'inf-1': 'inf-1-PM'});
+
+      await pumpResult(tester, justConfirmed: true, tablet: const Size(1280, 800));
+      await tester.tap(next());
+      await tester.pumpAndSettle();
+
+      expect(find.text('origem'), findsOneWidget);
+    });
   });
 }
