@@ -4979,3 +4979,21 @@ Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-deb
 - **8C:** a lista do desenho da Fase 8 (carregamento, erro e vazio em todas as telas; fonte ampliada; leitor de tela; contraste; ondulação do toque; toque duplo); as decisões visuais em aberto da 5B e da 6A — que agora incluem o contorno vermelho e o botão compacto do "Sair da conta" no tablet (ver "Ajustes"); os diálogos de confirmação usam a fonte padrão do Material, e não a Inter, em todo o app.
 - **8D:** as pendências "8" dos planos 3 a 7B que não entraram aqui; o aparelho compartilhado (a fila e os rascunhos de quem saiu ficam no aparelho até o dono entrar de novo — agora de propósito, pela decisão 4); o perfil salvo de outro usuário, se o app morrer entre o login e a gravação do perfil depois de uma falha da keystore (ver "Ajustes"); e quais pendências de backend e de web entram.
 - **Distribuição (fora da Fase 8):** a keystore própria do release.
+
+### Observações das revisões da execução (24/10/2026)
+
+**8C (telas):**
+- O vão entre o rótulo e o valor das linhas do Perfil é 12; o canvas desenha 14 no celular (`2i`) e 16 no tablet (`4k`/`4v`). Só aparece com rótulo longo. Decidir com o usuário, junto com as outras decisões visuais.
+- No tablet, o "Sair da conta" compacto encolhe para a largura do indicador enquanto sai (até 5 s), e o nome e o e-mail se realinham.
+- Dois toques rápidos no "Sair da conta" podem empilhar dois diálogos (o botão continua ativo enquanto as avaliações iniciadas são contadas).
+
+**8D (borda, limpeza e testes):**
+- Renovação de token: os ramos que encerram a sessão (4xx, token nulo, resposta sem token) não conferem se a sessão ainda é a mesma — um 4xx com o token antigo depois de um login novo derruba a sessão nova; falta o teste do caso "outro login" em `api_client_test.dart`.
+- Logout que lança no meio (keystore ou banco) deixa o estado pela metade e mostra "Não foi possível sair".
+- Troca de servidor: se o `clearAll` falhar, a abertura vai ao login e a fila antiga fica (e iria ao servidor novo).
+- Depois do "Limpar cache local", a fila espera o catálogo; quando ele volta, o envio só sai no próximo gatilho (até 10 min); a aba Sincronizar não diz por que a fila não saiu; a espera vale para o lote inteiro.
+- Envio da fila: falta o teste do 401 com o usuário trocado durante o POST; o nome do teste "401 no envio (sessão encerrada)" engana; o comentário do `onError` é impreciso; o recuo dos dois `listen` difere.
+- Perfil: `countDrafts` carrega as linhas em vez de `COUNT(*)`; `_isClearing` volta a `false` antes de medir de novo; o `catch` de `countStartedDrafts` não tem teste nem log; `sizeLabel` perto dos limites ("1024 KB"); faltam testes de `mounted` falso, linha com o motivo de sem rede, e-mail longo, `expand: false` isolado; o teste do giro confere o `State` acima da moldura; os ternários do tablet em `_ProfileRow`.
+- Testes que conferem pouco: o de dispose da Home (olha `isRefreshing`); o do timeout do logout não confere a limpeza do cache; `LogoCache` sem teste automático.
+- Ruído na saída da suíte: "Catálogo não atualizado (sem rede)" e os `debugPrint` novos do envio.
+- `README.md` do app: a seção do backend local ainda diz "Em desenvolvimento, o app fala com o backend que roda no PC".
