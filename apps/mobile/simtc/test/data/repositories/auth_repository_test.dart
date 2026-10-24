@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -295,6 +296,23 @@ void main() {
       ]);
     });
 
+    test('falha ao apagar o perfil do login anterior não impede o login',
+        () async {
+      stubLogin(token: fakeJwt({'sub': 'user-2'}));
+      stubMe({'id': 'user-2', 'name': 'Bruno', 'email': 'b@s.com', 'role': 'CONSULTANT'});
+      when(() => storage.deleteUser())
+          .thenThrow(PlatformException(code: 'keystore'));
+
+      final result = await repository.login(
+        email: 'b@s.com',
+        password: '123456',
+        keepSignedIn: true,
+      );
+
+      expect(result, isA<Success<AuthUser>>());
+      verify(() => storage.persistUser(any())).called(1);
+    });
+
     test('falha ao gravar o perfil não impede o login', () async {
       stubLogin(token: fakeJwt({'sub': 'user-1'}));
       stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
@@ -431,6 +449,31 @@ void main() {
     expect(repository.isAuthenticated, isFalse);
     expect(await session.readAccessToken(), isNull);
     verify(() => storage.clear()).called(greaterThanOrEqualTo(1));
+  });
+
+  test(
+      'logout não espera o servidor além do limite: sem resposta, sai do '
+      'mesmo jeito', () async {
+    repository = AuthRepository(
+      apiClient: api,
+      session: session,
+      clearLocalCache: db.clearSessionsCache,
+      logoutTimeout: const Duration(milliseconds: 10),
+    );
+    stubLogin(token: fakeJwt({'sub': 'user-1'}));
+    stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+    await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: true);
+    when(() => api.post<void>('/auth/logout'))
+        .thenAnswer((_) => Completer<Response<void>>().future);
+
+    await repository.logout();
+
+    expect(repository.isAuthenticated, isFalse);
+    expect(await session.readAccessToken(), isNull);
+  });
+
+  test('o limite padrão de espera do logout é de 5 segundos', () {
+    expect(AuthRepository.defaultLogoutTimeout, const Duration(seconds: 5));
   });
 
   test(

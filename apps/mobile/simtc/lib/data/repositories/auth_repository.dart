@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../utils/result.dart';
@@ -13,9 +15,18 @@ class AuthRepository extends ChangeNotifier {
     required ApiClient apiClient,
     required AuthSession session,
     required Future<void> Function() clearLocalCache,
+    this.logoutTimeout = defaultLogoutTimeout,
   })  : _api = apiClient,
         _session = session,
         _clearLocalCache = clearLocalCache;
+
+  /// Quanto o "Sair" espera o `POST /auth/logout`. Com sinal ruim ("conectado
+  /// mas sem dados") a chamada levaria os 15 s do `ApiClient`, com o botão
+  /// girando; passado isto, o aparelho sai do mesmo jeito (Fase 8A). O token
+  /// que o servidor não chegou a invalidar continua valendo até vencer.
+  final Duration logoutTimeout;
+
+  static const Duration defaultLogoutTimeout = Duration(seconds: 5);
 
   final ApiClient _api;
   final AuthSession _session;
@@ -146,9 +157,11 @@ class AuthRepository extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _api.post<void>('/auth/logout');
+      await _api.post<void>('/auth/logout').timeout(logoutTimeout);
     } on ApiException {
       // Sem rede ou token já inválido: a sessão local é limpa de qualquer forma.
+    } on TimeoutException {
+      // Ver [logoutTimeout].
     }
     await _session.clear();
     await _clearLocalCache();

@@ -289,6 +289,19 @@ void main() {
       expect(await db.select(db.sessions).get(), isEmpty);
     });
 
+    test(
+        'cada limpeza do cache baixado sobe a geração — um download no ar '
+        'confere isso antes de gravar', () async {
+      expect(db.cacheGeneration, 0);
+
+      await db.clearSessionsCache();
+      expect(db.cacheGeneration, 1);
+      await db.clearDownloadedData();
+      expect(db.cacheGeneration, 2);
+      await db.clearAll();
+      expect(db.cacheGeneration, 3);
+    });
+
     test('replaceSessionConsultants troca só os da sessão pedida', () async {
       await insertSession('sess-1');
       await insertSession('sess-2');

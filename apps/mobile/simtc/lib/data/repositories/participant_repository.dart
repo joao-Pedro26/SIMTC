@@ -100,6 +100,7 @@ class ParticipantRepository {
   /// posterior a ele (a linha "Enviada" do detalhe compara os dois horários).
   Future<Result<int>> syncSession(String sessionId) async {
     final requestedAt = _now();
+    final generation = _db.cacheGeneration;
     try {
       final response =
           await _api.get<Map<String, dynamic>>('/training-sessions/$sessionId');
@@ -130,12 +131,19 @@ class ParticipantRepository {
         return Success(participants.length);
       }
 
-      await _write(
+      final written = await _write(
         session,
         participants,
         SessionConsultant.listFromJson(body),
         requestedAt,
+        generation,
       );
+      if (!written) {
+        return Failure(
+          Exception('cache apagado durante o download'),
+          _refreshFailed,
+        );
+      }
       return Success(participants.length);
     } on ApiException catch (error) {
       // 403 (consultor saiu da sessão) e 404 (sessão apagada) têm mensagem
@@ -148,11 +156,14 @@ class ParticipantRepository {
     }
   }
 
-  Future<void> _write(
+  /// Devolve `false`, sem gravar nada, se o cache foi apagado depois que o
+  /// download começou ([AppDatabase.cacheGeneration]).
+  Future<bool> _write(
     TrainingSession session,
     List<SessionParticipant> participants,
     List<SessionConsultant>? consultants,
     DateTime now,
+    int generation,
   ) {
     final assessable = participants
         .where((p) => p.participationType == ParticipationType.teoricaEPratica)
@@ -178,6 +189,7 @@ class ParticipantRepository {
     );
 
     return _db.transaction(() async {
+      if (_db.cacheGeneration != generation) return false;
       // `cachedAt` só entra se a linha for nova: é a idade da agenda inteira
       // que a Home mostra offline, e o detalhe de uma sessão não atualiza as
       // outras. No conflito, o `DoUpdate` grava só `fields`.
@@ -217,6 +229,7 @@ class ParticipantRepository {
           consultants.map((c) => c.toCompanion(session.id)),
         );
       }
+      return true;
     });
   }
 

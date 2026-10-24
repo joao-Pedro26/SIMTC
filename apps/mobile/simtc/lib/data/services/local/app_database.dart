@@ -93,6 +93,14 @@ class AppDatabase extends _$AppDatabase {
 
   static QueryExecutor _openConnection() => driftDatabase(name: 'simtc');
 
+  /// Sobe a cada limpeza do cache baixado — sair da conta, "Limpar cache
+  /// local", troca de servidor. Um download que começou antes de uma limpeza
+  /// confere isto antes de gravar e desiste se mudou: senão, a agenda de quem
+  /// saiu voltaria para o aparelho de quem entrar depois (Fase 8A). Só vale
+  /// enquanto o app está aberto, que é o tempo de vida de um download.
+  int get cacheGeneration => _cacheGeneration;
+  int _cacheGeneration = 0;
+
   /// Apaga o cache de sessões e participantes (os consultores de cada sessão
   /// vão junto, pela chave estrangeira em cascata).
   ///
@@ -101,6 +109,7 @@ class AppDatabase extends _$AppDatabase {
   /// próximo consultor a entrar mostraria a agenda do anterior — offline, por
   /// tempo indefinido — até o primeiro sync.
   Future<void> clearSessionsCache() {
+    _cacheGeneration++;
     return transaction(() async {
       // Participantes têm FK para a sessão: apagar antes deles evita violar
       // a restrição, mesma ordem usada em `SessionRepository._write`.
@@ -113,6 +122,7 @@ class AppDatabase extends _$AppDatabase {
   /// servidor — sessões, participantes, consultores e catálogo —, sem tocar
   /// na fila nem nos rascunhos.
   Future<void> clearDownloadedData() {
+    _cacheGeneration++;
     return transaction(() async {
       await delete(sessionConsultants).go();
       await delete(participants).go();

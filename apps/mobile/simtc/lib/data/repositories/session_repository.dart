@@ -203,6 +203,7 @@ class SessionRepository {
   Future<Result<int>> syncAll() async {
     final sessions = <TrainingSession>[];
     var reachedEnd = false;
+    final generation = _db.cacheGeneration;
 
     // Calculado uma vez antes do laço: uma virada de meia-noite no meio do
     // sync não pode mudar o filtro entre páginas.
@@ -252,7 +253,14 @@ class SessionRepository {
       // pode subir crua — quem chama (`SessionsListViewModel.refresh`) espera
       // sempre um `Result`, e uma exceção sem tratamento trava o
       // pull-to-refresh (o `_isRefreshing` de lá nunca volta a `false`).
-      await _write(sessions, prune: reachedEnd);
+      final written =
+          await _write(sessions, prune: reachedEnd, generation: generation);
+      if (!written) {
+        return Failure(
+          Exception('cache apagado durante o download'),
+          _offlineMessage,
+        );
+      }
       return Success(sessions.length);
     } on ApiException catch (error) {
       return Failure(error, _offlineMessage);
@@ -266,10 +274,17 @@ class SessionRepository {
     }
   }
 
-  Future<void> _write(List<TrainingSession> sessions, {required bool prune}) {
+  /// Devolve `false`, sem gravar nada, se o cache foi apagado depois que o
+  /// download começou ([AppDatabase.cacheGeneration]).
+  Future<bool> _write(
+    List<TrainingSession> sessions, {
+    required bool prune,
+    required int generation,
+  }) {
     final now = DateTime.now();
 
     return _db.transaction(() async {
+      if (_db.cacheGeneration != generation) return false;
       if (prune) {
         final ids = sessions.map((s) => s.id).toList(growable: false);
         // Participantes têm chave estrangeira para a sessão: apagar a sessão
@@ -308,6 +323,7 @@ class SessionRepository {
               ),
             );
       }
+      return true;
     });
   }
 }

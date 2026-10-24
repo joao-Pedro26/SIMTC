@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
@@ -137,6 +139,22 @@ void main() {
 
     expect(result.isFailure, isTrue);
     expect(await db.select(db.sessions).get(), hasLength(1));
+  });
+
+  test(
+      'a agenda que chega depois de o cache ser apagado (sair da conta) não '
+      'grava — senão ela voltaria para o próximo a entrar', () async {
+    final response = Completer<Response<Map<String, dynamic>>>();
+    when(() => api.get<Map<String, dynamic>>('/training-sessions',
+            queryParameters: any(named: 'queryParameters')))
+        .thenAnswer((_) => response.future);
+
+    final sync = repository.syncAll();
+    await db.clearSessionsCache();
+    response.complete(page([sessionJson('s1')], pageNumber: 1, totalPages: 1));
+
+    expect((await sync).isFailure, isTrue);
+    expect(await db.select(db.sessions).get(), isEmpty);
   });
 
   test(

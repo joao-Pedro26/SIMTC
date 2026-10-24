@@ -46,6 +46,11 @@ class SessionsListViewModel extends ChangeNotifier {
   String? _errorMessage;
   DateTime? _lastSyncedAt;
 
+  // A Home é fechada no "Sair" com o sync da abertura ainda no ar (ele é
+  // `unawaited`). Sem esta guarda, o `finally` do `refresh` chamaria
+  // notifyListeners depois do dispose — a mesma da `SessionDetailViewModel`.
+  bool _disposed = false;
+
   SessionFilter get filter => _filter;
   bool get isRefreshing => _isRefreshing;
   String? get errorMessage => _errorMessage;
@@ -160,7 +165,13 @@ class SessionsListViewModel extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    _disposed = true;
     _sessionsSubscription?.cancel();
     _syncedAtSubscription?.cancel();
     _reconnectSubscription?.cancel();

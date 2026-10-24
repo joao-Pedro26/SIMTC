@@ -117,6 +117,21 @@ void main() {
     verify(repository.syncAll).called(2);
   });
 
+  test(
+      'a tela fechada com a atualização no ar (o "Sair" logo depois de abrir a '
+      'Home) não recebe aviso depois', () async {
+    final sync = Completer<Result<int>>();
+    when(repository.syncAll).thenAnswer((_) => sync.future);
+    final vm = build()..init();
+    await Future<void>.delayed(Duration.zero);
+
+    vm.dispose();
+    sync.complete(const Success(1));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(vm.isRefreshing, isFalse);
+  });
+
   test('os contadores dos chips não dependem do filtro escolhido', () async {
     final viewModel = build()..init();
     sessions.add([

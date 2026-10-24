@@ -336,6 +336,23 @@ void main() {
             'Não foi possível atualizar. Mostrando os dados já baixados.'),
       );
     });
+
+    test(
+        'o detalhe que chega depois de o cache ser apagado (sair da conta) não '
+        'grava', () async {
+      await seedSession();
+      final response = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.get<Map<String, dynamic>>(detailPath))
+          .thenAnswer((_) => response.future);
+
+      final sync = repository.syncSession('sess-1');
+      await db.clearSessionsCache();
+      response.complete(ok(detailJson([participantJson('tp-1')])));
+
+      expect(await sync, isA<Failure<int>>());
+      expect(await db.select(db.sessions).get(), isEmpty);
+      expect(await db.select(db.participants).get(), isEmpty);
+    });
   });
 
   group('download velho depois de mudança aceita', () {

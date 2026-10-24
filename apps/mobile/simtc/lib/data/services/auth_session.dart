@@ -50,8 +50,15 @@ class AuthSession {
     await _storage.setKeepSignedIn(keepSignedIn);
     // O perfil salvo é do login anterior. Apagá-lo antes de gravar os tokens
     // novos garante que um par de tokens nunca fique com o perfil de outra
-    // pessoa — nem se o app morrer antes do `saveUser` deste login.
-    await _storage.deleteUser();
+    // pessoa — nem se o app morrer antes do `saveUser` deste login. Se a
+    // keystore falhar aqui, o login segue: o `saveUser` logo depois grava por
+    // cima o perfil certo, e só o app morrendo entre os dois deixaria o
+    // perfil antigo — melhor do que não deixar ninguém entrar.
+    try {
+      await _storage.deleteUser();
+    } catch (_) {
+      // Ver acima.
+    }
     await updateTokens(accessToken, refreshToken);
   }
 
