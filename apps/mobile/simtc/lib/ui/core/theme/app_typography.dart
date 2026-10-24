@@ -78,6 +78,22 @@ abstract final class AppTypography {
   static TextStyle get profileNote =>
       _inter(size: 12.5, weight: FontWeight.w400, height: 1.45, color: AppColors.text3);
 
+  /// Os mesmos no tablet (quadros "4k" e "4v"), mais o nome
+  static TextStyle get profileNameTablet =>
+      _inter(size: 22, weight: FontWeight.w600, height: 1.25);
+
+  static TextStyle get profileEmailTablet =>
+      _inter(size: 14, weight: FontWeight.w400, height: 1.3, color: AppColors.text3);
+
+  static TextStyle get profileRowLabelTablet =>
+      _inter(size: 16, weight: FontWeight.w500, height: 1.3);
+
+  static TextStyle get profileRowValueTablet =>
+      _inter(size: 14.5, weight: FontWeight.w400, height: 1.3);
+
+  static TextStyle get profileNoteTablet =>
+      _inter(size: 13, weight: FontWeight.w400, height: 1.45, color: AppColors.text3);
+
   /// Título do cartão âmbar da fila sem rede ("3 avaliações na fila")
   static TextStyle get queueNoticeTitle =>
       _inter(size: 16, weight: FontWeight.w600, height: 1.25, color: AppColors.noteCommentInk);

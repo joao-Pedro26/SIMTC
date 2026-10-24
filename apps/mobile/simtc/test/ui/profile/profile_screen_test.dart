@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/auth_user.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/profile/profile_labels.dart';
+import 'package:simtc/ui/profile/profile_screen.dart';
 
 import '../../support/fake_assessment_sync_service.dart';
 import 'profile_harness.dart';
@@ -82,6 +84,36 @@ void main() {
     await h.pump(tester);
 
     expect(tester.widget<PillNavBar>(find.byType(PillNavBar)).currentIndex, 2);
+  });
+
+  testWidgets(
+      'no tablet, girar com a limpeza em andamento não recria a tela: a linha '
+      'continua girando e o fim da limpeza chega', (tester) async {
+    final gate = Completer<void>();
+    when(() => h.deviceData.clearDownloaded()).thenAnswer((_) => gate.future);
+    await h.pump(tester, size: const Size(1280, 800), formFactor: FormFactor.tablet);
+    final state = tester.state(find.byType(ProfileScreen));
+
+    await tester.tap(row('cache'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Limpar'));
+    await closeDialog(tester);
+    for (final size in const [Size(800, 1280), Size(1280, 800), Size(800, 1280)]) {
+      tester.view.physicalSize = size;
+      await tester.pump();
+      expect(tester.state(find.byType(ProfileScreen)), same(state));
+      expect(
+        find.descendant(
+          of: row('cache'),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+    }
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Cache local limpo.'), findsOneWidget);
   });
 
   testWidgets('o voltar do Android leva para Sessões', (tester) async {

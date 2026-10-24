@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import '../../data/services/assessment_sync_service.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../data/services/device_data_service.dart';
 import '../../router.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -18,7 +21,8 @@ import '../core/widgets/app_nav_bar.dart';
 import 'profile_labels.dart';
 import 'profile_viewmodel.dart';
 
-/// Tela 1.10 — aba "Perfil" (quadro "2i" do canvas, Fase 8A).
+/// Tela 1.10 — aba "Perfil" (quadros "2i" do celular e "4k"/"4v" do tablet,
+/// Fase 8A).
 ///
 /// Quem entrou, o perfil de acesso, a última sincronização, o "Limpar cache
 /// local" e a versão do app; e o "Sair da conta", que pede confirmação. Sem a
@@ -63,13 +67,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sync = context.watch<AssessmentSyncService>();
     final isOffline = context.watch<ConnectivityService>().isOffline;
     final now = (widget.clock ?? DateTime.now)();
+    final tablet = context.isTablet;
     final content = Column(
       children: [
-        _buildHeader(),
+        _buildHeader(tablet: tablet),
         Expanded(
           child: ListenableBuilder(
             listenable: _viewModel,
-            builder: (context, _) => _buildBody(sync, isOffline, now),
+            builder: (context, _) => tablet
+                ? _buildTabletBody(sync, isOffline, now)
+                : _buildBody(sync, isOffline, now),
           ),
         ),
       ],
@@ -85,27 +92,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: TabSnackBarArea(
         child: Scaffold(
           backgroundColor: AppColors.surface,
-          body: SafeArea(child: content),
-          bottomNavigationBar: const AppNavBar(current: AppTab.profile),
+          body: SafeArea(
+            child: tablet
+                ? TabletNavFrame(current: AppTab.profile, child: content)
+                : content,
+          ),
+          bottomNavigationBar:
+              tablet ? null : const AppNavBar(current: AppTab.profile),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  /// Tablet: 14 em cima e embaixo, 24 dos lados e título de 24 (quadros
+  /// "4k" e "4v").
+  Widget _buildHeader({required bool tablet}) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm + 2,
+      padding: tablet
+          ? const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+              vertical: AppSpacing.md + 2,
+            )
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.sm,
+              AppSpacing.sm,
+              AppSpacing.sm + 2,
+            ),
+      child: Text(
+        'Perfil',
+        style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
       ),
-      child: Text('Perfil', style: AppTypography.screenTitle),
+    );
+  }
+
+  /// No tablet, uma coluna de no máximo 820, centrada, com 24 de margem
+  /// pelo menos (quadros "4k" e "4v").
+  static const double _tabletColumnWidth = 820;
+
+  Widget _buildTabletBody(
+    AssessmentSyncService sync,
+    bool isOffline,
+    DateTime now,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = math.max(
+          AppSpacing.xxl,
+          (constraints.maxWidth - _tabletColumnWidth) / 2,
+        );
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            side,
+            AppSpacing.xxl,
+            side,
+            AppSpacing.xxxl,
+          ),
+          children: [
+            _buildTabletIdentity(_viewModel.user, isOffline),
+            _buildRows(sync, isOffline, now, tablet: true),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.lg),
+              child: Text(_footnote, style: AppTypography.profileNoteTablet),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Tablet: o nome e o e-mail à esquerda, o "Sair da conta" à direita, 16
+  /// entre os dois e 22 até as linhas.
+  Widget _buildTabletIdentity(AuthUser? user, bool isOffline) {
+    return Padding(
+      key: const Key('profile-identity'),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl + 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user?.name ?? '', style: AppTypography.profileNameTablet),
+                const SizedBox(height: AppSpacing.xs + 1),
+                Text(
+                  user?.email ?? '',
+                  style: AppTypography.profileEmailTablet,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          _buildLogoutButton(isOffline, compact: true),
+        ],
+      ),
     );
   }
 
@@ -161,7 +248,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// As quatro linhas, coladas: uma divisória de 1,5 em cima do grupo e uma
   /// embaixo de cada linha (o quadro desenha em cima e embaixo de cada uma,
   /// o que somaria 3 entre duas).
-  Widget _buildRows(AssessmentSyncService sync, bool isOffline, DateTime now) {
+  Widget _buildRows(
+    AssessmentSyncService sync,
+    bool isOffline,
+    DateTime now, {
+    bool tablet = false,
+  }) {
     final user = _viewModel.user;
     final bytes = _viewModel.cacheBytes;
     final busy = _viewModel.isClearing || _viewModel.isLoggingOut;
@@ -177,18 +269,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _ProfileRow(
             key: const Key('profile-row-role'),
+            tablet: tablet,
             icon: AppIcons.accessRole,
             label: 'Perfil de acesso',
             value: user == null ? '' : roleLabel(user.role),
           ),
           _ProfileRow(
             key: const Key('profile-row-sync'),
+            tablet: tablet,
             icon: AppIcons.sync,
             label: 'Última sincronização',
             value: lastSyncValue(sync.lastSyncedAt, now),
           ),
           _ProfileRow(
             key: const Key('profile-row-cache'),
+            tablet: tablet,
             icon: AppIcons.clearCache,
             label: 'Limpar cache local',
             note: isOffline ? 'Disponível quando houver conexão' : null,
@@ -198,6 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           _ProfileRow(
             key: const Key('profile-row-version'),
+            tablet: tablet,
             icon: AppIcons.info,
             label: 'Versão do app',
             value: _viewModel.version ?? '—',
@@ -208,10 +304,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLogoutButton(bool isOffline) {
+  /// No tablet, [compact]: o botão de 48 ao lado do nome, da largura do
+  /// rótulo (quadros "4k" e "4v").
+  Widget _buildLogoutButton(bool isOffline, {bool compact = false}) {
     return AppDangerOutlineButton(
       label: 'Sair da conta',
       icon: AppIcons.logout,
+      compact: compact,
+      expand: !compact,
       isLoading: _viewModel.isLoggingOut,
       onPressed: _viewModel.isClearing ? null : () => _confirmLogout(isOffline),
     );
@@ -290,11 +390,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 /// Uma linha do Perfil (quadro "2i"): ícone de 22, rótulo e valor; 15 em
 /// cima e embaixo, 20 dos lados, 14 entre o ícone e o rótulo, e pelo menos
-/// 56 de altura. Com [onTap], a linha inteira é o alvo do toque; [note]
-/// aparece embaixo do rótulo (o motivo de estar desativada).
+/// 56 de altura. No [tablet] (quadros "4k" e "4v"): ícone de 23, 18 em cima e
+/// embaixo, sem recuo dos lados (a coluna já tem), 16 entre o ícone e o
+/// rótulo e pelo menos 64. Com [onTap], a linha inteira é o alvo do toque;
+/// [note] aparece embaixo do rótulo (o motivo de estar desativada).
 class _ProfileRow extends StatelessWidget {
   const _ProfileRow({
     super.key,
+    this.tablet = false,
     required this.icon,
     required this.label,
     required this.value,
@@ -304,6 +407,7 @@ class _ProfileRow extends StatelessWidget {
     this.onTap,
   });
 
+  final bool tablet;
   final IconData icon;
   final String label;
   final String value;
@@ -314,6 +418,8 @@ class _ProfileRow extends StatelessWidget {
 
   static const double _iconSize = 22;
   static const double _iconGap = AppSpacing.md + 2;
+  static const double _tabletIconSize = 23;
+  static const double _tabletMinHeight = AppSpacing.controlHeight + AppSpacing.sm;
   static const double _spinnerSize = 16;
 
   @override
@@ -324,23 +430,36 @@ class _ProfileRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: AppSpacing.controlHeight),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: AppSpacing.md + 3,
+          constraints: BoxConstraints(
+            minHeight: tablet ? _tabletMinHeight : AppSpacing.controlHeight,
           ),
+          padding: tablet
+              ? const EdgeInsets.symmetric(vertical: AppSpacing.lg + 2)
+              : const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl,
+                  vertical: AppSpacing.md + 3,
+                ),
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
           ),
           child: Row(
             children: [
-              Icon(icon, size: _iconSize, color: AppColors.text3),
-              const SizedBox(width: _iconGap),
+              Icon(
+                icon,
+                size: tablet ? _tabletIconSize : _iconSize,
+                color: AppColors.text3,
+              ),
+              SizedBox(width: tablet ? AppSpacing.lg : _iconGap),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: AppTypography.profileRowLabel),
+                    Text(
+                      label,
+                      style: tablet
+                          ? AppTypography.profileRowLabelTablet
+                          : AppTypography.profileRowLabel,
+                    ),
                     if (note != null) ...[
                       const SizedBox(height: AppSpacing.xxs),
                       Text(note, style: AppTypography.meta),
@@ -358,9 +477,10 @@ class _ProfileRow extends StatelessWidget {
               else
                 Text(
                   value,
-                  style: AppTypography.profileRowValue.copyWith(
-                    color: valueColor,
-                  ),
+                  style: (tablet
+                          ? AppTypography.profileRowValueTablet
+                          : AppTypography.profileRowValue)
+                      .copyWith(color: valueColor),
                 ),
             ],
           ),

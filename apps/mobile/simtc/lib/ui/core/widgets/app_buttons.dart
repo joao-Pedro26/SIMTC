@@ -302,7 +302,8 @@ class AppCtaButton extends StatelessWidget {
 /// botão principal — "Cancelar sessão" (canvas "3b"): mora no fim da tela,
 /// longe do salvar. Com [compact], é a ação de uma linha de lista — "Remover
 /// da sessão" (canvas "3c"): o quadro a desenha com 44dp, aqui ela tem 48dp, o
-/// alvo mínimo do DS.
+/// alvo mínimo do DS. Sem [expand], tem a largura do rótulo em vez da do pai
+/// — o "Sair da conta" ao lado do nome, no Perfil do tablet.
 class AppDangerOutlineButton extends StatelessWidget {
   const AppDangerOutlineButton({
     super.key,
@@ -311,6 +312,7 @@ class AppDangerOutlineButton extends StatelessWidget {
     this.isLoading = false,
     this.icon,
     this.compact = false,
+    this.expand = true,
   });
 
   final String label;
@@ -318,6 +320,7 @@ class AppDangerOutlineButton extends StatelessWidget {
   final bool isLoading;
   final IconData? icon;
   final bool compact;
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +328,7 @@ class AppDangerOutlineButton extends StatelessWidget {
 
     return SizedBox(
       height: compact ? AppSpacing.touchTarget : AppSpacing.controlHeight,
-      width: double.infinity,
+      width: expand ? double.infinity : null,
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
@@ -367,12 +370,17 @@ class AppDangerOutlineButton extends StatelessWidget {
   Widget _buildContent() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (icon != null) ...[
           Icon(icon, size: compact ? 19 : 20),
           const SizedBox(width: AppSpacing.sm),
         ],
-        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+        // Sem [expand], a largura é a do rótulo: não há o que encolher.
+        if (expand)
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis))
+        else
+          Text(label),
       ],
     );
   }
