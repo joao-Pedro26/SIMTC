@@ -147,8 +147,11 @@ GoRouter createRouter(
         routes: [
           GoRoute(
             path: 'edit',
-            builder: (context, state) => SessionEditScreen(
-              sessionId: state.pathParameters['sessionId']!,
+            pageBuilder: (context, state) => _adminPage(
+              context,
+              state,
+              AdminDialogSize.sessionEdit,
+              SessionEditScreen(sessionId: state.pathParameters['sessionId']!),
             ),
           ),
           GoRoute(

@@ -28,6 +28,7 @@ import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
+import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/ui/sessions/sessions_split_view.dart';
@@ -596,6 +597,62 @@ void main() {
       final rect = tester.getRect(dialog());
       expect(rect.bottom, lessThanOrEqualTo(800 - 400));
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'em paisagem, "Editar dados do treinamento" abre numa janela de 600, a '
+        '68 do topo, com o lápis marcado e o rodapé numa linha (quadro "4m")',
+        (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+
+      await tester.tap(find.byTooltip('Editar dados do treinamento'));
+      await settle(tester);
+
+      expect(find.byType(SessionEditScreen), findsOneWidget);
+      final rect = tester.getRect(dialog());
+      expect(rect.width, 600);
+      expect(rect.right, 1280 - 40);
+      expect(rect.top, 68);
+      expect(highlighted(tester, 'Editar dados do treinamento'), isTrue);
+      expect(highlighted(tester, 'Consultores da sessão'), isFalse);
+      expect(find.text('Bracell · Direção Defensiva'), findsOneWidget);
+      final cta = find.widgetWithText(AppCtaButton, 'Salvar alterações');
+      expect(tester.getSize(cta).height, 52);
+      expect(tester.getCenter(find.text('Descartar')).dy, tester.getCenter(cta).dy);
+    });
+
+    testWidgets(
+        'girar com o local alterado não perde o que foi digitado; o fundo '
+        'pergunta antes de descartar', (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Editar dados do treinamento'));
+      await settle(tester);
+      final form = tester.state(find.byType(SessionEditScreen));
+      final city = find.descendant(
+        of: find.byKey(const Key('campo-cidade')),
+        matching: find.byType(EditableText),
+      );
+
+      await tester.enterText(city, 'Itabirito');
+      await tester.pump();
+
+      for (final size in [_portrait, _landscape, _portrait, _landscape]) {
+        await rotate(tester, size);
+        expect(identical(tester.state(find.byType(SessionEditScreen)), form), isTrue);
+        expect(find.text('Itabirito'), findsOneWidget);
+      }
+
+      await tester.tapAt(const Offset(200, 400));
+      await settle(tester);
+      expect(find.text('Descartar as alterações?'), findsOneWidget);
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Descartar'),
+      ));
+      await settle(tester);
+
+      expect(dialog(), findsNothing);
+      expect(highlighted(tester, 'Editar dados do treinamento'), isFalse);
     });
   });
 }

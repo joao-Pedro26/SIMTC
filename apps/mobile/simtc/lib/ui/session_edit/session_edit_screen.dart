@@ -9,10 +9,12 @@ import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
+import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
@@ -114,25 +116,31 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && !_viewModel.isBusy) _confirmLeave();
       },
-      child: Scaffold(
-        backgroundColor: AppColors.surface,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Sem toque: abrir a aba Sincronizar daqui largaria o formulário.
-              const AppTopBar(
-                title: 'Dados do treinamento',
-                trailing: SyncStatusIndicator(),
-              ),
-              ConnectivityBanner(
-                isOffline: isOffline,
-                message: 'Sem conexão — salvar e cancelar precisam de internet.',
-              ),
-              Expanded(child: _buildBody(isOffline)),
-              if (_viewModel.session != null)
-                _buildFooter(isOffline, keyboardOpen),
-            ],
-          ),
+      child: context.isTablet
+          ? _buildDialog(isOffline, keyboardOpen)
+          : _buildPage(isOffline, keyboardOpen),
+    );
+  }
+
+  Widget _buildPage(bool isOffline, bool keyboardOpen) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Sem toque: abrir a aba Sincronizar daqui largaria o formulário.
+            const AppTopBar(
+              title: 'Dados do treinamento',
+              trailing: SyncStatusIndicator(),
+            ),
+            ConnectivityBanner(
+              isOffline: isOffline,
+              message: 'Sem conexão — salvar e cancelar precisam de internet.',
+            ),
+            Expanded(child: _buildBody(isOffline)),
+            if (_viewModel.session != null)
+              _buildFooter(isOffline, keyboardOpen),
+          ],
         ),
       ),
     );
@@ -150,6 +158,39 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       );
     }
 
+    final form = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (lockedReason != null) ...[
+          InlineNotice(icon: AppIcons.lockedByOther, message: lockedReason),
+          const SizedBox(height: AppSpacing.lg + 2),
+        ],
+        _buildDateField(),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildPlaceRow(),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildNotesField(),
+        // O vão de 18 dos campos mais os 4 do botão: 22, como no quadro
+        // "3b" (o gap do bloco e o `padding-top` do botão).
+        const SizedBox(height: AppSpacing.lg + 2 + AppSpacing.xs),
+        _buildCancelButton(isOffline),
+      ],
+    );
+
+    // Na janela do tablet, sem a faixa da empresa (o subtítulo diz a
+    // sessão), com 20 em cima e embaixo e 24 dos lados.
+    if (context.isTablet) {
+      return ListView(
+        shrinkWrap: true,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxl,
+          vertical: AppSpacing.xl,
+        ),
+        children: [form],
+      );
+    }
+
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
@@ -158,28 +199,61 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
           logoUrl: session.companyLogoUrl,
           subtitle: session.courseName,
         ),
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (lockedReason != null) ...[
-                InlineNotice(icon: AppIcons.lockedByOther, message: lockedReason),
-                const SizedBox(height: AppSpacing.lg + 2),
-              ],
-              _buildDateField(),
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildPlaceRow(),
-              const SizedBox(height: AppSpacing.lg + 2),
-              _buildNotesField(),
-              // O vão de 18 dos campos mais os 4 do botão: 22, como no quadro
-              // "3b" (o gap do bloco e o `padding-top` do botão).
-              const SizedBox(height: AppSpacing.lg + 2 + AppSpacing.xs),
-              _buildCancelButton(isOffline),
-            ],
-          ),
-        ),
+        Padding(padding: const EdgeInsets.all(AppSpacing.xl), child: form),
       ],
+    );
+  }
+
+  /// No tablet, a tela é uma janela por cima do detalhe (quadros "4m" e
+  /// "4x"): a empresa e o curso vão para o subtítulo, e o rodapé fica numa
+  /// linha só. Os campos são os do celular. O X e o fundo passam pelo voltar,
+  /// que pergunta antes de descartar uma mudança.
+  Widget _buildDialog(bool isOffline, bool keyboardOpen) {
+    final session = _viewModel.session;
+
+    return AdminDialogFrame(
+      title: 'Dados do treinamento',
+      subtitle: session == null ? '' : '${session.companyName} · ${session.courseName}',
+      onClose: () => Navigator.of(context).maybePop(),
+      banner: ConnectivityBanner(
+        isOffline: isOffline,
+        message: 'Sem conexão — salvar e cancelar precisam de internet.',
+      ),
+      body: _buildBody(isOffline),
+      footer: session == null ? null : _buildDialogFooter(isOffline, keyboardOpen),
+    );
+  }
+
+  /// O rodapé da janela do tablet: "Descartar" à esquerda e "Salvar
+  /// alterações" à direita, com as mesmas regras do rodapé do celular.
+  Widget _buildDialogFooter(bool isOffline, bool keyboardOpen) {
+    final error = _viewModel.errorMessage;
+
+    return AdminDialogFooter(
+      notice: error != null && !keyboardOpen
+          ? InlineNotice(
+              icon: AppIcons.needsReview,
+              message: error,
+              tone: NoticeTone.danger,
+            )
+          : null,
+      caption: isOffline && _viewModel.canEdit && !keyboardOpen
+          ? 'Disponível quando houver conexão'
+          : null,
+      secondary: AppTextButton(
+        label: 'Descartar',
+        tone: AppTextButtonTone.neutral,
+        alignStart: true,
+        onPressed: _viewModel.isBusy ? null : _discard,
+      ),
+      primary: AppCtaButton(
+        label: 'Salvar alterações',
+        icon: AppIcons.save,
+        size: AppCtaSize.dialog,
+        fullWidth: false,
+        isLoading: _viewModel.isSaving,
+        onPressed: _viewModel.canSave && !isOffline ? _save : null,
+      ),
     );
   }
 
@@ -473,6 +547,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   Widget _buildSkeleton() {
     return ListView(
       key: const Key('session-edit-skeleton'),
+      shrinkWrap: context.isTablet,
       children: const [SkeletonListItem(), SkeletonListItem(), SkeletonListItem()],
     );
   }
