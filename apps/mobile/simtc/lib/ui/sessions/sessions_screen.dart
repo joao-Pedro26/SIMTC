@@ -15,6 +15,7 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_nav_bar.dart';
+import '../core/widgets/app_search_field.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/filter_chip_bar.dart';
@@ -209,6 +210,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// área rolável — e destaca o chip correspondente. Nunca dispara um novo
   /// scroll: só o toque explícito faz isso, senão vira loop.
   void _updateActiveChipFromScroll() {
+    // Com a busca aberta, os chips saem de cena: não há o que destacar.
+    if (_viewModel.isSearching) return;
     if (_programmaticScrollCount > 0) return;
     if (!_scrollController.hasClients) return;
 
@@ -260,11 +263,23 @@ class _SessionsScreenState extends State<SessionsScreen> {
           isOffline: isOffline,
           message: offlineDataMessage(viewModel.lastSyncedAt),
         ),
-        _buildFilters(viewModel),
+        if (!viewModel.isSearching) _buildFilters(viewModel),
         Expanded(child: _buildBody(viewModel)),
       ],
     );
 
+    // No celular, o voltar do Android fecha a busca antes de fechar o app.
+    // No tablet, quem cuida do voltar é o lado a lado (`SessionsSplitView`).
+    return PopScope(
+      canPop: context.isTablet || !viewModel.isSearching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && viewModel.isSearching) viewModel.closeSearch();
+      },
+      child: _buildPage(content, tabletPortrait: tabletPortrait),
+    );
+  }
+
+  Widget _buildPage(Widget content, {required bool tabletPortrait}) {
     return TabSnackBarArea(
       child: Scaffold(
         backgroundColor: AppColors.surface,
@@ -281,9 +296,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
+  /// Com a busca aberta (Fase 8B), o campo toma o lugar da saudação e do
+  /// título; a linha do logo e do indicador de envio continua em cima.
   Widget _buildHeader(BuildContext context) {
-    final user = context.watch<AuthRepository>().currentUser;
-    final title = user?.isAdmin == true ? 'Sessões' : 'Minhas sessões';
     final embedded = widget.embedded;
 
     // Painel de paisagem (quadro "4c"): 12/12/12/20 de recuo, saudação de 13
@@ -317,27 +332,50 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 semanticLabel: 'SIM Treinamentos',
               ),
               const Spacer(),
+              // A lupa, a 4 do indicador (quadro "2c"); some enquanto o campo
+              // está aberto, que já tem o X.
+              if (!_viewModel.isSearching) ...[
+                AppSearchButton(onPressed: _viewModel.openSearch),
+                const SizedBox(width: AppSpacing.xs),
+              ],
               SyncStatusIndicator(onTap: () => context.go(AppRoutes.sync)),
             ],
           ),
           const SizedBox(height: AppSpacing.sm + 2),
-          Text(
-            _greeting(user?.name),
-            style: embedded
-                ? AppTypography.screenSubtitle
-                : AppTypography.homeGreeting,
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
-          // mesmo texto quando o usuário é ADMIN.
-          Text(
-            title,
-            key: const Key('sessions-title'),
-            style: embedded ? AppTypography.screenTitle : AppTypography.homeTitle,
-          ),
+          if (_viewModel.isSearching)
+            AppSearchField(
+              hintText: 'Buscar pela empresa',
+              initialText: _viewModel.searchQuery,
+              onChanged: _viewModel.setSearchQuery,
+              onClose: _viewModel.closeSearch,
+            )
+          else
+            ..._buildTitle(context),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildTitle(BuildContext context) {
+    final user = context.watch<AuthRepository>().currentUser;
+    final title = user?.isAdmin == true ? 'Sessões' : 'Minhas sessões';
+    final embedded = widget.embedded;
+
+    return [
+      Text(
+        _greeting(user?.name),
+        style:
+            embedded ? AppTypography.screenSubtitle : AppTypography.homeGreeting,
+      ),
+      const SizedBox(height: AppSpacing.xxs),
+      // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
+      // mesmo texto quando o usuário é ADMIN.
+      Text(
+        title,
+        key: const Key('sessions-title'),
+        style: embedded ? AppTypography.screenTitle : AppTypography.homeTitle,
+      ),
+    ];
   }
 
   String _greeting(String? name) {
@@ -374,6 +412,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget _buildBody(SessionsListViewModel viewModel) {
     if (viewModel.isLoading) return _buildSkeleton();
 
+    // Na busca, a seção sem resultado some com o título; sem nenhum, uma
+    // frase diz que não achou (decisões de 24/10/2026).
+    final sections = viewModel.isFiltering
+        ? viewModel.sections.where((s) => !s.isEmpty).toList(growable: false)
+        : viewModel.sections;
+
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: viewModel.refresh,
@@ -398,8 +442,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
           bottom: AppSpacing.huge * 2,
         ),
         children: [
-          for (final section in viewModel.sections)
-            ..._buildSection(viewModel, section),
+          if (viewModel.isFiltering && sections.isEmpty)
+            _buildNoResults(viewModel.searchQuery.trim()),
+          for (final section in sections) ..._buildSection(viewModel, section),
         ],
       ),
     );
@@ -486,6 +531,22 @@ class _SessionsScreenState extends State<SessionsScreen> {
           onPressed: () => viewModel.revealMore(block.id),
           child: Text('Ver mais', style: AppTypography.link),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNoResults(String query) {
+    return Padding(
+      key: const Key('sessions-no-results'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.md,
+        AppSpacing.xl,
+        AppSpacing.md,
+      ),
+      child: InlineNotice(
+        icon: AppIcons.search,
+        message: 'Nenhuma sessão encontrada para “$query”.',
       ),
     );
   }

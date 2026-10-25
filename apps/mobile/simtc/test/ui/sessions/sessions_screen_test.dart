@@ -21,6 +21,9 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
+import 'package:simtc/ui/core/theme/app_spacing.dart';
+import 'package:simtc/ui/core/widgets/app_search_field.dart';
+import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
@@ -1101,6 +1104,148 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(SessionsScreen), findsOneWidget);
+  });
+
+  group('busca de sessões pela empresa (Fase 8B)', () {
+    TrainingSession sessao(
+      String id,
+      String company, {
+      int daysFromToday = 0,
+      SessionStatus status = SessionStatus.emAndamento,
+    }) {
+      return TrainingSession(
+        id: id,
+        companyName: company,
+        courseName: 'Direção Preventiva',
+        city: 'Lençóis Paulista',
+        state: 'SP',
+        date: DateTime.now().add(Duration(days: daysFromToday)),
+        status: status,
+        totalParticipants: 8,
+        assessableParticipants: 8,
+        assessedParticipants: 2,
+      );
+    }
+
+    Future<void> showSessions(
+      WidgetTester tester,
+      List<TrainingSession> list,
+    ) async {
+      tester.view.physicalSize = const Size(420, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await pump(tester);
+      sessions.add(list);
+      await tester.pump();
+    }
+
+    Future<void> search(WidgetTester tester, String text) async {
+      await tester.tap(find.byTooltip('Buscar'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pump();
+    }
+
+    testWidgets(
+        'a lupa, ao lado do indicador de envio, abre o campo no lugar da '
+        'saudação e do título; os chips saem; o X volta tudo', (tester) async {
+      await showSessions(tester, [sessao('s1', 'Bracell Celulose')]);
+      final lupa = tester.getRect(find.byTooltip('Buscar'));
+      final indicador = tester.getRect(find.byType(SyncStatusIndicator));
+      expect(indicador.left - lupa.right, AppSpacing.xs);
+
+      await tester.tap(find.byTooltip('Buscar'));
+      await tester.pump();
+
+      expect(find.byType(AppSearchField), findsOneWidget);
+      expect(find.text('Buscar pela empresa'), findsOneWidget);
+      expect(find.byKey(const Key('sessions-title')), findsNothing);
+      expect(find.text('Bom dia, Carla'), findsNothing);
+      expect(find.textContaining(', Carla'), findsNothing);
+      expect(find.byType(FilterChipBar), findsNothing);
+      expect(find.byType(SyncStatusIndicator), findsOneWidget);
+      expect(find.byTooltip('Buscar'), findsNothing);
+
+      await tester.tap(find.byTooltip('Fechar a busca'));
+      await tester.pump();
+
+      expect(find.byKey(const Key('sessions-title')), findsOneWidget);
+      expect(find.byType(FilterChipBar), findsOneWidget);
+      expect(find.byType(AppSearchField), findsNothing);
+    });
+
+    testWidgets(
+        'filtra pela empresa, sem acento nem maiúscula; a seção sem resultado '
+        'some', (tester) async {
+      await showSessions(tester, [
+        sessao('s1', 'Bracell Celulose'),
+        sessao('s2', 'Suzano Papel'),
+        sessao('s3', 'Bracell Celulose',
+            daysFromToday: -3, status: SessionStatus.concluido),
+        sessao('s4', 'Suzano Papel', daysFromToday: 2),
+      ]);
+
+      await search(tester, 'BRÁC');
+
+      expect(find.text('Bracell Celulose'), findsNWidgets(2));
+      expect(find.text('Suzano Papel'), findsNothing);
+      expect(find.textContaining('Hoje · '), findsOneWidget);
+      expect(find.text('Esta semana'), findsNothing,
+          reason: 'a semana só tem a Suzano');
+      expect(find.text('Concluídas'), findsOneWidget);
+      expect(find.text('Nada agendado para os próximos 7 dias.'), findsNothing);
+    });
+
+    testWidgets('todas as que batem aparecem, sem "Ver mais"', (tester) async {
+      await showSessions(tester, [
+        for (var i = 0; i < 12; i++) sessao('s$i', 'Bracell Unidade $i'),
+      ]);
+      expect(find.text('Ver mais', skipOffstage: false), findsOneWidget);
+
+      await search(tester, 'bracell');
+
+      expect(find.byType(SessionCard, skipOffstage: false), findsNWidgets(12));
+      expect(find.text('Ver mais', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('sem resultado, diz que não achou', (tester) async {
+      await showSessions(tester, [sessao('s1', 'Bracell Celulose')]);
+
+      await search(tester, ' xyz ');
+
+      expect(
+        find.text('Nenhuma sessão encontrada para “xyz”.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Hoje · '), findsNothing);
+    });
+
+    testWidgets('aberta e vazia, a lista é a de sempre', (tester) async {
+      await showSessions(tester, [sessao('s1', 'Bracell Celulose')]);
+
+      await tester.tap(find.byTooltip('Buscar'));
+      await tester.pump();
+
+      expect(find.text('Bracell Celulose'), findsOneWidget);
+      expect(find.text('Esta semana'), findsOneWidget);
+      expect(find.text('Nada agendado para os próximos 7 dias.'), findsOneWidget);
+    });
+
+    testWidgets('no celular, o voltar com a busca aberta fecha a busca',
+        (tester) async {
+      await showSessions(tester, [
+        sessao('s1', 'Bracell Celulose'),
+        sessao('s2', 'Suzano Papel'),
+      ]);
+      await search(tester, 'brac');
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(find.text('Suzano Papel'), findsOneWidget);
+    });
   });
 
   group('tablet (Fase 7A)', () {

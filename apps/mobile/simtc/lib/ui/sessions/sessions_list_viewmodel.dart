@@ -7,6 +7,8 @@ import '../../data/repositories/assessment_catalog_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../utils/result.dart';
+import '../core/list_search.dart';
+import '../core/search_text.dart';
 import 'session_filter.dart';
 
 /// Estado da tela 1.3 "Minhas sessões".
@@ -18,7 +20,7 @@ import 'session_filter.dart';
 /// As três seções (Hoje, Esta semana, Concluídas) estão sempre todas
 /// presentes — os chips não filtram, só marcam qual seção está em foco (a
 /// tela usa isso pra saber pra onde rolar e qual chip destacar).
-class SessionsListViewModel extends ChangeNotifier {
+class SessionsListViewModel extends ChangeNotifier with ListSearch {
   SessionsListViewModel({
     required SessionRepository repository,
     required AssessmentCatalogRepository catalog,
@@ -71,8 +73,18 @@ class SessionsListViewModel extends ChangeNotifier {
       (_sessions.isEmpty && _lastSyncedAt == null && _isRefreshing);
 
   /// As três seções, sempre nesta ordem, sempre as três — nunca escondidas.
-  List<SessionSection> get sections =>
-      buildSections(_sessions, _now(), _visibleCounts);
+  /// Com a busca filtrando, só as sessões da empresa buscada, e todas elas: nada de "Ver
+  /// mais" no meio de um resultado (Fase 8B).
+  List<SessionSection> get sections {
+    if (!isFiltering) return buildSections(_sessions, _now(), _visibleCounts);
+
+    final found = _sessions
+        .where((s) => containsSearch(s.companyName, searchQuery))
+        .toList(growable: false);
+    return buildSections(found, _now(), {
+      for (final id in SessionBlockId.values) id: found.length,
+    });
+  }
 
   Map<SessionFilter, int> get counts => {
         for (final filter in SessionFilter.values)
