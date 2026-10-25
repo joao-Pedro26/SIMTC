@@ -52,8 +52,13 @@ class _SessionsSplitViewState extends State<SessionsSplitView> {
     return _detailKey!;
   }
 
-  void _open(String sessionId) =>
-      context.go(AppRoutes.sessionDetail(sessionId));
+  /// No tablet o detalhe não é uma rota nova: sem tirar o foco antes, o campo
+  /// de busca da lista continuaria com ele, e o teclado aberto por cima do
+  /// detalhe (Fase 8B).
+  void _open(String sessionId) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    context.go(AppRoutes.sessionDetail(sessionId));
+  }
 
   void _backToList() => context.go(AppRoutes.home);
 
@@ -66,6 +71,7 @@ class _SessionsSplitViewState extends State<SessionsSplitView> {
       key: _listKey,
       embedded: expanded,
       selectedSessionId: expanded ? selected : null,
+      sessionOpen: selected != null,
       onOpenSession: _open,
     );
 

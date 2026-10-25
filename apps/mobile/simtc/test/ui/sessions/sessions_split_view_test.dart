@@ -732,6 +732,94 @@ void main() {
       expect(find.textContaining('Nenhum consultor encontrado'), findsOneWidget);
     });
   });
+
+  group('buscas no tablet (Fase 8B)', () {
+    Finder list() => find.byType(SessionsScreen);
+
+    Future<void> searchList(WidgetTester tester, String text) async {
+      await tester.tap(find.descendant(of: list(), matching: find.byTooltip('Buscar')));
+      await settle(tester);
+      await tester.enterText(
+        find.descendant(of: list(), matching: find.byType(TextField)),
+        text,
+      );
+      await settle(tester);
+    }
+
+    String listQuery(WidgetTester tester) => tester
+        .widget<TextField>(find.descendant(
+          of: find.byType(SessionsScreen, skipOffstage: false),
+          matching: find.byType(TextField, skipOffstage: false),
+          skipOffstage: false,
+        ))
+        .controller!
+        .text;
+
+    testWidgets(
+        'em retrato, abrir um resultado fecha o teclado; o voltar fecha a '
+        'sessão e a busca da lista continua', (tester) async {
+      await pumpApp(tester, location: AppRoutes.home, size: _portrait);
+      await searchList(tester, 'brac');
+      expect(card('Transportes Vale Norte'), findsNothing);
+
+      await tester.tap(card('Bracell'));
+      await settle(tester);
+
+      expect(find.byType(SessionDetailScreen), findsOneWidget);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        tester
+            .widget<EditableText>(find.descendant(
+              of: find.byType(SessionsScreen, skipOffstage: false),
+              matching: find.byType(EditableText, skipOffstage: false),
+              skipOffstage: false,
+            ))
+            .focusNode
+            .hasFocus,
+        isFalse,
+      );
+
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+
+      expect(find.byType(SessionDetailScreen), findsNothing);
+      expect(find.byType(AppSearchField), findsOneWidget);
+      expect(listQuery(tester), 'brac');
+      expect(card('Transportes Vale Norte'), findsNothing);
+    });
+
+    testWidgets(
+        'em paisagem, o voltar fecha a sessão; as buscas da lista e do '
+        'detalhe não são apagadas por ele', (tester) async {
+      await pumpApp(tester, location: AppRoutes.home);
+      await searchList(tester, 'brac');
+      await tester.tap(card('Bracell'));
+      await settle(tester);
+      final detail = find.byType(SessionDetailScreen);
+      await tester.tap(find.descendant(of: detail, matching: find.byTooltip('Buscar')));
+      await settle(tester);
+
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+
+      expect(detail, findsNothing);
+      expect(listQuery(tester), 'brac');
+      expect(card('Transportes Vale Norte'), findsNothing);
+    });
+
+    testWidgets('sem sessão aberta, o voltar com a busca aberta fecha a busca',
+        (tester) async {
+      await pumpApp(tester, location: AppRoutes.home, size: _portrait);
+      await searchList(tester, 'brac');
+
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(list(), findsOneWidget);
+      expect(card('Transportes Vale Norte'), findsOneWidget);
+    });
+  });
 }
 
 /// `pumpAndSettle` com teto: a Home anima o skeleton até a lista chegar.

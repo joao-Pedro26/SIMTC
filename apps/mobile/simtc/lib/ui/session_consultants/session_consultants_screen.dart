@@ -261,7 +261,11 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         _viewModel.teamNotice != null;
 
     return [
-      if (filtering && inSession.isEmpty && _viewModel.available.isEmpty)
+      // Com a equipe ainda carregando, não dá para dizer que não achou.
+      if (filtering &&
+          inSession.isEmpty &&
+          _viewModel.available.isEmpty &&
+          !_viewModel.isTeamLoading)
         Padding(
           key: const Key('consultants-no-results'),
           padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),

@@ -40,6 +40,7 @@ class SessionsScreen extends StatefulWidget {
     this.embedded = false,
     this.selectedSessionId,
     this.onOpenSession,
+    this.sessionOpen = false,
   });
 
   /// Painel da esquerda do tablet em paisagem.
@@ -50,6 +51,10 @@ class SessionsScreen extends StatefulWidget {
 
   /// O toque no card. Sem ele, o detalhe é empilhado por cima da lista.
   final ValueChanged<String>? onOpenSession;
+
+  /// No tablet, há uma sessão aberta (ao lado, ou por cima em retrato): o
+  /// voltar é do lado a lado, que fecha a sessão, e a busca da lista fica.
+  final bool sessionOpen;
 
   @override
   State<SessionsScreen> createState() => _SessionsScreenState();
@@ -268,12 +273,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
       ],
     );
 
-    // No celular, o voltar do Android fecha a busca antes de fechar o app.
-    // No tablet, quem cuida do voltar é o lado a lado (`SessionsSplitView`).
+    // O voltar do Android fecha a busca antes de fechar o app. Com uma
+    // sessão aberta no tablet, quem cuida do voltar é o lado a lado
+    // (`SessionsSplitView`), que fecha a sessão — e a busca fica.
     return PopScope(
-      canPop: context.isTablet || !viewModel.isSearching,
+      canPop: widget.sessionOpen || !viewModel.isSearching,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && viewModel.isSearching) viewModel.closeSearch();
+        if (!didPop && !widget.sessionOpen && viewModel.isSearching) {
+          viewModel.closeSearch();
+        }
       },
       child: _buildPage(content, tabletPortrait: tabletPortrait),
     );

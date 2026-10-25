@@ -907,6 +907,37 @@ void main() {
       expect(find.text('A equipe aparece quando houver conexão.'), findsOneWidget);
     });
 
+    testWidgets(
+        'com a equipe ainda carregando, não diz que não achou: espera a equipe',
+        (tester) async {
+      await seedFromServer();
+      final reply = Completer<Response<List<dynamic>>>();
+      when(() => api.get<List<dynamic>>(
+            teamPath,
+            queryParameters: any(named: 'queryParameters'),
+          )).thenAnswer((_) => reply.future);
+      await pumpScreen(tester, settle: false);
+      await tester.tap(find.byTooltip('Buscar'));
+      await pumpTransitions(tester);
+      await tester.enterText(find.byType(TextField), 'diego');
+      await pumpTransitions(tester);
+
+      expect(find.textContaining('Nenhum consultor encontrado'), findsNothing);
+      expect(find.byKey(const Key('equipe-skeleton')), findsOneWidget);
+
+      reply.complete(
+        Response<List<dynamic>>(
+          requestOptions: RequestOptions(path: teamPath),
+          statusCode: 200,
+          data: [consultantJson('c-diego')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(rowOf('equipe-c-diego'), findsOneWidget);
+      expect(find.textContaining('Nenhum consultor encontrado'), findsNothing);
+    });
+
     testWidgets('o voltar com a busca aberta fecha a busca e fica na tela',
         (tester) async {
       await seedFromServer();

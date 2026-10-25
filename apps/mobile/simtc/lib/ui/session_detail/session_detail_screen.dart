@@ -119,7 +119,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     return PopScope(
       canPop: context.isTablet || !_viewModel.isSearching,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _viewModel.isSearching) _viewModel.closeSearch();
+        // No tablet, o lado a lado também bloqueia o voltar, e o Flutter
+        // chama todas as `PopScope` da rota: sem a guarda, a busca do
+        // detalhe seria apagada junto com a sessão.
+        if (!didPop && !context.isTablet && _viewModel.isSearching) {
+          _viewModel.closeSearch();
+        }
       },
       child: _buildPage(context, isOffline),
     );
