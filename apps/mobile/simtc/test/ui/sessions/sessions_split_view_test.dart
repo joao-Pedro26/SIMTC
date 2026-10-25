@@ -24,6 +24,7 @@ import 'package:simtc/ui/checklist/checklist_screen.dart';
 import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/admin_dialog.dart';
+import 'package:simtc/ui/core/widgets/app_search_field.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
@@ -696,6 +697,39 @@ void main() {
       await tester.tapAt(const Offset(400, 60));
       await settle(tester);
       expect(dialog(), findsNothing, reason: 'tocar no fundo fecha');
+    });
+
+    testWidgets(
+        'na janela de consultores, a lupa fica ao lado do X e abre o campo '
+        'embaixo do cabeçalho; o texto atravessa o giro', (tester) async {
+      await pumpApp(tester, location: AppRoutes.sessionDetail('sess-1'));
+      await tester.tap(find.byTooltip('Consultores da sessão'));
+      await settle(tester);
+      Finder inDialog(Finder matching) =>
+          find.descendant(of: dialog(), matching: matching);
+
+      final lupa = tester.getRect(inDialog(find.byTooltip('Buscar')));
+      final fechar = tester.getRect(inDialog(find.byTooltip('Fechar')));
+      expect(lupa.right, fechar.left);
+      expect(lupa.top, fechar.top);
+
+      await tester.tap(inDialog(find.byTooltip('Buscar')));
+      await settle(tester);
+      expect(inDialog(find.byType(AppSearchField)), findsOneWidget);
+      await tester.enterText(inDialog(find.byType(TextField)), 'xyz');
+      await settle(tester);
+      expect(find.textContaining('Nenhum consultor encontrado'), findsOneWidget);
+
+      await rotate(tester, _portrait);
+
+      expect(
+        tester
+            .widget<TextField>(inDialog(find.byType(TextField)))
+            .controller!
+            .text,
+        'xyz',
+      );
+      expect(find.textContaining('Nenhum consultor encontrado'), findsOneWidget);
     });
   });
 }

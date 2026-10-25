@@ -23,7 +23,10 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/app_localization.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
+import 'package:simtc/ui/core/theme/app_spacing.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/app_search_field.dart';
+import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/inline_notice.dart';
 import 'package:simtc/ui/core/widgets/session_context_header.dart';
 import 'package:simtc/ui/core/widgets/status_chip.dart';
@@ -403,8 +406,8 @@ void main() {
     await pumpScreen(tester);
 
     expect(find.text('Consultores'), findsOneWidget);
-    // Sem a lupa do quadro: a busca é da Fase 8.
-    expect(find.byIcon(AppIcons.search), findsNothing);
+    // A lupa do quadro, que busca pelo nome (Fase 8B).
+    expect(find.byIcon(AppIcons.search), findsOneWidget);
     expect(find.text('Bracell · 12 set'), findsOneWidget);
     expect(find.text('5 participantes · 3 consultores'), findsOneWidget);
     // A faixa de contexto no fundo da tela, como no quadro.
@@ -816,6 +819,108 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Adicionar'), findsNothing);
+  });
+
+  group('busca de consultores (Fase 8B)', () {
+    Future<void> openSearch(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Buscar'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> type(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'a lupa fica à direita do título e abre o campo embaixo do cabeçalho; '
+        'o X fecha', (tester) async {
+      await seedFromServer();
+      await pumpScreen(tester);
+      final bar = tester.getRect(find.byType(AppTopBar));
+      expect(tester.getRect(find.byTooltip('Buscar')).right, bar.right - 8);
+
+      await openSearch(tester);
+
+      expect(find.byType(AppSearchField), findsOneWidget);
+      expect(find.text('Buscar consultor pelo nome'), findsOneWidget);
+      expect(
+        tester.getRect(find.byType(AppSearchField)).top,
+        bar.bottom + AppSpacing.sm,
+      );
+      expect(find.byTooltip('Buscar'), findsNothing);
+
+      await tester.tap(find.byTooltip('Fechar a busca'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(find.byTooltip('Buscar'), findsOneWidget);
+    });
+
+    testWidgets(
+        'filtra as duas listas pelo nome; a lista sem ninguém some com o '
+        'título', (tester) async {
+      await seedFromServer();
+      await pumpScreen(tester);
+      await openSearch(tester);
+
+      await type(tester, 'TAT');
+      expect(rowOf('consultor-c-tatiane'), findsOneWidget);
+      expect(rowOf('consultor-c-carla'), findsNothing);
+      expect(find.text('Na sessão'), findsOneWidget);
+      expect(find.text('Disponíveis na equipe'), findsNothing);
+
+      await type(tester, 'patricia');
+      expect(rowOf('equipe-c-patricia'), findsOneWidget);
+      expect(rowOf('equipe-c-diego'), findsNothing);
+      expect(find.text('Na sessão'), findsNothing);
+      expect(find.text('Disponíveis na equipe'), findsOneWidget);
+    });
+
+    testWidgets('sem ninguém nas duas, diz que não achou', (tester) async {
+      await seedFromServer();
+      await pumpScreen(tester);
+      await openSearch(tester);
+
+      await type(tester, ' xyz ');
+
+      expect(
+        find.text('Nenhum consultor encontrado para “xyz”.'),
+        findsOneWidget,
+      );
+      expect(find.text('Na sessão'), findsNothing);
+      expect(find.text('Disponíveis na equipe'), findsNothing);
+    });
+
+    testWidgets(
+        'sem conexão, o aviso da equipe vence a busca: a lista dela continua '
+        'com o motivo', (tester) async {
+      await seedFromServer();
+      serverUnreachable();
+      await goOffline();
+      await pumpScreen(tester);
+      await openSearch(tester);
+
+      await type(tester, 'tat');
+
+      expect(rowOf('consultor-c-tatiane'), findsOneWidget);
+      expect(find.text('Disponíveis na equipe'), findsOneWidget);
+      expect(find.text('A equipe aparece quando houver conexão.'), findsOneWidget);
+    });
+
+    testWidgets('o voltar com a busca aberta fecha a busca e fica na tela',
+        (tester) async {
+      await seedFromServer();
+      await pumpScreen(tester);
+      await openSearch(tester);
+      await type(tester, 'tat');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(find.byType(SessionConsultantsScreen), findsOneWidget);
+      expect(rowOf('consultor-c-carla'), findsOneWidget);
+    });
   });
 
   testWidgets('falha ao buscar a equipe: pede para puxar, e puxar traz a equipe',

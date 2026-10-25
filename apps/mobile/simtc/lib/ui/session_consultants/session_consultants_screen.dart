@@ -14,6 +14,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_search_field.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
@@ -25,10 +26,12 @@ import 'session_consultants_viewmodel.dart';
 
 /// Tela 1.13 — "Consultores" (quadro "3c" do canvas), só para ADMIN.
 ///
-/// Diferenças do canvas, aprovadas em 09/10/2026: sem a lupa (a busca é da
-/// Fase 8); o e-mail no lugar da agenda de quem está na equipe (o backend não
-/// tem agenda de consultor); a confirmação antes de remover quem tem
-/// avaliação em andamento; e os botões com 48dp (o quadro tem 44).
+/// Diferenças do canvas, aprovadas em 09/10/2026: o e-mail no lugar da agenda
+/// de quem está na equipe (o backend não tem agenda de consultor); a
+/// confirmação antes de remover quem tem avaliação em andamento; e os botões
+/// com 48dp (o quadro tem 44). A lupa do quadro busca pelo nome (Fase 8B); no
+/// tablet ela fica no cabeçalho da janela, ao lado do X (os quadros "4n" e
+/// "4y" não a desenham).
 class SessionConsultantsScreen extends StatefulWidget {
   const SessionConsultantsScreen({super.key, required this.sessionId});
 
@@ -91,18 +94,58 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
-    if (context.isTablet) return _buildDialog(isOffline);
 
+    // O voltar (o do Android, a seta e o X da janela) fecha a busca antes de
+    // fechar a tela.
+    return PopScope(
+      canPop: !_viewModel.isSearching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _viewModel.isSearching) _viewModel.closeSearch();
+      },
+      child: context.isTablet
+          ? _buildDialog(isOffline)
+          : _buildPage(isOffline),
+    );
+  }
+
+  Widget _buildPage(bool isOffline) {
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Column(
           children: [
-            const AppTopBar(title: 'Consultores'),
+            AppTopBar(
+              title: 'Consultores',
+              trailing: _viewModel.isSearching ? null : _buildSearchButton(),
+            ),
+            if (_viewModel.isSearching) _buildSearchField(),
             ..._buildBanners(isOffline),
             Expanded(child: _buildBody(isOffline)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchButton() =>
+      AppSearchButton(onPressed: _viewModel.openSearch);
+
+  /// O campo abre embaixo do cabeçalho, com o recuo da lista.
+  Widget _buildSearchField() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: _inset,
+        vertical: AppSpacing.sm,
+      ),
+      child: AppSearchField(
+        hintText: 'Buscar consultor pelo nome',
+        initialText: _viewModel.searchQuery,
+        onChanged: _viewModel.setSearchQuery,
+        onClose: _viewModel.closeSearch,
       ),
     );
   }
@@ -114,10 +157,14 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
       title: 'Consultores da sessão',
       subtitle: 'Cada toque vale na hora — não há botão de salvar.',
       onClose: () => Navigator.of(context).maybePop(),
+      actions: [if (!_viewModel.isSearching) _buildSearchButton()],
       banner: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: _buildBanners(isOffline),
+        children: [
+          if (_viewModel.isSearching) _buildSearchField(),
+          ..._buildBanners(isOffline),
+        ],
       ),
       body: _buildBody(isOffline),
     );
@@ -194,15 +241,45 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
               padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
               child: notice,
             ),
-          _buildSessionTitle(),
-          for (final item in _viewModel.inSession)
-            _buildSessionRow(item, enabled),
-          _buildTeamTitle(),
-          ..._buildTeam(enabled),
+          ..._buildLists(enabled),
           _buildFooterNote(),
         ],
       ),
     );
+  }
+
+  /// As duas listas. Com a busca filtrando, a lista sem ninguém some com o
+  /// título — a não ser que a equipe tenha um aviso próprio (sem conexão,
+  /// todos já na sessão), que vence a busca; sem ninguém nas duas, uma frase
+  /// diz que não achou (decisões de 24/10/2026).
+  List<Widget> _buildLists(bool enabled) {
+    final inSession = _viewModel.inSession;
+    final filtering = _viewModel.isFiltering;
+    final showTeam = !filtering ||
+        _viewModel.available.isNotEmpty ||
+        _viewModel.isTeamLoading ||
+        _viewModel.teamNotice != null;
+
+    return [
+      if (filtering && inSession.isEmpty && _viewModel.available.isEmpty)
+        Padding(
+          key: const Key('consultants-no-results'),
+          padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
+          child: InlineNotice(
+            icon: AppIcons.search,
+            message: 'Nenhum consultor encontrado para '
+                '“${_viewModel.searchQuery.trim()}”.',
+          ),
+        ),
+      if (!filtering || inSession.isNotEmpty) ...[
+        _buildSessionTitle(),
+        for (final item in inSession) _buildSessionRow(item, enabled),
+      ],
+      if (showTeam) ...[
+        _buildTeamTitle(),
+        ..._buildTeam(enabled),
+      ],
+    ];
   }
 
   /// Um aviso por vez: sem os consultores no aparelho, nada mais importa;

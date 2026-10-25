@@ -13,7 +13,9 @@ import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../utils/result.dart';
 import '../core/date_labels.dart';
+import '../core/list_search.dart';
 import '../core/name_sort.dart';
+import '../core/search_text.dart';
 
 /// A segunda linha de quem está na sessão, pelos participantes deste
 /// aparelho: "2 participantes · 1 em andamento", "2 participantes concluídos"
@@ -72,7 +74,7 @@ enum _TeamFailure { none, unreachable, failed }
 /// Quem está na sessão e os participantes vêm do cache, pelos streams; a
 /// equipe vem do servidor a cada abertura e não fica guardada. Entrar e sair
 /// valem na hora: um consultor por toque, e um toque de cada vez.
-class SessionConsultantsViewModel extends ChangeNotifier {
+class SessionConsultantsViewModel extends ChangeNotifier with ListSearch {
   SessionConsultantsViewModel({
     required this.sessionId,
     required SessionRepository sessionRepository,
@@ -158,10 +160,14 @@ class SessionConsultantsViewModel extends ChangeNotifier {
   /// que ainda não foi aberta com conexão.
   bool get notDownloaded => !isLoading && _consultants.isEmpty;
 
-  /// "Na sessão": o responsável primeiro, e os outros por nome.
+  /// "Na sessão": o responsável primeiro, e os outros por nome. Com a busca
+  /// filtrando, só quem tem o texto no nome (Fase 8B).
   List<SessionConsultantItem> get inSession {
     final responsibleId = _session?.responsibleConsultantId;
-    final sorted = [..._consultants]..sort((a, b) {
+    final sorted = [
+      for (final consultant in _consultants)
+        if (_matches(consultant)) consultant,
+    ]..sort((a, b) {
         final aFirst = a.id == responsibleId ? 0 : 1;
         final bFirst = b.id == responsibleId ? 0 : 1;
         if (aFirst != bFirst) return aFirst.compareTo(bFirst);
@@ -215,9 +221,15 @@ class SessionConsultantsViewModel extends ChangeNotifier {
         '${participant.name} para $status.';
   }
 
+  bool _matches(SessionConsultant consultant) =>
+      !isFiltering || containsSearch(consultant.name, searchQuery);
+
   /// "Disponíveis na equipe": os ativos que ainda não estão na sessão, por
-  /// nome.
-  List<SessionConsultant> get available {
+  /// nome — com a busca filtrando, só quem tem o texto no nome.
+  List<SessionConsultant> get available =>
+      [for (final c in _allAvailable) if (_matches(c)) c];
+
+  List<SessionConsultant> get _allAvailable {
     final team = _team;
     if (team == null) return const [];
     final inSession = {for (final consultant in _consultants) consultant.id};
@@ -232,7 +244,7 @@ class SessionConsultantsViewModel extends ChangeNotifier {
   /// enquanto ela carrega).
   String? get teamNotice {
     if (_team != null) {
-      return available.isEmpty
+      return _allAvailable.isEmpty
           ? 'Todos os consultores ativos da equipe já estão nesta sessão.'
           : null;
     }

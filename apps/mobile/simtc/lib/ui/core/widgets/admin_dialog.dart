@@ -136,11 +136,16 @@ class AdminDialogFrame extends StatelessWidget {
     required this.body,
     this.banner,
     this.footer,
+    this.actions = const [],
   });
 
   final String title;
   final String subtitle;
   final VoidCallback onClose;
+
+  /// Atalhos antes do X, cada um com o próprio alvo de 48 — a lupa da janela
+  /// de Consultores (Fase 8B).
+  final List<Widget> actions;
 
   /// O conteúdo. Uma lista aqui dentro precisa de `shrinkWrap`.
   final Widget body;
@@ -221,13 +226,23 @@ class AdminDialogFrame extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           Transform.translate(
             offset: const Offset(AppSpacing.sm + 2, -(AppSpacing.sm + 2)),
-            child: SizedBox.square(
-              dimension: AppSpacing.touchTarget,
-              child: IconButton(
-                tooltip: 'Fechar',
-                icon: const Icon(AppIcons.close, size: 24, color: AppColors.text3),
-                onPressed: onClose,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...actions,
+                SizedBox.square(
+                  dimension: AppSpacing.touchTarget,
+                  child: IconButton(
+                    tooltip: 'Fechar',
+                    icon: const Icon(
+                      AppIcons.close,
+                      size: 24,
+                      color: AppColors.text3,
+                    ),
+                    onPressed: onClose,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
