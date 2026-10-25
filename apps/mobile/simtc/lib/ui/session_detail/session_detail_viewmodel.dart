@@ -14,6 +14,7 @@ import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../data/services/local/app_database.dart';
 import '../../utils/result.dart';
+import '../core/list_search.dart';
 import 'participant_filter.dart';
 
 /// Estado da tela 1.4 "Detalhe da sessão".
@@ -28,7 +29,7 @@ import 'participant_filter.dart';
 /// põe a hora de início na linha, e a avaliação confirmada troca o chip por
 /// "Na fila"/"Erro no envio" até o servidor responder — e por "Enviada" até a
 /// sessão ser baixada de novo (revisão de 30/09/2026).
-class SessionDetailViewModel extends ChangeNotifier {
+class SessionDetailViewModel extends ChangeNotifier with ListSearch {
   SessionDetailViewModel({
     required this.sessionId,
     required SessionRepository sessionRepository,
@@ -182,13 +183,26 @@ class SessionDetailViewModel extends ChangeNotifier {
               .length,
       };
 
-  /// A lista do chip escolhido, na ordem do canvas.
+  /// A lista do chip escolhido, na ordem do canvas. Com a busca aberta, os
+  /// chips saem de cena e a lista é a de todos os participantes, filtrada
+  /// pelo texto (decisão de 24/10/2026).
   List<SessionParticipant> get visibleParticipants => sortForDisplay(
         _participants
-            .where((p) => matchesFilter(p, _filter, myConsultantId))
+            .where((p) => isSearching
+                ? matchesSearch(p, searchQuery)
+                : matchesFilter(p, _filter, myConsultantId))
             .toList(growable: false),
         myConsultantId,
       );
+
+  /// "2 de 18 participantes", embaixo da lista filtrada pela busca; nulo
+  /// quando a busca não filtra nada.
+  String? get searchCountLabel {
+    if (!isFiltering) return null;
+    final total = _participants.length;
+    final noun = total == 1 ? 'participante' : 'participantes';
+    return '${visibleParticipants.length} de $total $noun';
+  }
 
   ParticipantSituation situationFor(SessionParticipant participant) =>
       situationOf(participant, myConsultantId);

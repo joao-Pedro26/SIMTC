@@ -26,9 +26,12 @@ import 'package:simtc/ui/core/date_labels.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
+import 'package:simtc/ui/core/theme/app_spacing.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/app_search_field.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
+import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
@@ -115,12 +118,13 @@ void main() {
     String? assignedTo,
     String? assignedName,
     double? score,
+    String cpf = '042.118.***-**',
   }) {
     return SessionParticipant(
       id: id,
       sessionId: 'sess-1',
       name: name,
-      maskedCpf: '042.118.***-**',
+      maskedCpf: cpf,
       participationType: type,
       status: status,
       assignedConsultantId: assignedTo,
@@ -414,6 +418,154 @@ void main() {
 
     expect(find.text('Juliana Freitas Costa'), findsOneWidget);
     expect(find.text('Carlos Eduardo Nunes'), findsNothing);
+  });
+
+  group('busca de participantes (Fase 8B)', () {
+    List<SessionParticipant> turma() => [
+          participant('1', 'Ana Paula Ribeiro', cpf: '042.118.***-**'),
+          participant('2', 'Mariana Costa',
+              status: ParticipantStatus.aprovado,
+              score: 90,
+              cpf: '311.902.***-**'),
+          participant('3', 'José Antônio Lima', cpf: '555.123.***-**'),
+        ];
+
+    Future<void> openSearch(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Buscar'));
+      await tester.pump();
+    }
+
+    testWidgets(
+        'a lupa na ponta da barra abre o campo no lugar dos chips, na mesma '
+        'altura; o X fecha e o filtro de antes volta', (tester) async {
+      await show(tester, withParticipants: turma());
+      await tester.tap(find.widgetWithText(InkWell, 'Pendentes'));
+      await tester.pump();
+      final bar = find.byKey(const Key('participants-filter-bar'));
+      final barHeight = tester.getSize(bar).height;
+      expect(
+        tester.getRect(find.byTooltip('Buscar')).right,
+        420 - (AppSpacing.xl - AppSpacing.md),
+      );
+
+      await openSearch(tester);
+
+      expect(find.byType(FilterChipBar), findsNothing);
+      expect(find.byType(AppSearchField), findsOneWidget);
+      expect(find.text('Buscar por nome ou CPF'), findsOneWidget);
+      expect(tester.getSize(bar).height, barHeight);
+      expect(barHeight, 54 + 1);
+
+      await tester.tap(find.byTooltip('Fechar a busca'));
+      await tester.pump();
+
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(find.byType(FilterChipBar), findsOneWidget);
+      expect(find.text('Mariana Costa'), findsNothing,
+          reason: 'o filtro "Pendentes" voltou');
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+    });
+
+    testWidgets(
+        'procura em todos, ignorando o chip, pelo nome sem acento nem '
+        'maiúscula, e diz quantos achou', (tester) async {
+      await show(tester, withParticipants: turma());
+      await tester.tap(find.widgetWithText(InkWell, 'Pendentes'));
+      await tester.pump();
+      await openSearch(tester);
+
+      await tester.enterText(find.byType(TextField), 'ANA');
+      await tester.pump();
+
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+      expect(find.text('Mariana Costa'), findsOneWidget,
+          reason: 'aprovada, fora do chip "Pendentes", aparece na busca');
+      expect(find.text('José Antônio Lima'), findsNothing);
+      expect(find.text('2 de 3 participantes'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'jose antonio');
+      await tester.pump();
+
+      expect(find.text('José Antônio Lima'), findsOneWidget);
+      expect(find.text('1 de 3 participantes'), findsOneWidget);
+    });
+
+    testWidgets('aberta e vazia, mostra todos, sem a contagem', (tester) async {
+      await show(tester, withParticipants: turma());
+      await tester.tap(find.widgetWithText(InkWell, 'Pendentes'));
+      await tester.pump();
+      await openSearch(tester);
+
+      expect(find.text('Mariana Costa'), findsOneWidget);
+      expect(find.text('3 de 3 participantes'), findsNothing);
+    });
+
+    testWidgets(
+        'pelo CPF: com o CPF inteiro, compara os 6 primeiros dígitos; com '
+        'menos, o começo', (tester) async {
+      await show(tester, withParticipants: turma());
+      await openSearch(tester);
+
+      await tester.enterText(find.byType(TextField), '311.902.555-01');
+      await tester.pump();
+      expect(find.text('Mariana Costa'), findsOneWidget);
+      expect(find.text('Ana Paula Ribeiro'), findsNothing);
+      expect(find.text('José Antônio Lima'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), '04');
+      await tester.pump();
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+      expect(find.text('Mariana Costa'), findsNothing);
+    });
+
+    testWidgets('sem resultado, diz que não achou', (tester) async {
+      await show(tester, withParticipants: turma());
+      await openSearch(tester);
+
+      await tester.enterText(find.byType(TextField), ' xyz ');
+      await tester.pump();
+
+      expect(
+        find.text('Nenhum participante encontrado para “xyz”.'),
+        findsOneWidget,
+      );
+      expect(find.text('0 de 3 participantes'), findsOneWidget);
+    });
+
+    testWidgets(
+        'no celular, o voltar com a busca aberta fecha a busca e fica na tela',
+        (tester) async {
+      await show(tester, withParticipants: turma());
+      await openSearch(tester);
+      await tester.enterText(find.byType(TextField), 'ana');
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.byType(AppSearchField), findsNothing);
+      expect(find.byType(FilterChipBar), findsOneWidget);
+      expect(find.byType(SessionDetailScreen), findsOneWidget);
+      expect(find.text('José Antônio Lima'), findsOneWidget);
+    });
+
+    testWidgets('o texto continua quando a lista se atualiza',
+        (tester) async {
+      await show(tester, withParticipants: turma());
+      await openSearch(tester);
+      await tester.enterText(find.byType(TextField), 'mari');
+      await tester.pump();
+
+      participantsStream.add(turma());
+      await tester.pump();
+
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'mari',
+      );
+      expect(find.text('Mariana Costa'), findsOneWidget);
+      expect(find.text('Ana Paula Ribeiro'), findsNothing);
+    });
   });
 
   group('avaliação deste aparelho na linha "comigo"', () {

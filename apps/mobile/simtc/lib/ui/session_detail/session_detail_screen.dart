@@ -20,6 +20,7 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_search_field.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
@@ -112,6 +113,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Widget _buildScaffold(BuildContext context) {
     final isOffline = context.watch<ConnectivityService>().isOffline;
 
+    // No celular, o voltar (o do Android e a seta da barra) fecha a busca
+    // antes de sair da tela. No tablet o detalhe é um painel do lado a lado,
+    // e o voltar segue fechando a sessão.
+    return PopScope(
+      canPop: context.isTablet || !_viewModel.isSearching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _viewModel.isSearching) _viewModel.closeSearch();
+      },
+      child: _buildPage(context, isOffline),
+    );
+  }
+
+  Widget _buildPage(BuildContext context, bool isOffline) {
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
@@ -481,24 +495,64 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     if (confirmed == true && mounted) await _viewModel.startSession();
   }
 
+  /// A barra dos filtros, com a lupa na ponta direita (quadros "1e" e "1f").
+  /// Com a busca aberta, o campo toma o lugar dela, na mesma altura: 54, os
+  /// 34 de um chip mais 10 em cima e embaixo.
   Widget _buildFilters() {
-    final counts = _viewModel.counts;
-
     return Container(
+      key: const Key('participants-filter-bar'),
       alignment: Alignment.centerLeft,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      child: FilterChipBar(
-        items: [
-          for (final filter in ParticipantFilter.values)
-            FilterChipData(label: filter.label, count: counts[filter]),
-        ],
-        selectedIndex: ParticipantFilter.values.indexOf(_viewModel.filter),
-        onSelect: (index) =>
-            _viewModel.setFilter(ParticipantFilter.values[index]),
-        horizontalPadding: _inset,
+      child: _viewModel.isSearching ? _buildSearchField() : _buildChips(),
+    );
+  }
+
+  /// Os 3 que sobram dos 54 da barra em volta do campo de 48.
+  static const double _searchBarPadding = AppSpacing.xs - 1;
+
+  Widget _buildChips() {
+    final counts = _viewModel.counts;
+
+    return Row(
+      children: [
+        Expanded(
+          child: FilterChipBar(
+            items: [
+              for (final filter in ParticipantFilter.values)
+                FilterChipData(label: filter.label, count: counts[filter]),
+            ],
+            selectedIndex: ParticipantFilter.values.indexOf(_viewModel.filter),
+            onSelect: (index) =>
+                _viewModel.setFilter(ParticipantFilter.values[index]),
+            horizontalPadding: _inset,
+          ),
+        ),
+        // O ícone, e não o alvo de toque, fica alinhado com a margem.
+        Padding(
+          padding: EdgeInsets.only(right: _inset - AppSpacing.md),
+          child: AppSearchButton(
+            iconSize: AppSearchButton.filtersIconSize,
+            onPressed: _viewModel.openSearch,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: _inset,
+        vertical: _searchBarPadding,
+      ),
+      child: AppSearchField(
+        hintText: 'Buscar por nome ou CPF',
+        initialText: _viewModel.searchQuery,
+        onChanged: _viewModel.setSearchQuery,
+        onClose: _viewModel.closeSearch,
       ),
     );
   }
@@ -527,6 +581,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           else
             for (final participant in visible)
               _buildParticipant(participant, isOffline),
+          if (_viewModel.searchCountLabel case final label?)
+            Padding(
+              padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
+              child: Text(label, style: AppTypography.meta),
+            ),
         ],
       ),
     );
@@ -646,8 +705,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     // seria uma afirmação que o app não tem como fazer.
     if (_viewModel.neverDownloaded) return const SizedBox.shrink();
 
+    final query = _viewModel.searchQuery.trim();
     final message = !_viewModel.hasParticipants
         ? 'Nenhum participante inscrito nesta sessão.'
+        : _viewModel.isFiltering
+        ? 'Nenhum participante encontrado para “$query”.'
         : switch (_viewModel.filter) {
             ParticipantFilter.todos => 'Nenhum participante inscrito nesta sessão.',
             ParticipantFilter.pendentes => 'Nenhum participante pendente.',

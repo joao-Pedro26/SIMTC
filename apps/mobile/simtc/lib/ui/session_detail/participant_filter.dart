@@ -3,6 +3,7 @@ import '../../data/services/local/app_database.dart';
 import '../core/date_labels.dart';
 import '../core/name_sort.dart';
 import '../core/score_labels.dart';
+import '../core/search_text.dart';
 
 /// Os quatro chips da tela 1.4. Aqui eles filtram de verdade (o canvas tem
 /// "Todos"), ao contrário dos chips da Home, que são âncoras de rolagem.
@@ -44,6 +45,15 @@ ParticipantSituation situationOf(
 bool _isConcluded(ParticipantSituation situation) =>
     situation == ParticipantSituation.approved ||
     situation == ParticipantSituation.needsReview;
+
+/// A busca do detalhe (Fase 8B): pelo nome, ou pelo começo do CPF quando o
+/// texto é só de dígitos — o aparelho guarda só os 6 primeiros.
+bool matchesSearch(SessionParticipant participant, String query) {
+  final digits = cpfSearchDigits(query);
+  return digits == null
+      ? containsSearch(participant.name, query)
+      : matchesCpfStart(participant.maskedCpf, digits);
+}
 
 /// Regra dos chips (decidida com o usuário em 23/09/2026):
 /// - **Pendentes**: ninguém pegou ainda (quem é só da teórica não entra);
