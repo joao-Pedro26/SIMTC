@@ -2263,3 +2263,12 @@ Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-deb
 - **8C:** a aparência do campo de busca e a lupa do detalhe com 48 de alvo (o quadro desenha 36) entram na conferência visual da 8C; o leitor de tela nas buscas (o campo anuncia o exemplo; a contagem "N de M" não é anunciada quando muda).
 - **8D:** buscar participante em todas as sessões a partir da Home, por curso ou por cidade, e no servidor — fora da 8B por decisão do usuário; retomar só se fizer falta em campo.
 - As observações das revisões da 8A continuam valendo como estão no fim do plano da 8A.
+
+### Observações das revisões da 8B
+
+Nenhuma muda o que o usuário vê hoje; ficam para a 8C (aparência e leitor de tela) e a 8D (borda e testes):
+
+- **8C:** o contorno de 1.5 do campo é um número literal (como no resto do projeto) — conferir com os tokens na passada visual.
+- **8D (comportamento de borda):** numa sessão nunca baixada, a busca com texto mostra "0 de 0 participantes" sem a frase de nenhum resultado; em Consultores, com a equipe que falhou ao carregar, a frase de nenhum resultado aparece junto do erro; ao fechar a busca da Home, o chip destacado pode não bater com a rolagem até a próxima rolagem; no tablet sem sessão aberta, o voltar que fecha a busca também chama um `go(home)` redundante (inofensivo hoje).
+- **8D (testes que faltam):** o alvo do X, o contorno e a cor do campo e o cursor no fim; o singular "1 de 1 participante" e o texto misto (letras e dígitos); a `Key('sessions-no-results')`, o título do ADMIN com a busca e o puxar para atualizar durante a busca; em Consultores, "todos já na sessão" com filtro e o X/voltar do tablet com a busca; um teste próprio da guarda do voltar do detalhe no tablet (o teste de paisagem só verifica a busca da lista).
+- **8D (limpeza):** `searchCountLabel` e `available` recalculam a lista a cada chamada (custo desprezível); a ordem de imports em Consultores; um comentário com mais de 80 colunas no getter das seções da Home; um `fromLTRB` simétrico que pode ser `symmetric`.
