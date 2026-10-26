@@ -261,6 +261,203 @@ busca aberta, e o que acontece com as âncoras/chips da Home e a paginação de 
 - As decisões visuais em aberto (2 a 6 da 5B; 5 a 8 da 6A; o canto 12 do "Atribuir a
   mim"), decididas com o usuário no início da 8C.
 
+### Desenho da 8C (26/10/2026, depois da validação da 8B)
+
+Nas validações até aqui, nada incomodou o usuário em especial. Ele **deixou as decisões
+da 8C para o meu bom senso** ("pode analisar essas pendências pelo bom senso"). Por isso,
+**tudo abaixo é escolha minha**, e o usuário confere na leitura. Isso vale também para as
+divergências do canvas, que ficam juntas em "Divergências do canvas", no fim. O
+levantamento juntou as pendências marcadas "8" nos planos 2 a 7B e as observações da
+8A e da 8B. As que mudam regra de tela ou de negócio ficam para a 8D:
+
+- as decisões em aberto 1 a 4 da 6A;
+- os textos da consulta de CPF;
+- a tela travada que ainda pergunta se descarta.
+
+Ficam também para a 8D a limpeza de código e as lacunas de teste.
+
+**Intenção:** o app fica confortável para quem enxerga pouco, usa a fonte grande do
+Android ou o TalkBack. Ele também não pode ter toques "mortos" nem cores fora do canvas.
+Nada muda de regra, nada muda no backend, e a 8C não tem publicação.
+
+#### 1. Cores e contraste
+
+1. **Contorno vermelho:** o `dangerBorder` passa de `#FCA5A5` para **`#E9A2A2`**. É a cor
+   que o canvas usa em todo lugar: 11 vezes, sem nenhum `#FCA5A5`. Muda o "Cancelar
+   sessão", o "Remover da sessão", o "Sair da conta", a pílula e os chips de "Não
+   recomendado" e todo o resto que usa o token. Isso fecha a decisão 5 da 6A e o
+   contorno do "Sair" da 8A.
+2. **"Somente teórica":** entra o token **`mauveInk` `#6B4A7A`** para o ícone e o texto
+   do chip e do cartão de tipo da 1.11. É a cor do canvas, que aparece 9 vezes. O `mauve`
+   `#9B80A8` continua como tom de marca do tema. Fecha a outra metade da decisão 5 da 6A.
+3. **Navbar do celular:** hoje o item ativo, `#38BEC8` sobre o próprio tom a 16%, dá
+   cerca de 2,3:1. O inativo, `#94A3B8`, dá cerca de 2,5:1. A navbar do celular passa a
+   usar **os tons que os quadros do tablet já usam**: ativo em `primaryDark` sobre
+   `primarySurface`, com cerca de 5:1, e inativo em `text3`. É a pendência de contraste
+   da Fase 1.
+4. **Texto informativo pequeno em cinza-claro:** o `#94A3B8` sobre o branco dá cerca de
+   2,6:1. Entra o token **`textSubtle` `#64748B`**, com cerca de 4,8:1. Ele substitui o
+   `textMuted` onde o cinza-claro é texto que se lê:
+   - o "opcional" dos campos (decisão 6 da 6A);
+   - o "N itens" da categoria fechada;
+   - o número do item da infração;
+   - o "N infrações" do Resultado no tablet;
+   - o "SIM Treinamentos" ao lado de "Disponíveis na equipe".
+
+   O `textMuted` continua no exemplo dos campos, no que está desativado e nos ícones
+   decorativos.
+
+#### 2. Toque
+
+1. **Ondulação do toque** onde ela não aparece, porque o fundo pinta por cima da
+   animação:
+   - o card da sessão;
+   - a linha do participante;
+   - o cabeçalho da categoria aberta;
+   - os botões B/PM/M;
+   - os cartões de tipo da 1.11.
+
+   Quem planeja procura os outros casos do mesmo padrão: um `InkWell` com um
+   `Container` colorido dentro.
+2. **Dois toques rápidos** em algo que abre uma tela abrem uma tela só. O segundo toque
+   é ignorado enquanto a primeira tela está abrindo. Vale para:
+   - os cards da Home;
+   - as linhas de participante;
+   - os botões e ícones que abrem tela (Iniciar, Conferir, Resultado, ações de admin,
+     Consultores);
+   - o "Sair da conta", que hoje empilha dois diálogos. Ele fica desativado enquanto
+     as avaliações iniciadas são contadas.
+3. **Alvos de toque de 48dp** e rótulo em tudo o que se toca. As telas principais ganham
+   os testes de diretriz do Flutter: `androidTapTargetGuideline`,
+   `labeledTapTargetGuideline` e `textContrastGuideline`. Assim nada novo escapa. A lupa
+   do detalhe continua com 48 de alvo, mesmo com o quadro desenhando 36 (pendência da
+   8B).
+
+#### 3. Fonte do sistema ampliada (o Android vai até 2×)
+
+1. **Cabeçalho do detalhe (1.4):** continua fixo, como no canvas. Com a fonte do sistema
+   em **1,3× ou mais**, ele rola junto com a lista e sai de cena ao rolar. Com fonte
+   grande e observações longas, ele ocupava a maior parte da tela. A regra vale também
+   no painel do detalhe do tablet (escolha minha, pelo mesmo motivo).
+2. **1.11 com o teclado aberto:** sobrou um estouro em 640dp de altura, sem conexão e
+   com fonte em 1,6×. Quando o rodapé não cabe, ele entra na rolagem. A regra vale para
+   a 1.11 e para a 1.12.
+3. **Pílula "Não recomendado"** do Resultado e da 1.6 (decisão 4 da 5B): quando não cabe
+   ao lado do %, ela desce para baixo dele, sem quebrar o texto.
+4. **"Tentar novamente" e "Descartar"** da aba Sincronizar (decisão 3 da 5B): ficam lado
+   a lado quando os dois cabem com o texto numa linha. Se não couberem, ficam um embaixo
+   do outro, cada um na largura inteira.
+5. **Meta:** nenhum estouro (as faixas amarelas) em nenhuma tela, em 360×640 com fonte
+   em 1,3× e em 2×. Vale também no tablet em 1,3×.
+
+#### 4. Leitor de tela (TalkBack)
+
+1. **B/PM/M:** cada botão diz a própria letra e se está **selecionado**. O rótulo
+   continua o que se vê ("B", "PM", "M"); não invento nome por extenso.
+2. **Data da 1.12:** é um nó só, lido como "Data do treinamento, 12/10/2026, botão",
+   e não três soltos.
+3. **Cartões de tipo da 1.11:** dizem se estão selecionados e se estão desativados.
+4. **Janelas de admin no tablet:** o título é anunciado ao abrir. O fundo escurecido
+   continua com o rótulo "Fechar".
+5. **Buscas (8B):** a contagem "N de M participantes" é anunciada quando muda, e a
+   frase de nenhum resultado também. O campo tem rótulo, e não só o exemplo.
+6. **Cabeçalhos de seção** (Hoje, Próximas, Concluídas, as seções de Consultores e os
+   títulos de tela) são marcados como cabeçalho, para o TalkBack navegar por eles.
+
+#### 5. Carregamento, erro e vazio
+
+1. **Regra:** toda tela que carrega dados mostra o skeleton enquanto carrega. Se a carga
+   falha, mostra o erro com "Tentar novamente". Lista vazia mostra uma frase própria. As
+   janelas de admin do tablet também seguem a regra. Quem planeja confere tela por tela
+   e lista as que faltam. Já se sabe que a 1.6 não tem estado vazio próprio (pendência
+   da 5A).
+2. **Checklist**, hoje calado diante de uma falha de escrita no aparelho:
+   - **ao abrir** (`init`): no lugar das categorias, "Não foi possível abrir a avaliação
+     neste aparelho.", com "Tentar novamente";
+   - **ao marcar uma nota** (`toggleNote`): aviso passageiro "Não foi possível salvar a
+     nota. Tente de novo.". O botão continua mostrando só o que foi gravado, como já é
+     hoje;
+   - **no "Iniciar avaliação"**: aviso passageiro "Não foi possível iniciar a avaliação.
+     Tente de novo.";
+   - **o "salvo" do cabeçalho** passa a refletir a falha. Depois de uma escrita que
+     falhou, ele mostra **"Não salvo"** em vermelho (`dangerInk`, com o ícone de alerta),
+     até a próxima escrita que der certo.
+3. **"Desatribuir participante" (decisão 2 da 5B):** enquanto o pedido está no ar, o ⋮
+   do checklist vira o indicador de carregamento pequeno que o app já usa, e o TalkBack
+   lê "Desatribuindo…". Hoje nada mostra a espera, que dura de 15 a 35 s com a rede
+   lenta.
+4. **Descarte que não apagou (decisão 6 da 5B):** quando a avaliação deixou de estar
+   recusada, porque foi reenviada e aceita com o diálogo aberto, o aviso passa a ser
+   "Esta avaliação já foi aceita pelo servidor; não há o que descartar.".
+
+#### 6. Tipografia e medidas herdadas
+
+1. **Diálogos de confirmação em Inter:** hoje usam a fonte padrão do Material. O título
+   e o texto passam aos estilos do app, pelo tema, em todos os diálogos de uma vez.
+2. **Pesos que não aparecem:** três `copyWith(fontWeight: …)` não mudam o peso, porque
+   a Inter é variável e o peso vem do `fontVariations`. Estão no card da sessão, na Home
+   e na linha do progresso do detalhe. Viram estilos com nome no `AppTypography`, como
+   o próprio arquivo manda.
+3. **Medidas alinhadas ao canvas** (decisão 8 da 6A):
+   - o texto das observações da 1.12 em 15/1,45;
+   - o recuo vertical do cabeçalho de contexto em 14;
+   - na 1.11, o nome da empresa em 14 com vão de 2;
+   - o ícone de adicionar do detalhe com 20.
+
+   O widget compartilhado ganha os parâmetros que precisar, e cada tela passa os do
+   próprio quadro.
+4. **"Atribuir a mim":** canto 10, como no quadro e nos outros botões compactos (hoje
+   12).
+5. **Perfil:** o vão entre o rótulo e o valor passa a 14 no celular (`2i`) e 16 no
+   tablet (`4k`/`4v`), como no canvas (hoje 12). No tablet, o "Sair da conta" compacto
+   mantém a largura enquanto sai, sem encolher para a do indicador.
+
+#### 7. Ficam como estão (decisão minha)
+
+- **A setinha** nas linhas "Na fila", "Erro no envio" e "Enviada" (decisão 5 da 5B):
+  fica. As linhas abrem o Resultado, e a seta diz isso.
+- **O título "Participantes"** sem conexão (decisão 7 da 6A): não apaga. Só o ícone
+  de adicionar apaga, porque é ele que não funciona. O título não é ação.
+- **O campo de busca da 8B,** que não tem quadro: fica como está.
+
+#### Divergências do canvas (todas escolha minha, a conferir)
+
+- **Navbar do celular** nos tons do tablet (1.3).
+- **`textSubtle`** no texto informativo pequeno (1.4).
+- **Cabeçalho do detalhe** rolando com fonte em 1,3× ou mais (3.1).
+- **Pílula "Não recomendado"** descendo para baixo do % e **botões da fila** empilhados
+  quando não cabem (3.3 e 3.4).
+- **"Não salvo"** no cabeçalho do checklist e o indicador no lugar do ⋮ (5.2 e 5.3).
+- **A lupa do detalhe** com 48 de alvo (2.3).
+
+Já o contorno `#E9A2A2`, o `mauveInk`, as medidas da decisão 8 da 6A, o canto 10 e os
+vãos do Perfil **aproximam** o app do canvas.
+
+#### Validação da 8C
+
+No **aparelho físico** e no **emulador do tablet**, contra a produção:
+
+- a fonte do sistema no máximo e em 1,3×;
+- o TalkBack ligado, percorrendo Home, detalhe, checklist, Resultado, Sincronizar,
+  Perfil e as telas de admin;
+- toques rápidos repetidos nos cards e nas linhas;
+- a conferência das cores novas.
+
+A validação prévia do plano desenha as telas com as fontes de verdade em 412×915,
+360×640 com 1,3× e 2×, 1280×800 e 800×1280.
+
+#### Deixado para quem planeja
+
+- A lista exata de telas sem carregamento, erro ou vazio, e o texto de cada vazio que
+  faltar, no tom dos que já existem.
+- Como ignorar o segundo toque: um auxiliar único usado por todos, ou uma guarda em
+  cada tela.
+- Onde ligar os testes de diretriz. Antes de decidir os ajustes, quem planeja roda
+  esses testes nas telas antigas e lista o que eles acusarem. O que for divergência do
+  canvas volta ao usuário antes do plano.
+- O limite de 1,3× é um ponto de partida. Se o desenho com as fontes de verdade mostrar
+  outro ponto melhor, quem planeja propõe.
+
 ## 8D — Defeitos de borda, limpeza, testes e QA final
 
 - O restante das pendências "8" dos planos 3 a 7B (envio, admin, consulta de CPF,
