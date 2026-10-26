@@ -2256,6 +2256,8 @@ git commit -m "docs(mobile): registra a validacao da fase 8b"
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
 
+**Validado em 26/10/2026: celular no aparelho físico e tablet no emulador; roteiro inteiro passou. Aval dado para planejar a 8C.**
+
 ---
 
 ## Pendências levadas para a 8C e a 8D
