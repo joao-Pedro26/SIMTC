@@ -16,6 +16,7 @@ class SessionContextHeader extends StatelessWidget {
     this.title,
     this.logoUrl,
     this.muted = false,
+    this.spacious = false,
   });
 
   /// De onde saem o logo e as iniciais — e a primeira linha, sem [title].
@@ -32,6 +33,11 @@ class SessionContextHeader extends StatelessWidget {
   /// Fundo da tela em vez do da superfície (canvas "3a").
   final bool muted;
 
+  /// As medidas do quadro "3b" (Dados do treinamento): 14 de recuo, logo de
+  /// 44, empresa em 15 e 3 até a linha de apoio. Sem ela, as dos quadros
+  /// "3a" e "3c": 12, 40, 14 e 2 (Fase 8C).
+  final bool spacious;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -40,13 +46,16 @@ class SessionContextHeader extends StatelessWidget {
         color: muted ? AppColors.background : AppColors.surface,
         border: const Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.symmetric(
+      padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
-        vertical: AppSpacing.md,
+        vertical: spacious ? AppSpacing.md + 2 : AppSpacing.md,
       ),
       child: Row(
         children: [
-          CompanyLogo.card(companyName: companyName, url: logoUrl),
+          if (spacious)
+            CompanyLogo.card(companyName: companyName, url: logoUrl)
+          else
+            CompanyLogo.context(companyName: companyName, url: logoUrl),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -54,11 +63,15 @@ class SessionContextHeader extends StatelessWidget {
               children: [
                 Text(
                   title ?? companyName,
-                  style: AppTypography.contextTitle,
+                  style: spacious
+                      ? AppTypography.contextTitle
+                      : AppTypography.contextTitleCompact,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: AppSpacing.xxs + 1),
+                SizedBox(
+                  height: spacious ? AppSpacing.xxs + 1 : AppSpacing.xxs,
+                ),
                 Text(
                   subtitle,
                   style: AppTypography.meta,

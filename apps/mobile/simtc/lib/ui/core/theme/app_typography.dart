@@ -150,6 +150,15 @@ abstract final class AppTypography {
   static TextStyle get meta =>
       _inter(size: 12.5, weight: FontWeight.w400, height: 1.3, color: AppColors.text3);
 
+  /// O [meta] no peso 500: o progresso do card e do detalhe ("3 de 8
+  /// avaliados").
+  static TextStyle get progressLabel =>
+      _inter(size: 12.5, weight: FontWeight.w500, height: 1.3, color: AppColors.text3);
+
+  /// O [meta] no peso 600: o título de um bloco da Home ("Outras · 2").
+  static TextStyle get blockTitle =>
+      _inter(size: 12.5, weight: FontWeight.w600, height: 1.3, color: AppColors.text3);
+
   /// Cabeçalho de seção de lista ("Hoje · 23 set", "Concluídas")
   static TextStyle get sectionTitle =>
       _inter(size: 13, weight: FontWeight.w700, height: 1.3, color: AppColors.text3);
@@ -170,6 +179,10 @@ abstract final class AppTypography {
   static TextStyle get fieldValueMono =>
       _mono(size: 16, weight: FontWeight.w600, height: 1.3);
 
+  /// Valor de um campo de várias linhas (as observações do quadro "3b")
+  static TextStyle get fieldValueMultiline =>
+      _inter(size: 15, weight: FontWeight.w400, height: 1.45);
+
   /// Nota à direita do rótulo de um campo ("opcional")
   static TextStyle get fieldOptional =>
       _inter(size: 11.5, weight: FontWeight.w400, height: 1.2, color: AppColors.textSubtle);
@@ -186,6 +199,10 @@ abstract final class AppTypography {
   /// Empresa na faixa de contexto dos formulários de ADMIN (canvas "3b")
   static TextStyle get contextTitle =>
       _inter(size: 15, weight: FontWeight.w600, height: 1.25);
+
+  /// A mesma, na faixa de contexto dos quadros "3a" e "3c"
+  static TextStyle get contextTitleCompact =>
+      _inter(size: 14, weight: FontWeight.w600, height: 1.25);
 
   /// Nome do consultor na tela "Consultores" (canvas "3c")
   static TextStyle get consultantName =>

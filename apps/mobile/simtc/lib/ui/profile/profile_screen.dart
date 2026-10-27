@@ -467,7 +467,8 @@ class _ProfileRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
+              // 14 no celular ("2i") e 16 no tablet ("4k"/"4v") (Fase 8C).
+              SizedBox(width: tablet ? AppSpacing.lg : AppSpacing.md + 2),
               if (isLoading)
                 const SizedBox(
                   width: _spinnerSize,

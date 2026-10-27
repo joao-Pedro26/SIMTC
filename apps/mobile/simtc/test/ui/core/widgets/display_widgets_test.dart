@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
+import 'package:simtc/ui/core/theme/app_typography.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
@@ -198,6 +199,28 @@ void main() {
 
     await tester.tap(find.text('Bracell'));
     expect(taps, 1);
+  });
+
+  testWidgets('SessionCard escreve o progresso no peso 500 de verdade (Fase 8C)',
+      (tester) async {
+    await _pump(
+      tester,
+      const SessionCard(
+        companyName: 'Bracell',
+        courseName: 'Direção Preventiva',
+        meta: 'Hoje · Itabira/MG',
+        statusChip: StatusChip(
+          label: 'Em andamento',
+          icon: AppIcons.sessions,
+          tone: StatusTone.info,
+        ),
+        progressLabel: '3 de 8 avaliados',
+        progressValue: 0.375,
+      ),
+    );
+
+    expect(tester.widget<Text>(find.text('3 de 8 avaliados')).style,
+        AppTypography.progressLabel);
   });
 
   testWidgets('SessionCard mostra o logo da empresa antes do nome', (tester) async {
@@ -485,6 +508,55 @@ void main() {
         ),
       );
       expect(background(), AppColors.background);
+    });
+
+    testWidgets('a normal tem as medidas dos quadros "3a" e "3c": 12 de recuo, '
+        'logo de 40, empresa em 14 e 2 até a linha de apoio (Fase 8C)',
+        (tester) async {
+      await _pump(
+        tester,
+        const Column(
+          children: [
+            SessionContextHeader(companyName: 'Bracell', subtitle: 'Curso'),
+          ],
+        ),
+      );
+
+      expect(tester.getSize(find.byType(CompanyLogo)), const Size(40, 40));
+      expect(tester.widget<Text>(find.text('Bracell')).style!.fontSize, 14);
+      expect(
+        tester.getRect(find.text('Curso')).top -
+            tester.getRect(find.text('Bracell')).bottom,
+        2,
+      );
+      expect(tester.getSize(find.byType(SessionContextHeader)).height,
+          12 + 40 + 12 + 1);
+    });
+
+    testWidgets('a espaçosa tem as do quadro "3b": 14 de recuo, logo de 44, '
+        'empresa em 15 e 3 até a linha de apoio (Fase 8C)', (tester) async {
+      await _pump(
+        tester,
+        const Column(
+          children: [
+            SessionContextHeader(
+              companyName: 'Bracell',
+              subtitle: 'Curso',
+              spacious: true,
+            ),
+          ],
+        ),
+      );
+
+      expect(tester.getSize(find.byType(CompanyLogo)), const Size(44, 44));
+      expect(tester.widget<Text>(find.text('Bracell')).style!.fontSize, 15);
+      expect(
+        tester.getRect(find.text('Curso')).top -
+            tester.getRect(find.text('Bracell')).bottom,
+        3,
+      );
+      expect(tester.getSize(find.byType(SessionContextHeader)).height,
+          14 + 44 + 14 + 1);
     });
 
     testWidgets('nome e apoio compridos encolhem com reticências, sem estourar',

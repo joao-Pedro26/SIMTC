@@ -210,6 +210,7 @@ class _AppTextFieldState extends State<AppTextField> {
 
   TextStyle get _valueStyle {
     if (widget.obscureText) return AppTypography.passwordDots;
+    if (_isMultiline) return AppTypography.fieldValueMultiline;
     return widget.mono ? AppTypography.fieldValueMono : AppTypography.fieldValue;
   }
 

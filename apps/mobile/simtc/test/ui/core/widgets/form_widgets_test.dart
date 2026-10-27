@@ -226,6 +226,9 @@ void main() {
       expect(field.minLines, 3);
       expect(field.maxLines, isNull);
       expect(tester.getSize(find.byType(AppTextField)).height, greaterThan(96));
+      // O texto das observações do quadro "3b": 15/1,45 (Fase 8C).
+      expect(field.style!.fontSize, 15);
+      expect(field.style!.height, 1.45);
     });
 
     testWidgets('mono: o valor usa a fonte de números', (tester) async {
@@ -274,7 +277,9 @@ void main() {
       );
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Cancelar sessão'), findsNothing);
+      // O rótulo fica escondido embaixo do indicador, guardando a largura
+      // (Fase 8C): não se vê nem é lido.
+      expect(find.bySemanticsLabel('Cancelar sessão'), findsNothing);
 
       await tester.tap(find.byType(AppDangerOutlineButton));
       expect(taps, 0);
@@ -311,6 +316,30 @@ void main() {
         button.style!.shape!.resolve(const {}),
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       );
+    });
+
+    testWidgets('em carregamento, o compacto sem expandir guarda a largura do '
+        'rótulo (Fase 8C)', (tester) async {
+      Widget button({required bool loading}) => Align(
+            alignment: Alignment.topLeft,
+            child: AppDangerOutlineButton(
+              label: 'Sair da conta',
+              icon: AppIcons.logout,
+              compact: true,
+              expand: false,
+              isLoading: loading,
+              onPressed: () {},
+            ),
+          );
+
+      await _pump(tester, button(loading: false));
+      final width = tester.getSize(find.byType(AppDangerOutlineButton)).width;
+
+      await _pump(tester, button(loading: true));
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(tester.getSize(find.byType(AppDangerOutlineButton)).width, width);
+      expect(find.bySemanticsLabel('Sair da conta'), findsNothing,
+          reason: 'o rótulo escondido não é lido');
     });
 
     testWidgets('o tamanho padrão continua com texto 15, ícone 20 e canto 12',
@@ -592,6 +621,35 @@ void main() {
       expect(tester.getSize(find.byType(AppCtaButton)).height, 48);
       final text = tester.renderObject<RenderParagraph>(find.text('Atribuir a mim'));
       expect(text.text.style?.fontSize, 14);
+    });
+
+    testWidgets('o compacto tem canto 10, como no quadro; o do cabeçalho '
+        'continua com 12 (Fase 8C)', (tester) async {
+      ShapeBorder? shape() => tester
+          .widget<FilledButton>(find.byType(FilledButton))
+          .style!
+          .shape!
+          .resolve(const {});
+
+      await _pump(tester, AppCtaButton(label: 'Atribuir a mim', onPressed: () {}));
+      expect(
+        shape(),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      );
+
+      await _pump(
+        tester,
+        AppCtaButton(
+          label: 'Iniciar avaliação',
+          size: AppCtaSize.header,
+          fullWidth: false,
+          onPressed: () {},
+        ),
+      );
+      expect(
+        shape(),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
     });
 
     testWidgets('em carregamento mostra o indicador e não responde ao toque',

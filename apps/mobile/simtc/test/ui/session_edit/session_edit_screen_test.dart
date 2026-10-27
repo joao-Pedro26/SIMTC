@@ -22,6 +22,7 @@ import 'package:simtc/ui/core/app_localization.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
+import 'package:simtc/ui/core/widgets/session_context_header.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -244,6 +245,11 @@ void main() {
     expect(find.text('MG'), findsOneWidget);
     expect(find.text('Pátio 3 — portaria B.'), findsOneWidget);
     expect(find.text('Observações para os consultores'), findsOneWidget);
+    // A faixa de contexto do quadro "3b" (Fase 8C).
+    expect(
+      tester.widget<SessionContextHeader>(find.byType(SessionContextHeader)).spacious,
+      isTrue,
+    );
 
     expect(saveButton(tester).onPressed, isNull, reason: 'nada mudou ainda');
     expect(cancelButton(tester).onPressed, isNotNull);

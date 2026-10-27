@@ -425,7 +425,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             Expanded(
               child: Text(
                 short ? progress.shortLabel : progress.label,
-                style: AppTypography.meta.copyWith(fontWeight: FontWeight.w500),
+                style: AppTypography.progressLabel,
               ),
             ),
             Text(
@@ -695,6 +695,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           Expanded(child: title),
           AppIconAction(
             icon: AppIcons.addParticipant,
+            iconSize: 20,
             tooltip: 'Adicionar participante',
             highlighted: _openAdmin == _AdminScreen.addParticipant,
             onPressed:

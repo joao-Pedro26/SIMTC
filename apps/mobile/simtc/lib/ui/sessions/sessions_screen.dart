@@ -503,7 +503,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ),
           child: Text(
             block.title!,
-            style: AppTypography.meta.copyWith(fontWeight: FontWeight.w600),
+            style: AppTypography.blockTitle,
           ),
         ),
       for (final dayGroup in block.dayGroups) ..._buildDayGroup(dayGroup),

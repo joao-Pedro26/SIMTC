@@ -45,6 +45,19 @@ void main() {
       expect(AppTypography.screenTitle.fontSize, 22);
     });
 
+    test('os pesos médios do "meta" são estilos próprios, com o eixo wght '
+        '(Fase 8C)', () {
+      // Um `copyWith(fontWeight:)` não mexe no `fontVariations`: o peso
+      // pedido não aparecia.
+      expect(AppTypography.progressLabel.fontSize, AppTypography.meta.fontSize);
+      expect(AppTypography.progressLabel.color, AppTypography.meta.color);
+      expect(AppTypography.progressLabel.fontVariations,
+          contains(const FontVariation('wght', 500)));
+      expect(AppTypography.blockTitle.fontSize, AppTypography.meta.fontSize);
+      expect(AppTypography.blockTitle.fontVariations,
+          contains(const FontVariation('wght', 600)));
+    });
+
     test('estilos variáveis carregam o eixo wght correspondente ao peso', () {
       final style = AppTypography.button;
       expect(style.fontWeight, FontWeight.w700);

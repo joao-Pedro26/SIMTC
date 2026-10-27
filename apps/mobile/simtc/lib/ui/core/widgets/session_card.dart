@@ -136,7 +136,7 @@ class SessionCard extends StatelessWidget {
           Flexible(
             child: Text(
               progressLabel!,
-              style: AppTypography.meta.copyWith(fontWeight: FontWeight.w500),
+              style: AppTypography.progressLabel,
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -234,8 +234,12 @@ class AppCtaButton extends StatelessWidget {
               _ => AppSpacing.lg,
             },
           ),
+          // O compacto ("Atribuir a mim") tem o canto 10 do quadro, como os
+          // outros botões de linha de lista (Fase 8C).
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(
+              size == AppCtaSize.compact ? AppRadius.sm + 2 : AppRadius.md,
+            ),
           ),
           // A cor do `textStyle` não vale num botão — quem pinta o rótulo é o
           // `foregroundColor`. Daqui só saem o tamanho e o peso.
@@ -351,8 +355,26 @@ class AppDangerOutlineButton extends StatelessWidget {
           textStyle:
               compact ? AppTypography.buttonCompact : AppTypography.buttonDanger,
         ),
-        child: isLoading ? _buildSpinner() : _buildContent(),
+        child: isLoading ? _buildLoading() : _buildContent(),
       ),
+    );
+  }
+
+  /// O indicador por cima do rótulo escondido: sem [expand], o botão guarda a
+  /// largura do rótulo em vez de encolher para a do indicador (Fase 8C).
+  Widget _buildLoading() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Visibility(
+          visible: false,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: _buildContent(),
+        ),
+        _buildSpinner(),
+      ],
     );
   }
 
@@ -535,6 +557,7 @@ class AppIconAction extends StatelessWidget {
     required this.tooltip,
     this.onPressed,
     this.highlighted = false,
+    this.iconSize = 22,
   });
 
   final IconData icon;
@@ -544,6 +567,10 @@ class AppIconAction extends StatelessWidget {
   /// A janela que este botão abriu está aberta: o botão fica marcado atrás
   /// do fundo escurecido (quadros "4l", "4m" e "4n").
   final bool highlighted;
+
+  /// 22 na barra do topo; 20 no adicionar da linha "Participantes" (quadro
+  /// "1f").
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -559,7 +586,7 @@ class AppIconAction extends StatelessWidget {
           : null,
       child: IconButton(
         tooltip: tooltip,
-        icon: Icon(icon, size: 22),
+        icon: Icon(icon, size: iconSize),
         color: AppColors.primaryDark,
         disabledColor: AppColors.textMuted,
         onPressed: onPressed,

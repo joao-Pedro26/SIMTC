@@ -198,6 +198,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
           companyName: session.companyName,
           logoUrl: session.companyLogoUrl,
           subtitle: session.courseName,
+          spacious: true,
         ),
         Padding(padding: const EdgeInsets.all(AppSpacing.xl), child: form),
       ],

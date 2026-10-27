@@ -64,6 +64,15 @@ void main() {
     expect(icon.width, 22);
     expect(rectOf(tester, find.text('Perfil de acesso')).left, icon.right + 14);
     expect(rectOf(tester, find.text('Consultor')).right, 412 - 20);
+    // 14 entre o rótulo e o valor, como no quadro (Fase 8C).
+    expect(
+      rectOf(tester, find.text('Consultor')).left -
+          rectOf(tester, find.ancestor(
+            of: find.text('Perfil de acesso'),
+            matching: find.byType(Expanded),
+          ).first).right,
+      14,
+    );
 
     final button = rectOf(tester, find.byType(AppDangerOutlineButton));
     expect(button.height, 56);
@@ -134,6 +143,15 @@ void main() {
     );
     expect(rectOf(tester, find.text('Consultor')).right, columnRight);
     expect(tester.widget<Text>(find.text('Consultor')).style!.fontSize, 14.5);
+    // 16 entre o rótulo e o valor, como nos quadros (Fase 8C).
+    expect(
+      rectOf(tester, find.text('Consultor')).left -
+          rectOf(tester, find.ancestor(
+            of: find.text('Perfil de acesso'),
+            matching: find.byType(Expanded),
+          ).first).right,
+      16,
+    );
 
     final note = find.textContaining('Sair apaga as sessões');
     expect(rectOf(tester, note).top, rows.last.bottom + 16);

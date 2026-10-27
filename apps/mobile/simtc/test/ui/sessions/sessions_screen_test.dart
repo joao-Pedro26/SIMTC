@@ -22,6 +22,7 @@ import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_spacing.dart';
+import 'package:simtc/ui/core/theme/app_typography.dart';
 import 'package:simtc/ui/core/widgets/app_search_field.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
@@ -252,6 +253,9 @@ void main() {
     expect(find.text('Nenhuma sessão para hoje.'), findsOneWidget);
     expect(find.text('Outras · 1'), findsOneWidget);
     expect(find.text('Suzano Papel'), findsOneWidget);
+    // O peso 600 de verdade, do eixo wght (Fase 8C).
+    expect(tester.widget<Text>(find.text('Outras · 1')).style,
+        AppTypography.blockTitle);
 
     // O aviso vem ANTES de "Outras" — não depois.
     final noticeY =

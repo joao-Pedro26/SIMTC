@@ -27,6 +27,7 @@ import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_spacing.dart';
+import 'package:simtc/ui/core/theme/app_typography.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_search_field.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
@@ -289,6 +290,11 @@ void main() {
     expect(find.text('1 de 2 participantes avaliados'), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
     expect(find.text('BC'), findsOneWidget, reason: 'iniciais no lugar do logo');
+    // O peso 500 de verdade, do eixo wght (Fase 8C).
+    expect(
+      tester.widget<Text>(find.text('1 de 2 participantes avaliados')).style,
+      AppTypography.progressLabel,
+    );
   });
 
   testWidgets('cada situação de participante tem o seu chip', (tester) async {
@@ -698,6 +704,8 @@ void main() {
       expect(add.dx, greaterThan(title.dx));
       expect(tester.getSize(find.widgetWithIcon(AppIconAction, AppIcons.addParticipant)),
           const Size(48, 48));
+      // O ícone de 20 do quadro "1f" (Fase 8C).
+      expect(tester.widget<Icon>(find.byIcon(AppIcons.addParticipant)).size, 20);
     });
 
     testWidgets(

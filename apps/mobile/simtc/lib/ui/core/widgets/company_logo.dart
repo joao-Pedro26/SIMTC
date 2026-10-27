@@ -27,6 +27,12 @@ bool isSvgLogoUrl(String url) => url.toLowerCase().endsWith('.svg');
 /// venha ele em qualquer dos dois formatos. Sem rede na primeira vez, ficam
 /// as iniciais.
 class CompanyLogo extends StatelessWidget {
+  /// 40 de lado, na faixa de contexto das telas de admin (quadros "3a" e
+  /// "3c").
+  const CompanyLogo.context({super.key, required this.companyName, this.url})
+      : _size = AppSpacing.huge - AppSpacing.sm,
+        _radius = AppRadius.sm;
+
   /// 44 de lado, para o card da Home (tela 1.3).
   const CompanyLogo.card({super.key, required this.companyName, this.url})
       : _size = AppSpacing.huge - AppSpacing.xs,
