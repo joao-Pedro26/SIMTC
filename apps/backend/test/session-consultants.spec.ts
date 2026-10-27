@@ -21,7 +21,7 @@ const mockPrisma = {
     createMany: jest.fn(),
     findMany: jest.fn(),
   },
-  trainingParticipant: { findMany: jest.fn(), update: jest.fn() },
+  trainingParticipant: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -65,6 +65,7 @@ describe('TrainingSessionsService: consultores da sessão', () => {
     );
     mockPrisma.sessionConsultant.findMany.mockResolvedValue(links);
     mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
+    mockPrisma.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
   });
 
   describe('addConsultant', () => {
@@ -143,7 +144,7 @@ describe('TrainingSessionsService: consultores da sessão', () => {
 
       await expect(service.removeConsultant('s1', 'c1')).rejects.toThrow(BadRequestException);
       expect(mockPrisma.sessionConsultant.deleteMany).not.toHaveBeenCalled();
-      expect(mockPrisma.trainingParticipant.update).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.updateMany).not.toHaveBeenCalled();
     });
 
     it('tira o consultor e, na mesma transação, libera quem estava em avaliação com ele', async () => {
@@ -172,10 +173,10 @@ describe('TrainingSessionsService: consultores da sessão', () => {
         include: { assessment: { select: { score: true } } },
       });
       const released = (id: string, status: string) => ({
-        where: { id },
+        where: { id, status: 'EM_AVALIACAO' },
         data: { assignedConsultantId: null, status },
       });
-      expect(mockPrisma.trainingParticipant.update.mock.calls.map(([call]) => call)).toEqual([
+      expect(mockPrisma.trainingParticipant.updateMany.mock.calls.map(([call]) => call)).toEqual([
         released('tp-nunca-avaliado', 'PENDENTE'),
         released('tp-aprovado-antes', 'APROVADO'),
         released('tp-reprovado-antes', 'NAO_RECOMENDADO'),
@@ -194,7 +195,7 @@ describe('TrainingSessionsService: consultores da sessão', () => {
         responsibleConsultantId: 'c1',
         consultants: links,
       });
-      expect(mockPrisma.trainingParticipant.update).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -223,8 +224,8 @@ describe('TrainingSessionsService: consultores da sessão', () => {
           },
         }),
       );
-      expect(mockPrisma.trainingParticipant.update).toHaveBeenCalledWith({
-        where: { id: 'tp-1' },
+      expect(mockPrisma.trainingParticipant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tp-1', status: 'EM_AVALIACAO' },
         data: { assignedConsultantId: null, status: 'PENDENTE' },
       });
     });
@@ -236,7 +237,7 @@ describe('TrainingSessionsService: consultores da sessão', () => {
 
       expect(mockPrisma.sessionConsultant.createMany).toHaveBeenCalled();
       expect(mockPrisma.trainingParticipant.findMany).not.toHaveBeenCalled();
-      expect(mockPrisma.trainingParticipant.update).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.updateMany).not.toHaveBeenCalled();
     });
 
     it('sem additionalConsultantsIds: não mexe em consultor nem em participante', async () => {
