@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from 'src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { PracticalAssessmentsController } from 'src/practical-assessments/practical-assessments.controller';
 import { PracticalAssessmentsService } from 'src/practical-assessments/practical-assessments.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -8,6 +13,7 @@ import {
   calculateOverallScore,
   getApprovalStatus,
   JwtPayload,
+  UserRole,
 } from '@simtc/shared-types';
 
 const mockPrisma = {
@@ -269,7 +275,8 @@ describe('PracticalAssessmentsService', () => {
 
     beforeEach(() => {
       mockPrisma.assessmentCategory.findMany.mockResolvedValue([]);
-      mockPrisma.$transaction.mockResolvedValue([]);
+      // A transação interativa roda com o próprio mock no papel do `tx`.
+      mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockPrisma));
       // Quem envia está com o participante: é o caso de todo envio normal.
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
         status: 'EM_AVALIACAO',
@@ -296,6 +303,85 @@ describe('PracticalAssessmentsService', () => {
       const result = await service.syncFromMobile([dto], 'consultant-1');
 
       expect(result[0]).toMatchObject({ status: 'fulfilled' });
+    });
+
+    describe('numa transação só (Fase 8D-1)', () => {
+      /** O cliente da transação, separado do `mockPrisma`: o que for gravado
+       * fora dela aparece no `mockPrisma`. */
+      const tx = {
+        practicalAssessment: { create: jest.fn(), update: jest.fn() },
+        assessmentItem: { deleteMany: jest.fn() },
+        assessmentCategory: { findMany: jest.fn() },
+        trainingParticipant: { update: jest.fn() },
+      };
+
+      beforeEach(() => {
+        Object.values(tx).forEach((model) =>
+          Object.values(model).forEach((fn) => fn.mockReset()),
+        );
+        tx.assessmentCategory.findMany.mockResolvedValue([]);
+        mockPrisma.$transaction.mockImplementation((fn: (t: unknown) => unknown) => fn(tx));
+      });
+
+      it('a reavaliação apaga os itens, regrava a avaliação e calcula a nota dentro dela', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
+        tx.practicalAssessment.update.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result[0]).toMatchObject({ status: 'fulfilled' });
+        expect(tx.assessmentItem.deleteMany).toHaveBeenCalledWith({ where: { assessmentId: 'assess-1' } });
+        expect(tx.practicalAssessment.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ score: null }) }),
+        );
+        expect(tx.practicalAssessment.update).toHaveBeenCalledWith({
+          where: { id: 'assess-1' },
+          data: { score: 100 },
+        });
+        expect(tx.trainingParticipant.update).toHaveBeenCalledWith({
+          where: { id: 'tp-1' },
+          data: { status: 'APROVADO', assignedConsultantId: null },
+        });
+        expect(mockPrisma.assessmentItem.deleteMany).not.toHaveBeenCalled();
+        expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+        expect(mockPrisma.trainingParticipant.update).not.toHaveBeenCalled();
+      });
+
+      it('a primeira avaliação é criada e recebe a nota dentro dela', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        tx.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result[0]).toMatchObject({ status: 'fulfilled' });
+        expect(tx.practicalAssessment.create).toHaveBeenCalled();
+        expect(tx.trainingParticipant.update).toHaveBeenCalled();
+        expect(mockPrisma.practicalAssessment.create).not.toHaveBeenCalled();
+      });
+
+      it('uma falha no meio recusa o item, e a nota não é gravada fora da transação', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
+        tx.practicalAssessment.update.mockRejectedValue(new Error('falha no banco'));
+
+        const result = await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(result).toEqual([
+          { trainingParticipantId: 'tp-1', status: 'rejected', error: 'falha no banco' },
+        ]);
+        expect(tx.trainingParticipant.update).not.toHaveBeenCalled();
+        expect(mockPrisma.trainingParticipant.update).not.toHaveBeenCalled();
+      });
+    });
+
+    it('aceita o envio de quem está com o participante sem olhar o status da sessão: '
+      + 'a avaliação de campo não se perde se a sessão foi concluída antes do envio (Fase 8D-1)', async () => {
+      // O mock não tem `trainingSession`: se o envio lesse a sessão, quebraria.
+      mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+      mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+      const result = await service.syncFromMobile([dto], 'consultant-1');
+
+      expect(result).toEqual([{ trainingParticipantId: 'tp-1', status: 'fulfilled' }]);
     });
 
     it('devolve o erro para item rejeitado', async () => {
@@ -443,6 +529,36 @@ describe('PracticalAssessmentsService', () => {
       ]);
       expect(mockPrisma.practicalAssessment.create).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('PracticalAssessmentsService.findOne (Fase 8D-1)', () => {
+  it('uma avaliação que não existe é 404, e não 500', async () => {
+    const prisma = { practicalAssessment: { findUnique: jest.fn().mockResolvedValue(null) } };
+    const service = new PracticalAssessmentsService(prisma as unknown as PrismaService);
+
+    await expect(service.findOne('nao-existe')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('PracticalAssessmentsController: quem lê uma avaliação (Fase 8D-1)', () => {
+  // As duas leituras devolvem notas e infrações: só ADMIN e CONSULTANT. O
+  // `JwtAuthGuard` está na classe; o `RolesGuard`, que lê o papel, nos métodos.
+  const reflector = new Reflector();
+
+  it.each([
+    ['findByParticipant', PracticalAssessmentsController.prototype.findByParticipant],
+    ['findOne', PracticalAssessmentsController.prototype.findOne],
+  ])('%s exige ADMIN ou CONSULTANT, pelo RolesGuard', (_name, handler) => {
+    expect(reflector.get<UserRole[]>(ROLES_KEY, handler)).toEqual([
+      UserRole.ADMIN,
+      UserRole.CONSULTANT,
+    ]);
+    expect(reflector.get(GUARDS_METADATA, handler)).toEqual([RolesGuard]);
+  });
+
+  it('a classe continua exigindo o login', () => {
+    expect(reflector.get(GUARDS_METADATA, PracticalAssessmentsController)).toEqual([JwtAuthGuard]);
   });
 });
 

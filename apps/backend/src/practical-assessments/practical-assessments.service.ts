@@ -1,4 +1,5 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
@@ -70,6 +71,10 @@ export class PracticalAssessmentsService {
     if (!participant) {
       throw new ConflictException('Participante não encontrado');
     }
+    // O status da sessão não conta (Fase 8D-1): o consultor avalia sem rede e
+    // envia depois, e uma sessão concluída pelo ADMIN no fim do dia, antes do
+    // envio, faria a avaliação de campo se perder. Basta o participante
+    // continuar com quem envia.
     const isWithSender =
       participant.status === 'EM_AVALIACAO' && participant.assignedConsultantId === consultantId;
     if (!isWithSender) {
@@ -88,41 +93,45 @@ export class PracticalAssessmentsService {
       );
     }
 
-    if (existing) {
-      // Reavaliação: apaga os itens anteriores e atualiza o registro
-      await this.prisma.assessmentItem.deleteMany({
-        where: { assessmentId: existing.id },
-      });
+    // Tudo numa transação só (Fase 8D-1): uma falha no meio de uma
+    // reavaliação deixava a avaliação aceita sem itens.
+    return this.prisma.$transaction(async (tx) => {
+      if (existing) {
+        // Reavaliação: apaga os itens anteriores e atualiza o registro
+        await tx.assessmentItem.deleteMany({
+          where: { assessmentId: existing.id },
+        });
 
-      const updated = await this.prisma.practicalAssessment.update({
-        where: { id: existing.id },
-        data: {
-          consultantId,
-          date: new Date(dto.date),
-          startTime: new Date(dto.startTime),
-          endTime: dto.endTime ? new Date(dto.endTime) : null,
-          synced: true,
-          score: null, // resetar até calcular abaixo
-          items: {
-            create: dto.items.map((item) => ({ infractionNoteId: item.infractionNoteId })),
+        const updated = await tx.practicalAssessment.update({
+          where: { id: existing.id },
+          data: {
+            consultantId,
+            date: new Date(dto.date),
+            startTime: new Date(dto.startTime),
+            endTime: dto.endTime ? new Date(dto.endTime) : null,
+            synced: true,
+            score: null, // resetar até calcular abaixo
+            items: {
+              create: dto.items.map((item) => ({ infractionNoteId: item.infractionNoteId })),
+            },
           },
-        },
-        include: {
-          items: {
-            include: {
-              infractionNote: {
-                include: { infraction: { include: { category: true } } },
+          include: {
+            items: {
+              include: {
+                infractionNote: {
+                  include: { infraction: { include: { category: true } } },
+                },
               },
             },
           },
-        },
-      });
+        });
 
-      await this.applyScore(updated.id, updated.items, dto.trainingParticipantId);
-      return updated;
-    } else {
+        await this.applyScore(tx, updated.id, updated.items, dto.trainingParticipantId);
+        return updated;
+      }
+
       // Primeira avaliação
-      const assessment = await this.prisma.practicalAssessment.create({
+      const assessment = await tx.practicalAssessment.create({
         data: {
           trainingParticipantId: dto.trainingParticipantId,
           consultantId,
@@ -145,13 +154,15 @@ export class PracticalAssessmentsService {
         },
       });
 
-      await this.applyScore(assessment.id, assessment.items, dto.trainingParticipantId);
+      await this.applyScore(tx, assessment.id, assessment.items, dto.trainingParticipantId);
       return assessment;
-    }
+    });
   }
 
-  /** Calcula score e atualiza o assessment + status do participante */
+  /** Calcula score e atualiza o assessment + status do participante, na
+   * transação do envio. */
   private async applyScore(
+    tx: Prisma.TransactionClient,
     assessmentId: string,
     items: Array<{
       infractionNote: {
@@ -169,7 +180,7 @@ export class PracticalAssessmentsService {
     }
 
     // Busca TODAS as categorias (mesmo as não avaliadas nesta sessão, que contam 100%)
-    const allCategories = await this.prisma.assessmentCategory.findMany({
+    const allCategories = await tx.assessmentCategory.findMany({
       select: { id: true, _count: { select: { infractions: true } } },
     });
 
@@ -179,20 +190,19 @@ export class PracticalAssessmentsService {
     const overallScore = calculateOverallScore(categoryScores);
     const status = getApprovalStatus(overallScore);
 
-    await this.prisma.$transaction([
-      this.prisma.practicalAssessment.update({
-        where: { id: assessmentId },
-        data: { score: overallScore },
-      }),
-      this.prisma.trainingParticipant.update({
-        where: { id: trainingParticipantId },
-        data: { status, assignedConsultantId: null },
-      }),
-    ]);
+    await tx.practicalAssessment.update({
+      where: { id: assessmentId },
+      data: { score: overallScore },
+    });
+    await tx.trainingParticipant.update({
+      where: { id: trainingParticipantId },
+      data: { status, assignedConsultantId: null },
+    });
   }
 
-  findOne(id: string) {
-    return this.prisma.practicalAssessment.findUniqueOrThrow({
+  /** Um id que não existe é 404, e não o 500 do `findUniqueOrThrow` (Fase 8D-1). */
+  async findOne(id: string) {
+    const assessment = await this.prisma.practicalAssessment.findUnique({
       where: { id },
       include: {
         items: {
@@ -204,6 +214,8 @@ export class PracticalAssessmentsService {
         },
       },
     });
+    if (!assessment) throw new NotFoundException('Avaliação não encontrada');
+    return assessment;
   }
 
   /** Retorna avaliação existente do participante, ou null se não houver */

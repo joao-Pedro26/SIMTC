@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtPayload, SyncPracticalAssessmentDto } from '@simtc/shared-types';
+import { JwtPayload, SyncPracticalAssessmentDto, UserRole } from '@simtc/shared-types';
 import { PracticalAssessmentsService } from './practical-assessments.service';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 
@@ -33,13 +35,19 @@ export class PracticalAssessmentsController {
     return this.service.syncFromMobile(dtos, user.consultantId, user.sub);
   }
 
+  // As leituras devolvem notas e infrações: só ADMIN e CONSULTANT, e não um
+  // CLIENT de outra empresa (Fase 8D-1 do app mobile).
   @Get('by-participant/:trainingParticipantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.CONSULTANT)
   @ApiOperation({ summary: 'Retorna avaliação existente do participante, ou null' })
   findByParticipant(@Param('trainingParticipantId') trainingParticipantId: string) {
     return this.service.findByParticipant(trainingParticipantId);
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.CONSULTANT)
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
