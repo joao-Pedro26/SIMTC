@@ -18,6 +18,11 @@ class ConnectivityBanner extends StatelessWidget {
   final bool isOffline;
   final String? message;
 
+  /// Nos formulários de admin (1.11 e 1.12), com menos que isto de altura
+  /// entre a barra do topo e o rodapé — o teclado aberto num celular baixo —,
+  /// a faixa rola junto com o formulário, em vez de ficar fixa (Fase 8C).
+  static const double scrollsBelow = 300;
+
   @override
   Widget build(BuildContext context) {
     if (!isOffline) return const SizedBox.shrink();

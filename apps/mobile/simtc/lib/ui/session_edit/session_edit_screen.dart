@@ -133,11 +133,33 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
               title: 'Dados do treinamento',
               trailing: SyncStatusIndicator(),
             ),
-            ConnectivityBanner(
-              isOffline: isOffline,
-              message: 'Sem conexão — salvar e cancelar precisam de internet.',
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final banner = ConnectivityBanner(
+                    isOffline: isOffline,
+                    message: 'Sem conexão — salvar e cancelar precisam de '
+                        'internet.',
+                  );
+                  // Pouca altura (o teclado aberto num celular baixo): a faixa
+                  // rola junto com o formulário, e os botões continuam à
+                  // vista (Fase 8C).
+                  final bannerScrolls =
+                      constraints.maxHeight < ConnectivityBanner.scrollsBelow;
+                  return Column(
+                    children: [
+                      if (!bannerScrolls) banner,
+                      Expanded(
+                        child: _buildBody(
+                          isOffline,
+                          leading: bannerScrolls ? banner : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-            Expanded(child: _buildBody(isOffline)),
             if (_viewModel.session != null)
               _buildFooter(isOffline, keyboardOpen),
           ],
@@ -146,7 +168,10 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     );
   }
 
-  Widget _buildBody(bool isOffline) {
+  /// [leading] é o primeiro item da rolagem: a faixa de sem conexão, quando
+  /// ela rola, ou nada. Fica sempre no mesmo lugar, para o formulário não ser
+  /// recriado (e perder o foco) quando o teclado abre.
+  Widget _buildBody(bool isOffline, {required Widget leading}) {
     if (_viewModel.isLoading) return _buildSkeleton();
 
     final session = _viewModel.session;
@@ -194,6 +219,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
+        leading,
         SessionContextHeader(
           companyName: session.companyName,
           logoUrl: session.companyLogoUrl,
@@ -220,7 +246,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
         isOffline: isOffline,
         message: 'Sem conexão — salvar e cancelar precisam de internet.',
       ),
-      body: _buildBody(isOffline),
+      body: _buildBody(isOffline, leading: const SizedBox.shrink()),
       footer: session == null ? null : _buildDialogFooter(isOffline, keyboardOpen),
     );
   }

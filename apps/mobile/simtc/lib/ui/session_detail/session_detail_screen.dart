@@ -16,6 +16,7 @@ import '../../router.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
 import '../core/open_once.dart';
+import '../core/text_scale.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -236,6 +237,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
     final session = _viewModel.session;
     if (session == null) return _buildMissingSession();
+
+    // Com a fonte do sistema grande, o cabeçalho e os filtros rolam junto
+    // com a lista: fixos, ocupariam a maior parte da tela (Fase 8C).
+    if (context.isLargeText) {
+      return _buildParticipantList(
+        session,
+        isOffline,
+        leading: [_buildSessionHeader(session, isOffline), _buildFilters()],
+      );
+    }
 
     // Cabeçalho e chips fixos, lista rolando embaixo — como no canvas.
     return Column(
@@ -563,7 +574,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     );
   }
 
-  Widget _buildParticipantList(TrainingSession session, bool isOffline) {
+  /// [leading] vem antes de tudo, dentro da rolagem: o cabeçalho e os
+  /// filtros, com a fonte do sistema grande.
+  Widget _buildParticipantList(
+    TrainingSession session,
+    bool isOffline, {
+    List<Widget> leading = const [],
+  }) {
     final notice = _buildNotice(session, isOffline);
     final visible = _viewModel.visibleParticipants;
 
@@ -576,6 +593,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: AppSpacing.huge),
         children: [
+          ...leading,
           if (notice != null)
             Padding(
               padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),

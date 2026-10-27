@@ -591,6 +591,36 @@ void main() {
     });
   });
 
+  group('fonte do sistema grande (Fase 8C)', () {
+    Finder inList(Finder finder) =>
+        find.descendant(of: find.byType(ListView), matching: finder);
+
+    testWidgets('na fonte normal, o cabeçalho e os filtros ficam fixos',
+        (tester) async {
+      await show(tester, withParticipants: [participant('1', 'Ana Paula Ribeiro')]);
+
+      expect(find.text('Bracell Celulose'), findsOneWidget);
+      expect(inList(find.text('Bracell Celulose')), findsNothing);
+      expect(inList(find.byType(FilterChipBar)), findsNothing);
+    });
+
+    testWidgets('em 1,3×, o cabeçalho e os filtros rolam junto com a lista',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await show(tester, withParticipants: [participant('1', 'Ana Paula Ribeiro')]);
+
+      expect(inList(find.text('Bracell Celulose')), findsOneWidget);
+      expect(inList(find.byType(FilterChipBar)), findsOneWidget);
+      final header = tester.getTopLeft(find.text('Bracell Celulose')).dy;
+      final chips = tester.getTopLeft(find.byType(FilterChipBar)).dy;
+      final row = tester.getTopLeft(find.text('Ana Paula Ribeiro')).dy;
+      expect(header, lessThan(chips));
+      expect(chips, lessThan(row));
+    });
+  });
+
   testWidgets(
       'a linha mostra a ondulação do toque; a de outro consultor, sobre o '
       'fundo apagado (Fase 8C)', (tester) async {

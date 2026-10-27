@@ -526,6 +526,16 @@ void main() {
       find.text('Sem conexão — adicionar participante precisa de internet.'),
       findsOneWidget,
     );
+    // Com espaço, a faixa fica fixa embaixo da barra do topo (Fase 8C).
+    expect(
+      find.descendant(
+        of: find.byType(ListView),
+        matching: find.text(
+          'Sem conexão — adicionar participante precisa de internet.',
+        ),
+      ),
+      findsNothing,
+    );
     expect(find.text('Disponível quando houver conexão'), findsOneWidget);
     // Dá para ir preenchendo o resto.
     expect(tester.widget<TextField>(field('campo-nome')).enabled, isTrue);
@@ -1015,6 +1025,40 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text(reason), findsOneWidget);
+    });
+
+    testWidgets(
+        'sem conexão, com o teclado aberto num celular de 360x640 e a fonte '
+        'em 2×: a faixa rola com o formulário, nada estoura e o campo '
+        'continua com o foco (Fase 8C)', (tester) async {
+      await seedSession();
+      await goOffline();
+      await pumpAdd(tester, screen: const Size(360, 640), textScale: 2);
+      const banner = 'Sem conexão — adicionar participante precisa de internet.';
+
+      // Em 2×, a faixa e o contexto empurram o CPF para baixo da dobra.
+      await tester.scrollUntilVisible(
+        field('campo-cpf'),
+        200,
+        scrollable: find
+            .descendant(of: find.byType(ListView), matching: find.byType(Scrollable))
+            .first,
+      );
+      await tester.tap(field('campo-cpf'));
+      await setKeyboard(tester, 280);
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<TextField>(field('campo-cpf')).focusNode!.hasFocus,
+        isTrue,
+      );
+      // A faixa está no começo da rolagem, e não fixa no topo.
+      await tester.drag(find.byType(ListView), const Offset(0, 2000));
+      await tester.pump();
+      expect(
+        find.descendant(of: find.byType(ListView), matching: find.text(banner)),
+        findsOneWidget,
+      );
     });
 
     testWidgets(

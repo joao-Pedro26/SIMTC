@@ -48,35 +48,37 @@ class FinalScoreBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          // A pílula fica à direita do %; quando não cabe ao lado dele
+          // (tela estreita ou fonte do sistema grande), desce para baixo,
+          // sem quebrar o texto (Fase 8C).
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pontuação final',
-                      style: tablet
-                          ? AppTypography.summaryScoreLabelTablet
-                          : AppTypography.summaryScoreLabel,
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      score == null ? '—' : percentLabel(score),
-                      style: tablet
-                          ? AppTypography.summaryScoreTablet
-                          : result
-                              ? AppTypography.resultScoreTablet
-                              : AppTypography.summaryScore,
-                    ),
-                  ],
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Pontuação final',
+                    style: tablet
+                        ? AppTypography.summaryScoreLabelTablet
+                        : AppTypography.summaryScoreLabel,
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    score == null ? '—' : percentLabel(score),
+                    style: tablet
+                        ? AppTypography.summaryScoreTablet
+                        : result
+                            ? AppTypography.resultScoreTablet
+                            : AppTypography.summaryScore,
+                  ),
+                ],
               ),
-              if (approved != null) ...[
-                const SizedBox(width: AppSpacing.md),
-                _ResultPill(approved: approved, large: tablet),
-              ],
+              if (approved != null) _ResultPill(approved: approved, large: tablet),
             ],
           ),
           for (var i = 0; i < lines.length; i++) ...[

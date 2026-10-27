@@ -9,6 +9,7 @@ import '../../data/services/connectivity_service.dart';
 import '../../data/services/local/app_database.dart';
 import '../../router.dart';
 import '../core/form_factor.dart';
+import '../core/text_scale.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -327,18 +328,35 @@ class SyncScreen extends StatelessWidget {
     );
     if (!SendFailure.refusals.contains(item.lastError)) return retry;
 
-    return Row(
-      children: [
-        Expanded(child: retry),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: _DiscardButton(
-            onPressed: sync.isSending ? null : () => _confirmDiscard(context, sync, item),
-          ),
-        ),
-      ],
+    final discard = _DiscardButton(
+      onPressed: sync.isSending ? null : () => _confirmDiscard(context, sync, item),
+    );
+
+    // Lado a lado só onde os dois cabem com o texto numa linha (o tablet);
+    // no celular, "Tentar novamente" quebrava em duas linhas: um embaixo do
+    // outro, cada um na largura inteira (Fase 8C).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth / context.textScale >= _sideBySideMinWidth) {
+          return Row(
+            children: [
+              Expanded(child: retry),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: discard),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [retry, const SizedBox(height: AppSpacing.sm), discard],
+        );
+      },
     );
   }
+
+  /// A largura (na fonte normal) a partir da qual "Tentar novamente" e
+  /// "Descartar" cabem lado a lado, cada um com o texto numa linha.
+  static const double _sideBySideMinWidth = 480;
 
   Future<void> _confirmDiscard(
     BuildContext context,

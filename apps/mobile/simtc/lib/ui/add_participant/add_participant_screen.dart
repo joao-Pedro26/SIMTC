@@ -147,11 +147,32 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
               leadingTooltip: 'Fechar',
               trailing: SyncStatusIndicator(),
             ),
-            ConnectivityBanner(
-              isOffline: isOffline,
-              message: 'Sem conexão — adicionar participante precisa de internet.',
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final banner = ConnectivityBanner(
+                    isOffline: isOffline,
+                    message: 'Sem conexão — adicionar participante precisa de '
+                        'internet.',
+                  );
+                  // Pouca altura (o teclado aberto num celular baixo): a faixa
+                  // rola junto com o formulário, e os botões continuam à
+                  // vista (Fase 8C).
+                  final bannerScrolls =
+                      constraints.maxHeight < ConnectivityBanner.scrollsBelow;
+                  return Column(
+                    children: [
+                      if (!bannerScrolls) banner,
+                      Expanded(
+                        child: _buildBody(
+                          leading: bannerScrolls ? banner : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-            Expanded(child: _buildBody()),
             if (_viewModel.session != null)
               _buildFooter(isOffline, keyboardOpen),
           ],
@@ -174,12 +195,15 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
         isOffline: isOffline,
         message: 'Sem conexão — adicionar participante precisa de internet.',
       ),
-      body: _buildBody(),
+      body: _buildBody(leading: const SizedBox.shrink()),
       footer: session == null ? null : _buildDialogFooter(isOffline, keyboardOpen),
     );
   }
 
-  Widget _buildBody() {
+  /// [leading] é o primeiro item da rolagem: a faixa de sem conexão, quando
+  /// ela rola, ou nada. Fica sempre no mesmo lugar, para o formulário não ser
+  /// recriado (e perder o foco) quando o teclado abre.
+  Widget _buildBody({required Widget leading}) {
     if (_viewModel.isLoading) return _buildSkeleton();
 
     final session = _viewModel.session;
@@ -230,6 +254,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
+        leading,
         SessionContextHeader(
           companyName: session.companyName,
           logoUrl: session.companyLogoUrl,

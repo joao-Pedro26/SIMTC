@@ -594,6 +594,34 @@ void main() {
   });
 
   testWidgets(
+      'sem conexão, com o teclado aberto num celular de 360x640 e a fonte em '
+      '2×: a faixa rola com o formulário, nada estoura e o campo continua '
+      'com o foco (Fase 8C)', (tester) async {
+    await seedSession();
+    await goOffline();
+    await pumpEdit(tester, screen: const Size(360, 640), textScale: 2);
+    const banner = 'Sem conexão — salvar e cancelar precisam de internet.';
+
+    await tester.ensureVisible(field('campo-cidade'));
+    await tester.pump();
+    await tester.tap(field('campo-cidade'));
+    await setKeyboard(tester, 280);
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.widget<TextField>(field('campo-cidade')).focusNode!.hasFocus,
+      isTrue,
+    );
+    // A faixa está no começo da rolagem, e não fixa no topo.
+    await tester.drag(find.byType(ListView), const Offset(0, 2000));
+    await tester.pump();
+    expect(
+      find.descendant(of: find.byType(ListView), matching: find.text(banner)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
       'salvar recusado pelo servidor (403): o motivo aparece, a sessão é '
       'baixada de novo e os campos e botões travam, com o que foi digitado',
       (tester) async {

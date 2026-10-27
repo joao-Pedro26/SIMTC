@@ -10,6 +10,7 @@ import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
 import 'package:simtc/ui/core/widgets/filter_chip_bar.dart';
+import 'package:simtc/ui/core/widgets/final_score_block.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/session_card.dart';
 import 'package:simtc/ui/core/widgets/session_context_header.dart';
@@ -465,6 +466,63 @@ void main() {
         AppColors.mauveInk);
     expect(tester.widget<Icon>(find.byIcon(AppIcons.theoryOnly)).color,
         AppColors.mauveInk);
+  });
+
+  group('FinalScoreBlock: a pílula (Fase 8C)', () {
+    Future<void> pumpBlock(WidgetTester tester, double width) => _pump(
+          tester,
+          Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: width,
+              child: const FinalScoreBlock(score: 62.5, approved: false),
+            ),
+          ),
+        );
+
+    testWidgets('cabendo, fica à direita do %, embaixo alinhada com ele',
+        (tester) async {
+      await pumpBlock(tester, 700);
+
+      final percent = tester.getRect(find.text('62,5%'));
+      final pill = tester.getRect(find.text('Não recomendado'));
+      expect(pill.left, greaterThan(percent.right));
+      expect(pill.top, lessThan(percent.bottom));
+    });
+
+    testWidgets('sem espaço, desce para baixo do %, sem quebrar o texto',
+        (tester) async {
+      await pumpBlock(tester, 330);
+
+      final percent = tester.getRect(find.text('62,5%'));
+      final pill = tester.getRect(find.text('Não recomendado'));
+      expect(pill.top, greaterThan(percent.bottom));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  testWidgets(
+      'PillNavBar: os rótulos crescem com a fonte do sistema até 1,6× e '
+      'param, sem estourar os itens (Fase 8C)', (tester) async {
+    await _pump(
+      tester,
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: PillNavBar(
+          currentIndex: 0,
+          onSelect: (_) {},
+          items: const [
+            PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
+            PillNavItem(icon: AppIcons.sync, label: 'Sincronizar'),
+            PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
+          ],
+        ),
+      ),
+    );
+
+    final label = tester.renderObject<RenderParagraph>(find.text('Sincronizar'));
+    expect(label.textScaler.scale(10), 16);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('SkeletonListItem anima sem quebrar o layout', (tester) async {

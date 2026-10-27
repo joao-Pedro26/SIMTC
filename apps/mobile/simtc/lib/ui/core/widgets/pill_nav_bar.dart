@@ -56,13 +56,20 @@ class PillNavBar extends StatelessWidget {
   final List<PillNavItem> items;
   final PillNavLayout layout;
 
+  /// Os rótulos crescem com a fonte do sistema até aqui e param: a barra tem
+  /// altura fixa, e em 2× eles estouravam os itens (Fase 8C).
+  static const double maxLabelScale = 1.6;
+
   @override
   Widget build(BuildContext context) {
-    return switch (layout) {
-      PillNavLayout.phone => _buildPhone(),
-      PillNavLayout.tabletBottom => _buildTabletBottom(),
-      PillNavLayout.rail => _buildRail(),
-    };
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: maxLabelScale,
+      child: switch (layout) {
+        PillNavLayout.phone => _buildPhone(),
+        PillNavLayout.tabletBottom => _buildTabletBottom(),
+        PillNavLayout.rail => _buildRail(),
+      },
+    );
   }
 
   Widget _buildPhone() {

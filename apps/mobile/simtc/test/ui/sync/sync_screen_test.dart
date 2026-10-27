@@ -102,6 +102,43 @@ void main() {
         ),
       ];
 
+  group('"Tentar novamente" e "Descartar" (Fase 8C)', () {
+    LocalAssessment refused() => queuedAssessment(
+          '3',
+          participantName: 'Marcos Vinícius Alves',
+          status: LocalSyncStatus.error,
+          lastAttemptAt: DateTime(2026, 9, 29, 8, 5),
+          lastError: SendFailure.refused,
+        );
+
+    testWidgets('no celular, um embaixo do outro, na largura inteira e com o '
+        'texto numa linha', (tester) async {
+      await pump(tester, queue: [refused()], size: const Size(412, 1600));
+
+      final retry = tester.getRect(find.widgetWithText(OutlinedButton, 'Tentar novamente'));
+      final discard = tester.getRect(find.widgetWithText(OutlinedButton, 'Descartar'));
+      expect(discard.top, retry.bottom + 8);
+      expect(retry.width, discard.width);
+      expect(retry.left, discard.left);
+      expect(tester.getSize(find.text('Tentar novamente')).height,
+          lessThan(2 * 14), reason: 'uma linha só');
+    });
+
+    testWidgets('com largura (o tablet), lado a lado', (tester) async {
+      await pump(
+        tester,
+        queue: [refused()],
+        size: const Size(1280, 800),
+        formFactor: FormFactor.tablet,
+      );
+
+      final retry = tester.getRect(find.widgetWithText(OutlinedButton, 'Tentar novamente'));
+      final discard = tester.getRect(find.widgetWithText(OutlinedButton, 'Descartar'));
+      expect(discard.top, retry.top);
+      expect(discard.left, retry.right + 8);
+    });
+  });
+
   testWidgets(
       'item recusado pelo servidor: "Descartar" pede confirmação e tira a '
       'avaliação da fila', (tester) async {
