@@ -28,6 +28,8 @@ import 'package:simtc/ui/core/widgets/inline_notice.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
+import '../../support/ripple.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
@@ -283,6 +285,23 @@ void main() {
 
     expect(find.text('Excesso de velocidade'), findsNothing);
     expect(find.text('1 item'), findsOneWidget);
+  });
+
+  testWidgets(
+      'o cabeçalho da categoria aberta e os botões B/PM/M mostram a '
+      'ondulação do toque (Fase 8C)', (tester) async {
+    await pumpScreen(tester);
+
+    Finder inkOf(String text) =>
+        find.ancestor(of: find.text(text), matching: find.byType(InkWell)).first;
+
+    expectVisibleRipple(tester, inkOf('Controle do Veículo'),
+        background: AppColors.categoryExpandedBg);
+    expectVisibleRipple(tester, inkOf('B'), background: AppColors.noteBBg);
+
+    await tester.tap(find.text('PM'));
+    await tester.pumpAndSettle();
+    expectVisibleRipple(tester, inkOf('PM'), background: AppColors.notePmFill);
   });
 
   testWidgets(

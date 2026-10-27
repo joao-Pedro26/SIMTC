@@ -92,6 +92,8 @@ class _AppTextFieldState extends State<AppTextField> {
 
   bool get _isMultiline => widget.maxLines != 1;
 
+  static const double _singleLinePadding = AppSpacing.md + 2;
+
   @override
   void initState() {
     super.initState();
@@ -193,7 +195,15 @@ class _AppTextFieldState extends State<AppTextField> {
         ],
       ),
     );
-    if (!widget.readOnly) return box;
+    // Um toque em qualquer ponto da caixa (no ícone, ou acima e abaixo do
+    // texto) foca o campo, e não só na linha do texto (Fase 8C).
+    if (!widget.readOnly) {
+      return GestureDetector(
+        excludeFromSemantics: true,
+        onTap: widget.enabled ? _focusNode.requestFocus : null,
+        child: box,
+      );
+    }
 
     // Só leitura: a caixa inteira é o alvo do toque, e o campo de dentro não
     // recebe o ponteiro — assim o teclado nunca abre.
@@ -238,7 +248,11 @@ class _AppTextFieldState extends State<AppTextField> {
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
         disabledBorder: InputBorder.none,
-        contentPadding: EdgeInsets.zero,
+        // Numa linha, 14 em cima e embaixo dão ao campo os 48 do alvo de
+        // toque, dentro da caixa de 56 (Fase 8C).
+        contentPadding: _isMultiline
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(vertical: _singleLinePadding),
         hintText: widget.hintText,
         hintStyle: AppTypography.fieldValue.copyWith(color: AppColors.textMuted),
       ),

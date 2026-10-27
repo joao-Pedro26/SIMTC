@@ -77,9 +77,11 @@ class _FilterChipBarState extends State<FilterChipBar> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      // Os 10 de cima e de baixo do canvas, menos a margem de toque que cada
+      // chip já tem: a barra continua com a mesma altura.
       padding: EdgeInsets.symmetric(
         horizontal: widget.horizontalPadding,
-        vertical: AppSpacing.sm + 2,
+        vertical: AppSpacing.sm + 2 - _tapMargin,
       ),
       child: Row(
         children: [
@@ -105,40 +107,75 @@ class _FilterChipBarState extends State<FilterChipBar> {
   ) {
     final ink = isSelected ? AppColors.surface : AppColors.text2;
 
-    return InkWell(
+    // O chip desenha 34 de altura (canvas), mas o toque vale nos 48 em volta
+    // dele, e o leitor de tela o lê como um nó só, desse tamanho (Fase 8C).
+    return MergeSemantics(
       key: key,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: AppSpacing.xxxl + 2),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryDark : AppColors.borderStrong,
-            width: 0.5,
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: _tapMargin),
+            child: _buildChipFace(item, isSelected, ink, onTap),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              item.label,
-              style: AppTypography.chipLabel.copyWith(color: ink, fontSize: 12.5),
-            ),
-            if (item.count != null) ...[
-              const SizedBox(width: AppSpacing.xs + 1),
-              Text(
-                '${item.count}',
-                style: AppTypography.counter.copyWith(
-                  color: ink.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ],
         ),
       ),
     );
   }
+
+  /// O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
+  /// toque aparecer (Fase 8C).
+  Widget _buildChipFace(
+    FilterChipData item,
+    bool isSelected,
+    Color ink,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: isSelected ? AppColors.primary : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: _chipHeight),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: isSelected ? AppColors.primaryDark : AppColors.borderStrong,
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.label,
+                style: AppTypography.chipLabel.copyWith(color: ink, fontSize: 12.5),
+              ),
+              if (item.count != null) ...[
+                const SizedBox(width: AppSpacing.xs + 1),
+                Text(
+                  '${item.count}',
+                  style: AppTypography.counter.copyWith(
+                    color: ink.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A altura que o chip desenha (canvas) e a margem de toque em cima e
+  /// embaixo, que completa os 48 do alvo mínimo.
+  static const double _chipHeight = AppSpacing.xxxl + 2;
+  static const double _tapMargin = (AppSpacing.touchTarget - _chipHeight) / 2;
 }

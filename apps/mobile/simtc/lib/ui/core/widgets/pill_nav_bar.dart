@@ -197,33 +197,35 @@ class PillNavBar extends StatelessWidget {
   }) {
     final ink = isSelected ? AppColors.primaryDark : AppColors.text3;
 
+    // O fundo do ativo é do `Material`, embaixo do `InkWell`, para a
+    // ondulação do toque aparecer (Fase 8C).
     return Semantics(
       selected: isSelected,
       button: true,
       label: item.label,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
+      child: Material(
+        color: isSelected ? AppColors.primarySurface : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primarySurface : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(item.icon, size: 23, color: ink),
-                  const SizedBox(height: AppSpacing.xxs + 1),
-                  Text(label, style: labelStyle.copyWith(color: ink)),
-                ],
-              ),
-              if (item.badgeCount > 0) badge(item.badgeCount),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: SizedBox(
+            height: height,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(item.icon, size: 23, color: ink),
+                    const SizedBox(height: AppSpacing.xxs + 1),
+                    Text(label, style: labelStyle.copyWith(color: ink)),
+                  ],
+                ),
+                if (item.badgeCount > 0) badge(item.badgeCount),
+              ],
+            ),
           ),
         ),
       ),
@@ -240,28 +242,28 @@ class PillNavBar extends StatelessWidget {
       selected: isSelected,
       button: true,
       label: item.label,
-      child: InkWell(
-        onTap: onTap,
+      child: Material(
+        color: isSelected ? AppColors.primarySurface : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primarySurface : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(item.icon, size: 22, color: ink),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(item.label, style: AppTypography.navLabel.copyWith(color: ink)),
-                ],
-              ),
-              if (item.badgeCount > 0) _buildBadge(item.badgeCount),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: SizedBox(
+            height: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(item.icon, size: 22, color: ink),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(item.label, style: AppTypography.navLabel.copyWith(color: ink)),
+                  ],
+                ),
+                if (item.badgeCount > 0) _buildBadge(item.badgeCount),
+              ],
+            ),
           ),
         ),
       ),

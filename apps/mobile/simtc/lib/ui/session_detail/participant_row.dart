@@ -63,30 +63,34 @@ class ParticipantRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg - 1),
-        decoration: BoxDecoration(
-          color: muted ? AppColors.background : AppColors.surface,
-          border: Border(top: BorderSide(color: accentColor, width: 0.8)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(),
-            if (blockedNote != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Padding(
-                padding: _sides,
-                child: Text(blockedNote!, style: AppTypography.meta),
-              ),
+    // O fundo é do `Material`, embaixo do `InkWell`: num `Container` filho
+    // dele, pintaria por cima da ondulação do toque (Fase 8C).
+    return Material(
+      color: muted ? AppColors.background : AppColors.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg - 1),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: accentColor, width: 0.8)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(),
+              if (blockedNote != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Padding(
+                  padding: _sides,
+                  child: Text(blockedNote!, style: AppTypography.meta),
+                ),
+              ],
+              if (action != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Padding(padding: _sides, child: action!),
+              ],
             ],
-            if (action != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              Padding(padding: _sides, child: action!),
-            ],
-          ],
+          ),
         ),
       ),
     );

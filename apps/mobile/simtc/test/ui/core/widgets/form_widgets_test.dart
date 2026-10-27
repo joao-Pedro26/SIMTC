@@ -231,6 +231,35 @@ void main() {
       expect(field.style!.height, 1.45);
     });
 
+    testWidgets('o campo de uma linha tem 48 de toque, e tocar no ícone foca o '
+        'campo; a caixa continua com 56 (Fase 8C)', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+
+      await _pump(
+        tester,
+        AppTextField(
+          label: 'E-mail',
+          icon: AppIcons.email,
+          controller: controller,
+        ),
+      );
+
+      expect(tester.getSize(find.byType(TextField)).height,
+          greaterThanOrEqualTo(48));
+      final box = find.descendant(
+        of: find.byType(AppTextField),
+        matching: find.byWidgetPredicate((w) =>
+            w is Container && w.constraints?.minHeight == 56),
+      );
+      expect(tester.getSize(box).height, 56);
+
+      await tester.tap(find.byIcon(AppIcons.email));
+      await tester.pump();
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+          isTrue);
+    });
+
     testWidgets('mono: o valor usa a fonte de números', (tester) async {
       final controller = TextEditingController();
       addTearDown(controller.dispose);

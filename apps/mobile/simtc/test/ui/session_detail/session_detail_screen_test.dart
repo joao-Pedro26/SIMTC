@@ -41,6 +41,8 @@ import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/utils/result.dart';
 
+import '../../support/ripple.dart';
+
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
 class _MockParticipantRepository extends Mock implements ParticipantRepository {}
@@ -572,6 +574,28 @@ void main() {
       expect(find.text('Mariana Costa'), findsOneWidget);
       expect(find.text('Ana Paula Ribeiro'), findsNothing);
     });
+  });
+
+  testWidgets(
+      'a linha mostra a ondulação do toque; a de outro consultor, sobre o '
+      'fundo apagado (Fase 8C)', (tester) async {
+    await show(tester, withParticipants: [
+      participant('1', 'Ana Paula Ribeiro'),
+      participant('3', 'Marcos Vinícius Alves',
+          status: ParticipantStatus.emAvaliacao,
+          assignedTo: 'c-outro',
+          assignedName: 'Rafael Lima'),
+    ]);
+
+    Finder inkOf(String id) => find
+        .descendant(
+          of: find.byKey(ValueKey('participante-$id')),
+          matching: find.byType(InkWell),
+        )
+        .first;
+
+    expectVisibleRipple(tester, inkOf('1'), background: AppColors.surface);
+    expectVisibleRipple(tester, inkOf('3'), background: AppColors.background);
   });
 
   group('avaliação deste aparelho na linha "comigo"', () {

@@ -356,48 +356,53 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   }) {
     final selected = _viewModel.participationType == type;
 
+    // O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
+    // toque aparecer (Fase 8C).
     return Semantics(
       button: true,
       selected: selected,
-      child: InkWell(
-        key: Key('tipo-${type.name}'),
+      child: Material(
+        color: selected ? AppColors.primarySurface : AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        onTap: _fieldsEnabled
-            ? () => _viewModel.setParticipationType(type)
-            : null,
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: AppSpacing.touchTarget + AppSpacing.lg,
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs + 2,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primarySurface : AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.borderStrong,
-              width: 1.5,
+        child: InkWell(
+          key: Key('tipo-${type.name}'),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          onTap: _fieldsEnabled
+              ? () => _viewModel.setParticipationType(type)
+              : null,
+          child: Container(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.touchTarget + AppSpacing.lg,
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: selected ? AppColors.primaryDark : iconColor,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs + 2,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(
+                color: selected ? AppColors.primary : AppColors.borderStrong,
+                width: 1.5,
               ),
-              const SizedBox(height: AppSpacing.xxs + 1),
-              Text(
-                label,
-                style: selected
-                    ? AppTypography.optionCardSelected
-                    : AppTypography.optionCard,
-                textAlign: TextAlign.center,
-              ),
-            ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: selected ? AppColors.primaryDark : iconColor,
+                ),
+                const SizedBox(height: AppSpacing.xxs + 1),
+                Text(
+                  label,
+                  style: selected
+                      ? AppTypography.optionCardSelected
+                      : AppTypography.optionCard,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),

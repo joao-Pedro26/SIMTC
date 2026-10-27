@@ -26,6 +26,8 @@ import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
 
+import '../../support/ripple.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
@@ -304,6 +306,11 @@ void main() {
       tester.widget<Icon>(find.byIcon(AppIcons.theoryOnly)).color,
       AppColors.mauveInk,
     );
+    // E os dois cartões mostram a ondulação do toque.
+    expectVisibleRipple(tester, find.byKey(const Key('tipo-teoricaEPratica')),
+        background: AppColors.primarySurface);
+    expectVisibleRipple(tester, find.byKey(const Key('tipo-somenteTeorica')),
+        background: AppColors.surface);
 
     expect(addButton(tester).onPressed, isNull, reason: 'nada preenchido');
     expect(addAnotherButton(tester).onPressed, isNull);

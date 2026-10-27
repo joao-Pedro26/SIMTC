@@ -870,36 +870,40 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget _buildExpandedHeader(ChecklistCategory category) {
     final gap = _categoryGap;
 
-    return InkWell(
-      key: _openHeaderKey,
-      onTap: () => _viewModel.toggleCategory(category.id),
-      child: Container(
-        padding: _categoryPadding,
-        decoration: const BoxDecoration(
-          color: AppColors.categoryExpandedBg,
-          border: Border(bottom: BorderSide(color: AppColors.categoryExpandedBorder)),
-        ),
-        child: Row(
-          children: [
-            CategoryCodeChip(
-              code: category.code,
-              background: AppColors.primary,
-              ink: AppColors.surface,
-            ),
-            SizedBox(width: gap),
-            Expanded(
-              child: Text(
-                category.name,
-                style: _categoryNameStyle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+    // O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
+    // toque aparecer (Fase 8C).
+    return Material(
+      color: AppColors.categoryExpandedBg,
+      child: InkWell(
+        key: _openHeaderKey,
+        onTap: () => _viewModel.toggleCategory(category.id),
+        child: Container(
+          padding: _categoryPadding,
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.categoryExpandedBorder)),
+          ),
+          child: Row(
+            children: [
+              CategoryCodeChip(
+                code: category.code,
+                background: AppColors.primary,
+                ink: AppColors.surface,
               ),
-            ),
-            SizedBox(width: gap),
-            ScoreBadge(score: category.score),
-            SizedBox(width: gap),
-            const Icon(AppIcons.expandLess, size: 22, color: AppColors.text3),
-          ],
+              SizedBox(width: gap),
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: _categoryNameStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(width: gap),
+              ScoreBadge(score: category.score),
+              SizedBox(width: gap),
+              const Icon(AppIcons.expandLess, size: 22, color: AppColors.text3),
+            ],
+          ),
         ),
       ),
     );
@@ -1181,18 +1185,23 @@ class _NoteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = _colors;
-    return InkWell(
-      onTap: onTap,
+    // O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
+    // toque aparecer (Fase 8C).
+    return Material(
+      color: colors.bg,
       borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: Container(
-        height: AppSpacing.controlHeight,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: colors.bg,
-          border: Border.all(color: colors.border, width: 1.5),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Container(
+          height: AppSpacing.controlHeight,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border.all(color: colors.border, width: 1.5),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Text(note.noteType, style: AppTypography.noteButton.copyWith(color: colors.ink)),
         ),
-        child: Text(note.noteType, style: AppTypography.noteButton.copyWith(color: colors.ink)),
       ),
     );
   }

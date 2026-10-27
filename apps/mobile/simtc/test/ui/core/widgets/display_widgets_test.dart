@@ -17,6 +17,8 @@ import 'package:simtc/ui/core/widgets/skeleton.dart';
 import 'package:simtc/ui/core/widgets/status_chip.dart';
 import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 
+import '../../../support/ripple.dart';
+
 Future<void> _pump(WidgetTester tester, Widget child) {
   return tester.pumpWidget(
     MaterialApp(theme: AppTheme.light, home: Scaffold(body: child)),
@@ -125,6 +127,73 @@ void main() {
   });
 
   testWidgets(
+      'FilterChipBar: o chip tem 34 de desenho e 48 de toque; a barra '
+      'continua com 54 (Fase 8C)', (tester) async {
+    int? selected;
+    await _pump(
+      tester,
+      Align(
+        alignment: Alignment.topLeft,
+        child: FilterChipBar(
+          selectedIndex: 0,
+          onSelect: (i) => selected = i,
+          items: const [
+            FilterChipData(label: 'Todos', count: 8),
+            FilterChipData(label: 'Pendentes', count: 3),
+          ],
+        ),
+      ),
+    );
+
+    final chip = find.ancestor(
+      of: find.text('Pendentes'),
+      matching: find.byType(InkWell),
+    );
+    expect(tester.getSize(chip).height, 34);
+    expect(tester.getSize(find.byType(FilterChipBar)).height, 54);
+
+    // 6 acima do desenho do chip ainda é dele.
+    final rect = tester.getRect(chip);
+    await tester.tapAt(Offset(rect.center.dx, rect.top - 6));
+    expect(selected, 1);
+
+    // Para o leitor de tela e o alvo de toque, o chip tem 48.
+    expect(
+      tester.getSemantics(find.text('Pendentes')).rect.height,
+      48,
+    );
+    expect(tester.getSemantics(find.text('Todos')),
+        isSemantics(isSelected: true, hasSelectedState: true,
+            isButton: true, hasTapAction: true, label: 'Todos\n8'));
+  });
+
+  testWidgets('FilterChipBar mostra a ondulação do toque (Fase 8C)',
+      (tester) async {
+    await _pump(
+      tester,
+      FilterChipBar(
+        selectedIndex: 0,
+        onSelect: (_) {},
+        items: const [
+          FilterChipData(label: 'Todos'),
+          FilterChipData(label: 'Pendentes'),
+        ],
+      ),
+    );
+
+    expectVisibleRipple(
+      tester,
+      find.ancestor(of: find.text('Todos'), matching: find.byType(InkWell)),
+      background: AppColors.primary,
+    );
+    expectVisibleRipple(
+      tester,
+      find.ancestor(of: find.text('Pendentes'), matching: find.byType(InkWell)),
+      background: AppColors.surface,
+    );
+  });
+
+  testWidgets(
       'quando selectedIndex muda por fora (ex.: destaque por scroll manual), '
       'a barra rola até o chip ficar visível', (tester) async {
     // 360dp — Android de entrada, onde os três chips com contadores não
@@ -199,6 +268,30 @@ void main() {
 
     await tester.tap(find.text('Bracell'));
     expect(taps, 1);
+  });
+
+  testWidgets('SessionCard mostra a ondulação do toque, comum e destacado '
+      '(Fase 8C)', (tester) async {
+    Widget card({required bool selected}) => SessionCard(
+          companyName: 'Bracell',
+          courseName: 'Direção Preventiva',
+          meta: 'Hoje · Itabira/MG',
+          statusChip: const StatusChip(
+            label: 'Planejado',
+            icon: AppIcons.sessions,
+            tone: StatusTone.info,
+          ),
+          selected: selected,
+          onTap: () {},
+        );
+
+    await _pump(tester, card(selected: false));
+    expectVisibleRipple(tester, find.byType(InkWell),
+        background: AppColors.surface);
+
+    await _pump(tester, card(selected: true));
+    expectVisibleRipple(tester, find.byType(InkWell),
+        background: AppColors.categoryExpandedBg);
   });
 
   testWidgets('SessionCard escreve o progresso no peso 500 de verdade (Fase 8C)',
@@ -350,10 +443,11 @@ void main() {
         AppColors.text3);
     expect(tester.widget<Icon>(find.byIcon(AppIcons.profile)).color,
         AppColors.text3);
-    final active = tester.widget<Container>(find
-        .ancestor(of: find.text('Sessões'), matching: find.byType(Container))
-        .first);
-    expect((active.decoration! as BoxDecoration).color, AppColors.primarySurface);
+    expectVisibleRipple(
+      tester,
+      find.ancestor(of: find.text('Sessões'), matching: find.byType(InkWell)),
+      background: AppColors.primarySurface,
+    );
   });
 
   testWidgets('StatusChip mauve escreve em mauveInk (Fase 8C)', (tester) async {

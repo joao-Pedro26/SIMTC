@@ -43,37 +43,42 @@ class SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // O fundo é do `Material`, embaixo do `InkWell`: num `Container` filho
+    // dele, pintaria por cima da ondulação do toque (Fase 8C).
     return Semantics(
       selected: selected,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          // As bordas somam ao recuo (`Container` conta a borda da
-          // decoração): o recuo do card destacado desconta a diferença, e
-          // nem o texto nem a altura do card mudam ao tocar.
-          padding: selected
-              ? const EdgeInsets.fromLTRB(
-                  AppSpacing.xl - _selectedStripe,
-                  AppSpacing.lg - 1 + _accentWidth - _selectedEdge,
-                  AppSpacing.xl,
-                  AppSpacing.lg - 1 - _selectedEdge,
-                )
-              : const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.lg - 1,
-                ),
-          decoration: selected ? _selectedDecoration : _decoration,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: AppSpacing.md),
-              _buildStatusRow(),
-              if (progressValue != null) ...[
+      child: Material(
+        color: selected ? AppColors.categoryExpandedBg : AppColors.surface,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            // As bordas somam ao recuo (`Container` conta a borda da
+            // decoração): o recuo do card destacado desconta a diferença, e
+            // nem o texto nem a altura do card mudam ao tocar.
+            padding: selected
+                ? const EdgeInsets.fromLTRB(
+                    AppSpacing.xl - _selectedStripe,
+                    AppSpacing.lg - 1 + _accentWidth - _selectedEdge,
+                    AppSpacing.xl,
+                    AppSpacing.lg - 1 - _selectedEdge,
+                  )
+                : const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xl,
+                    vertical: AppSpacing.lg - 1,
+                  ),
+            decoration: selected ? _selectedDecoration : _decoration,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
                 const SizedBox(height: AppSpacing.md),
-                _buildProgressBar(),
+                _buildStatusRow(),
+                if (progressValue != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _buildProgressBar(),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -88,12 +93,10 @@ class SessionCard extends StatelessWidget {
   static const double _selectedStripe = 3;
 
   BoxDecoration get _decoration => BoxDecoration(
-        color: AppColors.surface,
         border: Border(top: BorderSide(color: accentColor, width: _accentWidth)),
       );
 
   static const BoxDecoration _selectedDecoration = BoxDecoration(
-    color: AppColors.categoryExpandedBg,
     border: Border(
       top: BorderSide(color: AppColors.selectedCardBorder, width: _selectedEdge),
       bottom: BorderSide(color: AppColors.selectedCardBorder, width: _selectedEdge),

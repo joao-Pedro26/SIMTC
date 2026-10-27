@@ -357,10 +357,14 @@ void main() {
   });
 
   bool isChipSelected(WidgetTester tester, String label) {
-    final inkWell = tester.widget<InkWell>(find.widgetWithText(InkWell, label));
-    final container = inkWell.child! as Container;
-    final decoration = container.decoration! as BoxDecoration;
-    return decoration.color == AppColors.primary;
+    // O fundo do chip é do `Material` embaixo do `InkWell` (Fase 8C).
+    final material = tester.widget<Material>(find
+        .ancestor(
+          of: find.widgetWithText(InkWell, label),
+          matching: find.byType(Material),
+        )
+        .first);
+    return material.color == AppColors.primary;
   }
 
   testWidgets('tocar num chip rola até a seção correspondente', (tester) async {
@@ -1338,7 +1342,15 @@ void main() {
       );
       final decoration =
           tester.widget<Container>(selected.first).decoration! as BoxDecoration;
-      expect(decoration.color, AppColors.categoryExpandedBg);
+      // O fundo é do `Material` embaixo do toque (Fase 8C).
+      expect(
+        tester
+            .widget<Material>(find
+                .ancestor(of: selected.first, matching: find.byType(Material))
+                .first)
+            .color,
+        AppColors.categoryExpandedBg,
+      );
       final border = decoration.border! as Border;
       expect(border.left, const BorderSide(color: AppColors.primary, width: 3));
       expect(border.top.color, AppColors.selectedCardBorder);
