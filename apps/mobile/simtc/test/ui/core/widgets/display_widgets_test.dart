@@ -304,6 +304,51 @@ void main() {
     expect(selected, 2);
   });
 
+  testWidgets(
+      'PillNavBar do celular usa os tons do tablet: ativo em primaryDark '
+      'sobre primarySurface, inativo em text3 (Fase 8C)', (tester) async {
+    await _pump(
+      tester,
+      PillNavBar(
+        currentIndex: 0,
+        onSelect: (_) {},
+        items: const [
+          PillNavItem(icon: AppIcons.sessions, label: 'Sessões'),
+          PillNavItem(icon: AppIcons.profile, label: 'Perfil'),
+        ],
+      ),
+    );
+
+    expect(tester.widget<Text>(find.text('Sessões')).style!.color,
+        AppColors.primaryDark);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.sessions)).color,
+        AppColors.primaryDark);
+    expect(tester.widget<Text>(find.text('Perfil')).style!.color,
+        AppColors.text3);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.profile)).color,
+        AppColors.text3);
+    final active = tester.widget<Container>(find
+        .ancestor(of: find.text('Sessões'), matching: find.byType(Container))
+        .first);
+    expect((active.decoration! as BoxDecoration).color, AppColors.primarySurface);
+  });
+
+  testWidgets('StatusChip mauve escreve em mauveInk (Fase 8C)', (tester) async {
+    await _pump(
+      tester,
+      const StatusChip(
+        label: 'Somente teórica',
+        icon: AppIcons.theoryOnly,
+        tone: StatusTone.mauve,
+      ),
+    );
+
+    expect(tester.widget<Text>(find.text('Somente teórica')).style!.color,
+        AppColors.mauveInk);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.theoryOnly)).color,
+        AppColors.mauveInk);
+  });
+
   testWidgets('SkeletonListItem anima sem quebrar o layout', (tester) async {
     await _pump(tester, const SkeletonListItem());
     await tester.pump(const Duration(milliseconds: 450));

@@ -299,6 +299,11 @@ void main() {
 
     expect(borderOf('tipo-teoricaEPratica'), AppColors.primary);
     expect(borderOf('tipo-somenteTeorica'), AppColors.borderStrong);
+    // O ícone do "Somente teórica" é o do canvas (Fase 8C).
+    expect(
+      tester.widget<Icon>(find.byIcon(AppIcons.theoryOnly)).color,
+      AppColors.mauveInk,
+    );
 
     expect(addButton(tester).onPressed, isNull, reason: 'nada preenchido');
     expect(addAnotherButton(tester).onPressed, isNull);

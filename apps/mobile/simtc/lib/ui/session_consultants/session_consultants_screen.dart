@@ -362,7 +362,7 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
           const SizedBox(width: AppSpacing.sm),
           Text(
             'SIM Treinamentos',
-            style: AppTypography.meta.copyWith(color: AppColors.textMuted),
+            style: AppTypography.meta.copyWith(color: AppColors.textSubtle),
           ),
         ],
       ),

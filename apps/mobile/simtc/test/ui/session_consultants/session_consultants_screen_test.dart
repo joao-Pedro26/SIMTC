@@ -21,6 +21,7 @@ import 'package:simtc/data/services/connectivity_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/app_localization.dart';
+import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/theme/app_spacing.dart';
@@ -514,6 +515,11 @@ void main() {
     expect(teamTitle.top - lastRow.bottom, 22);
     expect(teamRow.top - teamTitle.bottom, closeTo(10, 0.5));
     expect(tester.getRect(find.text('SIM Treinamentos')).right, 412 - 20);
+    // Texto que se lê: o cinza que passa de 4,5:1 (Fase 8C).
+    expect(
+      tester.widget<Text>(find.text('SIM Treinamentos')).style!.color,
+      AppColors.textSubtle,
+    );
 
     // A nota do fim: 16 acima, 20 dos lados, 24 abaixo.
     final note = tester.getRect(

@@ -27,6 +27,10 @@ abstract final class AppColors {
   static const Color ctaInk = Color(0xFF3D2500);
 
   static const Color mauve = Color(0xFF9B80A8);
+
+  /// Tinta do "Somente teórica" — ícone e texto do chip e do cartão de tipo
+  /// da 1.11. É a do canvas; o [mauve] fica como tom de marca do tema.
+  static const Color mauveInk = Color(0xFF6B4A7A);
   static const Color mauveSoft = Color(0xFFF5F0F8);
   static const Color mauveBorder = Color(0xFFCFBBD8);
 
@@ -43,6 +47,12 @@ abstract final class AppColors {
   static const Color text2 = Color(0xFF334155);
   static const Color text3 = Color(0xFF475569);
   static const Color textMuted = Color(0xFF94A3B8);
+
+  /// Texto informativo pequeno que se lê ("opcional", "6 itens"): o
+  /// [textMuted] dá 2,6:1 sobre o branco; este dá 4,8:1 (Fase 8C). O
+  /// [textMuted] fica no exemplo dos campos, no desativado e nos ícones
+  /// decorativos.
+  static const Color textSubtle = Color(0xFF64748B);
 
   // ─── Severidade B/PM/M — mesma escala do painel web ───────────────────────
   static const Color severityGoodBg = Color(0xFFDCFCE7);
@@ -65,7 +75,8 @@ abstract final class AppColors {
   static const Color warningInkStrong = Color(0xFFC2670A);
 
   static const Color dangerBg = Color(0xFFFEE2E2);
-  static const Color dangerBorder = Color(0xFFFCA5A5);
+  /// O contorno vermelho do canvas, em todo lugar (Fase 8C).
+  static const Color dangerBorder = Color(0xFFE9A2A2);
   static const Color dangerInk = Color(0xFFB91C1C);
 
   static const Color neutralBg = Color(0xFFF1F5F9);

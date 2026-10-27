@@ -172,7 +172,7 @@ abstract final class AppTypography {
 
   /// Nota à direita do rótulo de um campo ("opcional")
   static TextStyle get fieldOptional =>
-      _inter(size: 11.5, weight: FontWeight.w400, height: 1.2, color: AppColors.textMuted);
+      _inter(size: 11.5, weight: FontWeight.w400, height: 1.2, color: AppColors.textSubtle);
 
   /// Título da janela de admin no tablet ("Adicionar participante", quadro
   /// "4l")
@@ -248,8 +248,10 @@ abstract final class AppTypography {
       _inter(size: 14, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryDark);
 
   /// Link discreto ("Esqueci a senha")
+  /// O verde da marca um tom abaixo: o `primary` dá 3,4:1 sobre o branco
+  /// (Fase 8C).
   static TextStyle get link =>
-      _inter(size: 13.5, weight: FontWeight.w600, height: 1.2, color: AppColors.primary);
+      _inter(size: 13.5, weight: FontWeight.w600, height: 1.2, color: AppColors.primaryHover);
 
   /// Contadores e números (filtros, badges, percentuais)
   static TextStyle get counter =>
@@ -312,7 +314,7 @@ abstract final class AppTypography {
 
   /// "6 itens", na categoria fechada
   static TextStyle get categoryCount =>
-      _inter(size: 12, weight: FontWeight.w400, height: 1.3, color: AppColors.textMuted);
+      _inter(size: 12, weight: FontWeight.w400, height: 1.3, color: AppColors.textSubtle);
 
   /// Selo de score da categoria aberta ("86,7%"). A tela de resultado (quadro
   /// "5a", Fase 5) desenha o dela com 11,5.
@@ -321,7 +323,7 @@ abstract final class AppTypography {
 
   /// Número do item da infração na ficha oficial
   static TextStyle get infractionNumber =>
-      _mono(size: 12, weight: FontWeight.w600, height: 1.55, color: AppColors.textMuted);
+      _mono(size: 12, weight: FontWeight.w600, height: 1.55, color: AppColors.textSubtle);
 
   /// Descrição da infração ("bodyLarge" da escala do canvas)
   static TextStyle get infractionDescription =>
@@ -409,7 +411,7 @@ abstract final class AppTypography {
 
   /// "2 infrações", no cabeçalho de grupo
   static TextStyle get resultGroupCountTablet =>
-      _inter(size: 12.5, weight: FontWeight.w500, height: 1.2, color: AppColors.textMuted);
+      _inter(size: 12.5, weight: FontWeight.w500, height: 1.2, color: AppColors.textSubtle);
 
   /// Descrição da infração registrada
   static TextStyle get resultInfractionTablet =>

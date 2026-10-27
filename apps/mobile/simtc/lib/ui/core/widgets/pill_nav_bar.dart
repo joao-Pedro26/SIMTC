@@ -97,8 +97,8 @@ class PillNavBar extends StatelessWidget {
     );
   }
 
-  /// Os quadros do tablet desenham a barra com borda, e o item ativo em
-  /// `primarySurface`/`primaryDark` — não nos tons da pílula do celular.
+  /// Os quadros do tablet desenham a barra com borda. O item ativo em
+  /// `primarySurface`/`primaryDark` vale também para o celular (Fase 8C).
   static final BoxDecoration _tabletDecoration = BoxDecoration(
     color: AppColors.background,
     borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -230,8 +230,11 @@ class PillNavBar extends StatelessWidget {
     );
   }
 
+  /// O canvas do celular desenha o ativo em `accent` sobre o próprio tom e o
+  /// inativo em `textMuted` (2,3:1 e 2,5:1); o app usa os tons do tablet, que
+  /// passam de 4,5:1 (Fase 8C).
   Widget _buildItem(PillNavItem item, bool isSelected, VoidCallback onTap) {
-    final ink = isSelected ? AppColors.accent : AppColors.textMuted;
+    final ink = isSelected ? AppColors.primaryDark : AppColors.text3;
 
     return Semantics(
       selected: isSelected,
@@ -243,9 +246,7 @@ class PillNavBar extends StatelessWidget {
         child: Container(
           height: 52,
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.accent.withValues(alpha: 0.16)
-                : Colors.transparent,
+            color: isSelected ? AppColors.primarySurface : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Stack(

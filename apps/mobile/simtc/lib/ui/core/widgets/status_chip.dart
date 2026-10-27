@@ -34,7 +34,7 @@ extension on StatusTone {
         StatusTone.warning => AppColors.warningInk,
         StatusTone.success => AppColors.successInk,
         StatusTone.danger => AppColors.dangerInk,
-        StatusTone.mauve => AppColors.mauve,
+        StatusTone.mauve => AppColors.mauveInk,
       };
 }
 

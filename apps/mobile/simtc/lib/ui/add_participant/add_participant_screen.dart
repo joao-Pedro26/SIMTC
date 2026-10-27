@@ -339,7 +339,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
                 type: ParticipationType.somenteTeorica,
                 label: 'Somente teórica',
                 icon: AppIcons.theoryOnly,
-                iconColor: AppColors.mauve,
+                iconColor: AppColors.mauveInk,
               ),
             ),
           ],
