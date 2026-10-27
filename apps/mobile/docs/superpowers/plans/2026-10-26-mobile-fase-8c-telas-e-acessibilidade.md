@@ -4,7 +4,7 @@
 
 **Goal:** O app fica confortável para quem enxerga pouco, usa a fonte grande do Android ou o TalkBack, sem toques "mortos" nem cores fora do canvas: contraste, ondulação do toque, alvos de 48, toque duplo, leitor de tela, fonte ampliada, falhas de gravação do checklist e erro da primeira descida — e as decisões visuais em aberto das Fases 5B, 6A, 8A e 8B.
 
-**Architecture:** Nada muda de regra, de banco ou de backend. Os tokens novos (`mauveInk`, `textSubtle`) e os estilos com nome (`progressLabel`, `blockTitle`, `contextTitleCompact`, `fieldValueMultiline`) entram no tema; três auxiliares pequenos em `lib/ui/core/` (`open_once.dart`, `text_scale.dart`) e dois de teste (`test/support/ripple.dart`, `a11y.dart`) são usados pelas telas. A ondulação do toque segue o padrão que o Resultado e o Perfil já usam: o fundo vai para um `Material` embaixo do `InkWell`. As falhas de gravação do checklist e da primeira descida viram estado das ViewModels.
+**Architecture:** Nada muda de regra, de banco ou de backend. Os tokens novos (`mauveInk`, `textSubtle`) e os estilos com nome (`progressLabel`, `blockTitle`, `contextTitleCompact`, `fieldValueMultiline`) entram no tema; três auxiliares pequenos em `lib/ui/core/` (`open_once.dart`, `text_fscale.dart`) e dois de teste (`test/support/ripple.dart`, `a11y.dart`) são usados pelas telas. A ondulação do toque segue o padrão que o Resultado e o Perfil já usam: o fundo vai para um `Material` embaixo do `InkWell`. As falhas de gravação do checklist e da primeira descida viram estado das ViewModels.
 
 **Tech Stack:** Flutter 3.41.6 / Dart 3.11.4 · provider 6.1.5 · go_router 14.8.1 · drift 2.31.0 (sem mudança de esquema) · mocktail (testes). Nenhuma dependência nova.
 
@@ -6454,6 +6454,8 @@ git commit -m "docs(mobile): registra a validacao da fase 8c"
 ```
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
+
+**Validado em 27/10/2026: celular no aparelho físico e tablet no emulador; roteiro inteiro passou. Aval dado para planejar a 8D.**
 
 ---
 
