@@ -17,6 +17,10 @@ export function statusAfterRelease(previousScore: number | null | undefined) {
  * consultor e voltam ao status de antes da atribuição (ver
  * `statusAfterRelease`). Chamar na MESMA transação que faz o que os libera —
  * tirar o consultor do treinamento, excluí-lo ou cancelar o treinamento.
+ *
+ * A gravação é condicional ao participante continuar `EM_AVALIACAO`: se o
+ * envio do consultor gravou a avaliação entre a leitura e a gravação, o
+ * participante já mudou de situação por outro caminho e não é mexido.
  */
 export async function releaseHeldParticipants(
   tx: Prisma.TransactionClient,
@@ -28,8 +32,8 @@ export async function releaseHeldParticipants(
   });
 
   for (const participant of held) {
-    await tx.trainingParticipant.update({
-      where: { id: participant.id },
+    await tx.trainingParticipant.updateMany({
+      where: { id: participant.id, status: 'EM_AVALIACAO' },
       data: {
         assignedConsultantId: null,
         status: statusAfterRelease(participant.assessment?.score),

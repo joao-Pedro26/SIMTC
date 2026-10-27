@@ -150,7 +150,7 @@ describe('TrainingSessionsService.findAll', () => {
 describe('TrainingSessionsService: ciclo de vida (Fase 8D-1)', () => {
   const prisma = {
     trainingSession: { findUnique: jest.fn(), update: jest.fn() },
-    trainingParticipant: { findMany: jest.fn(), update: jest.fn() },
+    trainingParticipant: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     // A transação interativa roda com o próprio mock no papel do `tx`.
     $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
   };
@@ -239,7 +239,7 @@ describe('TrainingSessionsService: ciclo de vida (Fase 8D-1)', () => {
           { id: 'tp-1', assessment: null },
           { id: 'tp-2', assessment: { score: 62.5 } },
         ]),
-        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     prisma.$transaction.mockImplementationOnce((fn: (t: unknown) => unknown) => fn(tx));
@@ -254,11 +254,11 @@ describe('TrainingSessionsService: ciclo de vida (Fase 8D-1)', () => {
       where: { trainingSessionId: 's1', status: 'EM_AVALIACAO' },
       include: { assessment: { select: { score: true } } },
     });
-    expect(tx.trainingParticipant.update.mock.calls).toEqual([
-      [{ where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } }],
-      [{ where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } }],
+    expect(tx.trainingParticipant.updateMany.mock.calls).toEqual([
+      [{ where: { id: 'tp-1', status: 'EM_AVALIACAO' }, data: { assignedConsultantId: null, status: 'PENDENTE' } }],
+      [{ where: { id: 'tp-2', status: 'EM_AVALIACAO' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } }],
     ]);
     expect(prisma.trainingSession.update).not.toHaveBeenCalled();
-    expect(prisma.trainingParticipant.update).not.toHaveBeenCalled();
+    expect(prisma.trainingParticipant.updateMany).not.toHaveBeenCalled();
   });
 });

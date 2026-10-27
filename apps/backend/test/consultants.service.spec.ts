@@ -26,6 +26,7 @@ describe('ConsultantsService.deleteConsultant (Fase 8D-1)', () => {
     jest.clearAllMocks();
     prisma.consultant.findUnique.mockResolvedValue({ id: 'c1' });
     prisma.user.findMany.mockResolvedValue([]);
+    prisma.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('libera quem estava em avaliação com ele, de qualquer treinamento, antes de apagar a referência', async () => {
@@ -40,9 +41,10 @@ describe('ConsultantsService.deleteConsultant (Fase 8D-1)', () => {
       where: { assignedConsultantId: 'c1', status: 'EM_AVALIACAO' },
       include: { assessment: { select: { score: true } } },
     });
-    expect(prisma.trainingParticipant.update.mock.calls).toEqual([
-      [{ where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } }],
-      [{ where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'APROVADO' } }],
+    // As duas primeiras chamadas são a liberação; a terceira, logo abaixo, só tira a referência.
+    expect(prisma.trainingParticipant.updateMany.mock.calls.slice(0, 2)).toEqual([
+      [{ where: { id: 'tp-1', status: 'EM_AVALIACAO' }, data: { assignedConsultantId: null, status: 'PENDENTE' } }],
+      [{ where: { id: 'tp-2', status: 'EM_AVALIACAO' }, data: { assignedConsultantId: null, status: 'APROVADO' } }],
     ]);
     // O resto (já avaliado com ele) só perde a referência, depois: antes,
     // a liberação não acharia mais ninguém com ele.
@@ -51,7 +53,7 @@ describe('ConsultantsService.deleteConsultant (Fase 8D-1)', () => {
       data: { assignedConsultantId: null },
     });
     const [releasedAt] = prisma.trainingParticipant.findMany.mock.invocationCallOrder;
-    const [droppedAt] = prisma.trainingParticipant.updateMany.mock.invocationCallOrder;
+    const droppedAt = prisma.trainingParticipant.updateMany.mock.invocationCallOrder[2];
     expect(releasedAt).toBeLessThan(droppedAt);
     expect(prisma.consultant.delete).toHaveBeenCalledWith({ where: { id: 'c1' } });
   });
