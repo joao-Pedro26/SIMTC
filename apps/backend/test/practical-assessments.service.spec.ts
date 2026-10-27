@@ -477,6 +477,18 @@ describe('PracticalAssessmentsService', () => {
         expect(mockPrisma.practicalAssessment.create).not.toHaveBeenCalled();
       });
 
+      it('abre a transação esperando até 10 s por uma conexão, para a fila grande não ser recusada', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        tx.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+          maxWait: 10_000,
+          timeout: 10_000,
+        });
+      });
+
       it('uma falha no meio recusa o item, e a nota não é gravada fora da transação', async () => {
         mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
         tx.practicalAssessment.update.mockRejectedValue(new Error('falha no banco'));

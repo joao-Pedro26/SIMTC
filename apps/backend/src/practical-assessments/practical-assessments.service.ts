@@ -7,6 +7,14 @@ import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from
 import { statusAfterRelease } from '../participants/participant-release.util';
 import { SYNC_REFUSAL_NOT_ASSIGNED, SyncRefusedException } from './sync-refused.exception';
 
+/**
+ * Os itens de um lote do app são enviados em paralelo e cada transação segura
+ * uma conexão do pool até terminar; o app espera a resposta por até 20 s.
+ * Com o padrão do Prisma (2 s para abrir), uma fila grande teria itens
+ * recusados só por esperar conexão, e o app os trataria como recusa do servidor.
+ */
+const SYNC_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 10_000 };
+
 @Injectable()
 export class PracticalAssessmentsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -156,7 +164,7 @@ export class PracticalAssessmentsService {
 
       await this.applyScore(tx, assessment.id, assessment.items, dto.trainingParticipantId);
       return assessment;
-    });
+    }, SYNC_TRANSACTION_OPTIONS);
   }
 
   /** Calcula score e atualiza o assessment + status do participante, na
