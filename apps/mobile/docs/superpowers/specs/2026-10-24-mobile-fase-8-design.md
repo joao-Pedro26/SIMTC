@@ -468,6 +468,243 @@ A validação prévia do plano desenha as telas com as fontes de verdade em 412�
 - QA final: os dois perfis (CONSULTANT e ADMIN), celular e tablet, incluindo dois
   consultores no mesmo participante e queda de rede no meio do envio.
 
+### Desenho da 8D (27/10/2026, depois da validação da 8C)
+
+O usuário deixou as decisões da 8D para o meu bom senso ("analise pelo bom senso, como
+na 8C"). **Tudo abaixo é escolha minha**, para o usuário conferir na leitura. Isso vale
+também para as poucas regras de negócio que a 8D toca no servidor: elas estão marcadas
+com **(regra)**.
+
+O inventário juntou cerca de 60 pendências do app (as linhas "8" dos planos 2 a 6B e as
+observações das revisões da 8A, da 8B e da 8C) e umas 20 do backend e do web. Cada
+pendência do backend foi conferida no código de hoje, porque algumas foram resolvidas
+nas fases seguintes.
+
+**Intenção:** depois da 8D, o app vai para os consultores. A fase fecha o que pode
+**perder ou corromper uma avaliação**, o que **trava o uso em campo** e o que deixaria o
+servidor confiar numa regra que só o app aplica. Ela também paga a limpeza e os testes
+anotados, e termina com o QA final da Fase 8.
+
+**Divisão (escolha minha):** são três planos, nessa ordem, cada um com execução e
+validação próprias, como a 8A, a 8B e a 8C:
+
+- **8D-1, o servidor confere as regras.** É só backend, com publicação na produção.
+- **8D-2, defeitos de borda do app.**
+- **8D-3, limpeza e testes.** Termina com o QA final.
+
+O backend vem primeiro, porque parte da 8D-2 conta com as recusas novas do servidor.
+
+#### 8D-1 — O servidor confere as regras (backend)
+
+Hoje o app e o painel web impedem essas ações pela tela, mas a API aceita. Um cliente
+antigo, um teste manual ou uma corrida entre dois aparelhos passa por elas.
+
+1. **Envio de avaliação numa transação só.** Hoje o reenvio de uma reavaliação apaga os
+   itens, regrava a avaliação e calcula a nota em três passos soltos. Uma falha no meio
+   deixa uma avaliação aceita sem itens. Os três passos passam a ser tudo ou nada.
+2. **Atribuir só com a sessão em andamento e nunca o "Somente teórica"** **(regra)**. É o
+   que a tela do app e a do web já exigem. A atualização também confere de novo, dentro
+   da gravação, que o participante continua livre, para fechar a janela de dois
+   aparelhos atribuindo ao mesmo tempo. Ser consultor da sessão não é exigido, porque o
+   ADMIN atribui a si sem ser consultor dela.
+3. **Iniciar só uma sessão planejada; concluir só uma em andamento** **(regra)**. É o que
+   as duas telas já mostram. Hoje, iniciar uma sessão concluída a reabriria.
+4. **Cancelar uma sessão libera quem estava "em avaliação"** **(regra)**. Volta ao
+   status de antes da atribuição, pela mesma função que já libera quem estava com um
+   consultor tirado da sessão.
+5. **Excluir um consultor libera quem estava em avaliação com ele** **(regra)**. Hoje o
+   participante fica "em avaliação" sem dono, e nem o atribuir nem o desatribuir o
+   destravam.
+6. **O envio de avaliação continua aceito com a sessão já concluída** **(regra; nada
+   muda)**. Basta o participante continuar em avaliação com quem envia. O consultor
+   avalia sem rede e envia depois: se o ADMIN concluir a sessão no fim do dia, antes do
+   envio, recusar faria a avaliação de campo se perder. Isso fica dito no código.
+7. **Adicionar participante:**
+   - o CPF é gravado só com dígitos (hoje um CPF com máscara cria um cadastro
+     duplicado);
+   - o nome e o e-mail do cadastro só mudam depois de passar pela recusa de "CPF já
+     inscrito" (hoje uma recusa ainda grava o que o admin digitou);
+   - o e-mail é conferido como e-mail.
+8. **Ler uma avaliação só para ADMIN e CONSULTANT**
+   (`GET /practical-assessments/:id` e `…/by-participant/:id`). Hoje qualquer usuário
+   logado lê qualquer avaliação, inclusive um CLIENT, de outra empresa. O web não usa
+   essas rotas; o app usa a segunda. Um id inexistente devolve 404, e não 500.
+9. **Desatribuir:**
+   - a atualização confere de novo, dentro da gravação, que o participante continua com
+     o consultor;
+   - um participante que sumiu no meio vira 409, e não 500;
+   - ids repetidos no pedido deixam de dar uma recusa enganosa.
+10. **Os testes do backend voltam a ficar todos verdes.** São as 12 falhas antigas de
+    sempre, que vêm de mocks desatualizados (`sendOtpCode` e `EmailService`).
+11. **`apps/backend/CLAUDE.md`** ganha a rota de consulta de CPF no inventário.
+
+**Publicação:** como na 8A, o código vai para a `feat/frontend-backend-integration` só
+com o OK do usuário. A validação da 8D-1 roda contra a produção.
+
+#### 8D-2 — Defeitos de borda do app
+
+**Envio e sessão** (onde uma avaliação pode ficar presa ou ir para o lugar errado):
+
+1. **Um 4xx no lote inteiro** (por exemplo, um 400 de validação) deixa de marcar todos os
+   itens como "recusada pelo servidor", o que libera o "Descartar" em todos. Ele vira
+   uma falha que se tenta de novo. Só a recusa item a item libera o "Descartar".
+2. **O 401 no envio** renova o login e tenta de novo na mesma rodada, em vez de deixar os
+   itens "Na fila" até o próximo gatilho.
+3. **Erros ao entrar** (a reivindicação da fila sem dono e o stream da fila) passam a ser
+   tratados. O "Sincronizar agora" espera a rodada repetida. Uma lista de esperas vazia
+   não quebra.
+4. **Depois do "Limpar cache local",** a fila sai assim que o catálogo volta, sem
+   esperar o próximo gatilho de até 10 minutos. A aba Sincronizar diz que está
+   esperando o catálogo.
+5. **A renovação do login** só derruba a sessão se ainda for a mesma em que o pedido
+   começou. Hoje um 4xx com o token antigo, chegando depois de um login novo, derruba a
+   sessão nova.
+6. **"Sair" que falha no meio** termina de limpar o que dá e não deixa o aparelho pela
+   metade.
+7. **A troca de servidor que não consegue apagar tudo** não segue para o login com a
+   fila antiga, que iria para o servidor novo. Ela tenta de novo na abertura seguinte e
+   avisa.
+8. **Falha do armazenamento seguro** ao entrar (`deleteUser`, perfil salvo) não derruba
+   o login nem deixa o perfil de outro usuário.
+9. **O checklist de um participante que saiu das mãos do consultor** (desatribuído pelo
+   ADMIN, recusa 409 do desatribuir, consultor tirado da sessão) para de marcar notas e
+   de finalizar assim que o app sabe disso. Hoje as notas continuam marcáveis e o
+   "Finalizar" continua valendo.
+10. **O aviso "Você já está avaliando…"** é recalculado quando a fila ou as avaliações do
+    aparelho mudam, e não só ao abrir a tela.
+11. **"Última sincronização"** não volta para um horário anterior quando uma reavaliação
+    apaga a linha enviada.
+12. **Abertura com rede ruim** ("conectada mas sem dados"): a checagem da abertura ganha
+    um tempo limite curto, de 5 s. Hoje são até 35 s de splash antes de entrar sem rede.
+
+**Admin e CPF** (as decisões em aberto 2 e 3 da 6A e as pendências da consulta):
+
+13. **Data de mais de 90 dias no passado** (decisão 2 da 6A) **(regra de tela)**: a 1.12
+    pede confirmação antes de salvar, porque a sessão vai sumir da lista de todos os
+    aparelhos. É a opção (a) da 6A.
+14. **CPF sem conexão** (decisão 3 da 6A): sem rede, a consulta não roda, e só a faixa
+    de sem conexão aparece. Quando a rede volta, a consulta roda sozinha. É a opção (a),
+    recomendada pela revisão da 6A.
+15. **A resposta atrasada da consulta** é reconhecida pela consulta, e não pelo CPF. A
+    consulta ganha um tempo limite próprio, de 10 s. A máscara do CPF mantém o cursor
+    onde a pessoa está digitando. Quando a consulta termina sem cadastro, o foco vai
+    para o nome.
+16. **A tela travada** (sessão concluída por outra pessoa com a 1.11 ou a 1.12 aberta)
+    não pergunta mais se descarta: não há o que salvar.
+17. **Sessão apagada no servidor (404)** com a 1.11 ou a 1.12 aberta: a tela trava com
+    "Esta sessão não existe mais." e a sessão é baixada de novo.
+18. **"Cancelar sessão"** tira o foco do campo antes do diálogo. Hoje o teclado volta
+    sozinho e esconde o aviso de falha.
+
+**Telas** (das revisões da 8B e da 8C):
+
+19. **"Não salvo" sai no descarte.** Com a leitura do checklist que falhou, o "salvo" e
+    o ⋮ somem.
+20. **Com a fonte ≥1,3×,** tocar num chip do detalhe só rola a barra dos chips, e não a
+    lista inteira. O campo de busca não abre o teclado sozinho quando volta à vista.
+21. **"Desatribuindo…"** é anunciado pelo leitor de tela.
+22. **A busca do detalhe numa sessão nunca baixada** diz por que não acha nada, e não
+    "0 de 0 participantes". Em Consultores, a frase de nenhum resultado não aparece
+    junto do erro da equipe.
+23. **Ao fechar a busca da Home,** o chip destacado volta a bater com a rolagem.
+
+#### 8D-3 — Limpeza, testes e QA final
+
+1. **Limpeza das repetições anotadas:**
+   - o aviso passageiro, o rodapé com borda e o diálogo de confirmação, que se repetem
+     em várias telas, viram peças do Design System;
+   - o mapa B/PM/M → cor e as listas de meses abreviados ficam num lugar só;
+   - o esqueleto de `start`/`update`/`cancel` do `SessionRepository`;
+   - a regra "está comigo" (`isWith`) e o indicador de carregamento pequeno, cada um num
+     lugar só;
+   - um token para o canto 10 (`AppRadius.sm + 2`);
+   - os ternários do tablet e o `spacious`;
+   - os comentários imprecisos que as revisões apontaram;
+   - a seção do backend local no `README.md` do app.
+2. **Os testes que faltam**, da lista das revisões das Fases 5A a 8C: os caminhos de
+   falha do descarte e do desatribuir, as bordas dos repositórios (404, sem rede,
+   exceção que não é da API), as ViewModels da 1.11 e da 1.12, o `claimOpen`, o Perfil,
+   o `LogoCache`, a virada da meia-noite nos rótulos e os testes de diretriz em mais de
+   um estado por tela.
+3. **A saída da suíte fica limpa:** sem os avisos do drift, os `debugPrint` do envio, o
+   "Catálogo não atualizado (sem rede)" e o aviso de toque fora do alvo.
+4. **QA final da Fase 8**, no aparelho físico e no emulador do tablet, contra a produção:
+   - os dois perfis, CONSULTANT e ADMIN;
+   - dois consultores no mesmo participante, em dois aparelhos ou num aparelho e no web;
+   - queda de rede no meio do envio (modo avião durante o "Enviando");
+   - o aparelho compartilhado: um consultor sai e outro entra;
+   - o roteiro das telas das 8A, 8B e 8C, de novo.
+
+#### Fica fora da 8D (decisão minha)
+
+- **Tudo o que é do painel web.** O usuário disse que vai refinar o web depois da Fase
+  8. As pendências que os planos registraram para ele ficam listadas para essa rodada:
+  - o painel não usa a consulta de CPF e troca o nome do cadastro sem avisar;
+  - não consegue apagar as observações de uma sessão;
+  - o `PATCH` que troca o responsável sem a lista não recria os vínculos.
+- **Coisas novas, não defeitos:**
+  - enviar com o app fechado (WorkManager), que o desenho da Fase 8 já deixou de fora;
+  - guardar o Resultado no aparelho para ver sem rede;
+  - buscar participante em todas as sessões;
+  - mostrar em Consultores quais participantes estão com cada um;
+  - a agenda do consultor;
+  - apagar a data de uma sessão.
+- **Decisões já tomadas que continuam valendo:**
+  - a avaliação presa de sessão concluída fica guardada (decisão 5 da 6A, que recusou
+    apagar);
+  - o aparelho compartilhado guarda a fila de quem saiu (decisão 4 da 8A);
+  - o % por categoria usa o catálogo do aparelho (decisão 5 da 5B).
+- **Fora do código:**
+  - o limite de frequência da consulta de CPF (infraestrutura);
+  - os arquivos de assinatura antigos no armazenamento (uma limpeza na produção, que
+    pede autorização à parte);
+  - a keystore e a distribuição.
+- **A data copiada para a avaliação** quando a data da sessão muda depois: o servidor
+  grava a data que o app manda, e a do início é a mais fiel ao que aconteceu em campo.
+  Fica como está.
+- **Manter as abas vivas** (`StatefulShellRoute`) e **o chip da Home rolando pelo meio de
+  uma seção muito alta**: custo alto, efeito pequeno.
+
+#### Respostas à leitura de quem planeja (27/10/2026)
+
+- **Os "em avaliação" que já existem na produção** (sessão concluída ou cancelada, ou
+  consultor excluído) ficam como estão: o banco de produção é de teste, e não há
+  limpeza de dados. Um participante preso assim se libera pelo "Desatribuir" do ADMIN,
+  que já aceita qualquer consultor. *(escolha minha)*
+- **"O status de antes da atribuição"** não fica guardado em campo nenhum. Ele sai da
+  nota da avaliação anterior (`statusAfterRelease`, em `participant-release.util.ts`):
+  `PENDENTE` sem nota anterior, ou o status da nota anterior numa reavaliação. Não há
+  mudança de esquema.
+- **Envio depois de cancelar a sessão ou excluir o consultor:** a avaliação de campo
+  que ainda não foi enviada passa a ser recusada item a item (`NOT_ASSIGNED`), e a aba
+  Sincronizar oferece o "Descartar". É aceitável: a sessão foi cancelada, ou o consultor
+  nem consegue mais entrar. O envio responde 201 com o resultado de cada item; o "lote
+  inteiro" do item 1 da 8D-2 é o pedido que volta com erro HTTP.
+- **As rotas de leitura de avaliação:** conferido no código do web (`apps/web/src`), que
+  só chama `sync` e `assign`.
+- **Os 90 dias** são os da janela de descida da Home (a mesma constante), contados da
+  data do aparelho. Só a 1.12 tem campo de data. *(escolha minha)*
+- **A consulta de CPF que roda ao voltar a rede** só roda com o CPF completo e válido. Se
+  o campo mudou, a consulta antiga é descartada. *(escolha minha)*
+- **Os tempos-limite** (5 s na abertura e 10 s na consulta de CPF) são o tempo total do
+  pedido. *(escolha minha)*
+- **A saída da suíte limpa** quer dizer os avisos e logs listados, e não uma meta de
+  zero absoluto. *(escolha minha)*
+- **As 12 falhas antigas do backend** se consertam no teste (os mocks e a assinatura de
+  `sendOtpCode` desatualizados), sem mexer no código de produção. *(escolha minha)*
+- **O roteiro do QA final** reaproveita os roteiros das Tasks de validação das 8A, 8B e
+  8C, mais os casos novos da 8D-3. Tudo isso fica escrito no plano da 8D-3.
+
+#### Deixado para quem planeja
+
+- A ordem das tasks dentro de cada plano e como agrupar os itens.
+- Como o servidor faz a gravação condicional do atribuir e do desatribuir (`updateMany`
+  com a condição no `where` e a contagem conferida, ou transação com nova leitura).
+- Os textos das recusas novas do servidor, no tom das que já existem. A tela do app já
+  mostra a mensagem do servidor.
+- A lista exata de testes da 8D-3: os que conferem decisão primeiro, os de bordas de
+  repositório depois.
+
 ## Fora da Fase 8
 
 Keystore própria e distribuição do app; envio com o app fechado (WorkManager), salvo se
