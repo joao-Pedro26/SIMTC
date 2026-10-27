@@ -2,11 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { EmailService } from 'src/email/email.service';
+import { StorageService } from 'src/storage/storage.service';
 
 const mockPrisma = {
   trainingSession: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
-  participant: { findUnique: jest.fn(), create: jest.fn() },
+  participant: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
   trainingParticipant: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
+  // A transação interativa roda com o próprio mock no papel do `tx`.
+  $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma)),
 };
 
 describe('ParticipantsService', () => {
@@ -17,11 +21,16 @@ describe('ParticipantsService', () => {
       providers: [
         ParticipantsService,
         { provide: PrismaService, useValue: mockPrisma },
+        // O serviço passou a mandar e-mail e guardar arquivos: nos testes,
+        // os dois só precisam existir.
+        { provide: EmailService, useValue: {} },
+        { provide: StorageService, useValue: {} },
       ],
     }).compile();
 
     service = module.get<ParticipantsService>(ParticipantsService);
     jest.clearAllMocks();
+    mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
   });
 
   // ─── registerPublic ──────────────────────────────────────────────────────
@@ -42,6 +51,7 @@ describe('ParticipantsService', () => {
     it('lança 409 se CPF já está inscrito na sessão', async () => {
       mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
       mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
       await expect(service.registerPublic('token', dto as any)).rejects.toThrow(ConflictException);
     });
@@ -49,6 +59,7 @@ describe('ParticipantsService', () => {
     it('reutiliza participante existente pelo CPF', async () => {
       mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
       mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-existente' });
+      mockPrisma.participant.update.mockResolvedValue({ id: 'part-existente' });
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
       mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1' });
 
@@ -91,6 +102,7 @@ describe('ParticipantsService', () => {
     it('lança 409 se CPF já inscrito', async () => {
       mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
       mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
       await expect(service.addParticipant('sess-1', dto as any)).rejects.toThrow(ConflictException);
     });

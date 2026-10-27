@@ -120,7 +120,8 @@ describe('AuthService', () => {
       mockPrisma.user.update.mockResolvedValue({});
       await service.requestOtp('c@c.com');
       expect(mockPrisma.user.update).toHaveBeenCalled();
-      expect(mockEmail.sendOtpCode).toHaveBeenCalledWith('c@c.com', expect.any(String));
+      // O terceiro argumento é o nome de quem recebe (um espaço, sem nome).
+      expect(mockEmail.sendOtpCode).toHaveBeenCalledWith('c@c.com', expect.any(String), expect.any(String));
     });
   });
 
