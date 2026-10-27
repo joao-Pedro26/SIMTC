@@ -239,6 +239,25 @@ void main() {
       expect(find.text('Marcos Vinícius Alves'), findsOneWidget);
     });
 
+    testWidgets(
+        'a avaliação foi reenviada e aceita com o diálogo aberto: o aviso diz '
+        'que não há o que descartar (Fase 8C)', (tester) async {
+      await confirmDiscard(
+        tester,
+        arrange: () {
+          sync.discardResult = false;
+          sync.queueAfterRefusal = const [];
+        },
+      );
+
+      expect(
+        find.text('Esta avaliação já foi aceita pelo servidor; não há o que '
+            'descartar.'),
+        findsOneWidget,
+      );
+      expect(find.text(notDiscarded), findsNothing);
+    });
+
     testWidgets('o descarte deu erro: o mesmo aviso, e o item continua na fila',
         (tester) async {
       final refused = await confirmDiscard(

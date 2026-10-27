@@ -401,6 +401,84 @@ void main() {
         reason: 'abaixo de 70% a barra avisa que não aprova');
   });
 
+  group('falha ao gravar no aparelho (Fase 8C)', () {
+    /// O banco do aparelho recusa gravar em [table] — como um disco cheio.
+    Future<void> failWrites(String table) => db.customStatement(
+          'CREATE TRIGGER falha_$table BEFORE INSERT ON $table '
+          "BEGIN SELECT RAISE(ABORT, 'disco cheio'); END",
+        );
+
+    Future<void> allowWrites(String table) =>
+        db.customStatement('DROP TRIGGER falha_$table');
+
+    testWidgets(
+        'uma nota que não grava avisa, o botão não marca e o "salvo" vira '
+        '"Não salvo" até a próxima que grava', (tester) async {
+      await pumpScreen(tester);
+      await failWrites('local_assessment_items');
+
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Não foi possível salvar a nota. Tente de novo.'),
+          findsOneWidget);
+      expect(find.text('Não salvo'), findsOneWidget);
+      expect(find.text('salvo'), findsNothing);
+      expect(find.byIcon(AppIcons.notSaved), findsOneWidget);
+      expect(tester.getSemantics(find.text('PM')), isSemantics(isSelected: false));
+
+      await allowWrites('local_assessment_items');
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('salvo'), findsOneWidget);
+      expect(find.text('Não salvo'), findsNothing);
+      expect(tester.getSemantics(find.text('PM')), isSemantics(isSelected: true));
+    });
+
+    testWidgets(
+        '"Iniciar avaliação" que não grava avisa e continua "não iniciada", '
+        'com o botão ativo', (tester) async {
+      await pumpScreen(tester, started: false);
+      await failWrites('local_assessments');
+
+      await tester.tap(find.text('Iniciar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Não foi possível iniciar a avaliação. Tente de novo.'),
+          findsOneWidget);
+      expect(find.text('não iniciada'), findsOneWidget);
+      expect(
+        tester
+            .widget<AppCtaButton>(
+                find.widgetWithText(AppCtaButton, 'Iniciar avaliação'))
+            .onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets(
+        'abrir sem conseguir ler o aparelho: o motivo e "Tentar novamente", '
+        'que abre quando a leitura volta', (tester) async {
+      await db.customStatement(
+          'ALTER TABLE local_assessments RENAME TO local_assessments_fora');
+      await pumpScreen(tester, started: false);
+
+      expect(find.text('Não foi possível abrir a avaliação neste aparelho.'),
+          findsOneWidget);
+      expect(find.text('Iniciar avaliação'), findsNothing);
+
+      await db.customStatement(
+          'ALTER TABLE local_assessments_fora RENAME TO local_assessments');
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Não foi possível abrir a avaliação neste aparelho.'),
+          findsNothing);
+      expect(find.text('Iniciar avaliação'), findsOneWidget);
+    });
+  });
+
   testWidgets(
       'a observação da nota escolhida aparece embaixo dos botões, e some ao '
       'desmarcar', (tester) async {
@@ -641,8 +719,8 @@ void main() {
   });
 
   testWidgets(
-      'com o desatribuir esperando o backend, o menu ⋮ e o "Finalizar" ficam '
-      'desabilitados', (tester) async {
+      'com o desatribuir esperando o backend, o ⋮ vira o indicador de '
+      'carregamento e o "Finalizar" fica desabilitado', (tester) async {
     await assignToMe();
     final post = Completer<Response<Map<String, dynamic>>>();
     when(() => api.post<Map<String, dynamic>>('/practical-assessments/unassign',
@@ -654,12 +732,19 @@ void main() {
     await tester.tap(find.text('Desatribuir participante'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Desatribuir'));
-    await tester.pumpAndSettle();
+    // O indicador gira enquanto espera: sem `pumpAndSettle`.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-    final menu = tester.widget<PopupMenuButton<Object?>>(
-      find.byKey(const Key('checklist-menu')),
+    // A espera aparece no lugar do ⋮ (Fase 8C).
+    expect(find.byKey(const Key('checklist-menu')), findsNothing);
+    final waiting = find.byKey(const Key('checklist-desatribuindo'));
+    expect(
+      find.descendant(of: waiting, matching: find.byType(CircularProgressIndicator)),
+      findsOneWidget,
     );
-    expect(menu.enabled, isFalse);
+    expect(tester.getSize(waiting), const Size(48, 48));
+    expect(find.bySemanticsLabel('Desatribuindo…'), findsOneWidget);
     final finish = tester.widget<AppCtaButton>(
       find.widgetWithText(AppCtaButton, 'Finalizar avaliação'),
     );

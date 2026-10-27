@@ -314,6 +314,30 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// precisa de rede — offline, aparece desabilitado e diz por quê. Com um
   /// desatribuir ou um descarte no ar, o menu não abre.
   Widget _buildMenu(bool isOffline) {
+    // Com o desatribuir esperando o backend (de 15 a 35 s com a rede lenta),
+    // o ⋮ vira o indicador de carregamento pequeno (Fase 8C).
+    if (_viewModel.isUnassigning) {
+      return KeyedSubtree(
+        key: _menuKey,
+        child: Semantics(
+          label: 'Desatribuindo…',
+          child: const SizedBox.square(
+            key: Key('checklist-desatribuindo'),
+            dimension: AppSpacing.touchTarget,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.text3),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return KeyedSubtree(
       key: _menuKey,
       child: SizedBox.square(
@@ -466,11 +490,29 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         const SizedBox(width: AppSpacing.sm),
         Container(width: 1, height: 11, color: AppColors.borderStrong),
         const SizedBox(width: AppSpacing.sm),
-        const Icon(AppIcons.syncDone, size: 14, color: AppColors.savedInk),
-        const SizedBox(width: AppSpacing.xs),
-        Text('salvo', style: AppTypography.savedLabel),
+        ..._buildSavedState(),
       ],
     );
+  }
+
+  /// "salvo", ou "Não salvo" em vermelho depois de uma nota que não gravou
+  /// (Fase 8C).
+  List<Widget> _buildSavedState() {
+    if (_viewModel.saveFailed) {
+      return [
+        const Icon(AppIcons.notSaved, size: 14, color: AppColors.dangerInk),
+        const SizedBox(width: AppSpacing.xs),
+        Text(
+          'Não salvo',
+          style: AppTypography.savedLabel.copyWith(color: AppColors.dangerInk),
+        ),
+      ];
+    }
+    return [
+      const Icon(AppIcons.syncDone, size: 14, color: AppColors.savedInk),
+      const SizedBox(width: AppSpacing.xs),
+      Text('salvo', style: AppTypography.savedLabel),
+    ];
   }
 
   /// A nota do participante: começa em 100% e cai a cada infração marcada.
@@ -504,6 +546,29 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       return ListView(
         key: const Key('checklist-skeleton'),
         children: const [SkeletonListItem(), SkeletonListItem(), SkeletonListItem()],
+      );
+    }
+
+    if (_viewModel.loadFailed) {
+      return Padding(
+        key: const Key('checklist-load-failed'),
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const InlineNotice(
+              icon: AppIcons.notSaved,
+              tone: NoticeTone.danger,
+              message: 'Não foi possível abrir a avaliação neste aparelho.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppSecondaryButton(
+              label: 'Tentar novamente',
+              icon: AppIcons.retry,
+              onPressed: _viewModel.retryLoad,
+            ),
+          ],
+        ),
       );
     }
 

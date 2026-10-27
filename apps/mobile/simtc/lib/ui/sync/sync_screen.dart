@@ -394,8 +394,18 @@ class SyncScreen extends StatelessWidget {
       // apaga — sem isto, viraria uma exceção solta no toque do botão.
     }
     if (discarded || !context.mounted) return;
+    // Saiu da fila no meio do caminho: foi reenviada e aceita, e não há o que
+    // descartar nem tentar de novo (Fase 8C).
+    final accepted = !sync.queue.any((queued) => queued.id == item.id);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Não foi possível descartar. Tente de novo.')),
+      SnackBar(
+        content: Text(
+          accepted
+              ? 'Esta avaliação já foi aceita pelo servidor; não há o que '
+                  'descartar.'
+              : 'Não foi possível descartar. Tente de novo.',
+        ),
+      ),
     );
   }
 

@@ -18,6 +18,9 @@ abstract final class AppIcons {
   static const IconData noSignal = Icons.wifi_off_outlined;
   static const IconData sync = Icons.cloud_sync_outlined;
   static const IconData syncDone = Icons.cloud_done_outlined;
+
+  /// "Não salvo" no cabeçalho do checklist: a última marcação não gravou.
+  static const IconData notSaved = Icons.error_outline;
   static const IconData sessions = Icons.event_note_outlined;
   static const IconData profile = Icons.person_outlined;
   static const IconData approved = Icons.check_circle_outlined;

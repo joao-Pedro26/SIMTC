@@ -47,6 +47,10 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
   /// (o item deixou de ser recusa, ou há um envio no ar): a fila não muda.
   bool discardResult = true;
 
+  /// A fila depois de um descarte recusado ([discardResult] falso) — nula,
+  /// ela não muda.
+  List<LocalAssessment>? queueAfterRefusal;
+
   /// Se não for nulo, o "Descartar" lança isto — uma falha do banco local.
   Object? discardError;
 
@@ -73,7 +77,13 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
     discardCalls.add(localAssessmentId);
     final error = discardError;
     if (error != null) throw error;
-    if (!discardResult) return false;
+    if (!discardResult) {
+      // A avaliação deixou de ser recusa no meio do caminho (reenviada e
+      // aceita): ela sai da fila, e o descarte não apaga nada.
+      final after = queueAfterRefusal;
+      if (after != null) setQueue(after, sendingIds: _sendingIds);
+      return false;
+    }
     setQueue(
       [for (final item in _queue) if (item.id != localAssessmentId) item],
       sendingIds: _sendingIds,

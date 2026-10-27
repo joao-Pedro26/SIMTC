@@ -71,6 +71,10 @@ class ChecklistViewModel extends ChangeNotifier {
       'Não foi possível desatribuir o participante. Tente de novo.';
   static const String _draftNotDiscarded =
       'Participante desatribuído, mas a avaliação iniciada não foi apagada do aparelho.';
+  static const String _noteNotSaved =
+      'Não foi possível salvar a nota. Tente de novo.';
+  static const String _startFailed =
+      'Não foi possível iniciar a avaliação. Tente de novo.';
 
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessmentItem>>? _itemsSubscription;
@@ -80,6 +84,8 @@ class ChecklistViewModel extends ChangeNotifier {
   bool _starting = false;
   bool _discarding = false;
   bool _unassigning = false;
+  bool _loadFailed = false;
+  bool _saveFailed = false;
   String? _assessmentId;
   DateTime? _startTime;
   LocalSyncStatus? _status;
@@ -96,6 +102,14 @@ class ChecklistViewModel extends ChangeNotifier {
   String? _blockingName;
 
   bool get isLoading => _loading;
+
+  /// A leitura do aparelho falhou ao abrir: a tela mostra o motivo e o
+  /// "Tentar novamente" ([retryLoad]) no lugar das categorias (Fase 8C).
+  bool get loadFailed => _loadFailed;
+
+  /// A última nota marcada não gravou: o "salvo" do cabeçalho vira "Não
+  /// salvo" até a próxima que grava (Fase 8C).
+  bool get saveFailed => _saveFailed;
   SessionParticipant? get participant => _participant;
   String? get expandedCategoryId => _expandedCategoryId;
 
@@ -207,28 +221,42 @@ class ChecklistViewModel extends ChangeNotifier {
       notifyListeners();
     });
 
-    final current = await _assessmentRepository.findCurrent(
-      trainingParticipantId: participantId,
-      ownerUserId: ownerUserId,
-    );
-    if (_disposed) return;
-    // As marcações primeiro: o stream as entrega enquanto o catálogo carrega,
-    // e a tela já abre com elas.
-    if (current == null) {
-      await _checkBlock();
-    } else if (await _waits(current)) {
-      _resumable = current;
-    } else {
-      _attach(current);
-    }
-    if (_disposed) return;
+    try {
+      final current = await _assessmentRepository.findCurrent(
+        trainingParticipantId: participantId,
+        ownerUserId: ownerUserId,
+      );
+      if (_disposed) return;
+      // As marcações primeiro: o stream as entrega enquanto o catálogo
+      // carrega, e a tela já abre com elas.
+      if (current == null) {
+        await _checkBlock();
+      } else if (await _waits(current)) {
+        _resumable = current;
+      } else {
+        _attach(current);
+      }
+      if (_disposed) return;
 
-    _catalog = await _catalogRepository.loadCatalog();
-    if (_disposed) return;
-    if (isStarted) _openFirstCategory();
+      _catalog = await _catalogRepository.loadCatalog();
+      if (_disposed) return;
+      if (isStarted) _openFirstCategory();
+    } catch (_) {
+      // Uma falha do banco do aparelho: sem ela, a tela ficaria no
+      // carregamento para sempre (Fase 8C).
+      _loadFailed = true;
+    }
 
     _loading = false;
     notifyListeners();
+  }
+
+  /// "Tentar novamente" depois de uma leitura que falhou ao abrir.
+  Future<void> retryLoad() {
+    _loadFailed = false;
+    _loading = true;
+    notifyListeners();
+    return init();
   }
 
   /// Uma avaliação que já existe só abre direto se nada mudou enquanto ela
@@ -298,6 +326,10 @@ class ChecklistViewModel extends ChangeNotifier {
     } on EvaluationInProgressException catch (e) {
       // Outro participante começou depois de a tela abrir.
       await _block(e.trainingParticipantId);
+    } catch (_) {
+      // Uma falha do banco do aparelho: nada começou, e o botão volta a
+      // ficar ativo (Fase 8C).
+      _message = _startFailed;
     } finally {
       _starting = false;
       notifyListeners();
@@ -497,16 +529,24 @@ class ChecklistViewModel extends ChangeNotifier {
         .map((i) => i.infractionNoteId)
         .firstOrNull;
 
-    _items = current == noteId
-        ? await _assessmentRepository.unmark(
-            localAssessmentId: assessmentId,
-            infractionId: infractionId,
-          )
-        : await _assessmentRepository.mark(
-            localAssessmentId: assessmentId,
-            infractionId: infractionId,
-            infractionNoteId: noteId,
-          );
+    try {
+      _items = current == noteId
+          ? await _assessmentRepository.unmark(
+              localAssessmentId: assessmentId,
+              infractionId: infractionId,
+            )
+          : await _assessmentRepository.mark(
+              localAssessmentId: assessmentId,
+              infractionId: infractionId,
+              infractionNoteId: noteId,
+            );
+      _saveFailed = false;
+    } catch (_) {
+      // Não gravou: o botão continua mostrando o que está gravado, e o
+      // cabeçalho diz "Não salvo" (Fase 8C).
+      _saveFailed = true;
+      _message = _noteNotSaved;
+    }
     notifyListeners();
   }
 
