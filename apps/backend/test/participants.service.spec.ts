@@ -4,6 +4,10 @@ import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailService } from 'src/email/email.service';
 import { StorageService } from 'src/storage/storage.service';
+import { ParticipantsController } from 'src/participants/participants.controller';
+import { AddParticipantDto } from 'src/participants/dto/add-participant.dto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 
 const mockPrisma = {
   trainingSession: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
@@ -82,6 +86,19 @@ describe('ParticipantsService', () => {
 
       expect(mockPrisma.participant.create).toHaveBeenCalled();
     });
+
+    it('CPF já inscrito: recusa sem mudar o cadastro', async () => {
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
+
+      await expect(service.registerPublic('token', dto as any)).rejects.toThrow('CPF já inscrito neste treinamento');
+      expect(mockPrisma.trainingParticipant.findUnique).toHaveBeenCalledWith({
+        where: { trainingSessionId_participantId: { trainingSessionId: 'sess-1', participantId: 'part-1' } },
+      });
+      expect(mockPrisma.participant.update).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.create).not.toHaveBeenCalled();
+    });
   });
 
   // ─── addParticipant ──────────────────────────────────────────────────────
@@ -105,6 +122,86 @@ describe('ParticipantsService', () => {
       mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
       await expect(service.addParticipant('sess-1', dto as any)).rejects.toThrow(ConflictException);
+    });
+
+    it('CPF já inscrito: recusa sem mudar o cadastro', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
+
+      await expect(service.addParticipant('sess-1', dto as any)).rejects.toThrow('CPF já inscrito neste treinamento');
+      expect(mockPrisma.trainingParticipant.findUnique).toHaveBeenCalledWith({
+        where: { trainingSessionId_participantId: { trainingSessionId: 'sess-1', participantId: 'part-1' } },
+      });
+      expect(mockPrisma.participant.update).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.create).not.toHaveBeenCalled();
+    });
+
+    it('cadastro existente fora da sessão: atualiza nome e e-mail e inscreve', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
+      mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1' });
+
+      await service.addParticipant('sess-1', { cpf: '12345678901', name: 'Maria Nova', email: 'maria@nova.com' } as any);
+
+      expect(mockPrisma.participant.update).toHaveBeenCalledWith({
+        where: { id: 'part-1' },
+        data: expect.objectContaining({ name: 'Maria Nova', email: 'maria@nova.com' }),
+      });
+      expect(mockPrisma.trainingParticipant.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ trainingSessionId: 'sess-1', participantId: 'part-1' }) }),
+      );
+    });
+
+    it('cadastro novo: cria sem procurar inscrição', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      mockPrisma.participant.create.mockResolvedValue({ id: 'part-novo' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1' });
+
+      await service.addParticipant('sess-1', dto as any);
+
+      expect(mockPrisma.participant.create).toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── addParticipant: controller e DTO ────────────────────────────────────
+
+  describe('ParticipantsController.addParticipant', () => {
+    const svc = { addParticipant: jest.fn() };
+    const controller = new ParticipantsController(svc as unknown as ParticipantsService);
+
+    it('manda ao service o CPF só com dígitos', () => {
+      controller.addParticipant('sess-1', { cpf: '529.982.247-25', name: 'Maria' } as AddParticipantDto);
+
+      expect(svc.addParticipant).toHaveBeenCalledWith('sess-1', { cpf: '52998224725', name: 'Maria' });
+    });
+
+    it('CPF com dígito verificador errado é 400, sem chamar o service', () => {
+      expect(() =>
+        controller.addParticipant('sess-1', { cpf: '529.982.247-26', name: 'Maria' } as AddParticipantDto),
+      ).toThrow(BadRequestException);
+      expect(svc.addParticipant).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('AddParticipantDto', () => {
+    const errorsOf = (body: object) => validate(plainToInstance(AddParticipantDto, body));
+
+    it('recusa um e-mail que não é e-mail', async () => {
+      const errors = await errorsOf({ cpf: '52998224725', name: 'Maria', email: 'maria-sem-arroba' });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('email');
+      expect(Object.values(errors[0].constraints ?? {})).toEqual(['E-mail inválido']);
+    });
+
+    it('aceita e-mail válido ou ausente', async () => {
+      await expect(errorsOf({ cpf: '52998224725', name: 'Maria', email: 'maria@empresa.com.br' })).resolves.toEqual([]);
+      await expect(errorsOf({ cpf: '52998224725', name: 'Maria' })).resolves.toEqual([]);
     });
   });
 

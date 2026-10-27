@@ -21,16 +21,21 @@ export class ParticipantsController {
     return this.service.findBySession(trainingSessionId);
   }
 
+  /**
+   * O CPF segue para o service só com dígitos, que é como ele está gravado:
+   * um CPF com máscara não pode criar um segundo cadastro. Como na consulta
+   * abaixo, o `ValidateCpfPipe` é chamado à mão, depois do `ValidationPipe`.
+   */
   @Post('training-sessions/:id/participants')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   addParticipant(
     @Param('id') trainingSessionId: string,
-    @Body('cpf', ValidateCpfPipe) _cpf: string,
     @Body() dto: AddParticipantDto,
   ) {
-    return this.service.addParticipant(trainingSessionId, dto);
+    const cpf = new ValidateCpfPipe().transform(dto.cpf);
+    return this.service.addParticipant(trainingSessionId, { ...dto, cpf });
   }
 
   /**

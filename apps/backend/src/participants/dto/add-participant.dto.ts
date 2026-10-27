@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
 
 export enum ParticipationType {
     SOMENTE_TEORICA = 'SOMENTE_TEORICA',
@@ -13,7 +13,7 @@ export class AddParticipantDto {
     @IsString()
     name!: string;
 
-    @IsString()
+    @IsEmail({}, { message: 'E-mail inválido' })
     @IsOptional()
     email?: string;
 

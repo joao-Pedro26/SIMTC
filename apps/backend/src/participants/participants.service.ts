@@ -65,14 +65,20 @@ export class ParticipantsService {
    * estava no banco) em vez de apagar o valor existente. Já `name` é sempre
    * obrigatório nos dois formulários (público e admin), por isso sempre
    * sobrescreve.
+   *
+   * A recusa de "CPF já inscrito" vem ANTES da atualização: uma inscrição
+   * recusada não muda o cadastro. Cadastro novo não tem inscrição nenhuma.
    */
-  private async findOrUpdateParticipantByCpf(dto: {
-    cpf: string;
-    name: string;
-    email?: string;
-    cnhCategory?: string;
-    cnhExpiration?: string;
-  }) {
+  private async findOrUpdateParticipantForSession(
+    trainingSessionId: string,
+    dto: {
+      cpf: string;
+      name: string;
+      email?: string;
+      cnhCategory?: string;
+      cnhExpiration?: string;
+    },
+  ) {
     const existing = await this.prisma.participant.findUnique({ where: { cpf: dto.cpf } });
 
     if (!existing) {
@@ -85,6 +91,18 @@ export class ParticipantsService {
           cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
         },
       });
+    }
+
+    const enrolled = await this.prisma.trainingParticipant.findUnique({
+      where: {
+        trainingSessionId_participantId: {
+          trainingSessionId,
+          participantId: existing.id,
+        },
+      },
+    });
+    if (enrolled) {
+      throw new ConflictException('CPF já inscrito neste treinamento');
     }
 
     return this.prisma.participant.update({
@@ -114,23 +132,11 @@ export class ParticipantsService {
     }
 
     // 2. De-duplicação por CPF: reutiliza o participante, atualizando os
-    // dados com o que veio nesta nova inscrição (ver findOrUpdateParticipantByCpf)
-    const participant = await this.findOrUpdateParticipantByCpf(dto);
+    // dados com o que veio nesta nova inscrição; recusa quem já está inscrito
+    // (ver findOrUpdateParticipantForSession)
+    const participant = await this.findOrUpdateParticipantForSession(session.id, dto);
 
-    // 3. Vincula participante à sessão (verifica se já está inscrito)
-    const existing = await this.prisma.trainingParticipant.findUnique({
-      where: {
-        trainingSessionId_participantId: {
-          trainingSessionId: session.id,
-          participantId: participant.id,
-        },
-      },
-    });
-
-    if (existing) {
-      throw new ConflictException('CPF já inscrito neste treinamento');
-    }
-
+    // 3. Vincula participante à sessão
     const trainingParticipant = await this.prisma.trainingParticipant.create({
       data: {
         trainingSessionId: session.id,
@@ -165,21 +171,9 @@ export class ParticipantsService {
     }
 
     // De-duplicação por CPF: reutiliza o participante, atualizando os dados
-    // com o que veio nesta nova inscrição (ver findOrUpdateParticipantByCpf)
-    const participant = await this.findOrUpdateParticipantByCpf(dto);
-
-    const existing = await this.prisma.trainingParticipant.findUnique({
-      where: {
-        trainingSessionId_participantId: {
-          trainingSessionId,
-          participantId: participant.id,
-        },
-      },
-    });
-
-    if (existing) {
-      throw new ConflictException('CPF já inscrito neste treinamento');
-    }
+    // com o que veio nesta nova inscrição; recusa quem já está inscrito
+    // (ver findOrUpdateParticipantForSession)
+    const participant = await this.findOrUpdateParticipantForSession(trainingSessionId, dto);
 
     return this.prisma.trainingParticipant.create({
       data: {
