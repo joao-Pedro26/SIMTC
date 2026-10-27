@@ -95,10 +95,27 @@ describe('PracticalAssessmentsService', () => {
   // ─── assignParticipants ──────────────────────────────────────────────────
 
   describe('assignParticipants', () => {
+    /** Um participante, na sessão em andamento e com parte prática, a menos
+     * que o teste diga outra coisa. */
+    const record = (overrides: Record<string, unknown> = {}) => ({
+      id: 'tp-1',
+      status: 'PENDENTE',
+      assignedConsultantId: null,
+      participationType: 'TEORICA_E_PRATICA',
+      training: { status: 'EM_ANDAMENTO' },
+      ...overrides,
+    });
+
+    /** O cliente da transação: a gravação condicional acontece nele. */
+    const tx = { trainingParticipant: { updateMany: jest.fn() } };
+
+    beforeEach(() => {
+      tx.trainingParticipant.updateMany.mockReset();
+      mockPrisma.$transaction.mockImplementation((fn: (t: unknown) => unknown) => fn(tx));
+    });
+
     it('lança ConflictException se algum participante não existe', async () => {
-      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
-        { id: 'tp-1', status: 'PENDENTE', assignedConsultantId: null },
-      ]);
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([record()]);
       await expect(
         service.assignParticipants({ participantIds: ['tp-1', 'tp-2'] }, 'consultant-1'),
       ).rejects.toThrow(ConflictException);
@@ -106,19 +123,16 @@ describe('PracticalAssessmentsService', () => {
 
     it('lança ConflictException se participante já atribuído a outro consultor', async () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([
-        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor' },
+        record({ status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor' }),
       ]);
       await expect(
         service.assignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor'),
       ).rejects.toThrow(ConflictException);
     });
 
-    it('atribui participantes ao consultor corretamente', async () => {
-      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
-        { id: 'tp-1', status: 'PENDENTE', assignedConsultantId: null },
-        { id: 'tp-2', status: 'PENDENTE', assignedConsultantId: null },
-      ]);
-      mockPrisma.trainingParticipant.updateMany.mockResolvedValue({ count: 2 });
+    it('atribui participantes ao consultor corretamente, com a condição na própria gravação', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([record(), record({ id: 'tp-2' })]);
+      tx.trainingParticipant.updateMany.mockResolvedValue({ count: 2 });
 
       const result = await service.assignParticipants(
         { participantIds: ['tp-1', 'tp-2'] },
@@ -126,17 +140,25 @@ describe('PracticalAssessmentsService', () => {
       );
 
       expect(result).toEqual({ assigned: 2 });
-      expect(mockPrisma.trainingParticipant.updateMany).toHaveBeenCalledWith({
+      expect(mockPrisma.trainingParticipant.findMany).toHaveBeenCalledWith({
         where: { id: { in: ['tp-1', 'tp-2'] } },
+        include: { training: { select: { status: true } } },
+      });
+      expect(tx.trainingParticipant.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['tp-1', 'tp-2'] },
+          status: { not: 'APROVADO' },
+          OR: [{ status: { not: 'EM_AVALIACAO' } }, { assignedConsultantId: 'consultant-1' }],
+        },
         data: { assignedConsultantId: 'consultant-1', status: 'EM_AVALIACAO' },
       });
     });
 
     it('permite reatribuir participante ao mesmo consultor', async () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([
-        { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor' },
+        record({ status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor' }),
       ]);
-      mockPrisma.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
+      tx.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.assignParticipants(
         { participantIds: ['tp-1'] },
@@ -144,11 +166,72 @@ describe('PracticalAssessmentsService', () => {
       );
       expect(result).toEqual({ assigned: 1 });
     });
+
+    describe('o servidor confere as regras das telas (Fase 8D-1)', () => {
+      it.each([['PLANEJADO'], ['CONCLUIDO'], ['CANCELADO']])(
+        'sessão %s: recusa, sem gravar nada',
+        async (status) => {
+          mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+            record({ training: { status } }),
+          ]);
+
+          await expect(
+            service.assignParticipants({ participantIds: ['tp-1'] }, 'consultant-1'),
+          ).rejects.toThrow('Só dá para atribuir participantes com o treinamento em andamento');
+          expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+        },
+      );
+
+      it('"Somente teórica": recusa, sem gravar nada', async () => {
+        mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+          record({ participationType: 'SOMENTE_TEORICA' }),
+        ]);
+
+        await expect(
+          service.assignParticipants({ participantIds: ['tp-1'] }, 'consultant-1'),
+        ).rejects.toThrow('Participantes somente da parte teórica não têm avaliação prática');
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('outro aparelho atribuiu no meio do caminho: a gravação não pega todos e recusa '
+        + '(a transação desfaz o que pegou)', async () => {
+        mockPrisma.trainingParticipant.findMany.mockResolvedValue([record(), record({ id: 'tp-2' })]);
+        tx.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
+
+        await expect(
+          service.assignParticipants({ participantIds: ['tp-1', 'tp-2'] }, 'consultant-1'),
+        ).rejects.toThrow('Um ou mais participantes já estão em avaliação com outro consultor');
+      });
+
+      it('ids repetidos no pedido contam uma vez só', async () => {
+        mockPrisma.trainingParticipant.findMany.mockResolvedValue([record()]);
+        tx.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
+
+        const result = await service.assignParticipants(
+          { participantIds: ['tp-1', 'tp-1'] },
+          'consultant-1',
+        );
+
+        expect(result).toEqual({ assigned: 1 });
+        expect(mockPrisma.trainingParticipant.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: { in: ['tp-1'] } } }),
+        );
+      });
+    });
   });
 
   // ─── unassignParticipants ────────────────────────────────────────────────
 
   describe('unassignParticipants', () => {
+    /** O cliente da transação: cada liberação é uma gravação condicional nele. */
+    const tx = { trainingParticipant: { updateMany: jest.fn() } };
+
+    beforeEach(() => {
+      tx.trainingParticipant.updateMany.mockReset();
+      tx.trainingParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$transaction.mockImplementation((fn: (t: unknown) => unknown) => fn(tx));
+    });
+
     it('lança ConflictException se algum participante não existe', async () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([
         { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
@@ -181,8 +264,6 @@ describe('PracticalAssessmentsService', () => {
         { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
         { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: { score: 62.5 } },
       ]);
-      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
-      mockPrisma.$transaction.mockResolvedValue([]);
 
       const result = await service.unassignParticipants(
         { participantIds: ['tp-1', 'tp-2'] },
@@ -194,9 +275,15 @@ describe('PracticalAssessmentsService', () => {
         where: { id: { in: ['tp-1', 'tp-2'] } },
         include: { assessment: { select: { score: true } } },
       });
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
-        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } },
-        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } },
+      expect(tx.trainingParticipant.updateMany.mock.calls).toEqual([
+        [{
+          where: { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor' },
+          data: { assignedConsultantId: null, status: 'PENDENTE' },
+        }],
+        [{
+          where: { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor' },
+          data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' },
+        }],
       ]);
     });
 
@@ -204,15 +291,14 @@ describe('PracticalAssessmentsService', () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([
         { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: { score: 0 } },
       ]);
-      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
-      mockPrisma.$transaction.mockResolvedValue([]);
 
       const result = await service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor');
 
       expect(result).toEqual({ unassigned: 1 });
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
-        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } },
-      ]);
+      expect(tx.trainingParticipant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor' },
+        data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' },
+      });
     });
 
     it('ADMIN libera participante que está com outro consultor, sem precisar de perfil de consultor', async () => {
@@ -220,8 +306,6 @@ describe('PracticalAssessmentsService', () => {
         { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor', assessment: null },
         { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'mais-um', assessment: { score: 90 } },
       ]);
-      mockPrisma.trainingParticipant.update.mockImplementation((args) => args);
-      mockPrisma.$transaction.mockResolvedValue([]);
 
       // Sem `consultantId` no token: só o papel. Se o serviço fosse procurar o
       // perfil de consultor do usuário, o mock (que não tem `user`) estouraria.
@@ -233,9 +317,15 @@ describe('PracticalAssessmentsService', () => {
       );
 
       expect(result).toEqual({ unassigned: 2 });
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
-        { where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } },
-        { where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'APROVADO' } },
+      expect(tx.trainingParticipant.updateMany.mock.calls).toEqual([
+        [{
+          where: { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'outro-consultor' },
+          data: { assignedConsultantId: null, status: 'PENDENTE' },
+        }],
+        [{
+          where: { id: 'tp-2', status: 'EM_AVALIACAO', assignedConsultantId: 'mais-um' },
+          data: { assignedConsultantId: null, status: 'APROVADO' },
+        }],
       ]);
     });
 
@@ -259,6 +349,34 @@ describe('PracticalAssessmentsService', () => {
         service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor', 'user-1', 'CONSULTANT'),
       ).rejects.toThrow('Um ou mais participantes não estão atribuídos a você');
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    describe('corridas e pedidos repetidos (Fase 8D-1)', () => {
+      it('o participante mudou ou sumiu no meio do caminho: 409, e não 500 '
+        + '(a transação desfaz o que já liberou)', async () => {
+        mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+          { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
+        ]);
+        tx.trainingParticipant.updateMany.mockResolvedValue({ count: 0 });
+
+        await expect(
+          service.unassignParticipants({ participantIds: ['tp-1'] }, 'meu-consultor'),
+        ).rejects.toThrow('Um ou mais participantes mudaram de situação. Atualize a lista e tente de novo.');
+      });
+
+      it('ids repetidos no pedido contam uma vez só, sem recusa enganosa', async () => {
+        mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+          { id: 'tp-1', status: 'EM_AVALIACAO', assignedConsultantId: 'meu-consultor', assessment: null },
+        ]);
+
+        const result = await service.unassignParticipants(
+          { participantIds: ['tp-1', 'tp-1'] },
+          'meu-consultor',
+        );
+
+        expect(result).toEqual({ unassigned: 1 });
+        expect(tx.trainingParticipant.updateMany).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

@@ -236,12 +236,24 @@ export class PracticalAssessmentsService {
 
   async assignParticipants(dto: AssignParticipantsDto, consultantIdFromJwt?: string, userId?: string) {
     const consultantId = await this.resolveConsultantId(consultantIdFromJwt, userId);
+    // Ids repetidos no pedido contam uma vez só (Fase 8D-1).
+    const ids = [...new Set(dto.participantIds)];
     const records = await this.prisma.trainingParticipant.findMany({
-      where: { id: { in: dto.participantIds } },
+      where: { id: { in: ids } },
+      include: { training: { select: { status: true } } },
     });
 
-    if (records.length !== dto.participantIds.length) {
+    if (records.length !== ids.length) {
       throw new ConflictException('Um ou mais participantes não foram encontrados');
+    }
+
+    // As regras que as telas do app e do web já aplicam (Fase 8D-1): só com
+    // o treinamento em andamento, e só quem tem a parte prática.
+    if (records.some((r) => r.training.status !== 'EM_ANDAMENTO')) {
+      throw new ConflictException('Só dá para atribuir participantes com o treinamento em andamento');
+    }
+    if (records.some((r) => r.participationType === 'SOMENTE_TEORICA')) {
+      throw new ConflictException('Participantes somente da parte teórica não têm avaliação prática');
     }
 
     // Participantes aprovados não podem ser reatribuídos
@@ -260,12 +272,26 @@ export class PracticalAssessmentsService {
       );
     }
 
-    await this.prisma.trainingParticipant.updateMany({
-      where: { id: { in: dto.participantIds } },
-      data: { assignedConsultantId: consultantId, status: 'EM_AVALIACAO' },
+    // A gravação confere as mesmas condições de novo: entre a leitura e aqui,
+    // outro aparelho pode ter atribuído alguém. Se não pegar todos, a
+    // transação desfaz o que pegou (Fase 8D-1).
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.trainingParticipant.updateMany({
+        where: {
+          id: { in: ids },
+          status: { not: 'APROVADO' },
+          OR: [{ status: { not: 'EM_AVALIACAO' } }, { assignedConsultantId: consultantId }],
+        },
+        data: { assignedConsultantId: consultantId, status: 'EM_AVALIACAO' },
+      });
+      if (count !== ids.length) {
+        throw new ConflictException(
+          'Um ou mais participantes já estão em avaliação com outro consultor',
+        );
+      }
     });
 
-    return { assigned: dto.participantIds.length };
+    return { assigned: ids.length };
   }
 
   /**
@@ -285,12 +311,14 @@ export class PracticalAssessmentsService {
     const consultantId = isAdmin
       ? undefined
       : await this.resolveConsultantId(consultantIdFromJwt, userId);
+    // Ids repetidos no pedido contam uma vez só (Fase 8D-1).
+    const ids = [...new Set(dto.participantIds)];
     const records = await this.prisma.trainingParticipant.findMany({
-      where: { id: { in: dto.participantIds } },
+      where: { id: { in: ids } },
       include: { assessment: { select: { score: true } } },
     });
 
-    if (records.length !== dto.participantIds.length) {
+    if (records.length !== ids.length) {
       throw new ConflictException('Um ou mais participantes não foram encontrados');
     }
 
@@ -307,17 +335,25 @@ export class PracticalAssessmentsService {
       }
     }
 
-    await this.prisma.$transaction(
-      records.map((r) =>
-        this.prisma.trainingParticipant.update({
-          where: { id: r.id },
+    // Cada liberação confere de novo que o participante continua como foi
+    // lido: no meio do caminho, outro pedido pode tê-lo liberado, avaliado ou
+    // removido. Aí a transação desfaz tudo, com 409 em vez de 500 (Fase 8D-1).
+    await this.prisma.$transaction(async (tx) => {
+      for (const r of records) {
+        const { count } = await tx.trainingParticipant.updateMany({
+          where: { id: r.id, status: 'EM_AVALIACAO', assignedConsultantId: r.assignedConsultantId },
           data: {
             assignedConsultantId: null,
             status: statusAfterRelease(r.assessment?.score),
           },
-        }),
-      ),
-    );
+        });
+        if (count !== 1) {
+          throw new ConflictException(
+            'Um ou mais participantes mudaram de situação. Atualize a lista e tente de novo.',
+          );
+        }
+      }
+    });
 
     return { unassigned: records.length };
   }
