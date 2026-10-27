@@ -41,6 +41,7 @@ import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/utils/result.dart';
 
+import '../../support/a11y.dart';
 import '../../support/ripple.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
@@ -415,6 +416,36 @@ void main() {
     expect(find.text('Nenhum participante inscrito nesta sessão.'), findsNothing);
   });
 
+  testWidgets(
+      'sessão nunca baixada cuja descida falhou com conexão: o motivo e '
+      '"Tentar novamente" (Fase 8C)', (tester) async {
+    // A sessão sai do cache antes da resposta do servidor, como no aparelho.
+    final reply = Completer<Result<int>>();
+    when(() => participants.syncSession('sess-1')).thenAnswer((_) => reply.future);
+    await show(tester, withSession: session(downloaded: false));
+    reply.complete(Failure(Exception('erro'), 'Erro no servidor.'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('Não foi possível baixar os participantes desta sessão.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Puxe para atualizar'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing, reason: 'um aviso só');
+
+    when(() => participants.syncSession('sess-1'))
+        .thenAnswer((_) async => const Success(0));
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pump();
+
+    verify(() => participants.syncSession('sess-1')).called(2);
+    expect(
+      find.text('Não foi possível baixar os participantes desta sessão.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('os chips filtram a lista', (tester) async {
     await show(tester, withParticipants: [
       participant('2', 'Carlos Eduardo Nunes'),
@@ -589,6 +620,22 @@ void main() {
       expect(find.text('Mariana Costa'), findsOneWidget);
       expect(find.text('Ana Paula Ribeiro'), findsNothing);
     });
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo, no consultor e no ADMIN '
+      '(Fase 8C)', (tester) async {
+    await show(tester, withParticipants: [
+      participant('1', 'Ana Paula Ribeiro'),
+      participant('3', 'Marcos Vinícius Alves',
+          status: ParticipantStatus.emAvaliacao,
+          assignedTo: 'c-outro',
+          assignedName: 'Rafael Lima'),
+    ]);
+    await expectAccessibleTargets(tester);
+
+    when(() => auth.currentUser).thenReturn(admin);
+    await show(tester, withParticipants: [participant('1', 'Ana Paula Ribeiro')]);
+    await expectAccessibleTargets(tester);
   });
 
   group('fonte do sistema grande (Fase 8C)', () {

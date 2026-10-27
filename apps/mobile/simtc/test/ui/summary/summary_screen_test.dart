@@ -13,6 +13,8 @@ import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
+import '../../support/a11y.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 /// Repositório real com o "Confirmar" falhando — como um disco cheio.
@@ -207,6 +209,13 @@ void main() {
     expect(find.text('sem infração'), findsOneWidget);
     expect(find.text('100,0%'), findsOneWidget);
     expect(find.text('Confirmar'), findsOneWidget);
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await draftWith({'inf-1': 'inf-1-PM'});
+    await pumpSummary(tester);
+
+    await expectAccessibleTargets(tester);
   });
 
   testWidgets('abaixo de 70% mostra "Não recomendado"', (tester) async {

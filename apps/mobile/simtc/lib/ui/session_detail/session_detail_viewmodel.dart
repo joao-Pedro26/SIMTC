@@ -78,6 +78,9 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
   bool _sessionLoaded = false;
   bool _participantsLoaded = false;
   bool _isRefreshing = false;
+
+  /// A descida falhou com a sessão nunca baixada: ver [downloadFailed].
+  bool _downloadFailed = false;
   bool _isStarting = false;
   String? _assigningParticipantId;
   String? _unassigningParticipantId;
@@ -134,6 +137,11 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
       (neverDownloaded && _participants.isEmpty && _isRefreshing);
 
   bool get hasParticipants => _participants.isNotEmpty;
+
+  /// Os participantes nunca foram baixados e a última descida falhou: a tela
+  /// mostra o motivo e o "Tentar novamente" no lugar do aviso de baixar com
+  /// conexão — um aviso só, sem o passageiro (Fase 8C).
+  bool get downloadFailed => _downloadFailed && neverDownloaded;
 
   /// Atribuir e abrir o checklist só valem com a sessão em andamento.
   bool get evaluationOpen => _session?.status == SessionStatus.emAndamento;
@@ -308,6 +316,17 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
     notifyListeners();
   }
 
+  /// Com participantes baixados, a falha é um aviso passageiro; nunca
+  /// baixada, é o estado da tela ([downloadFailed]). Antes de a sessão sair
+  /// do cache, não dá para saber: fica o aviso passageiro.
+  void _refreshFailedWith(String message) {
+    if (_sessionLoaded && neverDownloaded) {
+      _downloadFailed = true;
+    } else {
+      _message = message;
+    }
+  }
+
   /// Abertura da tela, puxar para atualizar e volta da conexão caem aqui.
   Future<void> refresh() async {
     if (_disposed) return;
@@ -320,17 +339,18 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
     }
 
     _isRefreshing = true;
+    _downloadFailed = false;
     notifyListeners();
 
     try {
       final result = await _participantRepository.syncSession(sessionId);
       if (result case Failure(:final message)) {
-        _message = message ?? _refreshFailed;
+        _refreshFailedWith(message ?? _refreshFailed);
       }
     } catch (_) {
       // Rede de segurança: `syncSession` já devolve `Result` para todo erro
       // esperado. Sem ela, `_isRefreshing` travaria em `true`.
-      _message = _refreshFailed;
+      _refreshFailedWith(_refreshFailed);
     } finally {
       _isRefreshing = false;
       notifyListeners();

@@ -35,6 +35,7 @@ import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/ui/sync/sync_screen.dart';
 import 'package:simtc/utils/result.dart';
 
+import '../../support/a11y.dart';
 import '../../support/fake_assessment_sync_service.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
@@ -127,6 +128,14 @@ void main() {
 
   String titleText(WidgetTester tester) =>
       tester.widget<Text>(find.byKey(const Key('sessions-title'))).data!;
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await pump(tester);
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await expectAccessibleTargets(tester);
+  });
 
   testWidgets(
       'dois toques rápidos num card abrem um detalhe só (Fase 8C)',
@@ -250,6 +259,39 @@ void main() {
 
     expect(find.text('Sem conexão.'), findsOneWidget);
     expect(find.byType(SessionCard), findsOneWidget);
+  });
+
+  testWidgets(
+      'a primeira descida falhou com o aparelho vazio: o motivo e "Tentar '
+      'novamente", e não as seções vazias (Fase 8C)', (tester) async {
+    final reply = Completer<Result<int>>();
+    when(repository.syncAll).thenAnswer((_) => reply.future);
+
+    await pump(tester);
+    sessions.add(const []);
+    await tester.pump();
+    reply.complete(Failure(Exception('sem rede'), 'Sem conexão.'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 750));
+
+    expect(
+      find.text('Não foi possível baixar as sessões. Confira a conexão e '
+          'tente de novo.'),
+      findsOneWidget,
+    );
+    expect(find.text('Nenhuma sessão para hoje.'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing, reason: 'um aviso só');
+
+    when(repository.syncAll).thenAnswer((_) async => const Success(1));
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pump();
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    verify(repository.syncAll).called(2);
+    expect(find.byType(SessionCard), findsOneWidget);
+    expect(find.text('Tentar novamente'), findsNothing);
   });
 
   testWidgets('cache vazio mostra as três seções vazias, não o skeleton',

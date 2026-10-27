@@ -15,6 +15,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/app_search_field.dart';
 import '../core/widgets/company_logo.dart';
@@ -423,6 +424,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   Widget _buildBody(SessionsListViewModel viewModel) {
     if (viewModel.isLoading) return _buildSkeleton();
+    if (viewModel.downloadFailed) return _buildDownloadFailed(viewModel);
 
     // Na busca, a seção sem resultado some com o título; sem nenhum, uma
     // frase diz que não achou (decisões de 24/10/2026).
@@ -547,6 +549,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
           child: Text('Ver mais', style: AppTypography.link),
         ),
       ),
+    );
+  }
+
+  /// A primeira descida falhou e não há sessão nenhuma no aparelho (Fase 8C).
+  Widget _buildDownloadFailed(SessionsListViewModel viewModel) {
+    return ListView(
+      key: const Key('sessions-download-failed'),
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      children: [
+        const InlineNotice(
+          icon: AppIcons.noSignal,
+          tone: NoticeTone.warning,
+          message: 'Não foi possível baixar as sessões. Confira a conexão e '
+              'tente de novo.',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppSecondaryButton(
+          label: 'Tentar novamente',
+          icon: AppIcons.retry,
+          onPressed: viewModel.refresh,
+        ),
+      ],
     );
   }
 

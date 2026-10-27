@@ -622,6 +622,27 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   /// Um aviso por vez, o mais importante primeiro: sem dados baixados, nada
   /// mais importa; depois, por que ninguém pode ser atribuído agora.
   Widget? _buildNotice(TrainingSession session, bool isOffline) {
+    // Com conexão, a descida falhou de fato: o motivo e o "Tentar de novo"
+    // (Fase 8C).
+    if (_viewModel.downloadFailed && !isOffline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const InlineNotice(
+            icon: AppIcons.noSignal,
+            tone: NoticeTone.warning,
+            message: 'Não foi possível baixar os participantes desta sessão.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSecondaryButton(
+            label: 'Tentar novamente',
+            icon: AppIcons.retry,
+            onPressed: _viewModel.refresh,
+          ),
+        ],
+      );
+    }
+
     if (_viewModel.neverDownloaded) {
       return const InlineNotice(
         icon: AppIcons.noSignal,

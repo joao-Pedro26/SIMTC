@@ -14,6 +14,7 @@ import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/sync/sync_screen.dart';
 
+import '../../support/a11y.dart';
 import '../../support/fake_assessment_sync_service.dart';
 
 class _MockConnectivity extends Mock implements Connectivity {}
@@ -101,6 +102,12 @@ void main() {
           lastError: 'tempo esgotado',
         ),
       ];
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await pump(tester, queue: filaDoCanvas());
+
+    await expectAccessibleTargets(tester);
+  });
 
   group('"Tentar novamente" e "Descartar" (Fase 8C)', () {
     LocalAssessment refused() => queuedAssessment(

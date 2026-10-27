@@ -28,6 +28,7 @@ import 'package:simtc/ui/core/widgets/inline_notice.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
+import '../../support/a11y.dart';
 import '../../support/ripple.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -399,6 +400,16 @@ void main() {
     expect(scoreBar(tester).value, 0.0, reason: 'a barra acompanha a nota');
     expect(scoreBarColor(tester), AppColors.dangerInk,
         reason: 'abaixo de 70% a barra avisa que não aprova');
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo, antes e depois de iniciar '
+      '(Fase 8C)', (tester) async {
+    await pumpScreen(tester, started: false);
+    await expectAccessibleTargets(tester);
+
+    await tester.tap(find.text('Iniciar avaliação'));
+    await tester.pumpAndSettle();
+    await expectAccessibleTargets(tester);
   });
 
   group('falha ao gravar no aparelho (Fase 8C)', () {

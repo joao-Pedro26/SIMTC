@@ -25,6 +25,8 @@ import 'package:simtc/ui/core/widgets/app_text_field.dart';
 import 'package:simtc/ui/core/widgets/session_context_header.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 
+import '../../support/a11y.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
@@ -231,6 +233,13 @@ void main() {
 
   AppDangerOutlineButton cancelButton(WidgetTester tester) =>
       tester.widget<AppDangerOutlineButton>(find.byType(AppDangerOutlineButton));
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await seedSession();
+    await pumpEdit(tester);
+
+    await expectAccessibleTargets(tester);
+  });
 
   testWidgets('mostra o contexto da sessão e os campos com os valores dela',
       (tester) async {

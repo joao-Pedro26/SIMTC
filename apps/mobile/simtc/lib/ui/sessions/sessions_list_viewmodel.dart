@@ -45,6 +45,7 @@ class SessionsListViewModel extends ChangeNotifier with ListSearch {
   final Map<SessionBlockId, int> _visibleCounts = {};
   bool _hasLoadedOnce = false;
   bool _isRefreshing = false;
+  bool _downloadFailed = false;
   String? _errorMessage;
   DateTime? _lastSyncedAt;
 
@@ -56,6 +57,13 @@ class SessionsListViewModel extends ChangeNotifier with ListSearch {
   SessionFilter get filter => _filter;
   bool get isRefreshing => _isRefreshing;
   String? get errorMessage => _errorMessage;
+
+  /// A descida falhou e o aparelho não tem sessão nenhuma, nunca baixada: a
+  /// tela mostra o motivo e o "Tentar novamente", e não as seções vazias —
+  /// "nenhuma sessão" seria uma afirmação que o app não tem como fazer
+  /// (Fase 8C).
+  bool get downloadFailed =>
+      _downloadFailed && _sessions.isEmpty && _lastSyncedAt == null;
 
   /// Quando o cache foi atualizado pela última vez — a faixa de offline usa
   /// isso para dizer a idade do que está na tela.
@@ -134,6 +142,7 @@ class SessionsListViewModel extends ChangeNotifier with ListSearch {
     if (_isRefreshing) return;
 
     _isRefreshing = true;
+    _downloadFailed = false;
     _errorMessage = null;
     notifyListeners();
 
@@ -147,17 +156,29 @@ class SessionsListViewModel extends ChangeNotifier with ListSearch {
     try {
       final result = await _repository.syncAll();
       if (result case Failure(message: final message)) {
-        _errorMessage = message ?? 'Não foi possível atualizar as sessões.';
+        _failed(message ?? 'Não foi possível atualizar as sessões.');
       }
     } catch (_) {
       // `syncAll` já devolve `Result` para todo erro esperado; isto é uma
       // rede de segurança contra o que escapar dele. Sem ela, `_isRefreshing`
       // travaria em `true` e todo refresh seguinte (puxar, voltar a conexão,
       // reabrir a tela) cairia no guard-clause de início deste método.
-      _errorMessage = 'Não foi possível atualizar as sessões.';
+      _failed('Não foi possível atualizar as sessões.');
     } finally {
       _isRefreshing = false;
       notifyListeners();
+    }
+  }
+
+  /// Com sessões no aparelho, a falha é um aviso passageiro; sem nenhuma,
+  /// nunca baixada, é o estado da tela ([downloadFailed]) — um aviso só.
+  /// Antes da primeira leitura do cache, não dá para saber: fica o aviso
+  /// passageiro.
+  void _failed(String message) {
+    if (_hasLoadedOnce && _sessions.isEmpty && _lastSyncedAt == null) {
+      _downloadFailed = true;
+    } else {
+      _errorMessage = message;
     }
   }
 

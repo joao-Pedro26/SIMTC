@@ -24,6 +24,8 @@ import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/summary/summary_screen.dart';
 
+import '../../support/a11y.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
@@ -271,6 +273,14 @@ void main() {
     router.push(AppRoutes.participantResult('sess-1', 'tp-1', justConfirmed: justConfirmed));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await seedParticipant(status: 'EM_AVALIACAO');
+    await confirmedHere({'inf-1': 'inf-1-PM'});
+    await pumpResult(tester, justConfirmed: true);
+
+    await expectAccessibleTargets(tester);
+  });
 
   testWidgets(
       'logo depois do "Confirmar": a nota, a linha de detalhe, o aviso de '

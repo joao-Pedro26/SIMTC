@@ -8,6 +8,8 @@ import 'package:simtc/ui/auth/login_screen.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 
+import '../../support/a11y.dart';
+
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 void main() {
@@ -56,6 +58,12 @@ void main() {
       );
   Rect button(WidgetTester tester) =>
       tester.getRect(find.byType(AppPrimaryButton));
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await show(tester, size: const Size(412, 915));
+
+    await expectAccessibleTargets(tester);
+  });
 
   testWidgets('celular: logo de 150 em cima do formulário, como antes',
       (tester) async {

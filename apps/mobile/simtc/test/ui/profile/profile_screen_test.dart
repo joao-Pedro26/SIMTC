@@ -10,6 +10,7 @@ import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/profile/profile_labels.dart';
 import 'package:simtc/ui/profile/profile_screen.dart';
 
+import '../../support/a11y.dart';
 import '../../support/fake_assessment_sync_service.dart';
 import 'profile_harness.dart';
 
@@ -78,6 +79,12 @@ void main() {
       find.descendant(of: row('sync'), matching: find.text('Nenhum envio')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await h.pump(tester);
+
+    await expectAccessibleTargets(tester);
   });
 
   testWidgets('a navbar marca o Perfil', (tester) async {

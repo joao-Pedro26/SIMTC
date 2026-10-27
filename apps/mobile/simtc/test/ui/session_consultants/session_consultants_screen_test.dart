@@ -34,6 +34,8 @@ import 'package:simtc/ui/core/widgets/status_chip.dart';
 import 'package:simtc/ui/session_consultants/consultant_row.dart';
 import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
 
+import '../../support/a11y.dart';
+
 class _MockApiClient extends Mock implements ApiClient {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
@@ -465,6 +467,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Sem conexão'), findsNothing);
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await seedFromServer();
+    await pumpScreen(tester);
+
+    await expectAccessibleTargets(tester);
   });
 
   testWidgets('a ordem é a do quadro: contexto, "Na sessão" com o responsável '

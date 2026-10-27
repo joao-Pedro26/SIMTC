@@ -26,6 +26,7 @@ import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
 
+import '../../support/a11y.dart';
 import '../../support/ripple.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -327,6 +328,13 @@ void main() {
     expect(addAnotherButton(tester).onPressed, isNull);
     // Atribuir a outro consultor não existe no backend (decisão de 06/10/2026).
     expect(find.text('Consultor responsável'), findsNothing);
+  });
+
+  testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
+    await seedSession();
+    await pumpAdd(tester);
+
+    await expectAccessibleTargets(tester);
   });
 
   testWidgets('sessão sem data: a faixa de contexto mostra só o curso',
