@@ -5,6 +5,7 @@ import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/theme/app_typography.dart';
+import 'package:simtc/ui/core/widgets/admin_dialog.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/app_top_bar.dart';
 import 'package:simtc/ui/core/widgets/company_logo.dart';
@@ -510,6 +511,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Detalhe da sessão'), findsNothing);
     expect(find.text('abrir'), findsOneWidget);
+  });
+
+  testWidgets('AppTopBar: o título é cabeçalho para o leitor de tela (Fase 8C)',
+      (tester) async {
+    await _pump(tester, const AppTopBar(title: 'Detalhe da sessão'));
+
+    expect(
+      tester.getSemantics(find.text('Detalhe da sessão')),
+      isSemantics(label: 'Detalhe da sessão', isHeader: true),
+    );
+  });
+
+  testWidgets(
+      'AdminDialogFrame: o título é cabeçalho e nomeia a janela, para o '
+      'leitor de tela anunciá-la ao abrir (Fase 8C)', (tester) async {
+    await _pump(
+      tester,
+      AdminDialogFrame(
+        title: 'Adicionar participante',
+        subtitle: 'Bracell · Direção Defensiva',
+        onClose: () {},
+        body: const SizedBox(height: 40),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.text('Adicionar participante')),
+      isSemantics(
+        label: 'Adicionar participante',
+        isHeader: true,
+        namesRoute: true,
+      ),
+    );
   });
 
   testWidgets('AppTopBar põe os atalhos entre o título e o indicador',

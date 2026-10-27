@@ -306,6 +306,17 @@ void main() {
       tester.widget<Icon>(find.byIcon(AppIcons.theoryOnly)).color,
       AppColors.mauveInk,
     );
+    // O leitor de tela diz qual cartão está escolhido e que eles respondem
+    // ao toque (Fase 8C).
+    expect(
+      tester.getSemantics(find.byKey(const Key('tipo-teoricaEPratica'))),
+      isSemantics(
+        isButton: true,
+        isSelected: true,
+        hasEnabledState: true,
+        isEnabled: true,
+      ),
+    );
     // E os dois cartões mostram a ondulação do toque.
     expectVisibleRipple(tester, find.byKey(const Key('tipo-teoricaEPratica')),
         background: AppColors.primarySurface);
@@ -1103,6 +1114,12 @@ void main() {
         findsOneWidget,
       );
       expect(addButton(tester).onPressed, isNull);
+      // O leitor de tela diz que os cartões de tipo estão desativados
+      // (Fase 8C).
+      expect(
+        tester.getSemantics(find.byKey(const Key('tipo-somenteTeorica'))),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+      );
     });
   });
 

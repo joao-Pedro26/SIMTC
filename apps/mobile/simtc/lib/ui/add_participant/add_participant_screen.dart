@@ -361,6 +361,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     return Semantics(
       button: true,
       selected: selected,
+      enabled: _fieldsEnabled,
       child: Material(
         color: selected ? AppColors.primarySurface : AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.sm),

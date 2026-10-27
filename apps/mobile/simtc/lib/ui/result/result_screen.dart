@@ -313,7 +313,12 @@ class _ResultScreenState extends State<ResultScreen> {
       padding: EdgeInsets.fromLTRB(_inset, top, _inset, bottom),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: AppTypography.sectionTitle)),
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(title, style: AppTypography.sectionTitle),
+            ),
+          ),
           if (trailing != null) Text(trailing, style: AppTypography.categoryCount),
         ],
       ),

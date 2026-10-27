@@ -379,10 +379,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
       const SizedBox(height: AppSpacing.xxs),
       // O key desambigua o título do rótulo 'Sessões' da navbar, que tem o
       // mesmo texto quando o usuário é ADMIN.
-      Text(
-        title,
-        key: const Key('sessions-title'),
-        style: embedded ? AppTypography.screenTitle : AppTypography.homeTitle,
+      Semantics(
+        header: true,
+        child: Text(
+          title,
+          key: const Key('sessions-title'),
+          style: embedded ? AppTypography.screenTitle : AppTypography.homeTitle,
+        ),
       ),
     ];
   }
@@ -473,7 +476,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
           horizontal: AppSpacing.xl,
           vertical: AppSpacing.lg - 1,
         ),
-        child: Text(section.title, style: AppTypography.sectionTitle),
+        child: Semantics(
+          header: true,
+          child: Text(section.title, style: AppTypography.sectionTitle),
+        ),
       ),
       if (section.isEmpty)
         _buildSectionEmpty(section.filter)
@@ -553,9 +559,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
         AppSpacing.xl,
         AppSpacing.md,
       ),
-      child: InlineNotice(
-        icon: AppIcons.search,
-        message: 'Nenhuma sessão encontrada para “$query”.',
+      // Anunciada quando aparece, enquanto se digita (Fase 8C).
+      child: Semantics(
+        liveRegion: true,
+        child: InlineNotice(
+          icon: AppIcons.search,
+          message: 'Nenhuma sessão encontrada para “$query”.',
+        ),
       ),
     );
   }

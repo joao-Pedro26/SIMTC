@@ -129,7 +129,7 @@ class _AppTextFieldState extends State<AppTextField> {
   Widget build(BuildContext context) {
     final helperText = widget.helperText;
 
-    return Column(
+    final field = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel(),
@@ -143,6 +143,20 @@ class _AppTextFieldState extends State<AppTextField> {
           Text(helperText, style: AppTypography.meta),
         ],
       ],
+    );
+    if (!widget.readOnly) return field;
+
+    // Só leitura (a data): um nó só para o leitor de tela, com o rótulo, o
+    // valor e o toque — e não três soltos (Fase 8C).
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: widget.enabled,
+      label: widget.label,
+      value: widget.controller.text,
+      onTap: widget.enabled ? widget.onTap : null,
+      excludeSemantics: true,
+      child: field,
     );
   }
 
@@ -207,14 +221,10 @@ class _AppTextFieldState extends State<AppTextField> {
 
     // Só leitura: a caixa inteira é o alvo do toque, e o campo de dentro não
     // recebe o ponteiro — assim o teclado nunca abre.
-    return Semantics(
-      button: true,
-      enabled: widget.enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.enabled ? widget.onTap : null,
-        child: IgnorePointer(child: box),
-      ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.enabled ? widget.onTap : null,
+      child: IgnorePointer(child: box),
     );
   }
 

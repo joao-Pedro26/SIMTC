@@ -587,10 +587,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           else
             for (final participant in visible)
               _buildParticipant(participant, isOffline),
+          // Anunciada quando muda, enquanto se digita (Fase 8C).
           if (_viewModel.searchCountLabel case final label?)
             Padding(
               padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
-              child: Text(label, style: AppTypography.meta),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(label, style: AppTypography.meta),
+              ),
             ),
         ],
       ),
@@ -668,7 +672,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   Widget _buildListHeader(bool isOffline) {
-    final title = Text('Participantes', style: AppTypography.sectionTitle);
+    final title = Semantics(
+      header: true,
+      child: Text('Participantes', style: AppTypography.sectionTitle),
+    );
     if (!_viewModel.isAdmin) {
       return Padding(
         padding: EdgeInsets.symmetric(
@@ -724,9 +731,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             ParticipantFilter.concluidos => 'Nenhum participante avaliado ainda.',
           };
 
+    // Anunciada quando aparece, enquanto se digita a busca (Fase 8C).
     return Padding(
       padding: EdgeInsets.fromLTRB(_inset, 0, _inset, AppSpacing.md),
-      child: InlineNotice(icon: AppIcons.profile, message: message),
+      child: Semantics(
+        liveRegion: true,
+        child: InlineNotice(icon: AppIcons.profile, message: message),
+      ),
     );
   }
 

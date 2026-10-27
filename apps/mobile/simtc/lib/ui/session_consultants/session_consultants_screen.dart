@@ -269,10 +269,14 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         Padding(
           key: const Key('consultants-no-results'),
           padding: EdgeInsets.fromLTRB(_inset, AppSpacing.md, _inset, 0),
-          child: InlineNotice(
-            icon: AppIcons.search,
-            message: 'Nenhum consultor encontrado para '
-                '“${_viewModel.searchQuery.trim()}”.',
+          // Anunciada quando aparece, enquanto se digita (Fase 8C).
+          child: Semantics(
+            liveRegion: true,
+            child: InlineNotice(
+              icon: AppIcons.search,
+              message: 'Nenhum consultor encontrado para '
+                  '“${_viewModel.searchQuery.trim()}”.',
+            ),
           ),
         ),
       if (!filtering || inSession.isNotEmpty) ...[
@@ -308,7 +312,10 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         horizontal: _inset,
         vertical: AppSpacing.lg - 1,
       ),
-      child: Text('Na sessão', style: AppTypography.sectionTitle),
+      child: Semantics(
+        header: true,
+        child: Text('Na sessão', style: AppTypography.sectionTitle),
+      ),
     );
   }
 
@@ -352,11 +359,15 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
         textBaseline: TextBaseline.alphabetic,
         children: [
           Expanded(
-            child: Text(
-              'Disponíveis na equipe',
-              style: AppTypography.sectionTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Semantics(
+              container: true,
+              header: true,
+              child: Text(
+                'Disponíveis na equipe',
+                style: AppTypography.sectionTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

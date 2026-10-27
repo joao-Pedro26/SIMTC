@@ -260,6 +260,11 @@ void main() {
 
     expect(find.text('Última sincronização hoje 07:12'), findsOneWidget);
     expect(find.text('Pendentes'), findsOneWidget);
+    // O título da aba e o da lista são cabeçalhos (Fase 8C).
+    expect(tester.getSemantics(find.text('Sincronizar').first),
+        isSemantics(isHeader: true));
+    expect(tester.getSemantics(find.text('Pendentes')),
+        isSemantics(isHeader: true));
     expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
     expect(find.text('Avaliação prática · 86,7% · 08:41'), findsOneWidget);
     expect(find.text('Na fila'), findsOneWidget);

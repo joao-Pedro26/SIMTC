@@ -210,7 +210,12 @@ class AdminDialogFrame extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: AppTypography.dialogTitle),
+                // O leitor de tela anuncia a janela pelo título (Fase 8C).
+                Semantics(
+                  header: true,
+                  namesRoute: true,
+                  child: Text(title, style: AppTypography.dialogTitle),
+                ),
                 const SizedBox(height: AppSpacing.xxs + 1),
                 // Uma linha em paisagem (quadro "4l"); quebra em retrato
                 // (quadro "4w").

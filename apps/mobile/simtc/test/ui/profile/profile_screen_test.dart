@@ -84,6 +84,9 @@ void main() {
     await h.pump(tester);
 
     expect(tester.widget<PillNavBar>(find.byType(PillNavBar)).currentIndex, 2);
+    // O título da aba é cabeçalho para o leitor de tela (Fase 8C).
+    expect(tester.getSemantics(find.text('Perfil').first),
+        isSemantics(isHeader: true));
   });
 
   testWidgets(

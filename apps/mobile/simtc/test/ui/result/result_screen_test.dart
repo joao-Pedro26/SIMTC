@@ -293,6 +293,9 @@ void main() {
     expect(find.text('Na fila de envio — sai sozinha quando houver conexão.'),
         findsOneWidget);
     expect(find.text('Desempenho por categoria'), findsOneWidget);
+    // Os títulos das seções são cabeçalhos (Fase 8C).
+    expect(tester.getSemantics(find.text('Desempenho por categoria')),
+        isSemantics(isHeader: true));
     expect(find.text('70,0%'), findsOneWidget, reason: 'o selo de CV');
     expect(find.text('100,0%'), findsOneWidget, reason: 'o selo de RR');
     expect(find.text('Infrações registradas'), findsOneWidget);

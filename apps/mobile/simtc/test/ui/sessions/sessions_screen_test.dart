@@ -294,6 +294,15 @@ void main() {
     expect(find.text('Nenhuma sessão para hoje.'), findsOneWidget);
     expect(find.text('Outras · 1'), findsOneWidget);
     expect(find.text('Suzano Papel'), findsOneWidget);
+    // O título da tela e os das seções são cabeçalhos (Fase 8C).
+    expect(
+      tester.getSemantics(find.byKey(const Key('sessions-title'))),
+      isSemantics(isHeader: true),
+    );
+    expect(
+      tester.getSemantics(find.textContaining('Hoje · ')),
+      isSemantics(isHeader: true),
+    );
     // O peso 600 de verdade, do eixo wght (Fase 8C).
     expect(tester.widget<Text>(find.text('Outras · 1')).style,
         AppTypography.blockTitle);
@@ -1268,6 +1277,11 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Hoje · '), findsNothing);
+      // A frase é anunciada quando aparece (Fase 8C).
+      expect(
+        tester.getSemantics(find.text('Nenhuma sessão encontrada para “xyz”.')),
+        isSemantics(isLiveRegion: true),
+      );
     });
 
     testWidgets('aberta e vazia, a lista é a de sempre', (tester) async {

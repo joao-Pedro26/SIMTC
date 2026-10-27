@@ -292,6 +292,11 @@ void main() {
     expect(find.text('1 de 2 participantes avaliados'), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
     expect(find.text('BC'), findsOneWidget, reason: 'iniciais no lugar do logo');
+    // "Participantes" é cabeçalho para o leitor de tela (Fase 8C).
+    expect(
+      tester.getSemantics(find.text('Participantes')),
+      isSemantics(label: 'Participantes', isHeader: true),
+    );
     // O peso 500 de verdade, do eixo wght (Fase 8C).
     expect(
       tester.widget<Text>(find.text('1 de 2 participantes avaliados')).style,
@@ -538,6 +543,16 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('0 de 3 participantes'), findsOneWidget);
+      // A frase e a contagem são anunciadas quando mudam (Fase 8C).
+      expect(
+        tester.getSemantics(
+            find.text('Nenhum participante encontrado para “xyz”.')),
+        isSemantics(isLiveRegion: true),
+      );
+      expect(
+        tester.getSemantics(find.text('0 de 3 participantes')),
+        isSemantics(isLiveRegion: true),
+      );
     });
 
     testWidgets(

@@ -626,13 +626,16 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             // Encolhe com reticências: num celular estreito com a fonte
             // ampliada, o título e a contagem não cabem inteiros na linha.
             Expanded(
-              child: Text(
-                'O que será avaliado',
-                style: tablet
-                    ? AppTypography.sectionTitleTablet
-                    : AppTypography.sectionTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Semantics(
+                header: true,
+                child: Text(
+                  'O que será avaliado',
+                  style: tablet
+                      ? AppTypography.sectionTitleTablet
+                      : AppTypography.sectionTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -1188,21 +1191,25 @@ class _NoteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = _colors;
     // O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
-    // toque aparecer (Fase 8C).
-    return Material(
-      color: colors.bg,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: InkWell(
-        onTap: onTap,
+    // toque aparecer. O leitor de tela diz qual está marcado (Fase 8C).
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: colors.bg,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Container(
-          height: AppSpacing.controlHeight,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.border, width: 1.5),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Container(
+            height: AppSpacing.controlHeight,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.border, width: 1.5),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Text(note.noteType, style: AppTypography.noteButton.copyWith(color: colors.ink)),
           ),
-          child: Text(note.noteType, style: AppTypography.noteButton.copyWith(color: colors.ink)),
         ),
       ),
     );

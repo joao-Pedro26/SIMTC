@@ -305,6 +305,24 @@ void main() {
   });
 
   testWidgets(
+      'o leitor de tela diz qual dos B/PM/M está marcado (Fase 8C)',
+      (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.text('PM'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(find.text('PM')),
+      isSemantics(label: 'PM', isButton: true, isSelected: true),
+    );
+    expect(
+      tester.getSemantics(find.text('B')),
+      isSemantics(label: 'B', isButton: true, isSelected: false),
+    );
+  });
+
+  testWidgets(
       'abrir outra categoria fecha a aberta, e o número da infração é o item '
       'da ficha (order), não a posição', (tester) async {
     await addSecondCategory();
@@ -756,6 +774,9 @@ void main() {
       // Ainda é a tela de antes do checklist: sem as notas, sem "salvo".
       expect(find.byKey(const Key('checklist-not-started')), findsOneWidget);
       expect(find.text('O que será avaliado'), findsOneWidget);
+      // O título da lista é cabeçalho para o leitor de tela (Fase 8C).
+      expect(tester.getSemantics(find.text('O que será avaliado')),
+          isSemantics(isHeader: true));
       expect(find.text('PM'), findsNothing);
       expect(find.text('salvo'), findsNothing);
       expect(find.text('Finalizar avaliação'), findsNothing);

@@ -515,6 +515,15 @@ void main() {
     expect(teamTitle.top - lastRow.bottom, 22);
     expect(teamRow.top - teamTitle.bottom, closeTo(10, 0.5));
     expect(tester.getRect(find.text('SIM Treinamentos')).right, 412 - 20);
+    // Os títulos das seções são cabeçalhos para o leitor de tela (Fase 8C).
+    expect(
+      tester.getSemantics(find.text('Na sessão')),
+      isSemantics(label: 'Na sessão', isHeader: true),
+    );
+    expect(
+      tester.getSemantics(find.text('Disponíveis na equipe')),
+      isSemantics(label: 'Disponíveis na equipe', isHeader: true),
+    );
     // Texto que se lê: o cinza que passa de 4,5:1 (Fase 8C).
     expect(
       tester.widget<Text>(find.text('SIM Treinamentos')).style!.color,
@@ -892,6 +901,11 @@ void main() {
       expect(
         find.text('Nenhum consultor encontrado para “xyz”.'),
         findsOneWidget,
+      );
+      // A frase é anunciada quando aparece (Fase 8C).
+      expect(
+        tester.getSemantics(find.text('Nenhum consultor encontrado para “xyz”.')),
+        isSemantics(isLiveRegion: true),
       );
       expect(find.text('Na sessão'), findsNothing);
       expect(find.text('Disponíveis na equipe'), findsNothing);

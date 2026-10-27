@@ -245,6 +245,20 @@ void main() {
     expect(find.text('MG'), findsOneWidget);
     expect(find.text('Pátio 3 — portaria B.'), findsOneWidget);
     expect(find.text('Observações para os consultores'), findsOneWidget);
+    // A data é um nó só para o leitor de tela: "Data, 12 set 2026, botão"
+    // (Fase 8C).
+    expect(
+      tester.getSemantics(find.byKey(const Key('campo-data'))),
+      isSemantics(
+        label: 'Data',
+        value: '12 set 2026',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+    expect(find.bySemanticsLabel('Data'), findsOneWidget);
     // A faixa de contexto do quadro "3b" (Fase 8C).
     expect(
       tester.widget<SessionContextHeader>(find.byType(SessionContextHeader)).spacious,

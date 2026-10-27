@@ -139,9 +139,12 @@ class SyncScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Sincronizar',
-            style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
+          Semantics(
+            header: true,
+            child: Text(
+              'Sincronizar',
+              style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
+            ),
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
@@ -240,7 +243,10 @@ class SyncScreen extends StatelessWidget {
             AppSpacing.xl,
             AppSpacing.md + 3,
           ),
-          child: Text('Pendentes', style: AppTypography.sectionTitle),
+          child: Semantics(
+            header: true,
+            child: Text('Pendentes', style: AppTypography.sectionTitle),
+          ),
         ),
         DecoratedBox(
           decoration: const BoxDecoration(

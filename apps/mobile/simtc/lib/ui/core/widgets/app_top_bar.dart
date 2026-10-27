@@ -63,15 +63,18 @@ class AppTopBar extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              title,
-              // 18 no tablet (quadros "4e", "4g" e "4i").
-              style: context.isTablet
-                  ? AppTypography.appBarTitleTablet
-                  : AppTypography.appBarTitle,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                // 18 no tablet (quadros "4e", "4g" e "4i").
+                style: context.isTablet
+                    ? AppTypography.appBarTitleTablet
+                    : AppTypography.appBarTitle,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           ...actions,

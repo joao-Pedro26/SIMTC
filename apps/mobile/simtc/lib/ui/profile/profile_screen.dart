@@ -125,9 +125,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               AppSpacing.sm,
               AppSpacing.sm + 2,
             ),
-      child: Text(
-        'Perfil',
-        style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
+      child: Semantics(
+        header: true,
+        child: Text(
+          'Perfil',
+          style: tablet ? AppTypography.homeTitle : AppTypography.screenTitle,
+        ),
       ),
     );
   }
