@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -126,6 +127,46 @@ void main() {
 
   String titleText(WidgetTester tester) =>
       tester.widget<Text>(find.byKey(const Key('sessions-title'))).data!;
+
+  testWidgets(
+      'dois toques rápidos num card abrem um detalhe só (Fase 8C)',
+      (tester) async {
+    final router = GoRouter(
+      initialLocation: AppRoutes.home,
+      routes: [
+        GoRoute(
+          path: AppRoutes.home,
+          builder: (_, __) => const SessionsScreen(),
+        ),
+        GoRoute(
+          path: '/sessions/:id',
+          builder: (_, __) => const Scaffold(body: Text('detalhe')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<SessionRepository>.value(value: repository),
+          Provider<AssessmentCatalogRepository>.value(value: catalog),
+          ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    sessions.add([hoje()]);
+    await tester.pump();
+
+    await tester.tap(find.byType(SessionCard));
+    // O segundo toque antes do próximo quadro: a rota nova ainda não
+    // está montada.
+    await tester.tap(find.byType(SessionCard));
+    await tester.pumpAndSettle();
+
+    expect(find.text('detalhe', skipOffstage: false), findsOneWidget);
+  });
 
   testWidgets(
       'a fila de envio aparece no badge da aba Sincronizar e no indicador do '

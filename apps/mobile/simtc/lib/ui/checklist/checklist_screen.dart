@@ -9,6 +9,7 @@ import '../../data/repositories/participant_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/form_factor.dart';
+import '../core/open_once.dart';
 import '../core/score_labels.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
@@ -1128,6 +1129,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   /// "Confirmar" de lá; daqui, só se decide para onde ir: ao Resultado
   /// (confirmou), à categoria tocada ou de volta ao checklist.
   Future<void> _openSummary() async {
+    if (!context.claimOpen()) return;
     final exit = await context.push<SummaryExit>(
       AppRoutes.participantSummary(widget.sessionId, widget.participantId),
     );

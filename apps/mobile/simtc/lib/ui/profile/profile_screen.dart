@@ -12,6 +12,7 @@ import '../../data/services/connectivity_service.dart';
 import '../../data/services/device_data_service.dart';
 import '../../router.dart';
 import '../core/form_factor.dart';
+import '../core/open_once.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -355,7 +356,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _confirmLogout(bool isOffline) async {
     final queued = context.read<AssessmentSyncService>().queue.length;
     final drafts = await _viewModel.countStartedDrafts();
-    if (!mounted) return;
+    // A confirmação só abre depois de contar as avaliações iniciadas: o
+    // segundo de dois toques rápidos conta de novo, mas não abre outra
+    // (Fase 8C).
+    if (!mounted || !context.claimOpen()) return;
 
     final confirmed = await showDialog<bool>(
       context: context,

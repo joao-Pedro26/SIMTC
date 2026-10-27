@@ -1349,6 +1349,39 @@ void main() {
       expect(screen.fromResult, isTrue);
     });
 
+    testWidgets('dois toques rápidos na linha abrem um checklist só (Fase 8C)',
+        (tester) async {
+      final ana = participant('1', 'Ana Paula Ribeiro',
+          status: ParticipantStatus.emAvaliacao, assignedTo: 'c-eu');
+      when(() => participants.watchParticipant('1'))
+          .thenAnswer((_) => Stream.value(ana));
+      await showWithRouter(tester, [ana]);
+
+      await tester.tap(find.text('Ana Paula Ribeiro'));
+      // O segundo toque antes do próximo quadro: a rota nova ainda não
+      // está montada.
+      await tester.tap(find.text('Ana Paula Ribeiro'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ChecklistScreen, skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets(
+        'dois toques rápidos no lápis do ADMIN abrem uma tela só (Fase 8C)',
+        (tester) async {
+      when(() => auth.currentUser).thenReturn(admin);
+      await showWithRouter(tester, [participant('1', 'Ana Paula Ribeiro')]);
+
+      await tester.tap(find.byTooltip('Editar dados do treinamento'));
+      // O segundo toque antes do próximo quadro: a rota nova ainda não
+      // está montada.
+      await tester.tap(find.byTooltip('Editar dados do treinamento'));
+      // A 1.12 anima o skeleton enquanto carrega: sem `pumpAndSettle`.
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(SessionEditScreen, skipOffstage: false), findsOneWidget);
+    });
+
     testWidgets('um concluído abre o Resultado', (tester) async {
       final juliana = participant('4', 'Juliana Freitas Costa',
           status: ParticipantStatus.aprovado, score: 86);

@@ -232,6 +232,18 @@ void main() {
   });
 
   group('sair da conta', () {
+    testWidgets(
+        'dois toques rápidos abrem uma confirmação só, mesmo enquanto as '
+        'avaliações iniciadas são contadas (Fase 8C)', (tester) async {
+      await h.pump(tester);
+
+      await tester.tap(find.text('Sair da conta'));
+      await tester.tap(find.text('Sair da conta'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sair da conta?'), findsOneWidget);
+    });
+
     testWidgets('sem fila nem rascunho, a confirmação é a simples; '
         'confirmando, sai', (tester) async {
       await h.pump(tester);

@@ -412,6 +412,20 @@ void main() {
   });
 
   testWidgets(
+      'dois toques rápidos em "Finalizar avaliação" abrem uma conferência só '
+      '(Fase 8C)', (tester) async {
+    await pumpOverOrigin(tester);
+
+    await tester.tap(find.text('Finalizar avaliação'));
+    // O segundo toque antes do próximo quadro: a rota nova ainda não
+    // está montada.
+    await tester.tap(find.text('Finalizar avaliação'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SummaryScreen, skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets(
       '"Finalizar avaliação" abre a conferência sem diálogo, mesmo com '
       'categoria sem marcação, e ainda não põe nada na fila', (tester) async {
     await pumpOverOrigin(tester);

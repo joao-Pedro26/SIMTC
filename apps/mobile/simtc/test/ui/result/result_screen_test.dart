@@ -406,6 +406,21 @@ void main() {
     expect(find.text('Não ajustou o banco, cinto ou espelhos'), findsOneWidget);
   });
 
+  testWidgets('dois toques rápidos em "Reavaliar" abrem um checklist só '
+      '(Fase 8C)', (tester) async {
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
+    serverAnswers(serverJson());
+    await pumpResult(tester);
+
+    await tester.tap(find.text('Reavaliar'));
+    // O segundo toque antes do próximo quadro: a rota nova ainda não
+    // está montada.
+    await tester.tap(find.text('Reavaliar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen, skipOffstage: false), findsOneWidget);
+  });
+
   testWidgets(
       '"Reavaliar" abre o checklist em "não iniciada" por cima do Resultado: '
       'voltar sem iniciar leva de volta a ele, sem reserva', (tester) async {

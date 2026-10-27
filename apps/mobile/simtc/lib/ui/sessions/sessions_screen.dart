@@ -10,6 +10,7 @@ import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
+import '../core/open_once.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -601,7 +602,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         final open = widget.onOpenSession;
         if (open != null) {
           open(session.id);
-        } else {
+        } else if (context.claimOpen()) {
           context.push(AppRoutes.sessionDetail(session.id));
         }
       },

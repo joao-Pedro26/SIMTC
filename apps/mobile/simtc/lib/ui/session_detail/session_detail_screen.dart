@@ -15,6 +15,7 @@ import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
+import '../core/open_once.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -850,14 +851,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   /// participante do banco, por isso não recebem `extra`.
   VoidCallback? _tapActionFor(SessionParticipant participant) {
     if (_viewModel.opensChecklist(participant)) {
-      return () => context.push(
-            AppRoutes.participantChecklist(widget.sessionId, participant.id),
-          );
+      return () {
+        if (!context.claimOpen()) return;
+        context.push(
+          AppRoutes.participantChecklist(widget.sessionId, participant.id),
+        );
+      };
     }
     if (_viewModel.opensResult(participant)) {
-      return () => context.push(
-            AppRoutes.participantResult(widget.sessionId, participant.id),
-          );
+      return () {
+        if (!context.claimOpen()) return;
+        context.push(
+          AppRoutes.participantResult(widget.sessionId, participant.id),
+        );
+      };
     }
     return null;
   }

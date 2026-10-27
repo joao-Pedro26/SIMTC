@@ -13,6 +13,7 @@ import '../../router.dart';
 import '../checklist/checklist_badges.dart';
 import '../checklist/checklist_sections.dart';
 import '../core/form_factor.dart';
+import '../core/open_once.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
@@ -592,6 +593,7 @@ class _ResultScreenState extends State<ResultScreen> {
   /// avaliação" de lá, e o voltar do checklist traz de volta a este
   /// Resultado (decisões de 06/10/2026).
   void _reevaluate() {
+    if (!context.claimOpen()) return;
     context.push(
       AppRoutes.participantChecklist(
         widget.sessionId,
