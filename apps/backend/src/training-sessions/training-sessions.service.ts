@@ -8,7 +8,10 @@ import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
-import { releaseParticipantsOfConsultants } from '../participants/participant-release.util';
+import {
+  releaseHeldParticipants,
+  releaseParticipantsOfConsultants,
+} from '../participants/participant-release.util';
 
 @Injectable()
 export class TrainingSessionsService {
@@ -147,33 +150,44 @@ export class TrainingSessionsService {
     return session;
   }
 
-  /** Só ADMIN ou o consultor responsável pela sessão podem iniciar/concluir (regras de negócio). */
+  /**
+   * Só ADMIN ou o consultor responsável pela sessão podem iniciar/concluir
+   * (regras de negócio). Devolve o status, que decide se a passagem vale.
+   */
   private async assertCanManageLifecycle(id: string, user?: JwtPayload) {
-    if (!user || user.role === 'ADMIN') return;
     const session = await this.prisma.trainingSession.findUnique({
       where: { id },
-      select: { responsibleConsultantId: true },
+      select: { responsibleConsultantId: true, status: true },
     });
     if (!session) {
       throw new NotFoundException('Sessão de treinamento não encontrada');
     }
-    if (session.responsibleConsultantId !== user.consultantId) {
+    if (user && user.role !== 'ADMIN' && session.responsibleConsultantId !== user.consultantId) {
       throw new ForbiddenException(
         'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
       );
     }
+    return session.status;
   }
 
+  /** Só um treinamento planejado é iniciado: iniciar um concluído o reabriria (Fase 8D-1). */
   async start(id: string, user?: JwtPayload) {
-    await this.assertCanManageLifecycle(id, user);
+    const status = await this.assertCanManageLifecycle(id, user);
+    if (status !== 'PLANEJADO') {
+      throw new ForbiddenException('Só dá para iniciar um treinamento planejado');
+    }
     return this.prisma.trainingSession.update({
       where: { id },
       data: { status: 'EM_ANDAMENTO' },
     });
   }
 
+  /** Só um treinamento em andamento é concluído (Fase 8D-1). */
   async complete(id: string, user?: JwtPayload) {
-    await this.assertCanManageLifecycle(id, user);
+    const status = await this.assertCanManageLifecycle(id, user);
+    if (status !== 'EM_ANDAMENTO') {
+      throw new ForbiddenException('Só dá para concluir um treinamento em andamento');
+    }
     return this.prisma.trainingSession.update({
       where: { id },
       data: { status: 'CONCLUIDO' },
@@ -346,9 +360,15 @@ export class TrainingSessionsService {
     if (session.status === 'CANCELADO') {
       throw new ForbiddenException('Treinamento já está cancelado');
     }
-    return this.prisma.trainingSession.update({
-      where: { id },
-      data: { status: 'CANCELADO' },
+    // Quem estava em avaliação é liberado junto: numa sessão cancelada, ficaria
+    // "em avaliação" para sempre (Fase 8D-1).
+    return this.prisma.$transaction(async (tx) => {
+      const cancelled = await tx.trainingSession.update({
+        where: { id },
+        data: { status: 'CANCELADO' },
+      });
+      await releaseHeldParticipants(tx, { trainingSessionId: id });
+      return cancelled;
     });
   }
 

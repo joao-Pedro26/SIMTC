@@ -146,3 +146,119 @@ describe('TrainingSessionsService.findAll', () => {
     expect(args.where.OR).toHaveLength(2);
   });
 });
+
+describe('TrainingSessionsService: ciclo de vida (Fase 8D-1)', () => {
+  const prisma = {
+    trainingSession: { findUnique: jest.fn(), update: jest.fn() },
+    trainingParticipant: { findMany: jest.fn(), update: jest.fn() },
+    // A transação interativa roda com o próprio mock no papel do `tx`.
+    $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
+  };
+  const service = new TrainingSessionsService(
+    prisma as unknown as PrismaService,
+    {} as EmailService,
+    {} as StorageService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.trainingParticipant.findMany.mockResolvedValue([]);
+  });
+
+  function sessionIs(status: string) {
+    prisma.trainingSession.findUnique.mockResolvedValue({
+      id: 's1',
+      status,
+      responsibleConsultantId: 'c1',
+      consultants: [],
+    });
+  }
+
+  it('inicia um treinamento planejado', async () => {
+    sessionIs('PLANEJADO');
+    await service.start('s1', admin);
+    expect(prisma.trainingSession.update).toHaveBeenCalledWith({
+      where: { id: 's1' },
+      data: { status: 'EM_ANDAMENTO' },
+    });
+  });
+
+  it.each([['EM_ANDAMENTO'], ['CONCLUIDO'], ['CANCELADO']])(
+    'não inicia um treinamento %s (iniciar um concluído o reabriria)',
+    async (status) => {
+      sessionIs(status);
+      await expect(service.start('s1', admin)).rejects.toThrow(
+        'Só dá para iniciar um treinamento planejado',
+      );
+      expect(prisma.trainingSession.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('conclui um treinamento em andamento', async () => {
+    sessionIs('EM_ANDAMENTO');
+    await service.complete('s1', consultant);
+    expect(prisma.trainingSession.update).toHaveBeenCalledWith({
+      where: { id: 's1' },
+      data: { status: 'CONCLUIDO' },
+    });
+  });
+
+  it.each([['PLANEJADO'], ['CONCLUIDO'], ['CANCELADO']])(
+    'não conclui um treinamento %s',
+    async (status) => {
+      sessionIs(status);
+      await expect(service.complete('s1', admin)).rejects.toThrow(
+        'Só dá para concluir um treinamento em andamento',
+      );
+      expect(prisma.trainingSession.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('o consultor que não é o responsável continua sem poder iniciar', async () => {
+    sessionIs('PLANEJADO');
+    const other = { sub: 'u3', role: 'CONSULTANT', consultantId: 'c9' } as unknown as JwtPayload;
+    await expect(service.start('s1', other)).rejects.toThrow(
+      'Somente o consultor responsável por este treinamento pode iniciá-lo ou concluí-lo',
+    );
+  });
+
+  it('um treinamento que não existe é 404, também para o ADMIN', async () => {
+    prisma.trainingSession.findUnique.mockResolvedValue(null);
+    await expect(service.start('nao-existe', admin)).rejects.toThrow(
+      'Sessão de treinamento não encontrada',
+    );
+  });
+
+  it('cancelar libera quem estava em avaliação, na mesma transação, e volta ao status de antes', async () => {
+    sessionIs('EM_ANDAMENTO');
+    // A transação recebe um `tx` próprio: o que for gravado fora dele não conta.
+    const tx = {
+      trainingSession: { update: jest.fn() },
+      trainingParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'tp-1', assessment: null },
+          { id: 'tp-2', assessment: { score: 62.5 } },
+        ]),
+        update: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementationOnce((fn: (t: unknown) => unknown) => fn(tx));
+
+    await service.cancelSession('s1');
+
+    expect(tx.trainingSession.update).toHaveBeenCalledWith({
+      where: { id: 's1' },
+      data: { status: 'CANCELADO' },
+    });
+    expect(tx.trainingParticipant.findMany).toHaveBeenCalledWith({
+      where: { trainingSessionId: 's1', status: 'EM_AVALIACAO' },
+      include: { assessment: { select: { score: true } } },
+    });
+    expect(tx.trainingParticipant.update.mock.calls).toEqual([
+      [{ where: { id: 'tp-1' }, data: { assignedConsultantId: null, status: 'PENDENTE' } }],
+      [{ where: { id: 'tp-2' }, data: { assignedConsultantId: null, status: 'NAO_RECOMENDADO' } }],
+    ]);
+    expect(prisma.trainingSession.update).not.toHaveBeenCalled();
+    expect(prisma.trainingParticipant.update).not.toHaveBeenCalled();
+  });
+});

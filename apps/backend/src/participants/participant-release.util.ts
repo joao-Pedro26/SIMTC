@@ -13,28 +13,17 @@ export function statusAfterRelease(previousScore: number | null | undefined) {
 }
 
 /**
- * Libera os participantes do treinamento que estavam em avaliação com algum
- * dos consultores de `consultantIds`: ficam sem consultor e voltam ao status
- * de antes da atribuição (ver `statusAfterRelease`).
- *
- * É o que acontece quando um consultor sai do treinamento (decisão de
- * 06/10/2026, Fase 6B do app mobile): sem isso, o participante ficaria "em
- * avaliação" com alguém que não está mais lá, e ninguém mais conseguiria
- * pegá-lo. Chamar na MESMA transação que tira o vínculo do consultor.
+ * Libera quem está em avaliação entre os participantes de `where`: ficam sem
+ * consultor e voltam ao status de antes da atribuição (ver
+ * `statusAfterRelease`). Chamar na MESMA transação que faz o que os libera —
+ * tirar o consultor do treinamento, excluí-lo ou cancelar o treinamento.
  */
-export async function releaseParticipantsOfConsultants(
+export async function releaseHeldParticipants(
   tx: Prisma.TransactionClient,
-  trainingSessionId: string,
-  consultantIds: string[],
+  where: Prisma.TrainingParticipantWhereInput,
 ): Promise<void> {
-  if (consultantIds.length === 0) return;
-
   const held = await tx.trainingParticipant.findMany({
-    where: {
-      trainingSessionId,
-      status: 'EM_AVALIACAO',
-      assignedConsultantId: { in: consultantIds },
-    },
+    where: { ...where, status: 'EM_AVALIACAO' },
     include: { assessment: { select: { score: true } } },
   });
 
@@ -47,4 +36,25 @@ export async function releaseParticipantsOfConsultants(
       },
     });
   }
+}
+
+/**
+ * Libera os participantes do treinamento que estavam em avaliação com algum
+ * dos consultores de `consultantIds`.
+ *
+ * É o que acontece quando um consultor sai do treinamento (decisão de
+ * 06/10/2026, Fase 6B do app mobile): sem isso, o participante ficaria "em
+ * avaliação" com alguém que não está mais lá, e ninguém mais conseguiria
+ * pegá-lo. Chamar na MESMA transação que tira o vínculo do consultor.
+ */
+export async function releaseParticipantsOfConsultants(
+  tx: Prisma.TransactionClient,
+  trainingSessionId: string,
+  consultantIds: string[],
+): Promise<void> {
+  if (consultantIds.length === 0) return;
+  await releaseHeldParticipants(tx, {
+    trainingSessionId,
+    assignedConsultantId: { in: consultantIds },
+  });
 }

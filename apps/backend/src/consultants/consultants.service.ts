@@ -5,6 +5,7 @@ import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../email/email.service';
 import { CreateConsultantDto } from './dto/create-consultant.dto';
 import { UpdateConsultantDto } from './dto/update-consultant.dto';
+import { releaseHeldParticipants } from '../participants/participant-release.util';
 import * as bcrypt from 'bcrypt';
 
 // Sem caracteres ambíguos (0/O, 1/l/I) para facilitar a digitação manual pelo consultor
@@ -124,6 +125,9 @@ export class ConsultantsService {
         data: { consultantId: null },
       });
 
+      // Quem estava em avaliação com ele é liberado: sem dono, ficaria "em
+      // avaliação" para sempre (Fase 8D-1). O resto só perde a referência.
+      await releaseHeldParticipants(tx, { assignedConsultantId: id });
       await tx.trainingParticipant.updateMany({
         where: { assignedConsultantId: id },
         data: { assignedConsultantId: null },
