@@ -2201,6 +2201,8 @@ git commit -m "docs(mobile): registra a validacao da fase 8d-1"
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
 
+**Validado em 30/10/2026: roteiro inteiro passou contra a produção. Aval dado para planejar a 8D-2.**
+
 ---
 
 ## Observações levadas para a 8D-2
