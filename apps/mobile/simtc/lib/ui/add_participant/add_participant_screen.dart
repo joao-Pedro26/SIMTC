@@ -572,11 +572,14 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   }
 
   /// O X, o voltar do Android e o gesto de voltar caem aqui. Com algo
-  /// preenchido, pergunta antes; e devolve `true` se alguém entrou na sessão
-  /// desde que a tela abriu, para o detalhe se atualizar.
+  /// preenchido, pergunta antes — a não ser com a tela travada, em que não
+  /// há o que adicionar (Fase 8D); e devolve `true` se alguém entrou na
+  /// sessão desde que a tela abriu, para o detalhe se atualizar.
   Future<void> _close() async {
     if (_viewModel.isSubmitting) return;
-    if (_viewModel.hasInput && !await _confirmDiscard()) return;
+    if (_viewModel.hasInput && _viewModel.canAdd && !await _confirmDiscard()) {
+      return;
+    }
     if (mounted) Navigator.of(context).pop(_viewModel.addedCount > 0);
   }
 

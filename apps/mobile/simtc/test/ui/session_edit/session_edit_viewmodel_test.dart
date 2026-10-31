@@ -559,6 +559,34 @@ void main() {
       verify(() => participants.syncSession('sess-1')).called(1);
     });
 
+    test(
+        'a sessão apagada no servidor (404): trava com "Esta sessão não '
+        'existe mais.", sem a mensagem do servidor, e baixa de novo (Fase 8D)',
+        () async {
+      when(() => sessions.update(
+            'sess-1',
+            date: any(named: 'date'),
+            city: any(named: 'city'),
+            state: any(named: 'state'),
+            notes: any(named: 'notes'),
+          )).thenAnswer(
+        (_) async => const Failure<void>(
+          ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+          'Treinamento não encontrado',
+        ),
+      );
+      final vm = await open();
+      vm.setCity('Betim');
+
+      expect(await vm.save(), isFalse);
+
+      expect(vm.lockedReason, 'Esta sessão não existe mais.');
+      expect(vm.canEdit, isFalse);
+      expect(vm.canSave, isFalse);
+      expect(vm.errorMessage, isNull);
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
     test('uma exceção inesperada vira a mensagem genérica, sem travar a tela',
         () async {
       when(() => sessions.update(

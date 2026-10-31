@@ -770,6 +770,60 @@ void main() {
       );
     });
 
+    testWidgets(
+        'a sessão concluída por outra pessoa com algo preenchido: o X fecha '
+        'sem perguntar (Fase 8D)', (tester) async {
+      await seedSession();
+      await pumpAdd(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda');
+      await tester.pump();
+
+      await db.customUpdate(
+        "UPDATE sessions SET status = 'CONCLUIDO' WHERE id = 'sess-1'",
+        updates: {db.sessions},
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Fechar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('origem'), findsOneWidget);
+    });
+
+    testWidgets(
+        'a sessão apagada no servidor (404): a tela trava com o motivo e o X '
+        'fecha sem perguntar (Fase 8D)', (tester) async {
+      await seedSession();
+      cpfIsFree();
+      when(() => api.post<Map<String, dynamic>>(addPath, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Treinamento não encontrado',
+        statusCode: 404,
+      ));
+      when(() => api.get<Map<String, dynamic>>(sessionPath)).thenThrow(
+        const ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+      );
+      await pumpAdd(tester);
+      await typeCpf(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Esta sessão não existe mais.'), findsOneWidget);
+      expect(find.text('Treinamento não encontrado'), findsNothing);
+      expect(addButton(tester).onPressed, isNull);
+      verify(() => api.get<Map<String, dynamic>>(sessionPath)).called(1);
+
+      await tester.tap(find.byTooltip('Fechar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('origem'), findsOneWidget);
+    });
+
     testWidgets('o voltar do Android, com algo preenchido, também pergunta',
         (tester) async {
       await seedSession();

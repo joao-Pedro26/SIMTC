@@ -377,6 +377,26 @@ void main() {
       verifyNever(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')));
     });
 
+    testWidgets(
+        '"Voltar" da pergunta não devolve o foco ao campo em edição (Fase 8D)',
+        (tester) async {
+      await seedSession();
+      patchAnswers();
+      await pumpEdit(tester, clock: () => DateTime(2027, 1, 20, 9));
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+
+      await pickDay15AndSave(tester);
+      await tester.tap(find.widgetWithText(TextButton, 'Voltar'));
+      await tester.pumpAndSettle();
+
+      final city = tester.widget<EditableText>(find.descendant(
+        of: field('campo-cidade'),
+        matching: find.byType(EditableText),
+      ));
+      expect(city.focusNode.hasFocus, isFalse);
+    });
+
     testWidgets('confirmando, salva a data antiga e fecha a tela', (tester) async {
       await seedSession();
       patchAnswers();
@@ -744,6 +764,31 @@ void main() {
       );
     });
 
+    testWidgets(
+        'a sessão concluída por outra pessoa com mudança por salvar: o voltar '
+        'sai sem perguntar (Fase 8D)', (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+
+      await db.customUpdate(
+        "UPDATE sessions SET status = 'CONCLUIDO' WHERE id = 'sess-1'",
+        updates: {db.sessions},
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Sessão concluída: os dados não podem mais ser alterados.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('origem'), findsOneWidget);
+    });
+
     testWidgets('o voltar do Android, com mudança, também pergunta',
         (tester) async {
       await seedSession();
@@ -1001,6 +1046,58 @@ void main() {
 
       expect(find.byType(SessionEditScreen), findsOneWidget);
       verifyNever(() => api.patch<Map<String, dynamic>>(cancelPath));
+    });
+
+    testWidgets(
+        'o "Cancelar sessão" tira o foco do campo antes do diálogo (Fase 8D)',
+        (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+
+      await tester.tap(find.text('Cancelar sessão'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+
+      final city = tester.widget<EditableText>(find.descendant(
+        of: field('campo-cidade'),
+        matching: find.byType(EditableText),
+      ));
+      expect(city.focusNode.hasFocus, isFalse);
+    });
+
+    testWidgets(
+        'a sessão apagada no servidor (404): a tela trava com o motivo, baixa '
+        'a sessão de novo e o voltar sai sem perguntar (Fase 8D)',
+        (tester) async {
+      await seedSession();
+      when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+          .thenThrow(const ApiException(
+        message: 'Treinamento não encontrado',
+        statusCode: 404,
+      ));
+      when(() => api.get<Map<String, dynamic>>(path)).thenThrow(
+        const ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+      );
+      await pumpEdit(tester);
+      await tester.enterText(field('campo-cidade'), 'Betim');
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(AppCtaButton, 'Salvar alterações'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Esta sessão não existe mais.'), findsOneWidget);
+      expect(find.text('Treinamento não encontrado'), findsNothing);
+      expect(saveButton(tester).onPressed, isNull);
+      verify(() => api.get<Map<String, dynamic>>(path)).called(1);
+
+      await tester.tap(find.byTooltip('Voltar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('origem'), findsOneWidget);
     });
 
     testWidgets('recusado pelo servidor: o motivo aparece, e a tela fica',

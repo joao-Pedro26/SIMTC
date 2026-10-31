@@ -958,6 +958,24 @@ void main() {
       verify(() => participants.syncSession('sess-1')).called(1);
     });
 
+    test(
+        'a sessão apagada no servidor (404): trava com "Esta sessão não '
+        'existe mais.", sem a mensagem do servidor, e baixa de novo (Fase 8D)',
+        () async {
+      addAnswers(const Failure<SessionParticipant>(
+        ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+        'Treinamento não encontrado',
+      ));
+      final vm = await filled();
+
+      expect(await vm.submit(), isNull);
+
+      expect(vm.lockedReason, 'Esta sessão não existe mais.');
+      expect(vm.canAdd, isFalse);
+      expect(vm.errorMessage, isNull);
+      verify(() => participants.syncSession('sess-1')).called(1);
+    });
+
     test('sem rede: mostra o motivo, e o que foi digitado continua', () async {
       addAnswers(const Failure<SessionParticipant>(
         ApiException(message: 'Sem conexão', isNetworkError: true),

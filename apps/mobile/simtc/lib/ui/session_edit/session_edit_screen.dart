@@ -110,9 +110,11 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     // rodapé, que fica apagado. Sem isso, o diálogo abriria sobre um envio que
     // o servidor ainda vai aceitar, e o `pop(true)` do salvar fecharia o
     // diálogo em vez da tela. O `pop` direto — do "Descartar" e do salvar —
-    // não passa por aqui.
+    // não passa por aqui. Com a tela travada (outra pessoa concluiu ou
+    // cancelou a sessão, ou ela foi apagada), não há o que salvar: sai sem
+    // perguntar (Fase 8D).
     return PopScope<Object?>(
-      canPop: !_viewModel.isDirty && !_viewModel.isBusy,
+      canPop: (!_viewModel.isDirty || !_viewModel.canEdit) && !_viewModel.isBusy,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && !_viewModel.isBusy) _confirmLeave();
       },
@@ -459,8 +461,14 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     );
   }
 
+  /// Tira o foco do campo em edição antes de um diálogo (Fase 8D). Tirar só
+  /// do `FocusScope` da tela não basta: ela guarda o campo, e o foco volta
+  /// para ele — com o teclado — quando o diálogo fecha, cobrindo o aviso de
+  /// um salvar ou cancelar que falhou.
+  void _dropFocus() => FocusManager.instance.primaryFocus?.unfocus();
+
   Future<void> _save() async {
-    FocusScope.of(context).unfocus();
+    _dropFocus();
     if (_viewModel.dateLeavesTheList && !await _confirmOldDate()) return;
     if (!mounted) return;
     final saved = await _viewModel.save();
@@ -531,6 +539,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   }
 
   Future<void> _confirmCancel() async {
+    _dropFocus();
     final count = _viewModel.inEvaluationCount;
     final inEvaluation = switch (count) {
       0 => '',

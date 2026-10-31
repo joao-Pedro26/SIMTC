@@ -67,6 +67,11 @@ class SessionEditViewModel extends ChangeNotifier {
   bool _cancelling = false;
   String? _error;
 
+  /// O servidor disse que a sessão não existe mais (404): a tela trava
+  /// (Fase 8D). O cache ainda pode tê-la — a sessão apagada no painel só
+  /// some do aparelho no próximo sync da Home.
+  bool _gone = false;
+
   /// Antes da primeira leitura do cache.
   bool get isLoading => !_loaded;
 
@@ -99,6 +104,7 @@ class SessionEditViewModel extends ChangeNotifier {
     if (_currentUser?.isAdmin != true) {
       return 'Só administradores podem alterar os dados do treinamento.';
     }
+    if (_gone) return 'Esta sessão não existe mais.';
     final session = _session;
     if (session == null) {
       return 'Esta sessão não está mais disponível neste aparelho.';
@@ -232,8 +238,7 @@ class SessionEditViewModel extends ChangeNotifier {
         case Success():
           return true;
         case Failure(:final exception, :final message):
-          _error = message ?? _saveFailed;
-          _resyncIfRefused(exception);
+          _refused(exception, message ?? _saveFailed);
           return false;
       }
     } catch (_) {
@@ -259,8 +264,7 @@ class SessionEditViewModel extends ChangeNotifier {
         case Success():
           return true;
         case Failure(:final exception, :final message):
-          _error = message ?? _cancelFailed;
-          _resyncIfRefused(exception);
+          _refused(exception, message ?? _cancelFailed);
           return false;
       }
     } catch (_) {
@@ -272,12 +276,19 @@ class SessionEditViewModel extends ChangeNotifier {
     }
   }
 
-  /// O servidor recusou (403) ou não achou a sessão (404): alguém a concluiu,
-  /// cancelou ou apagou. Baixar de novo põe o cache — e o status desta tela —
-  /// em dia.
-  void _resyncIfRefused(Exception exception) {
-    if (exception is! ApiException) return;
-    if (exception.statusCode == 403 || exception.statusCode == 404) {
+  /// O motivo da recusa fica na tela, a não ser a sessão apagada (404): aí a
+  /// tela trava com "Esta sessão não existe mais." ([lockedReason]).
+  void _refused(Exception exception, String message) {
+    final status = exception is ApiException ? exception.statusCode : null;
+    if (status == 404) {
+      _gone = true;
+    } else {
+      _error = message;
+    }
+    // O servidor recusou (403) ou não achou a sessão (404): alguém a
+    // concluiu, cancelou ou apagou. Baixar de novo põe o cache — e o status
+    // desta tela — em dia.
+    if (status == 403 || status == 404) {
       unawaited(_participantRepository.syncSession(sessionId));
     }
   }

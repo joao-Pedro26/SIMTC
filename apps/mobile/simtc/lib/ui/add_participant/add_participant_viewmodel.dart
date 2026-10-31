@@ -120,6 +120,10 @@ class AddParticipantViewModel extends ChangeNotifier {
   String? _error;
   int _addedCount = 0;
 
+  /// O servidor disse que a sessão não existe mais (404): a tela trava
+  /// (Fase 8D).
+  bool _gone = false;
+
   /// Antes da primeira leitura do cache.
   bool get isLoading => !_loaded;
 
@@ -171,6 +175,7 @@ class AddParticipantViewModel extends ChangeNotifier {
     if (_currentUser?.isAdmin != true) {
       return 'Só administradores podem adicionar participantes.';
     }
+    if (_gone) return 'Esta sessão não existe mais.';
     final session = _session;
     if (session == null) {
       return 'Esta sessão não está mais disponível neste aparelho.';
@@ -411,7 +416,13 @@ class AddParticipantViewModel extends ChangeNotifier {
       return;
     }
 
-    _error = message ?? _addFailed;
+    // A sessão apagada (404) trava a tela com o motivo ([lockedReason]), no
+    // lugar da mensagem do servidor (Fase 8D).
+    if (status == 404) {
+      _gone = true;
+    } else {
+      _error = message ?? _addFailed;
+    }
     // 400: inscrições encerradas (a sessão foi concluída ou cancelada); 404:
     // a sessão foi apagada. Baixar de novo põe o cache — e esta tela — em dia.
     if (status == 400 || status == 404) {
