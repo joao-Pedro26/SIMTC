@@ -55,6 +55,10 @@ class DeviceDataService {
   /// consegue nem ler o endereço (keystore invalidada), nada é apagado: sem
   /// saber o servidor anterior, apagar a fila a cada abertura seria pior do
   /// que o risco que a limpeza evita.
+  ///
+  /// Se o banco não consegue apagar, lança, e o endereço novo não é guardado:
+  /// a abertura não segue com a fila antiga, e a próxima tentativa apaga de
+  /// novo (Fase 8D).
   Future<bool> resetIfServerChanged(String apiBaseUrl) async {
     final String? saved;
     try {

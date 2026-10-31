@@ -38,7 +38,7 @@ void main() {
     );
     addTearDown(viewModel.dispose);
 
-    expect(await viewModel.decideInitialRoute(), isTrue);
+    expect(await viewModel.decideInitialRoute(), SplashOutcome.home);
 
     verifyInOrder([
       () => deviceData.resetIfServerChanged('http://localhost:3001/api'),
@@ -52,7 +52,19 @@ void main() {
     final viewModel = SplashViewModel(authRepository: auth, deviceData: deviceData);
     addTearDown(viewModel.dispose);
 
-    expect(await viewModel.decideInitialRoute(), isFalse);
+    expect(await viewModel.decideInitialRoute(), SplashOutcome.login);
+  });
+
+  test(
+      'a troca de servidor que não apagou o aparelho não segue nem para o '
+      'login (Fase 8D)', () async {
+    when(() => deviceData.resetIfServerChanged(any()))
+        .thenThrow(Exception('disco cheio'));
+    final viewModel = SplashViewModel(authRepository: auth, deviceData: deviceData);
+    addTearDown(viewModel.dispose);
+
+    expect(await viewModel.decideInitialRoute(), SplashOutcome.resetFailed);
+    verifyNever(() => auth.restoreSession());
   });
 
   test('o endereço conferido é, por padrão, o deste build', () {

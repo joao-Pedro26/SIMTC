@@ -78,4 +78,37 @@ void main() {
       expect(bar(tester).center.dx, size.width / 2);
     });
   }
+
+  group('troca de servidor que não apagou o aparelho (Fase 8D)', () {
+    testWidgets('avisa no lugar da barra, e o "Tentar de novo" confere de novo',
+        (tester) async {
+      var attempts = 0;
+      when(() => deviceData.resetIfServerChanged(any())).thenAnswer((_) async {
+        attempts++;
+        if (attempts == 1) throw Exception('disco cheio');
+        return true;
+      });
+
+      await show(tester, size: const Size(412, 915));
+      await tester.pump();
+
+      expect(find.byKey(const Key('splash-reset-failed')), findsOneWidget);
+      expect(
+        find.text('Não foi possível preparar o aparelho para o novo servidor. '
+            'Tente de novo.'),
+        findsOneWidget,
+      );
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      verifyNever(() => auth.restoreSession());
+
+      await tester.tap(find.text('Tentar de novo'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(attempts, 2);
+      expect(find.byKey(const Key('splash-reset-failed')), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      verify(() => auth.restoreSession()).called(1);
+    });
+  });
 }

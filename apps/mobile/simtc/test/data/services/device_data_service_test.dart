@@ -22,6 +22,14 @@ class _FakeLogoCache implements LogoCache {
   }
 }
 
+/// O banco que não consegue apagar tudo (disco cheio, arquivo preso).
+class _FailingClearDatabase extends AppDatabase {
+  _FailingClearDatabase() : super(NativeDatabase.memory());
+
+  @override
+  Future<void> clearAll() async => throw Exception('disco cheio');
+}
+
 void main() {
   const production = 'https://api.simtc.com.br/api';
   const local = 'http://localhost:3001/api';
@@ -172,6 +180,23 @@ void main() {
       expect(await service.resetIfServerChanged(production), isFalse);
 
       expect(await counts(), everything);
+      verifyNever(() => storage.saveApiBaseUrl(any()));
+    });
+
+    test(
+        'o banco que não apaga: lança, e o endereço novo não é guardado — a '
+        'próxima tentativa apaga de novo (Fase 8D)', () async {
+      final failing = _FailingClearDatabase();
+      addTearDown(failing.close);
+      final service = DeviceDataService(
+        database: failing,
+        storage: storage,
+        logos: logos,
+      );
+      when(() => storage.readApiBaseUrl()).thenAnswer((_) async => local);
+
+      await expectLater(service.resetIfServerChanged(production), throwsException);
+
       verifyNever(() => storage.saveApiBaseUrl(any()));
     });
 

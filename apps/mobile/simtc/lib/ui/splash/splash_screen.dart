@@ -7,11 +7,18 @@ import '../../data/services/device_data_service.dart';
 import '../../router.dart';
 import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/theme/app_typography.dart';
+import '../core/widgets/app_buttons.dart';
 import 'splash_viewmodel.dart';
 
 /// Tela 1.1 do canvas: logo centralizada e uma barra fina de progresso,
 /// enquanto o app tenta retomar a sessão salva. Sem texto de carregamento.
+///
+/// Só a troca de servidor que não conseguiu apagar o aparelho tem texto
+/// (Fase 8D — não está no canvas): o aviso e o "Tentar de novo" no lugar da
+/// barra.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -20,10 +27,17 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _resetFailed = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _decide());
+  }
+
+  void _retry() {
+    setState(() => _resetFailed = false);
+    _decide();
   }
 
   Future<void> _decide() async {
@@ -32,9 +46,9 @@ class _SplashScreenState extends State<SplashScreen> {
       deviceData: context.read<DeviceDataService>(),
     );
 
-    var isSignedIn = false;
+    var outcome = SplashOutcome.login;
     try {
-      isSignedIn = await viewModel.decideInitialRoute();
+      outcome = await viewModel.decideInitialRoute();
     } catch (error, stack) {
       // A abertura nunca pode terminar numa tela parada. Qualquer falha
       // inesperada vai para o log e manda o usuário para o login, de onde ele
@@ -47,7 +61,11 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (!mounted) return;
-    context.go(isSignedIn ? AppRoutes.home : AppRoutes.login);
+    if (outcome == SplashOutcome.resetFailed) {
+      setState(() => _resetFailed = true);
+      return;
+    }
+    context.go(outcome == SplashOutcome.home ? AppRoutes.home : AppRoutes.login);
   }
 
   @override
@@ -67,7 +85,10 @@ class _SplashScreenState extends State<SplashScreen> {
             SizedBox(
               height: tablet ? _tabletGap : AppSpacing.xxl + AppSpacing.xs,
             ),
-            _buildProgress(width: tablet ? _tabletBarWidth : 140),
+            if (_resetFailed)
+              _buildResetFailed()
+            else
+              _buildProgress(width: tablet ? _tabletBarWidth : 140),
           ],
         ),
       ),
@@ -83,6 +104,34 @@ class _SplashScreenState extends State<SplashScreen> {
       'assets/images/logo-simtc.png',
       height: height,
       semanticLabel: 'SIM Treinamentos',
+    );
+  }
+
+  static const double _noticeMaxWidth = 360;
+
+  Widget _buildResetFailed() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _noticeMaxWidth),
+        child: Column(
+          key: const Key('splash-reset-failed'),
+          children: [
+            Text(
+              'Não foi possível preparar o aparelho para o novo servidor. '
+              'Tente de novo.',
+              style: AppTypography.body,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppCtaButton(
+              label: 'Tentar de novo',
+              icon: AppIcons.retry,
+              onPressed: _retry,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
