@@ -981,6 +981,27 @@ void main() {
       expect(find.byType(SessionConsultantsScreen), findsOneWidget);
       expect(rowOf('consultor-c-carla'), findsOneWidget);
     });
+
+    testWidgets(
+        'com a equipe que não carregou, a busca sem resultado não diz que não '
+        'achou: vale o aviso da equipe (Fase 8D)', (tester) async {
+      await seedFromServer();
+      when(() => api.get<List<dynamic>>(
+            teamPath,
+            queryParameters: any(named: 'queryParameters'),
+          )).thenThrow(
+          const ApiException(message: 'Internal server error', statusCode: 500));
+      await pumpScreen(tester, screen: const Size(412, 900));
+      await openSearch(tester);
+
+      await type(tester, 'zzz');
+
+      expect(find.byKey(const Key('consultants-no-results')), findsNothing);
+      expect(
+        find.text('Não foi possível carregar a equipe. Puxe para atualizar.'),
+        findsOneWidget,
+      );
+    });
   });
 
   testWidgets('falha ao buscar a equipe: pede para puxar, e puxar traz a equipe',

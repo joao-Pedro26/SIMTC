@@ -129,6 +129,50 @@ void main() {
   });
 
   testWidgets(
+      'FilterChipBar dentro de uma lista: o chip escolhido rola só a barra, '
+      'não a lista (Fase 8D)', (tester) async {
+    tester.view.physicalSize = const Size(300, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final list = ScrollController();
+    addTearDown(list.dispose);
+    const items = [
+      FilterChipData(label: 'Todos', count: 8),
+      FilterChipData(label: 'Pendentes', count: 3),
+      FilterChipData(label: 'Meus', count: 2),
+      FilterChipData(label: 'Concluídos', count: 1),
+    ];
+
+    Widget screen(int selected) => MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: ListView(
+              controller: list,
+              children: [
+                const SizedBox(height: 400),
+                FilterChipBar(selectedIndex: selected, onSelect: (_) {}, items: items),
+                const SizedBox(height: 1200),
+              ],
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(screen(0));
+    list.jumpTo(300);
+    await tester.pump();
+
+    await tester.pumpWidget(screen(3));
+    await tester.pumpAndSettle();
+
+    expect(list.offset, 300, reason: 'a lista fica onde estava');
+    final bar = tester.getRect(find.byType(FilterChipBar));
+    final chip = tester.getRect(find.text('Concluídos'));
+    expect(chip.right, lessThanOrEqualTo(bar.right),
+        reason: 'a barra rolou até o chip escolhido');
+  });
+
+  testWidgets(
       'FilterChipBar: o chip tem 34 de desenho e 48 de toque; a barra '
       'continua com 54 (Fase 8C)', (tester) async {
     int? selected;

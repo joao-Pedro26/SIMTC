@@ -585,6 +585,59 @@ void main() {
   });
 
   testWidgets(
+      'ao fechar a busca, o chip destacado volta a bater com a rolagem '
+      '(Fase 8D)', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final muitasHoje = List.generate(
+      15,
+      (i) => TrainingSession(
+        id: 'h$i',
+        companyName: 'Empresa Hoje $i',
+        courseName: 'Curso',
+        city: 'Bauru',
+        state: 'SP',
+        date: DateTime.now(),
+        status: SessionStatus.planejado,
+        totalParticipants: 1,
+        assessableParticipants: 1,
+        assessedParticipants: 0,
+      ),
+    );
+    final concluida = TrainingSession(
+      id: 'concluida-0',
+      companyName: 'Empresa Concluída 0',
+      courseName: 'Curso',
+      city: 'Bauru',
+      state: 'SP',
+      date: DateTime(2026, 8, 1),
+      status: SessionStatus.concluido,
+      totalParticipants: 1,
+      assessableParticipants: 1,
+      assessedParticipants: 1,
+    );
+    await pump(tester);
+    sessions.add([...muitasHoje, concluida]);
+    await tester.pump();
+    await tester.fling(find.byType(ListView), const Offset(0, -2200), 3000);
+    await tester.pumpAndSettle();
+    expect(isChipSelected(tester, 'Concluídas'), isTrue);
+
+    // A busca encurta a lista: a rolagem volta para o meio de "Hoje".
+    await tester.tap(find.byTooltip('Buscar'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'Hoje 1');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Fechar a busca'));
+    await tester.pumpAndSettle();
+
+    expect(isChipSelected(tester, 'Hoje'), isTrue);
+    expect(isChipSelected(tester, 'Concluídas'), isFalse);
+  });
+
+  testWidgets(
       'depois de rolar manualmente, tocar num chip ainda rola pra seção certa '
       'sem piscar', (tester) async {
     tester.view.physicalSize = const Size(400, 700);

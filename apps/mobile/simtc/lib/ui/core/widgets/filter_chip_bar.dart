@@ -58,18 +58,23 @@ class _FilterChipBarState extends State<FilterChipBar> {
   }
 
   /// Espera o próximo frame — o chip recém-selecionado só ganha a cor/borda
-  /// de destaque neste build, e `Scrollable.ensureVisible` precisa do
-  /// `RenderObject` já montado com essa geometria pra calcular quanto rolar.
+  /// de destaque neste build, e o `ensureVisible` precisa do `RenderObject`
+  /// já montado com essa geometria pra calcular quanto rolar.
+  ///
+  /// Rola só a própria barra (Fase 8D): o `Scrollable.ensureVisible` rolaria
+  /// também a lista vertical em volta dela — com a fonte grande, a barra rola
+  /// junto com a lista do detalhe, e o toque num chip a levava até o topo.
   void _ensureSelectedVisible() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final context = _chipKeys[widget.selectedIndex].currentContext;
-      if (context == null) return;
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-      );
+      final chip = context?.findRenderObject();
+      if (context == null || chip == null) return;
+      Scrollable.of(context).position.ensureVisible(
+            chip,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
     });
   }
 

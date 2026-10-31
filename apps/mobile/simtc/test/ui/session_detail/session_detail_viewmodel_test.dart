@@ -791,6 +791,29 @@ void main() {
       expect(vm.isStarting, isFalse);
       verify(() => participants.syncSession('sess-1')).called(1);
     });
+
+    test(
+        'recusa do servidor (outro aparelho já iniciou): mostra o motivo e '
+        'baixa a sessão de novo (Fase 8D)', () async {
+      when(() => sessions.start('sess-1')).thenAnswer(
+        (_) async => const Failure<void>(
+          ApiException(
+            message: 'Só dá para iniciar um treinamento planejado',
+            statusCode: 403,
+          ),
+          'Só dá para iniciar um treinamento planejado',
+        ),
+      );
+      final vm = await ready(
+        withSession: session(status: SessionStatus.planejado, responsible: 'c-eu'),
+      );
+
+      await vm.startSession();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(vm.message, 'Só dá para iniciar um treinamento planejado');
+      verify(() => participants.syncSession('sess-1')).called(2);
+    });
   });
 
   test('falha ao atualizar vira mensagem, sem apagar a lista', () async {

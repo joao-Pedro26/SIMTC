@@ -103,10 +103,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// animação do segundo toque no meio do caminho (ver `_onChipTap`).
   int _tapGeneration = 0;
 
+  /// Ver [_resyncChipAfterSearch].
+  bool _wasSearching = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel.addListener(_showErrorWhenItArrives);
+    _viewModel.addListener(_resyncChipAfterSearch);
     _scrollController.addListener(_updateActiveChipFromScroll);
   }
 
@@ -115,6 +119,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _scrollController.removeListener(_updateActiveChipFromScroll);
     _scrollController.dispose();
     _viewModel.removeListener(_showErrorWhenItArrives);
+    _viewModel.removeListener(_resyncChipAfterSearch);
     _viewModel.dispose();
     super.dispose();
   }
@@ -141,6 +146,19 @@ class _SessionsScreenState extends State<SessionsScreen> {
       listenable: _viewModel,
       builder: (context, _) => _buildScaffold(context, _viewModel),
     );
+  }
+
+  /// A busca fechou: a lista volta inteira, na rolagem que tiver, e o chip
+  /// destacado passa a ser o da seção que está na tela (Fase 8D). Sem isso,
+  /// ficava o de antes da busca até a próxima rolagem.
+  void _resyncChipAfterSearch() {
+    final searching = _viewModel.isSearching;
+    if (_wasSearching && !searching) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _updateActiveChipFromScroll();
+      });
+    }
+    _wasSearching = searching;
   }
 
   /// Toque num chip: marca a seção correspondente e rola até ela.

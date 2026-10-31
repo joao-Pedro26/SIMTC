@@ -41,6 +41,10 @@ class AppSearchButton extends StatelessWidget {
 /// busca, o texto e o X que fecha a busca. Tem 48 de altura e abre com o
 /// teclado à mostra. Guarda o próprio texto: começa com [initialText] e avisa
 /// cada mudança em [onChanged].
+///
+/// Dentro de uma lista (o detalhe com a fonte grande), continua vivo quando
+/// sai de vista (Fase 8D): recriado ao voltar, o `autofocus` abriria o
+/// teclado sozinho, e o texto voltaria ao [initialText].
 class AppSearchField extends StatefulWidget {
   const AppSearchField({
     super.key,
@@ -61,9 +65,13 @@ class AppSearchField extends StatefulWidget {
   State<AppSearchField> createState() => _AppSearchFieldState();
 }
 
-class _AppSearchFieldState extends State<AppSearchField> {
+class _AppSearchFieldState extends State<AppSearchField>
+    with AutomaticKeepAliveClientMixin {
   late final TextEditingController _controller =
       TextEditingController(text: widget.initialText);
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -73,6 +81,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.md),
       borderSide: const BorderSide(color: AppColors.primary, width: 1.5),

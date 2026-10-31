@@ -204,9 +204,10 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
       );
 
   /// "2 de 18 participantes", embaixo da lista filtrada pela busca; nulo
-  /// quando a busca não filtra nada.
+  /// quando a busca não filtra nada — ou quando a sessão nunca foi baixada,
+  /// em que "0 de 0" não diria nada (Fase 8D).
   String? get searchCountLabel {
-    if (!isFiltering) return null;
+    if (!isFiltering || neverDownloaded) return null;
     final total = _participants.length;
     final noun = total == 1 ? 'participante' : 'participantes';
     return '${visibleParticipants.length} de $total $noun';
@@ -446,6 +447,11 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
   }
 
   /// "Iniciar sessão" — só o responsável ou um ADMIN chegam a ver o botão.
+  ///
+  /// Recusado pelo servidor — outro aparelho já iniciou (ou concluiu) a
+  /// sessão, e ela não está mais planejada (Fase 8D) —, a mensagem dele
+  /// aparece e a sessão é baixada de novo: a tela deixa de mostrar
+  /// "Planejado" e o botão. Sem rede, nada a baixar.
   Future<void> startSession() async {
     if (_isStarting || !canStartSession) return;
 
@@ -459,8 +465,9 @@ class SessionDetailViewModel extends ChangeNotifier with ListSearch {
         case Success():
           _message = 'Sessão iniciada. Já dá para atribuir participantes.';
           resync = true;
-        case Failure(:final message):
+        case Failure(:final exception, :final message):
           _message = message ?? _startFailed;
+          resync = exception is ApiException && !exception.isNetworkError;
       }
     } catch (_) {
       _message = _startFailed;

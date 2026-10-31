@@ -71,6 +71,45 @@ void main() {
       );
     });
 
+    testWidgets(
+        'dentro de uma lista, sair de vista e voltar não abre o teclado nem '
+        'perde o texto (Fase 8D)', (tester) async {
+      tester.view.physicalSize = const Size(360, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final list = ScrollController();
+      addTearDown(list.dispose);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            controller: list,
+            children: [
+              AppSearchField(
+                hintText: 'Buscar por nome ou CPF',
+                onChanged: (_) {},
+                onClose: () {},
+              ),
+              const SizedBox(height: 3000),
+            ],
+          ),
+        ),
+      ));
+      await tester.enterText(find.byType(TextField), 'ana');
+      // O teclado fechado: o campo perde o foco.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+
+      list.jumpTo(2000);
+      await tester.pump();
+      list.jumpTo(0);
+      await tester.pump();
+
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.focusNode.hasFocus, isFalse);
+      expect(editable.controller.text, 'ana');
+    });
+
     testWidgets('cada letra avisa o texto; o X fecha a busca', (tester) async {
       final changes = <String>[];
       var closes = 0;

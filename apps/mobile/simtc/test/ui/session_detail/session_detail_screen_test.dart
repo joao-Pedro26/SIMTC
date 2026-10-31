@@ -421,6 +421,24 @@ void main() {
   });
 
   testWidgets(
+      'sessão nunca baixada: a busca diz por que não acha nada, sem "0 de 0" '
+      '(Fase 8D)', (tester) async {
+    await show(tester, withSession: session(downloaded: false));
+
+    await tester.tap(find.byTooltip('Buscar'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'ana');
+    await tester.pump();
+
+    expect(
+      find.text('A busca procura nos participantes baixados, e os desta '
+          'sessão ainda não foram baixados.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('de 0'), findsNothing);
+  });
+
+  testWidgets(
       'sessão nunca baixada cuja descida falhou com conexão: o motivo e '
       '"Tentar novamente" (Fase 8C)', (tester) async {
     // A sessão sai do cache antes da resposta do servidor, como no aparelho.

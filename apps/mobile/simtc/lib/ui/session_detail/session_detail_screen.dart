@@ -754,11 +754,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   Widget _buildEmpty() {
-    // Nunca baixada: o aviso de cima já explica, e "nenhum participante"
-    // seria uma afirmação que o app não tem como fazer.
-    if (_viewModel.neverDownloaded) return const SizedBox.shrink();
-
     final query = _viewModel.searchQuery.trim();
+
+    // Nunca baixada: o aviso de cima já explica, e "nenhum participante"
+    // seria uma afirmação que o app não tem como fazer. Só a busca diz por
+    // que não acha nada (Fase 8D).
+    if (_viewModel.neverDownloaded) {
+      if (!_viewModel.isFiltering) return const SizedBox.shrink();
+      return Padding(
+        padding: EdgeInsets.fromLTRB(_inset, 0, _inset, AppSpacing.md),
+        child: Semantics(
+          liveRegion: true,
+          child: const InlineNotice(
+            icon: AppIcons.search,
+            message: 'A busca procura nos participantes baixados, e os desta '
+                'sessão ainda não foram baixados.',
+          ),
+        ),
+      );
+    }
+
     final message = !_viewModel.hasParticipants
         ? 'Nenhum participante inscrito nesta sessão.'
         : _viewModel.isFiltering
