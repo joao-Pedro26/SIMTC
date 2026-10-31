@@ -176,6 +176,10 @@ void main() {
           consultantId: any(named: 'consultantId'),
           exceptTrainingParticipantId: any(named: 'exceptTrainingParticipantId'),
         )).thenAnswer((_) async => null);
+    // O checklist confere de novo se outra avaliação está em andamento
+    // quando o aparelho muda (Fase 8D): aqui, nada muda.
+    when(() => assessments.watchInProgressChanges())
+        .thenAnswer((_) => const Stream.empty());
   });
 
   tearDown(() {

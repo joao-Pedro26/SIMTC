@@ -78,6 +78,7 @@ class ChecklistViewModel extends ChangeNotifier {
 
   StreamSubscription<SessionParticipant?>? _participantSubscription;
   StreamSubscription<List<LocalAssessmentItem>>? _itemsSubscription;
+  StreamSubscription<void>? _inProgressSubscription;
 
   bool _disposed = false;
   bool _loading = true;
@@ -182,7 +183,8 @@ class ChecklistViewModel extends ChangeNotifier {
 
   /// Outro participante deste consultor está em andamento: só uma avaliação
   /// por vez (decisão de 01/10/2026). A tela mostra o aviso e desabilita o
-  /// "Iniciar avaliação".
+  /// "Iniciar avaliação". Conferido de novo sempre que as avaliações do
+  /// aparelho ou os participantes mudam, e não só ao abrir a tela (Fase 8D).
   bool get isBlocked => !isStarted && _blockingParticipantId != null;
 
   /// Nome de quem está em andamento, para o aviso; nulo se o participante
@@ -220,6 +222,9 @@ class ChecklistViewModel extends ChangeNotifier {
       _participant = p;
       notifyListeners();
     });
+    _inProgressSubscription ??= _assessmentRepository
+        .watchInProgressChanges()
+        .listen((_) => unawaited(_refreshBlock()));
 
     try {
       final current = await _assessmentRepository.findCurrent(
@@ -462,6 +467,25 @@ class ChecklistViewModel extends ChangeNotifier {
     if (inProgress != null) await _block(inProgress.trainingParticipantId);
   }
 
+  /// Ver [isBlocked]: só antes de a avaliação começar, e nunca no meio de
+  /// outra leitura ou gravação desta tela — elas conferem por conta própria.
+  Future<void> _refreshBlock() async {
+    if (_disposed || _loading || isStarted || _starting || _busy) return;
+    final blockingBefore = _blockingParticipantId;
+    final nameBefore = _blockingName;
+    try {
+      await _checkBlock(startedAfter: _resumable?.startTime);
+    } catch (_) {
+      // Uma falha do banco deixa o aviso como estava.
+      _blockingParticipantId = blockingBefore;
+      _blockingName = nameBefore;
+      return;
+    }
+    if (_blockingParticipantId != blockingBefore || _blockingName != nameBefore) {
+      notifyListeners();
+    }
+  }
+
   /// Guarda quem está em andamento e o nome dele, para o aviso.
   Future<void> _block(String blockingParticipantId) async {
     _blockingParticipantId = blockingParticipantId;
@@ -482,7 +506,8 @@ class ChecklistViewModel extends ChangeNotifier {
     });
   }
 
-  /// Desliga a tela da avaliação descartada: volta a "não iniciada".
+  /// Desliga a tela da avaliação descartada: volta a "não iniciada" — e o
+  /// "Não salvo" de uma nota que não gravou vai junto com ela (Fase 8D).
   void _detach() {
     _itemsSubscription?.cancel();
     _itemsSubscription = null;
@@ -491,6 +516,7 @@ class ChecklistViewModel extends ChangeNotifier {
     _status = null;
     _items = const [];
     _expandedCategoryId = null;
+    _saveFailed = false;
   }
 
   /// Como no canvas: o checklist começa com a primeira categoria aberta.
@@ -520,9 +546,13 @@ class ChecklistViewModel extends ChangeNotifier {
   /// `_itemsSubscription` reagir — o stream de uma assinatura já aberta pode
   /// notificar um turno de evento depois da escrita, e a tela precisa
   /// mostrar o botão pressionado na hora.
+  ///
+  /// Com o participante fora das mãos do consultor ([isReleased]), não marca
+  /// nada (Fase 8D): as marcações ficam como estavam até ele ser atribuído
+  /// de novo.
   Future<void> toggleNote(String infractionId, String noteId) async {
     final assessmentId = _assessmentId;
-    if (assessmentId == null || isConfirmed || _busy) return;
+    if (assessmentId == null || isConfirmed || isReleased || _busy) return;
 
     final current = _items
         .where((i) => i.infractionId == infractionId)
@@ -560,6 +590,7 @@ class ChecklistViewModel extends ChangeNotifier {
     _disposed = true;
     _participantSubscription?.cancel();
     _itemsSubscription?.cancel();
+    _inProgressSubscription?.cancel();
     super.dispose();
   }
 }

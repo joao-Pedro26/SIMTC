@@ -208,8 +208,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             ),
             const SizedBox(width: AppSpacing.lg),
             _buildHeaderFinish(),
-            if (!_viewModel.isLoading &&
-                (_viewModel.canDiscard || _viewModel.canUnassign)) ...[
+            if (_showsMenu) ...[
               const SizedBox(width: AppSpacing.sm),
               _buildMenu(isOffline),
             ],
@@ -240,8 +239,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 const SizedBox(width: AppSpacing.md),
                 _buildHeaderFinish(),
               ],
-              if (!_viewModel.isLoading &&
-                  (_viewModel.canDiscard || _viewModel.canUnassign)) ...[
+              if (_showsMenu) ...[
                 if (_finishInHeader) const SizedBox(width: AppSpacing.sm),
                 _buildMenu(isOffline),
               ],
@@ -266,6 +264,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   bool get _showsProgress =>
       !_viewModel.isLoading && _viewModel.hasCatalog && _viewModel.isStarted;
+
+  /// O ⋮ some com a leitura que falhou (Fase 8D): o que ele descartaria ou
+  /// desatribuiria é o que a tela não conseguiu ler.
+  bool get _showsMenu =>
+      !_viewModel.isLoading &&
+      !_viewModel.loadFailed &&
+      (_viewModel.canDiscard || _viewModel.canUnassign);
 
   Widget _buildBackButton(BuildContext context) {
     return SizedBox.square(
@@ -319,8 +324,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (_viewModel.isUnassigning) {
       return KeyedSubtree(
         key: _menuKey,
+        // `liveRegion`: o leitor de tela anuncia a espera assim que ela
+        // aparece, sem o consultor tocar nela (Fase 8D).
         child: Semantics(
           label: 'Desatribuindo…',
+          liveRegion: true,
           child: const SizedBox.square(
             key: Key('checklist-desatribuindo'),
             dimension: AppSpacing.touchTarget,
@@ -487,10 +495,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Container(width: 1, height: 11, color: AppColors.borderStrong),
-        const SizedBox(width: AppSpacing.sm),
-        ..._buildSavedState(),
+        // Com a leitura que falhou, não há o que dizer que está salvo
+        // (Fase 8D).
+        if (!_viewModel.loadFailed) ...[
+          const SizedBox(width: AppSpacing.sm),
+          Container(width: 1, height: 11, color: AppColors.borderStrong),
+          const SizedBox(width: AppSpacing.sm),
+          ..._buildSavedState(),
+        ],
       ],
     );
   }
@@ -1085,7 +1097,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             child: _NoteButton(
               note: infraction.notes[i],
               selected: infraction.selectedNoteId == infraction.notes[i].id,
-              onTap: _viewModel.isConfirmed
+              onTap: _viewModel.isConfirmed || _viewModel.isReleased
                   ? null
                   : () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
             ),

@@ -519,6 +519,66 @@ void main() {
         unorderedEquals(['tp-1', 'tp-2']),
       );
     });
+
+    test(
+        'o aviso some sem reabrir a tela quando a outra avaliação é '
+        'descartada (Fase 8D)', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await startOtherParticipant();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.isBlocked, isTrue);
+      var notified = 0;
+      vm.addListener(() => notified++);
+
+      final other = await assessmentRepository.findByParticipant('tp-2');
+      await assessmentRepository.discardDraft(other!.id);
+      await pumpEventQueue();
+
+      expect(vm.isBlocked, isFalse);
+      expect(notified, greaterThan(0));
+    });
+
+    test(
+        'o aviso some sem reabrir a tela quando o outro participante é '
+        'liberado: a avaliação dele fica presa e não bloqueia (Fase 8D)',
+        () async {
+      await seedParticipant();
+      await seedCatalog();
+      await startOtherParticipant();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.isBlocked, isTrue);
+
+      await (db.update(db.participants)..where((t) => t.id.equals('tp-2')))
+          .write(const ParticipantsCompanion(
+        status: Value('PENDENTE'),
+        assignedConsultantId: Value(null),
+      ));
+      await pumpEventQueue();
+
+      expect(vm.isBlocked, isFalse);
+    });
+
+    test(
+        'o aviso aparece sem reabrir a tela quando outra avaliação começa '
+        '(Fase 8D)', () async {
+      await seedParticipant();
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.isBlocked, isFalse);
+
+      await startOtherParticipant();
+      await pumpEventQueue();
+
+      expect(vm.isBlocked, isTrue);
+      expect(vm.blockingParticipantName, 'Marina Lopes');
+    });
   });
 
   // O participante saiu das mãos do consultor com a avaliação pela metade
@@ -951,6 +1011,31 @@ void main() {
       await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
       await pumpEventQueue();
       expect(vm.isReleased, isFalse);
+    });
+
+    test(
+        'com o participante liberado, as notas não marcam até ele ser '
+        'atribuído de novo (Fase 8D)', () async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      await seedOldDraft();
+      final vm = await open();
+
+      await setParticipant(status: 'PENDENTE');
+      await pumpEventQueue();
+      await vm.toggleNote('inf-1', 'note-m');
+
+      expect(vm.isReleased, isTrue);
+      expect(
+        vm.sections.single.infractions.single.selectedNoteId,
+        isNot('note-m'),
+      );
+
+      await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
+      await pumpEventQueue();
+      await vm.toggleNote('inf-1', 'note-m');
+
+      expect(vm.sections.single.infractions.single.selectedNoteId, 'note-m');
     });
 
     test('desatribuir com a avaliação antiga à espera também a apaga',

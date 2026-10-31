@@ -448,6 +448,45 @@ void main() {
     });
 
     testWidgets(
+        'o "Não salvo" vai embora com a avaliação descartada (Fase 8D)',
+        (tester) async {
+      await pumpScreen(tester);
+      await failWrites('local_assessment_items');
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+      expect(find.text('Não salvo'), findsOneWidget);
+      await allowWrites('local_assessment_items');
+      // O aviso passageiro da nota que não gravou sai antes de seguir.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('checklist-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Descartar avaliação'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Iniciar avaliação'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('salvo'), findsOneWidget);
+      expect(find.text('Não salvo'), findsNothing);
+    });
+
+    testWidgets(
+        'com a leitura que falhou, o "salvo" e o ⋮ somem (Fase 8D)',
+        (tester) async {
+      await db.customStatement(
+          'ALTER TABLE infraction_notes RENAME TO infraction_notes_fora');
+      await pumpScreen(tester);
+
+      expect(find.text('Não foi possível abrir a avaliação neste aparelho.'),
+          findsOneWidget);
+      expect(find.text('salvo'), findsNothing);
+      expect(find.byKey(const Key('checklist-menu')), findsNothing);
+    });
+
+    testWidgets(
         '"Iniciar avaliação" que não grava avisa e continua "não iniciada", '
         'com o botão ativo', (tester) async {
       await pumpScreen(tester, started: false);
@@ -756,6 +795,11 @@ void main() {
     );
     expect(tester.getSize(waiting), const Size(48, 48));
     expect(find.bySemanticsLabel('Desatribuindo…'), findsOneWidget);
+    // O leitor de tela anuncia a espera sozinho (Fase 8D).
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Desatribuindo…')),
+      isSemantics(label: 'Desatribuindo…', isLiveRegion: true),
+    );
     final finish = tester.widget<AppCtaButton>(
       find.widgetWithText(AppCtaButton, 'Finalizar avaliação'),
     );
@@ -1021,8 +1065,13 @@ void main() {
       );
       expect(notice.tone, NoticeTone.warning);
       expect(cta(tester, 'Finalizar avaliação').onPressed, isNull);
-      // As marcações continuam na tela.
+      // As marcações continuam na tela, e as notas não marcam (Fase 8D).
       expect(find.text(pmComment), findsOneWidget);
+      await tester.tap(find.text('M'));
+      await tester.pumpAndSettle();
+      expect(tester.getSemantics(find.text('M')),
+          isSemantics(isSelected: false, hasTapAction: false));
+      expect(tester.getSemantics(find.text('PM')), isSemantics(isSelected: true));
 
       await setParticipant(status: 'EM_AVALIACAO', consultant: 'c-eu');
       await tester.pumpAndSettle();

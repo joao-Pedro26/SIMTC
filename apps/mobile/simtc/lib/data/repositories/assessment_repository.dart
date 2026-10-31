@@ -355,6 +355,19 @@ class AssessmentRepository {
         .map((notes) => notes.isNotEmpty);
   }
 
+  /// Avisa quando muda algo que decide se outra avaliação está em andamento
+  /// ([findInProgressOther]): as avaliações do aparelho ou os participantes
+  /// (um deles liberado prende a avaliação dele). Não emite ao assinar. O
+  /// checklist confere de novo o "Você já está avaliando…" (Fase 8D).
+  Stream<void> watchInProgressChanges() {
+    return _db
+        .tableUpdates(TableUpdateQuery.onAllTables([
+          _db.localAssessments,
+          _db.participants,
+        ]))
+        .map((_) {});
+  }
+
   /// Quantas avaliações [ownerUserId] iniciou e ainda não confirmou — todas,
   /// inclusive as presas (sessão concluída, participante liberado): a
   /// confirmação do "Sair" avisa que elas ficam no aparelho (Fase 8A).
