@@ -16,6 +16,7 @@ class AuthRepository extends ChangeNotifier {
     required AuthSession session,
     required Future<void> Function() clearLocalCache,
     this.logoutTimeout = defaultLogoutTimeout,
+    this.restoreTimeout = defaultRestoreTimeout,
   })  : _api = apiClient,
         _session = session,
         _clearLocalCache = clearLocalCache;
@@ -27,6 +28,13 @@ class AuthRepository extends ChangeNotifier {
   final Duration logoutTimeout;
 
   static const Duration defaultLogoutTimeout = Duration(seconds: 5);
+
+  /// Quanto a abertura espera o servidor confirmar a sessão salva. Com sinal
+  /// ruim ("conectado mas sem dados") seriam até 35 s de splash; passado
+  /// isto, a abertura entra como se estivesse sem rede (Fase 8D).
+  final Duration restoreTimeout;
+
+  static const Duration defaultRestoreTimeout = Duration(seconds: 5);
 
   final ApiClient _api;
   final AuthSession _session;
@@ -98,7 +106,12 @@ class AuthRepository extends ChangeNotifier {
   /// e aos rascunhos em cache. A sessão não é conferida agora — a primeira
   /// chamada com rede faz isso (401 → renovação → `handleSessionExpired`,
   /// como em qualquer momento do uso). Erro de servidor com rede não entra
-  /// offline: aí o problema não é o sinal.
+  /// offline: aí o problema não é o sinal. O servidor que não responde em
+  /// [restoreTimeout] conta como sem rede.
+  ///
+  /// O perfil salvo só vale se for de quem é dono do token (Fase 8D): uma
+  /// falha da keystore no login pode ter deixado o perfil de quem entrou
+  /// antes, e a entrada sem rede não pode abrir o app no nome de outra pessoa.
   Future<Result<AuthUser>> restoreSession() async {
     final bool hasTokens;
     try {
@@ -116,9 +129,9 @@ class AuthRepository extends ChangeNotifier {
       return Failure(Exception('sem sessão salva'), _sessionEnded);
     }
 
+    final accessToken = await _session.readAccessToken() ?? '';
     try {
-      final accessToken = await _session.readAccessToken();
-      final user = await _loadCurrentUser(accessToken ?? '');
+      final user = await _loadCurrentUser(accessToken).timeout(restoreTimeout);
       if (user == null) {
         await logout();
         return Failure(Exception('perfil não permitido'), _roleNotAllowed);
@@ -128,19 +141,36 @@ class AuthRepository extends ChangeNotifier {
       _currentUser = user;
       notifyListeners();
       return Success(user);
+    } on TimeoutException {
+      return _enterOffline(accessToken, _restoreTimedOut);
     } on ApiException catch (error) {
-      if (error.isNetworkError) {
-        final saved = await _session.readSavedUser();
-        if (saved != null) {
-          _currentUser = saved;
-          notifyListeners();
-          return Success(saved);
-        }
-        return Failure(error, error.message);
-      }
+      if (error.isNetworkError) return _enterOffline(accessToken, error);
       if (error.statusCode == 401) await _session.clear();
       return Failure(error, _sessionEnded);
     }
+  }
+
+  static const ApiException _restoreTimedOut = ApiException(
+    message: 'O servidor demorou para responder. Verifique a internet e tente '
+        'de novo.',
+    isNetworkError: true,
+    isTimeout: true,
+  );
+
+  /// A abertura sem resposta do servidor: entra com o perfil salvo, se ele
+  /// for do dono do token (ver [restoreSession]).
+  Future<Result<AuthUser>> _enterOffline(
+    String accessToken,
+    ApiException error,
+  ) async {
+    final saved = await _session.readSavedUser();
+    final owner = decodeJwtPayload(accessToken)?['sub'];
+    if (saved != null && saved.id == owner) {
+      _currentUser = saved;
+      notifyListeners();
+      return Success(saved);
+    }
+    return Failure(error, error.message);
   }
 
   /// Pede o e-mail de redefinição de senha. O backend responde 204 mesmo quando
@@ -155,6 +185,10 @@ class AuthRepository extends ChangeNotifier {
     }
   }
 
+  /// Nunca para no meio (Fase 8D): cada passo da limpeza roda mesmo que o
+  /// anterior falhe (a keystore, o banco), e o usuário sai do mesmo jeito.
+  /// Deixar o aparelho pela metade seria pior: o "Sair" de novo pode falhar
+  /// igual, e o próximo a entrar herdaria a sessão.
   Future<void> logout() async {
     try {
       await _api.post<void>('/auth/logout').timeout(logoutTimeout);
@@ -163,8 +197,17 @@ class AuthRepository extends ChangeNotifier {
     } on TimeoutException {
       // Ver [logoutTimeout].
     }
-    await _session.clear();
-    await _clearLocalCache();
+    try {
+      await _session.clear();
+    } catch (_) {
+      // Os tokens já saíram da memória, e `TokenStorage.clear` desligou o
+      // "manter conectado": a próxima abertura vai ao login.
+    }
+    try {
+      await _clearLocalCache();
+    } catch (_) {
+      // O cache de sessões que sobrar é baixado de novo por quem entrar.
+    }
     _currentUser = null;
     notifyListeners();
   }

@@ -121,8 +121,7 @@ class ApiClient {
       final newRefreshToken = data['refreshToken'] as String?;
 
       if (accessToken == null || newRefreshToken == null) {
-        await onSessionExpired();
-        return const _Refresh.expired();
+        return _expire(refreshToken);
       }
 
       // A sessão acabou enquanto a renovação estava no ar (o "Sair", ou outro
@@ -143,11 +142,19 @@ class ApiClient {
       // deslogava — e o login exige rede.
       final status = refreshError.response?.statusCode;
       if (status != null && status >= 400 && status < 500) {
-        await onSessionExpired();
-        return const _Refresh.expired();
+        return _expire(refreshToken);
       }
       return _Refresh.failed(refreshError);
     }
+  }
+
+  /// O servidor não renovou [usedRefreshToken]: a sessão dele acabou. Só
+  /// avisa o app se ela ainda é a sessão de agora — a resposta pode chegar
+  /// depois de um login novo, e derrubar a sessão nova por causa do token
+  /// antigo mandaria quem acabou de entrar de volta ao login (Fase 8D).
+  Future<_Refresh> _expire(String usedRefreshToken) async {
+    if (await readRefreshToken() == usedRefreshToken) await onSessionExpired();
+    return const _Refresh.expired();
   }
 
   Future<Response<T>> get<T>(

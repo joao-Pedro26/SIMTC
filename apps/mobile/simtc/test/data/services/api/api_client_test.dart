@@ -9,17 +9,24 @@ import 'package:simtc/data/services/api/api_exception.dart';
 
 /// Resposta programada para o adaptador falso.
 class _Reply {
-  const _Reply(this.statusCode, [this.body = const <String, dynamic>{}])
-      : networkError = null;
+  const _Reply(
+    this.statusCode, [
+    this.body = const <String, dynamic>{},
+    this.delay = Duration.zero,
+  ]) : networkError = null;
 
   /// A requisição falha sem chegar a ter resposta (sem rede, tempo esgotado).
   const _Reply.network(DioExceptionType this.networkError)
       : statusCode = 0,
-        body = const <String, dynamic>{};
+        body = const <String, dynamic>{},
+        delay = Duration.zero;
 
   final int statusCode;
   final Map<String, dynamic> body;
   final DioExceptionType? networkError;
+
+  /// Quanto a resposta demora a chegar.
+  final Duration delay;
 }
 
 /// Corpo JSON pronto, no formato que o Dio espera do adaptador.
@@ -55,6 +62,7 @@ class _FakeAdapter implements HttpClientAdapter {
     }
 
     final reply = replies.removeAt(0);
+    await Future<void>.delayed(reply.delay);
     if (reply.networkError != null) {
       throw DioException(requestOptions: options, type: reply.networkError!);
     }
@@ -218,6 +226,61 @@ void main() {
     expect(accessToken, isNull);
     expect(refreshToken, isNull);
     expect(sessionExpiredCalls, 0);
+  });
+
+  group('a recusa da renovação que chega depois de um login novo (Fase 8D)', () {
+    /// O 401 da chamada e a resposta da renovação, que demora 50 ms: no
+    /// meio dela, outra pessoa entra no aparelho.
+    Future<void> loginDuringRefresh(_Reply refreshReply) async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        refreshReply,
+      ]);
+
+      final request = client.get<Map<String, dynamic>>('/training-sessions');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      accessToken = 'token-de-quem-entrou';
+      refreshToken = 'refresh-de-quem-entrou';
+
+      await expectLater(
+        request,
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+    }
+
+    test('um 4xx do token antigo não derruba a sessão nova', () async {
+      await loginDuringRefresh(const _Reply(
+        401,
+        {'message': 'Refresh token inválido ou expirado'},
+        Duration(milliseconds: 50),
+      ));
+
+      expect(sessionExpiredCalls, 0);
+      expect(accessToken, 'token-de-quem-entrou');
+      expect(refreshToken, 'refresh-de-quem-entrou');
+    });
+
+    test('nem a resposta sem tokens', () async {
+      await loginDuringRefresh(
+        const _Reply(200, <String, dynamic>{}, Duration(milliseconds: 50)),
+      );
+
+      expect(sessionExpiredCalls, 0);
+      expect(refreshToken, 'refresh-de-quem-entrou');
+    });
+
+    test('a mesma recusa, sem login no meio, encerra a sessão', () async {
+      final client = buildClient([
+        const _Reply(401, {'message': 'Unauthorized'}),
+        const _Reply(200, <String, dynamic>{}),
+      ]);
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/training-sessions'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(sessionExpiredCalls, 1);
+    });
   });
 
   group('renovação sem resposta do servidor mantém a sessão', () {

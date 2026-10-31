@@ -42,10 +42,25 @@ class TokenStorage {
   /// o perfil de quem entrou antes (ver `AuthSession.start`).
   Future<void> deleteUser() => _storage.delete(key: _userKey);
 
+  /// Apaga cada chave mesmo que outra falhe, e lança a primeira falha no
+  /// fim (Fase 8D). Se algo ficou, desliga o "manter conectado": a próxima
+  /// abertura não retoma a sessão de quem saiu, e vai ao login.
   Future<void> clear() async {
-    await _storage.delete(key: _accessKey);
-    await _storage.delete(key: _refreshKey);
-    await _storage.delete(key: _userKey);
+    Object? failure;
+    for (final key in [_accessKey, _refreshKey, _userKey]) {
+      try {
+        await _storage.delete(key: key);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure == null) return;
+    try {
+      await setKeepSignedIn(false);
+    } catch (_) {
+      // A keystore inteira falhou: não há o que mais fazer aqui.
+    }
+    throw failure;
   }
 
   /// O endereço da API com que o app falou na última abertura (ver

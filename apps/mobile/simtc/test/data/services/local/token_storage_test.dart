@@ -42,6 +42,24 @@ void main() {
     verifyNever(() => secure.delete(key: 'app.apiBaseUrl'));
   });
 
+  test(
+      'uma chave que não apaga não impede as outras; o "manter conectado" é '
+      'desligado e a falha sobe no fim (Fase 8D)', () async {
+    final secure = _MockSecureStorage();
+    when(() => secure.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+    when(() => secure.delete(key: 'auth.accessToken'))
+        .thenThrow(Exception('keystore'));
+    when(() => secure.write(key: any(named: 'key'), value: any(named: 'value')))
+        .thenAnswer((_) async {});
+    final storage = TokenStorage(storage: secure);
+
+    await expectLater(storage.clear(), throwsException);
+
+    verify(() => secure.delete(key: 'auth.refreshToken')).called(1);
+    verify(() => secure.delete(key: 'auth.user')).called(1);
+    verify(() => secure.write(key: 'auth.keepSignedIn', value: 'false')).called(1);
+  });
+
   test('deleteUser apaga só o perfil salvo, sem mexer nos tokens', () async {
     final secure = _MockSecureStorage();
     when(() => secure.delete(key: any(named: 'key'))).thenAnswer((_) async {});

@@ -47,13 +47,19 @@ class AuthSession {
     required bool keepSignedIn,
   }) async {
     _keepSignedIn = keepSignedIn;
-    await _storage.setKeepSignedIn(keepSignedIn);
+    // Uma falha da keystore não derruba o login (Fase 8D): a sessão vale em
+    // memória do mesmo jeito, e só a próxima abertura sente a falta.
+    try {
+      await _storage.setKeepSignedIn(keepSignedIn);
+    } catch (_) {
+      // Ver acima.
+    }
     // O perfil salvo é do login anterior. Apagá-lo antes de gravar os tokens
     // novos garante que um par de tokens nunca fique com o perfil de outra
     // pessoa — nem se o app morrer antes do `saveUser` deste login. Se a
     // keystore falhar aqui, o login segue: o `saveUser` logo depois grava por
-    // cima o perfil certo, e só o app morrendo entre os dois deixaria o
-    // perfil antigo — melhor do que não deixar ninguém entrar.
+    // cima o perfil certo. Se ele também falhar, o perfil antigo fica, mas a
+    // entrada sem rede confere de quem ele é (`AuthRepository.restoreSession`).
     try {
       await _storage.deleteUser();
     } catch (_) {
@@ -63,11 +69,22 @@ class AuthSession {
   }
 
   /// Usado também pelo `ApiClient` quando o token é renovado.
+  ///
+  /// Nunca lança (Fase 8D): sem gravar, a sessão vale enquanto o app estiver
+  /// aberto. O que sobrou no aparelho é apagado, para a próxima abertura não
+  /// voltar com um par de tokens velho ou pela metade.
   Future<void> updateTokens(String accessToken, String refreshToken) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
-    if (_keepSignedIn) {
+    if (!_keepSignedIn) return;
+    try {
       await _storage.persist(accessToken: accessToken, refreshToken: refreshToken);
+    } catch (_) {
+      try {
+        await _storage.clear();
+      } catch (_) {
+        // Tokens que sobrarem são recusados pelo servidor na próxima abertura.
+      }
     }
   }
 
@@ -106,9 +123,15 @@ class AuthSession {
     await _storage.clear();
   }
 
-  /// Chamado pelo `ApiClient` quando não dá mais para renovar o token.
+  /// Chamado pelo `ApiClient` quando não dá mais para renovar o token. Avisa
+  /// mesmo que o armazenamento falhe ao apagar (Fase 8D): os tokens já saíram
+  /// da memória, e o app precisa ir ao login.
   Future<void> expire() async {
-    await clear();
+    try {
+      await clear();
+    } catch (_) {
+      // Ver acima; `TokenStorage.clear` já desligou o "manter conectado".
+    }
     if (!_expiredController.isClosed) _expiredController.add(null);
   }
 

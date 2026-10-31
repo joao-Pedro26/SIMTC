@@ -251,9 +251,22 @@ void main() {
       isNetworkError: true,
     );
 
+    /// O token salvo é da Carla (`user-1`): o perfil salvo só vale se for
+    /// dela (Fase 8D).
+    final tokenDaCarla = fakeJwt({'sub': 'user-1'});
+
     void stubSavedTokens() {
-      when(() => storage.readAccess()).thenAnswer((_) async => accessToken);
+      when(() => storage.readAccess()).thenAnswer((_) async => tokenDaCarla);
       when(() => storage.readRefresh()).thenAnswer((_) async => 'refresh-1');
+    }
+
+    void stubSavedUser(String id) {
+      when(() => storage.readUser()).thenAnswer((_) async => jsonEncode(AuthUser(
+            id: id,
+            name: 'Carla',
+            email: 'c@s.com',
+            role: AppUserRole.consultant,
+          ).toJson()));
     }
 
     test('login com "manter conectado" guarda o perfil no aparelho', () async {
@@ -313,6 +326,31 @@ void main() {
       verify(() => storage.persistUser(any())).called(1);
     });
 
+    test(
+        'falha ao gravar o "manter conectado" ou os tokens não impede o login '
+        '(Fase 8D)', () async {
+      stubLogin(token: fakeJwt({'sub': 'user-1'}));
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+      when(() => storage.setKeepSignedIn(any()))
+          .thenThrow(PlatformException(code: 'keystore'));
+      when(() => storage.persist(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          )).thenThrow(PlatformException(code: 'keystore'));
+
+      final result = await repository.login(
+        email: 'c@s.com',
+        password: '123456',
+        keepSignedIn: true,
+      );
+
+      expect(result, isA<Success<AuthUser>>());
+      expect(repository.isAuthenticated, isTrue);
+      expect(await session.readRefreshToken(), 'refresh-1',
+          reason: 'a sessão vale em memória');
+      verify(() => storage.clear()).called(1);
+    });
+
     test('falha ao gravar o perfil não impede o login', () async {
       stubLogin(token: fakeJwt({'sub': 'user-1'}));
       stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
@@ -363,8 +401,80 @@ void main() {
       expect(repository.currentUser!.name, 'Carla');
       expect(repository.currentUser!.consultantId, 'consultant-9');
       verifyNever(() => storage.clear());
-      expect(await session.readAccessToken(), accessToken,
+      expect(await session.readAccessToken(), tokenDaCarla,
           reason: 'quando a rede voltar, é este token que o servidor confere');
+    });
+
+    test(
+        'o perfil salvo de outra pessoa (a keystore falhou no login) não abre '
+        'o app sem rede: vai para o login (Fase 8D)', () async {
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(semRede);
+      stubSavedUser('user-2');
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect(repository.isAuthenticated, isFalse);
+    });
+
+    test(
+        'um token que não se lê também não abre o app com o perfil salvo '
+        '(Fase 8D)', () async {
+      when(() => storage.readAccess()).thenAnswer((_) async => 'não-é-jwt');
+      when(() => storage.readRefresh()).thenAnswer((_) async => 'refresh-1');
+      when(() => api.get<Map<String, dynamic>>('/auth/me')).thenThrow(semRede);
+      stubSavedUser('user-1');
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+    });
+
+    test(
+        'com sinal ruim, a abertura não espera o servidor além do limite: '
+        'entra com o perfil salvo (Fase 8D)', () async {
+      repository = AuthRepository(
+        apiClient: api,
+        session: session,
+        clearLocalCache: db.clearSessionsCache,
+        restoreTimeout: const Duration(milliseconds: 10),
+      );
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me'))
+          .thenAnswer((_) => Completer<Response<Map<String, dynamic>>>().future);
+      stubSavedUser('user-1');
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Success<AuthUser>>());
+      expect(repository.currentUser!.id, 'user-1');
+      verifyNever(() => storage.clear());
+    });
+
+    test(
+        'com sinal ruim e sem perfil salvo, vai para o login com o motivo '
+        '(Fase 8D)', () async {
+      repository = AuthRepository(
+        apiClient: api,
+        session: session,
+        clearLocalCache: db.clearSessionsCache,
+        restoreTimeout: const Duration(milliseconds: 10),
+      );
+      stubSavedTokens();
+      when(() => api.get<Map<String, dynamic>>('/auth/me'))
+          .thenAnswer((_) => Completer<Response<Map<String, dynamic>>>().future);
+
+      final result = await repository.restoreSession();
+
+      expect(result, isA<Failure<AuthUser>>());
+      expect((result as Failure<AuthUser>).message,
+          'O servidor demorou para responder. Verifique a internet e tente de '
+          'novo.');
+    });
+
+    test('o limite padrão de espera da abertura é de 5 segundos (Fase 8D)', () {
+      expect(AuthRepository.defaultRestoreTimeout, const Duration(seconds: 5));
     });
 
     test('sem rede na abertura e sem perfil salvo, continua indo para o login',
@@ -469,6 +579,55 @@ void main() {
     await repository.logout();
 
     expect(repository.isAuthenticated, isFalse);
+    expect(await session.readAccessToken(), isNull);
+  });
+
+  group('"Sair" que falha no meio (Fase 8D)', () {
+    Future<void> loggedIn() async {
+      stubLogin(token: fakeJwt({'sub': 'user-1'}));
+      stubMe({'id': 'user-1', 'name': 'Carla', 'email': 'c@s.com', 'role': 'CONSULTANT'});
+      await repository.login(email: 'c@s.com', password: '123456', keepSignedIn: true);
+      when(() => api.post<void>('/auth/logout')).thenAnswer(
+          (_) async => Response<void>(requestOptions: RequestOptions(path: '/auth/logout')));
+    }
+
+    test('a keystore que não apaga não impede apagar o cache, e o usuário sai',
+        () async {
+      await loggedIn();
+      await seedCache();
+      when(() => storage.clear()).thenThrow(PlatformException(code: 'keystore'));
+
+      await repository.logout();
+
+      expect(repository.isAuthenticated, isFalse);
+      expect(await session.readAccessToken(), isNull);
+      expect(await db.select(db.sessions).get(), isEmpty);
+    });
+
+    test('o banco que não apaga também não segura o usuário', () async {
+      repository = AuthRepository(
+        apiClient: api,
+        session: session,
+        clearLocalCache: () async => throw Exception('disco cheio'),
+      );
+      await loggedIn();
+
+      await repository.logout();
+
+      expect(repository.isAuthenticated, isFalse);
+      verify(() => storage.clear()).called(greaterThanOrEqualTo(1));
+    });
+  });
+
+  test(
+      'a sessão que expira avisa o app mesmo que o armazenamento falhe ao '
+      'apagar (Fase 8D)', () async {
+    when(() => storage.clear()).thenThrow(PlatformException(code: 'keystore'));
+    final expired = session.onExpired.first;
+
+    await session.expire();
+
+    await expectLater(expired, completes);
     expect(await session.readAccessToken(), isNull);
   });
 
