@@ -11,6 +11,7 @@ import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../utils/cpf.dart';
+import '../../utils/email.dart';
 import '../../utils/result.dart';
 
 /// Em que pé está o CPF digitado em "Adicionar participante".
@@ -83,10 +84,6 @@ class AddParticipantViewModel extends ChangeNotifier {
   static const String _addFailed =
       'Não foi possível adicionar o participante. Tente de novo.';
 
-  /// Só para barrar erro de digitação no endereço que recebe o certificado:
-  /// algo, arroba, algo, ponto, algo — sem espaços. O backend não confere.
-  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-
   StreamSubscription<TrainingSession?>? _sessionSubscription;
   StreamSubscription<void>? _reconnectSubscription;
 
@@ -108,6 +105,16 @@ class AddParticipantViewModel extends ChangeNotifier {
   String? _autoName;
   String? _autoEmail;
   bool _filledFromRegistry = false;
+
+  /// Conta as consultas: a resposta só vale se for a da última (Fase 8D).
+  /// Pelo CPF não dá — digitar, apagar um dígito e redigitar o mesmo CPF
+  /// dispara duas consultas iguais, e a primeira a voltar poria o nome do
+  /// cadastro por cima de uma correção feita depois da segunda.
+  int _lookupGeneration = 0;
+
+  /// A consulta acabou sem cadastro: o foco vai para o nome (Fase 8D). Ver
+  /// [takeNameFocus].
+  bool _nameFocusPending = false;
 
   bool _submitting = false;
   String? _error;
@@ -195,10 +202,19 @@ class AddParticipantViewModel extends ChangeNotifier {
         _ => null,
       };
 
-  /// Vazio vale: o e-mail é opcional.
+  /// Vazio vale: o e-mail é opcional. Preenchido, segue a regra do servidor
+  /// (`isValidEmail`).
   bool get isEmailValid {
     final email = _email.trim();
-    return email.isEmpty || _emailPattern.hasMatch(email);
+    return email.isEmpty || isValidEmail(email);
+  }
+
+  /// A tela pergunta, a cada mudança, se deve levar o foco ao nome — e a
+  /// pergunta vale uma vez só.
+  bool takeNameFocus() {
+    final pending = _nameFocusPending;
+    _nameFocusPending = false;
+    return pending;
   }
 
   bool get canSubmit =>
@@ -230,7 +246,7 @@ class AddParticipantViewModel extends ChangeNotifier {
     }
     _cpfCheck = CpfCheck.checking;
     notifyListeners();
-    unawaited(_lookup(_cpf));
+    unawaited(_lookup(_cpf, ++_lookupGeneration));
   }
 
   /// Aceita o CPF com ou sem máscara. Completo e válido, dispara a consulta.
@@ -243,6 +259,8 @@ class AddParticipantViewModel extends ChangeNotifier {
     _error = null;
     _enrolledName = null;
     _clearRegistryFill();
+    // A consulta no ar, se houver, deixa de valer.
+    final generation = ++_lookupGeneration;
 
     if (cpf.length < 11) {
       _cpfCheck = CpfCheck.incomplete;
@@ -254,7 +272,7 @@ class AddParticipantViewModel extends ChangeNotifier {
       _cpfCheck = CpfCheck.offline;
     } else {
       _cpfCheck = CpfCheck.checking;
-      unawaited(_lookup(cpf));
+      unawaited(_lookup(cpf, generation));
     }
     notifyListeners();
   }
@@ -279,7 +297,7 @@ class AddParticipantViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _lookup(String cpf) async {
+  Future<void> _lookup(String cpf, int generation) async {
     Result<CpfLookup> result;
     try {
       result = await _participantRepository
@@ -289,8 +307,8 @@ class AddParticipantViewModel extends ChangeNotifier {
       // O tempo esgotado também cai aqui.
       result = Failure(Exception('$error'));
     }
-    // Resposta atrasada: a tela fechou, ou o CPF já é outro.
-    if (_disposed || cpf != _cpf) return;
+    // Resposta atrasada: a tela fechou, ou outra consulta veio depois.
+    if (_disposed || generation != _lookupGeneration) return;
 
     switch (result) {
       case Success(:final data) when data.enrolled:
@@ -303,7 +321,11 @@ class AddParticipantViewModel extends ChangeNotifier {
         unawaited(_participantRepository.syncSession(sessionId));
       case Success(:final data):
         _cpfCheck = CpfCheck.available;
-        if (data.registered) _fillFromRegistry(data);
+        if (data.registered) {
+          _fillFromRegistry(data);
+        } else {
+          _nameFocusPending = true;
+        }
       case Failure():
         _cpfCheck = CpfCheck.unverified;
     }
@@ -407,6 +429,7 @@ class AddParticipantViewModel extends ChangeNotifier {
     _autoName = null;
     _autoEmail = null;
     _filledFromRegistry = false;
+    _nameFocusPending = false;
   }
 
   // A consulta e o "adicionar" podem responder depois de a tela fechar.

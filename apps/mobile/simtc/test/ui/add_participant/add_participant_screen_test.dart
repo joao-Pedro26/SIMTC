@@ -384,6 +384,22 @@ void main() {
   });
 
   testWidgets(
+      'a consulta sem cadastro leva o foco para o nome (Fase 8D)',
+      (tester) async {
+    await seedSession();
+    cpfIsFree();
+    await pumpAdd(tester);
+
+    await typeCpf(tester);
+
+    final name = tester.widget<EditableText>(find.descendant(
+      of: field('campo-nome'),
+      matching: find.byType(EditableText),
+    ));
+    expect(name.focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets(
       'CPF com cadastro de outro treinamento: preenche nome e e-mail e avisa '
       'de onde vieram', (tester) async {
     await seedSession();

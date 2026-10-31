@@ -374,6 +374,60 @@ void main() {
       expect(vm.filledFromRegistry, isFalse);
     });
 
+    test(
+        'a resposta atrasada do mesmo CPF, redigitado, também é ignorada — '
+        'vale a última consulta (Fase 8D)', () async {
+      final first = Completer<Result<CpfLookup>>();
+      final second = Completer<Result<CpfLookup>>();
+      final answers = [first, second];
+      when(() => participants.lookupCpf('sess-1', cpf))
+          .thenAnswer((_) => answers.removeAt(0).future);
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      vm.setCpf(cpf.substring(0, 10));
+      vm.setCpf(cpf);
+      second.complete(const Success(free));
+      await pumpEventQueue();
+      vm.setName('Fernanda corrigida à mão');
+
+      first.complete(const Success(registered));
+      await pumpEventQueue();
+
+      expect(vm.name, 'Fernanda corrigida à mão');
+      expect(vm.filledFromRegistry, isFalse);
+      expect(vm.cpfCheck, CpfCheck.available);
+    });
+
+    test(
+        'a consulta que acaba sem cadastro pede o foco no nome, uma vez só '
+        '(Fase 8D)', () async {
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      expect(vm.takeNameFocus(), isFalse, reason: 'a consulta ainda está no ar');
+      await pumpEventQueue();
+
+      expect(vm.takeNameFocus(), isTrue);
+      expect(vm.takeNameFocus(), isFalse);
+    });
+
+    test('com cadastro, ou já inscrito, o foco não muda (Fase 8D)', () async {
+      lookupAnswers(registered);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      expect(vm.takeNameFocus(), isFalse);
+
+      lookupAnswers(
+        const CpfLookup(registered: true, enrolled: true, name: 'Ana'),
+        forCpf: otherCpf,
+      );
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+      expect(vm.takeNameFocus(), isFalse);
+    });
+
     test('enquanto consulta, não dá para adicionar', () async {
       final answer = Completer<Result<CpfLookup>>();
       when(() => participants.lookupCpf('sess-1', cpf))
@@ -724,7 +778,16 @@ void main() {
       final vm = await filled();
       expect(vm.isEmailValid, isTrue, reason: 'vazio vale');
 
-      for (final wrong in ['fernanda', 'fernanda@', 'fernanda@empresa', 'a b@c.com']) {
+      // A regra do servidor (Fase 8D): `a@b.c` e o ponto repetido também não.
+      for (final wrong in [
+        'fernanda',
+        'fernanda@',
+        'fernanda@empresa',
+        'a b@c.com',
+        'a@b.c',
+        'maria@empresa..com',
+        'm@x.com.',
+      ]) {
         vm.setEmail(wrong);
         expect(vm.isEmailValid, isFalse, reason: wrong);
         expect(vm.canSubmit, isFalse, reason: wrong);

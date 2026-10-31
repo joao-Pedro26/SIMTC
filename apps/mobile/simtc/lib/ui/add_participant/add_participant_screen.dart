@@ -55,6 +55,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final FocusNode _cpfFocus = FocusNode();
+  final FocusNode _nameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
 
   @override
@@ -73,6 +74,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _cpfFocus.dispose();
+    _nameFocus.dispose();
     _emailFocus.dispose();
     super.dispose();
   }
@@ -90,6 +92,13 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     }
     if (_viewModel.cpf.isEmpty && _cpfController.text.isNotEmpty) {
       _cpfController.clear();
+    }
+    // A consulta acabou sem cadastro, com o admin ainda no CPF: o nome é o
+    // próximo a digitar (Fase 8D). O campo só destrava no quadro seguinte.
+    if (_viewModel.takeNameFocus() && _cpfFocus.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _cpfFocus.hasFocus) _nameFocus.requestFocus();
+      });
     }
   }
 
@@ -317,6 +326,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
       key: const Key('campo-nome'),
       label: 'Nome completo',
       controller: _nameController,
+      focusNode: _nameFocus,
       icon: AppIcons.profile,
       textCapitalization: TextCapitalization.words,
       textInputAction: TextInputAction.next,
