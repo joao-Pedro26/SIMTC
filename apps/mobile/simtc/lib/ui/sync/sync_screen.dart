@@ -16,6 +16,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
+import '../core/widgets/inline_notice.dart';
 import '../core/widgets/status_chip.dart';
 import 'sync_queue_labels.dart';
 
@@ -102,6 +103,8 @@ class SyncScreen extends StatelessWidget {
           ),
           children: [
             if (isOffline && queue.isNotEmpty) _buildOfflineCard(queue.length),
+            if (!isOffline && queue.isNotEmpty && sync.isWaitingForCatalog)
+              _buildCatalogNotice(),
             if (queue.isEmpty)
               _buildEmpty()
             else
@@ -193,6 +196,21 @@ class SyncScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// A fila espera o catálogo que o "Limpar cache local" apagou (Fase 8D —
+  /// não está no canvas): diz por que ela não sai, e que sai sozinha.
+  Widget _buildCatalogNotice() {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.lg),
+      child: InlineNotice(
+        key: Key('sync-catalog-notice'),
+        icon: AppIcons.info,
+        message: 'A fila espera o catálogo de avaliação, apagado do aparelho '
+            'pelo "Limpar cache local". Ela sai sozinha quando a aba Sessões '
+            'baixar o catálogo de novo.',
       ),
     );
   }

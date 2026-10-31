@@ -152,6 +152,7 @@ void main() {
   AssessmentSyncService startService({
     List<Duration> retryDelays = const [Duration(hours: 1)],
     AssessmentRepository? repository,
+    DateTime Function()? now,
   }) {
     final started = AssessmentSyncService(
       apiClient: api,
@@ -160,7 +161,7 @@ void main() {
       connectivity: connectivity,
       authChanges: user,
       currentUserId: () => user.value,
-      now: () => DateTime(2026, 9, 29, 9, 15),
+      now: now ?? () => DateTime(2026, 9, 29, 9, 15),
       retryDelays: retryDelays,
     );
     service = started..start();
@@ -302,9 +303,14 @@ void main() {
         SendFailure.timeout,
       ),
       (const ApiException(message: 'x', statusCode: 503), SendFailure.serverDown),
+      // O pedido inteiro recusado não é a recusa de um item (Fase 8D).
       (
         const ApiException(message: 'Consultor não identificado', statusCode: 409),
-        SendFailure.refused,
+        SendFailure.sendFailed,
+      ),
+      (
+        const ApiException(message: 'items must be an array', statusCode: 400),
+        SendFailure.sendFailed,
       ),
     ];
 
@@ -315,6 +321,45 @@ void main() {
       await until(() async => await statusOf(a.id) == LocalSyncStatus.error);
       expect((await row(a.id)).lastError, reason, reason: '$error');
     }
+  });
+
+  test(
+      'um 4xx no pedido inteiro não libera o "Descartar": a fila tenta de novo '
+      'sozinha (Fase 8D)', () async {
+    failWith(const ApiException(message: 'Bad Request', statusCode: 400));
+    final sync = startService(retryDelays: const [Duration(milliseconds: 50)]);
+
+    final a = await confirmed('tp-1');
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.error);
+    await until(() => !sync.isSending);
+    expect((await row(a.id)).lastError, SendFailure.sendFailed);
+    expect(SendFailure.refusals, isNot(contains(SendFailure.sendFailed)));
+    expect(await sync.discardRefused(a.id), isFalse);
+    expect(await db.select(db.localAssessments).get(), hasLength(1));
+
+    acceptAll();
+
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.synced);
+  });
+
+  test(
+      'um item que a resposta não cita não é uma recusa: fica com o erro do '
+      'envio, sem o "Descartar" (Fase 8D)', () async {
+    when(() => api.post<List<dynamic>>(any(), data: any(named: 'data')))
+        .thenAnswer((invocation) async {
+      sent.add(payloadOf(invocation));
+      return Response<List<dynamic>>(
+        requestOptions: RequestOptions(path: AssessmentSyncService.syncPath),
+        statusCode: 201,
+        data: const [],
+      );
+    });
+    startService();
+
+    final a = await confirmed('tp-1');
+
+    await until(() async => await statusOf(a.id) == LocalSyncStatus.error);
+    expect((await row(a.id)).lastError, SendFailure.sendFailed);
   });
 
   test(
@@ -365,9 +410,10 @@ void main() {
 
   test(
       'sem o catálogo no aparelho (depois do "Limpar cache local"), a '
-      'avaliação com marcações não sai vazia: espera o catálogo voltar',
+      'avaliação com marcações não sai vazia: espera o catálogo voltar, e sai '
+      'assim que ele volta, sem esperar a próxima tentativa (Fase 8D)',
       () async {
-    final sync = startService(retryDelays: const [Duration(milliseconds: 20)]);
+    final sync = startService(retryDelays: const [Duration(hours: 1)]);
     final draft = await assessments.openDraft(
       trainingParticipantId: 'tp-1',
       sessionId: 'sess-1',
@@ -386,8 +432,9 @@ void main() {
     expect(await statusOf(draft.id), LocalSyncStatus.pendingSync);
     expect((await row(draft.id)).lastError, isNull);
     expect(sync.queue, hasLength(1));
+    expect(sync.isWaitingForCatalog, isTrue);
 
-    // A Home baixa o catálogo de novo: a próxima tentativa leva a marcação.
+    // A Home baixa o catálogo de novo: o envio sai na hora, com a marcação.
     await db.into(db.assessmentCategories).insert(
         AssessmentCategoriesCompanion.insert(id: 'cat-1', code: 'A', name: 'Antes', order: 1));
     await db.into(db.infractions).insert(InfractionsCompanion.insert(
@@ -399,6 +446,7 @@ void main() {
     expect(sent.single.single['items'], [
       {'infractionNoteId': 'note-m'},
     ]);
+    expect(sync.isWaitingForCatalog, isFalse);
   });
 
   test('uma falha ao entrar (dar dono às avaliações antigas) não impede '
@@ -688,6 +736,30 @@ void main() {
     await until(() => sync.lastSyncedAt != null);
     expect(sync.lastSyncedAt, DateTime(2026, 9, 29, 9, 15));
     expect(sync.queue, isEmpty);
+  });
+
+  test(
+      'a última sincronização não volta para trás quando a reavaliação apaga '
+      'a avaliação enviada (Fase 8D)', () async {
+    var clock = DateTime(2026, 9, 29, 9, 15);
+    final sync = startService(now: () => clock);
+    await confirmed('tp-1');
+    await until(() => sync.lastSyncedAt == DateTime(2026, 9, 29, 9, 15));
+    clock = DateTime(2026, 9, 29, 9, 40);
+    await confirmed('tp-2');
+    await until(() => sync.lastSyncedAt == DateTime(2026, 9, 29, 9, 40));
+    await until(() => !sync.isSending);
+
+    // "Reavaliar" o tp-2: o rascunho novo apaga do aparelho a enviada às 9:40.
+    await assessments.openDraft(
+      trainingParticipantId: 'tp-2',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+      consultantId: 'c-eu',
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(sync.lastSyncedAt, DateTime(2026, 9, 29, 9, 40));
   });
 
   test('sair da conta para de seguir a fila de quem saiu', () async {

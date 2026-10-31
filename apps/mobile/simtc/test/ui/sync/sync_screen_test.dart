@@ -44,6 +44,7 @@ void main() {
     List<LocalAssessment> queue = const [],
     Set<String> sendingIds = const {},
     DateTime? lastSyncedAt,
+    bool waitingForCatalog = false,
     Size size = const Size(420, 1600),
     FormFactor formFactor = FormFactor.phone,
   }) async {
@@ -56,6 +57,7 @@ void main() {
       queue: queue,
       sendingIds: sendingIds,
       lastSyncedAt: lastSyncedAt,
+      waitingForCatalog: waitingForCatalog,
     );
     final router = GoRouter(
       initialLocation: AppRoutes.sync,
@@ -284,6 +286,58 @@ void main() {
 
     expect(find.text('Tentar novamente'), findsOneWidget);
     expect(find.text('Descartar'), findsNothing);
+  });
+
+  testWidgets('o erro do envio inteiro não tem "Descartar": tenta sozinha (Fase 8D)',
+      (tester) async {
+    await pump(tester, queue: [
+      queuedAssessment(
+        '4',
+        participantName: 'Rodrigo Tavares',
+        status: LocalSyncStatus.error,
+        lastAttemptAt: DateTime(2026, 9, 29, 7, 58),
+        lastError: SendFailure.sendFailed,
+      ),
+    ]);
+
+    expect(find.text('Falhou às 07:58 · erro no envio'), findsOneWidget);
+    expect(find.text('Tentar novamente'), findsOneWidget);
+    expect(find.text('Descartar'), findsNothing);
+  });
+
+  group('fila esperando o catálogo (Fase 8D)', () {
+    const aviso = Key('sync-catalog-notice');
+
+    testWidgets('diz por que a fila não sai, e que sai sozinha', (tester) async {
+      await pump(tester, queue: filaDoCanvas(), waitingForCatalog: true);
+
+      expect(find.byKey(aviso), findsOneWidget);
+      expect(
+        find.text('A fila espera o catálogo de avaliação, apagado do aparelho '
+            'pelo "Limpar cache local". Ela sai sozinha quando a aba Sessões '
+            'baixar o catálogo de novo.'),
+        findsOneWidget,
+      );
+      // O aviso fica acima da lista de pendentes.
+      expect(
+        tester.getTopLeft(find.byKey(aviso)).dy,
+        lessThan(tester.getTopLeft(find.text('Pendentes')).dy),
+      );
+    });
+
+    testWidgets('sem rede, vale o cartão de sem conexão', (tester) async {
+      await goOffline();
+      await pump(tester, queue: filaDoCanvas(), waitingForCatalog: true);
+
+      expect(find.byKey(const Key('sync-offline-card')), findsOneWidget);
+      expect(find.byKey(aviso), findsNothing);
+    });
+
+    testWidgets('com o catálogo no aparelho, nada a dizer', (tester) async {
+      await pump(tester, queue: filaDoCanvas());
+
+      expect(find.byKey(aviso), findsNothing);
+    });
   });
 
   testWidgets(

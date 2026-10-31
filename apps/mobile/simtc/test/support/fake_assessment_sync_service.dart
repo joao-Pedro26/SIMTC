@@ -21,9 +21,11 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
     List<LocalAssessment> queue = const [],
     Set<String> sendingIds = const {},
     DateTime? lastSyncedAt,
+    bool waitingForCatalog = false,
   })  : _queue = queue,
         _sendingIds = sendingIds,
         _lastSyncedAt = lastSyncedAt,
+        _waitingForCatalog = waitingForCatalog,
         super(
           apiClient: _UnusedApiClient(),
           assessments: _UnusedAssessmentRepository(),
@@ -36,6 +38,7 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
   List<LocalAssessment> _queue;
   Set<String> _sendingIds;
   final DateTime? _lastSyncedAt;
+  final bool _waitingForCatalog;
 
   /// Quantas vezes a tela pediu para enviar agora.
   int syncNowCalls = 0;
@@ -66,6 +69,9 @@ class FakeAssessmentSyncService extends AssessmentSyncService {
 
   @override
   DateTime? get lastSyncedAt => _lastSyncedAt;
+
+  @override
+  bool get isWaitingForCatalog => _waitingForCatalog;
 
   @override
   Future<void> syncNow() async => syncNowCalls++;

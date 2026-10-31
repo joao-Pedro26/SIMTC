@@ -19,6 +19,11 @@ abstract final class SendFailure {
   static const String serverDown = 'servidor indisponível';
   static const String refused = 'recusada pelo servidor';
 
+  /// O pedido inteiro voltou com erro (um 4xx, como um 400 de validação), ou
+  /// a resposta não falou de um item: nenhum item foi recusado de fato, e a
+  /// fila tenta de novo sozinha (Fase 8D). Só a recusa item a item é [refused].
+  static const String sendFailed = 'erro no envio';
+
   /// O servidor recusou porque o participante não está mais em avaliação com
   /// quem enviou (Fase 6B): um ADMIN o desatribuiu, ou o consultor saiu da
   /// sessão, antes de o envio chegar.
@@ -103,6 +108,7 @@ class AssessmentSyncService extends ChangeNotifier {
 
   StreamSubscription<List<LocalAssessment>>? _queueSubscription;
   StreamSubscription<DateTime?>? _lastSyncedSubscription;
+  StreamSubscription<bool>? _catalogSubscription;
   StreamSubscription<void>? _reconnectSubscription;
   Timer? _retryTimer;
 
@@ -140,6 +146,7 @@ class AssessmentSyncService extends ChangeNotifier {
   List<LocalAssessment> _queue = const [];
   Set<String> _sendingIds = const {};
   DateTime? _lastSyncedAt;
+  bool _waitingForCatalog = false;
 
   /// A fila de quem está logado: confirmadas e ainda não aceitas, na ordem
   /// do "Confirmar".
@@ -152,8 +159,16 @@ class AssessmentSyncService extends ChangeNotifier {
   bool isSendingItem(String localAssessmentId) =>
       _sendingIds.contains(localAssessmentId);
 
-  /// Quando o último envio foi aceito — nulo se nada foi aceito ainda.
+  /// Quando o último envio foi aceito — nulo se nada foi aceito ainda. Nunca
+  /// volta para trás enquanto o mesmo usuário está logado: a reavaliação
+  /// apaga do aparelho a avaliação já enviada, e sem ela o banco diria o
+  /// horário de um envio anterior (Fase 8D).
   DateTime? get lastSyncedAt => _lastSyncedAt;
+
+  /// A fila tem marcações e o catálogo não está no aparelho (o "Limpar cache
+  /// local" apagou): ela espera, e sai sozinha assim que o catálogo voltar
+  /// (Fase 8D). A aba Sincronizar diz por que a fila não saiu.
+  bool get isWaitingForCatalog => _waitingForCatalog;
 
   /// Começa a seguir o usuário logado, a fila dele e a conexão. Chamado uma
   /// vez, pelo `AppDependencies`.
@@ -175,8 +190,10 @@ class AssessmentSyncService extends ChangeNotifier {
     _retryTimer?.cancel();
     _queueSubscription?.cancel();
     _lastSyncedSubscription?.cancel();
+    _catalogSubscription?.cancel();
     _queue = const [];
     _lastSyncedAt = null;
+    _waitingForCatalog = false;
     _firstQueueEmission = false;
     _sessionsToRefresh.clear();
     _reacceptedInFlight.clear();
@@ -206,11 +223,25 @@ class AssessmentSyncService extends ChangeNotifier {
         );
     _lastSyncedSubscription = _assessments.watchLastSyncedAt(userId).listen(
       (at) {
+        // Ver [lastSyncedAt]: um horário anterior ao que a tela já mostra é
+        // o de um envio mais antigo, que sobrou no banco.
+        final last = _lastSyncedAt;
+        if (at == null || (last != null && !at.isAfter(last))) return;
         _lastSyncedAt = at;
         notifyListeners();
       },
       onError: (Object error) =>
           debugPrint('Leitura da última sincronização falhou: $error'),
+    );
+    _catalogSubscription = _assessments.watchHasCatalog().listen(
+      (hasCatalog) {
+        if (!hasCatalog || !_waitingForCatalog) return;
+        _waitingForCatalog = false;
+        notifyListeners();
+        unawaited(syncNow());
+      },
+      onError: (Object error) =>
+          debugPrint('Leitura do catálogo falhou: $error'),
     );
   }
 
@@ -303,14 +334,18 @@ class AssessmentSyncService extends ChangeNotifier {
     final batch = await _assessments.loadQueue(userId);
     if (batch.isEmpty) {
       _failures = 0;
+      _setWaitingForCatalog(false);
       return;
     }
     if (await _assessments.waitsForCatalog(batch)) {
-      // Ver `AssessmentRepository.waitsForCatalog`: a fila espera, sem erro,
-      // e tenta de novo pela espera crescente — até a Home baixar o catálogo.
+      // Ver `AssessmentRepository.waitsForCatalog`: a fila espera, sem erro.
+      // Ela sai assim que o catálogo voltar (ver [isWaitingForCatalog]); a
+      // espera crescente fica como rede de segurança.
+      _setWaitingForCatalog(true);
       _scheduleRetry();
       return;
     }
+    _setWaitingForCatalog(false);
 
     _sendingIds = {for (final a in batch) a.id};
     notifyListeners();
@@ -327,7 +362,7 @@ class AssessmentSyncService extends ChangeNotifier {
       for (final assessment in batch) {
         final id = assessment.trainingParticipantId;
         results[assessment.id] =
-            outcome.containsKey(id) ? outcome[id] : SendFailure.refused;
+            outcome.containsKey(id) ? outcome[id] : SendFailure.sendFailed;
       }
     } on ApiException catch (error) {
       // 401: nada falhou por culpa da avaliação, e a fila não ganha erro. Se
@@ -427,7 +462,13 @@ class AssessmentSyncService extends ChangeNotifier {
     if (error.isNetworkError) return SendFailure.noConnection;
     final status = error.statusCode;
     if (status != null && status >= 500) return SendFailure.serverDown;
-    return SendFailure.refused;
+    return SendFailure.sendFailed;
+  }
+
+  void _setWaitingForCatalog(bool waiting) {
+    if (_waitingForCatalog == waiting) return;
+    _waitingForCatalog = waiting;
+    notifyListeners();
   }
 
   void _scheduleRetry() {
@@ -450,6 +491,7 @@ class AssessmentSyncService extends ChangeNotifier {
     _retryTimer?.cancel();
     _queueSubscription?.cancel();
     _lastSyncedSubscription?.cancel();
+    _catalogSubscription?.cancel();
     _reconnectSubscription?.cancel();
     super.dispose();
   }

@@ -347,6 +347,14 @@ class AssessmentRepository {
     return item != null;
   }
 
+  /// Se o catálogo está no aparelho, avisando quando muda — é como a fila que
+  /// espera por ele ([waitsForCatalog]) sabe que pode sair (Fase 8D).
+  Stream<bool> watchHasCatalog() {
+    return (_db.select(_db.infractionNotes)..limit(1))
+        .watch()
+        .map((notes) => notes.isNotEmpty);
+  }
+
   /// Quantas avaliações [ownerUserId] iniciou e ainda não confirmou — todas,
   /// inclusive as presas (sessão concluída, participante liberado): a
   /// confirmação do "Sair" avisa que elas ficam no aparelho (Fase 8A).

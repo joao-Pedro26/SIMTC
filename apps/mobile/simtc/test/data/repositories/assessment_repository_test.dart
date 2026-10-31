@@ -1000,5 +1000,29 @@ void main() {
         DateTime(2026, 9, 29, 9, 30),
       );
     });
+
+    test('avisa quando o catálogo some e quando ele volta (Fase 8D)', () async {
+      final seen = <bool>[];
+      final subscription = repository.watchHasCatalog().listen(seen.add);
+      addTearDown(subscription.cancel);
+      await pumpEventQueue();
+      expect(seen, [false]);
+
+      await db.into(db.assessmentCategories).insert(AssessmentCategoriesCompanion.insert(
+          id: 'cat-1', code: 'A', name: 'Antes', order: 1));
+      await db.into(db.infractions).insert(InfractionsCompanion.insert(
+          id: 'inf-1', categoryId: 'cat-1', description: 'Cinto', order: 1));
+      await pumpEventQueue();
+      expect(seen, [false], reason: 'sem nota, ainda não há o que avaliar');
+
+      await db.into(db.infractionNotes).insert(InfractionNotesCompanion.insert(
+          id: 'note-m', infractionId: 'inf-1', noteType: 'M', deduction: 3));
+      await pumpEventQueue();
+      expect(seen, [false, true]);
+
+      await db.clearDownloadedData();
+      await pumpEventQueue();
+      expect(seen, [false, true, false]);
+    });
   });
 }
