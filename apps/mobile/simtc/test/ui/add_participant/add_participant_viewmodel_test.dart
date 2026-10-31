@@ -566,6 +566,38 @@ void main() {
       expect(vm.isCheckingCpf, isFalse);
     });
 
+    test(
+        'a rede voltar com um "adicionar" no ar não consulta: o formulário '
+        'pode ser zerado antes da resposta (Fase 8D)', () async {
+      when(() => participants.lookupCpf('sess-1', cpf)).thenAnswer(
+        (_) async => Failure<CpfLookup>(Exception('sem rede'), 'x'),
+      );
+      final adding = Completer<Result<SessionParticipant>>();
+      when(() => participants.add(
+            'sess-1',
+            cpf: any(named: 'cpf'),
+            name: any(named: 'name'),
+            email: any(named: 'email'),
+            participationType: any(named: 'participationType'),
+          )).thenAnswer((_) => adding.future);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      vm.setName('Fernanda Lopes Meireles');
+      final submitted = vm.submit(addAnother: true);
+
+      connectivity.reconnect();
+      await pumpEventQueue();
+      adding.complete(Success(added()));
+      await submitted;
+      await pumpEventQueue();
+
+      verify(() => participants.lookupCpf('sess-1', cpf)).called(1);
+      expect(vm.cpf, '');
+      expect(vm.cpfCheck, CpfCheck.incomplete);
+      expect(vm.name, '');
+    });
+
     test('a consulta que falhou é refeita quando a rede volta', () async {
       when(() => participants.lookupCpf('sess-1', cpf)).thenAnswer(
         (_) async => Failure<CpfLookup>(Exception('sem rede'), 'x'),

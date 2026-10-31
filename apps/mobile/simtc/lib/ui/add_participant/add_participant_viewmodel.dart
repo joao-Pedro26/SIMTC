@@ -246,6 +246,9 @@ class AddParticipantViewModel extends ChangeNotifier {
   /// A rede voltou: o CPF que ficou sem consulta — digitado sem conexão, ou
   /// cuja consulta falhou — é consultado sozinho.
   void _lookupAgain() {
+    // Com um "adicionar" no ar, o formulário pode ser zerado ("Salvar e
+    // adicionar outro") antes de a consulta voltar.
+    if (_submitting) return;
     if (_cpfCheck != CpfCheck.offline && _cpfCheck != CpfCheck.unverified) {
       return;
     }
@@ -431,6 +434,8 @@ class AddParticipantViewModel extends ChangeNotifier {
   }
 
   void _reset() {
+    // A consulta no ar, se houver, era do participante que acabou de entrar.
+    _lookupGeneration++;
     _cpf = '';
     _name = '';
     _email = '';

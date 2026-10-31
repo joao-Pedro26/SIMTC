@@ -56,6 +56,31 @@ class _FailingEntryRepository extends AssessmentRepository {
   }
 }
 
+/// O catálogo termina de gravar logo depois de a rodada ver que ele faltava.
+class _CatalogArrivesMidRound extends AssessmentRepository {
+  _CatalogArrivesMidRound({required super.database}) : _db = database;
+
+  final AppDatabase _db;
+  bool _arrived = false;
+
+  @override
+  Future<bool> waitsForCatalog(List<LocalAssessment> assessments) async {
+    final waits = await super.waitsForCatalog(assessments);
+    if (waits && !_arrived) {
+      _arrived = true;
+      await _db.into(_db.assessmentCategories).insert(
+          AssessmentCategoriesCompanion.insert(id: 'cat-1', code: 'A', name: 'Antes', order: 1));
+      await _db.into(_db.infractions).insert(InfractionsCompanion.insert(
+          id: 'inf-1', categoryId: 'cat-1', description: 'Cinto', order: 1));
+      await _db.into(_db.infractionNotes).insert(InfractionNotesCompanion.insert(
+          id: 'note-m', infractionId: 'inf-1', noteType: 'M', deduction: 3));
+      // O aviso do catálogo chega antes de a rodada marcar a espera.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    return waits;
+  }
+}
+
 void main() {
   late AppDatabase db;
   late AssessmentRepository assessments;
@@ -446,6 +471,30 @@ void main() {
     expect(sent.single.single['items'], [
       {'infractionNoteId': 'note-m'},
     ]);
+    expect(sync.isWaitingForCatalog, isFalse);
+  });
+
+  test(
+      'o catálogo que chega durante a rodada que viu que ele faltava: a fila '
+      'sai na repetição, sem esperar a próxima tentativa (Fase 8D)', () async {
+    final draft = await assessments.openDraft(
+      trainingParticipantId: 'tp-1',
+      sessionId: 'sess-1',
+      ownerUserId: 'user-1',
+      consultantId: 'c-eu',
+    );
+    await assessments.mark(
+      localAssessmentId: draft.id,
+      infractionId: 'inf-1',
+      infractionNoteId: 'note-m',
+    );
+    await assessments.confirm(draft.id, participantName: 'P tp-1', score: 70);
+    final sync = startService(
+      retryDelays: const [Duration(hours: 1)],
+      repository: _CatalogArrivesMidRound(database: db),
+    );
+
+    await until(() async => await statusOf(draft.id) == LocalSyncStatus.synced);
     expect(sync.isWaitingForCatalog, isFalse);
   });
 

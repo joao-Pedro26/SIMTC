@@ -235,9 +235,10 @@ class AssessmentSyncService extends ChangeNotifier {
     );
     _catalogSubscription = _assessments.watchHasCatalog().listen(
       (hasCatalog) {
-        if (!hasCatalog || !_waitingForCatalog) return;
-        _waitingForCatalog = false;
-        notifyListeners();
+        // Com uma rodada no ar, o catálogo pode ter chegado depois de ela ver
+        // que ele não estava: o `syncNow` a repete no fim (Fase 8D).
+        if (!hasCatalog || !(_waitingForCatalog || isSending)) return;
+        _setWaitingForCatalog(false);
         unawaited(syncNow());
       },
       onError: (Object error) =>

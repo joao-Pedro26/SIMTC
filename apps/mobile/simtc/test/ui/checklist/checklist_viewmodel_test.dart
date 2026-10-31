@@ -564,6 +564,29 @@ void main() {
     });
 
     test(
+        'a sessão baixada de novo, com o mesmo participante em andamento, não '
+        'faz o aviso piscar (Fase 8D)', () async {
+      await seedParticipant();
+      await seedCatalog();
+      await startOtherParticipant();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      expect(vm.isBlocked, isTrue);
+      final seen = <bool>[];
+      vm.addListener(() => seen.add(vm.isBlocked));
+
+      // O download depois de um envio regrava a linha, sem mudar nada.
+      await (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(const ParticipantsCompanion(name: Value('Carlos Eduardo Nunes')));
+      await pumpEventQueue();
+
+      expect(seen, isNot(contains(false)));
+      expect(vm.isBlocked, isTrue);
+      expect(vm.blockingParticipantName, 'Marina Lopes');
+    });
+
+    test(
         'o aviso aparece sem reabrir a tela quando outra avaliação começa '
         '(Fase 8D)', () async {
       await seedParticipant();

@@ -240,13 +240,13 @@ class SessionConsultantsViewModel extends ChangeNotifier with ListSearch {
   /// A primeira busca da equipe ainda não respondeu.
   bool get isTeamLoading => _teamLoading && _team == null;
 
-  /// O que a tela escreve no lugar da equipe; nulo quando há lista (ou
-  /// enquanto ela carrega).
   /// A equipe não carregou por uma falha do servidor: o aviso dela ("Não foi
   /// possível carregar a equipe") explica a lista vazia, e a busca não diz
   /// junto que não achou (Fase 8D).
   bool get teamFailed => _team == null && _teamFailure == _TeamFailure.failed;
 
+  /// O que a tela escreve no lugar da equipe; nulo quando há lista (ou
+  /// enquanto ela carrega).
   String? get teamNotice {
     if (_team != null) {
       return _allAvailable.isEmpty

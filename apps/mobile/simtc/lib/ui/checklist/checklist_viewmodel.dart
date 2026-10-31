@@ -456,34 +456,44 @@ class ChecklistViewModel extends ChangeNotifier {
   /// uma avaliação parada, [startedAfter] é o início dela: só a que começou
   /// depois a faz esperar.
   Future<void> _checkBlock({DateTime? startedAfter}) async {
-    _blockingParticipantId = null;
-    _blockingName = null;
+    final (blocking, name) = await _findBlock(startedAfter: startedAfter);
+    _blockingParticipantId = blocking;
+    _blockingName = name;
+  }
+
+  /// Quem está em andamento (e o nome dele), sem mexer na tela: os campos só
+  /// mudam depois das duas leituras. No meio delas, a tela pode se redesenhar
+  /// (o stream do participante avisa junto) e não pode ver o aviso sumir.
+  Future<(String?, String?)> _findBlock({DateTime? startedAfter}) async {
     final inProgress = await _assessmentRepository.findInProgressOther(
       ownerUserId: ownerUserId,
       consultantId: consultantId,
       exceptTrainingParticipantId: participantId,
       startedAfter: startedAfter,
     );
-    if (inProgress != null) await _block(inProgress.trainingParticipantId);
+    if (inProgress == null) return (null, null);
+    final other = await _participantRepository.findParticipant(
+      inProgress.trainingParticipantId,
+    );
+    return (inProgress.trainingParticipantId, other?.name);
   }
 
   /// Ver [isBlocked]: só antes de a avaliação começar, e nunca no meio de
   /// outra leitura ou gravação desta tela — elas conferem por conta própria.
   Future<void> _refreshBlock() async {
     if (_disposed || _loading || isStarted || _starting || _busy) return;
-    final blockingBefore = _blockingParticipantId;
-    final nameBefore = _blockingName;
+    final String? blocking;
+    final String? name;
     try {
-      await _checkBlock(startedAfter: _resumable?.startTime);
+      (blocking, name) = await _findBlock(startedAfter: _resumable?.startTime);
     } catch (_) {
-      // Uma falha do banco deixa o aviso como estava.
-      _blockingParticipantId = blockingBefore;
-      _blockingName = nameBefore;
-      return;
+      return; // Uma falha do banco deixa o aviso como estava.
     }
-    if (_blockingParticipantId != blockingBefore || _blockingName != nameBefore) {
-      notifyListeners();
-    }
+    if (_disposed) return;
+    if (blocking == _blockingParticipantId && name == _blockingName) return;
+    _blockingParticipantId = blocking;
+    _blockingName = name;
+    notifyListeners();
   }
 
   /// Guarda quem está em andamento e o nome dele, para o aviso.
