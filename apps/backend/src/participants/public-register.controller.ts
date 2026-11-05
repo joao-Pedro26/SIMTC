@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  HttpCode,
+  HttpStatus,
   Param,
   Body,
   UseGuards,
@@ -21,6 +23,7 @@ import { catchError, Observable, throwError } from 'rxjs';
 import { ParticipantsService } from './participants.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
 import { SIGNATURE_MAX_BYTES } from './signature.constants';
+import { SignatureLookupDto } from './dto/signature-lookup.dto';
 
 /** Arquivo acima do limite do multer vira 400 com mensagem clara (e não 413). */
 @Injectable()
@@ -61,5 +64,15 @@ export class PublicRegisterController {
     @UploadedFile() signature?: Express.Multer.File,
   ) {
     return this.service.registerPublic(qrToken, dto, signature);
+  }
+
+  /** Prévia da assinatura: só com CPF + e-mail que conferem. Throttle próprio e mais apertado. */
+  @Post('register/:qrToken/signature-preview')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 3600_000 } })
+  @ApiOperation({ summary: 'Prévia da assinatura salva, liberada só com CPF e e-mail que conferem — sem autenticação' })
+  signaturePreview(@Param('qrToken') qrToken: string, @Body() dto: SignatureLookupDto) {
+    return this.service.signaturePreview(qrToken, dto);
   }
 }

@@ -3,14 +3,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { StorageService } from '../storage/storage.service';
 import { randomUUID } from 'crypto';
-import { RegisterParticipantPublicDto, SignatureAction } from '@simtc/shared-types';
+import { RegisterParticipantPublicDto, SignatureAction, SignaturePreviewResponse } from '@simtc/shared-types';
 import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto';
+import { SignatureLookupDto } from './dto/signature-lookup.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { deleteOrphanedParticipants } from './participant-cleanup.util';
 import { assertValidSignaturePng } from './png-signature.util';
 import { SIGNATURE_BUCKET } from './signature.constants';
 
 const SIGNATURE_ACTIONS: SignatureAction[] = ['keep', 'replace', 'none'];
+/** Validade da signed URL da prévia: basta para o `<img>` carregar, não serve para compartilhar. */
+const SIGNATURE_PREVIEW_TTL_SECONDS = 120;
 
 @Injectable()
 export class ParticipantsService {
@@ -292,6 +295,61 @@ export class ParticipantsService {
     } catch (err) {
       console.error('Falha ao apagar arquivo de assinatura:', err);
     }
+  }
+
+  /**
+   * Prévia da assinatura na inscrição pública. A assinatura só aparece quando
+   * CPF e e-mail conferem com o cadastro (ver brainstorm §4). Não devolve nome
+   * nem CNH. Falha ao gerar a signed URL vira `none`, sem travar o formulário.
+   */
+  async signaturePreview(qrToken: string, dto: SignatureLookupDto): Promise<SignaturePreviewResponse> {
+    const access = await this.checkSignatureAccess(qrToken, dto);
+    if (access.status !== 'found') return access;
+
+    try {
+      const previewUrl = await this.storage.getSignedUrl(SIGNATURE_BUCKET, access.signaturePath, SIGNATURE_PREVIEW_TTL_SECONDS);
+      // Toda assinatura gravada tem data (ver registerPublic); o fallback só cobre dado antigo
+      const updatedAt = (access.signatureUpdatedAt ?? new Date(0)).toISOString();
+      return { status: 'found', previewUrl, updatedAt };
+    } catch (err) {
+      console.error('Falha ao gerar prévia da assinatura:', err);
+      return { status: 'none' };
+    }
+  }
+
+  /**
+   * Conferência de acesso à assinatura pelo formulário público: sessão do token
+   * (404 se não existe, 400 se encerrada) → CPF normalizado só com dígitos →
+   * participante → `none` (sem cadastro ou sem assinatura), `locked` (e-mail não
+   * confere) ou `found` (com o caminho da assinatura).
+   */
+  private async checkSignatureAccess(
+    qrToken: string,
+    dto: { cpf: string; email: string },
+  ): Promise<
+    | { status: 'none' }
+    | { status: 'locked' }
+    | { status: 'found'; signaturePath: string; signatureUpdatedAt: Date | null }
+  > {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { qrCodeToken: qrToken },
+      select: { status: true },
+    });
+    if (!session) throw new NotFoundException('Sessão de treinamento não encontrada');
+    if (session.status === 'CANCELADO' || session.status === 'CONCLUIDO') {
+      throw new BadRequestException('Inscrições encerradas para este treinamento');
+    }
+
+    const cpf = dto.cpf.replace(/\D/g, '');
+    const participant = await this.prisma.participant.findUnique({ where: { cpf } });
+    if (!participant || !participant.signaturePath) return { status: 'none' };
+    if (!this.emailMatches(participant.email, dto.email)) return { status: 'locked' };
+
+    return {
+      status: 'found',
+      signaturePath: participant.signaturePath,
+      signatureUpdatedAt: participant.signatureUpdatedAt,
+    };
   }
 
   async addParticipant(trainingSessionId: string, dto: AddParticipantDto) {

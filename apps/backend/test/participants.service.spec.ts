@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailService } from 'src/email/email.service';
@@ -9,7 +9,7 @@ import { AddParticipantDto } from 'src/participants/dto/add-participant.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-const mockStorage = { upload: jest.fn(), delete: jest.fn() };
+const mockStorage = { upload: jest.fn(), delete: jest.fn(), getSignedUrl: jest.fn() };
 
 const mockPrisma = {
   trainingSession: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
@@ -41,6 +41,7 @@ describe('ParticipantsService', () => {
     mockPrisma.participant.findMany.mockResolvedValue([]);
     mockStorage.upload.mockResolvedValue('https://storage/x.png');
     mockStorage.delete.mockResolvedValue(undefined);
+    mockStorage.getSignedUrl.mockResolvedValue('https://storage/signed.png?token=abc');
   });
 
   // ─── registerPublic ──────────────────────────────────────────────────────
@@ -405,6 +406,94 @@ describe('ParticipantsService', () => {
     it('aceita e-mail válido ou ausente', async () => {
       await expect(errorsOf({ cpf: '52998224725', name: 'Maria', email: 'maria@empresa.com.br' })).resolves.toEqual([]);
       await expect(errorsOf({ cpf: '52998224725', name: 'Maria' })).resolves.toEqual([]);
+    });
+  });
+
+  // ─── signaturePreview ────────────────────────────────────────────────────
+
+  describe('signaturePreview', () => {
+    const CPF = '52998224725';
+    const UPDATED = new Date('2026-10-01T12:00:00.000Z');
+    const withSignature = (over: Record<string, unknown> = {}) => ({
+      id: 'part-1',
+      name: 'João Segredo',
+      cpf: CPF,
+      cnhCategory: 'B',
+      email: 'joao@mail.com',
+      signaturePath: 'participants/part-1/123.png',
+      signatureUpdatedAt: UPDATED,
+      ...over,
+    });
+
+    beforeEach(() => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+    });
+
+    it('lança 404 se o token não corresponde a nenhuma sessão', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(null);
+      await expect(
+        service.signaturePreview('token-inexistente', { cpf: CPF, email: 'joao@mail.com' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([['CANCELADO'], ['CONCLUIDO']])('sessão %s: BadRequestException', async (status) => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status });
+      await expect(
+        service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.participant.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('none se o CPF não está cadastrado', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      const result = await service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ status: 'none' });
+      expect(mockStorage.getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('none se o CPF existe mas não tem assinatura', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature({ signaturePath: null, signatureUpdatedAt: null }));
+      const result = await service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ status: 'none' });
+      expect(mockStorage.getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('normaliza o CPF com máscara antes de buscar', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      await service.signaturePreview('token', { cpf: '529.982.247-25', email: 'joao@mail.com' });
+      expect(mockPrisma.participant.findUnique).toHaveBeenCalledWith({ where: { cpf: CPF } });
+    });
+
+    it('found: CPF e e-mail conferem (caixa e espaços), signed URL de 120 s', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      const result = await service.signaturePreview('token', { cpf: CPF, email: '  JOAO@mail.com ' });
+      expect(mockStorage.getSignedUrl).toHaveBeenCalledWith('signatures', 'participants/part-1/123.png', 120);
+      expect(result).toEqual({
+        status: 'found',
+        previewUrl: 'https://storage/signed.png?token=abc',
+        updatedAt: UPDATED.toISOString(),
+      });
+    });
+
+    it('locked: e-mail diferente, sem previewUrl e sem gerar signed URL', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      const result = await service.signaturePreview('token', { cpf: CPF, email: 'outro@mail.com' });
+      expect(result).toEqual({ status: 'locked' });
+      expect(mockStorage.getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('locked: cadastro sem e-mail nunca confere', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature({ email: null }));
+      const result = await service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ status: 'locked' });
+    });
+
+    it('falha ao gerar signed URL: none', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      mockStorage.getSignedUrl.mockRejectedValue(new Error('storage fora do ar'));
+      const result = await service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ status: 'none' });
     });
   });
 

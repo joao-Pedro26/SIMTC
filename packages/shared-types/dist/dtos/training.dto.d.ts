@@ -42,6 +42,20 @@ export interface RegisterParticipantPublicResponse {
     signatureSaved: boolean;
     signatureIgnored?: boolean;
 }
+/**
+ * Prévia da assinatura na inscrição pública. 'none': sem assinatura (ou CPF não
+ * cadastrado). 'locked': há assinatura, mas o e-mail não confere (sem prévia).
+ * 'found': CPF e e-mail conferem; `previewUrl` é uma signed URL de 120 s.
+ */
+export type SignaturePreviewResponse = {
+    status: 'none';
+} | {
+    status: 'found';
+    previewUrl: string;
+    updatedAt: string;
+} | {
+    status: 'locked';
+};
 export interface UpdateParticipantTypeDto {
     participationType: ParticipationType;
 }
