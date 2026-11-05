@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Check, Eraser, X } from 'lucide-react'
 import { useSignaturePad } from '@/lib/signature/use-signature-pad'
 import styles from './signature-modal.module.css'
 
@@ -92,20 +93,38 @@ function SignatureModalContent({ onCancel, onConfirm }: Omit<SignatureModalProps
         </p>
 
         <footer className={styles.actions}>
-          <button type="button" className={styles.clearBtn} onClick={clear} disabled={isEmpty}>
-            Limpar
+          <button
+            type="button"
+            className={styles.clearBtn}
+            onClick={clear}
+            disabled={isEmpty}
+            aria-label="Limpar"
+            title="Limpar"
+          >
+            <Eraser className={styles.icon} size={18} aria-hidden="true" />
+            <span className={styles.btnLabel}>Limpar</span>
           </button>
           <div className={styles.rightActions}>
-            <button type="button" className={styles.cancelBtn} onClick={onCancel}>
-              Cancelar
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={onCancel}
+              aria-label="Cancelar"
+              title="Cancelar"
+            >
+              <X className={styles.icon} size={18} aria-hidden="true" />
+              <span className={styles.btnLabel}>Cancelar</span>
             </button>
             <button
               type="button"
               className={styles.confirmBtn}
               onClick={handleConfirm}
               disabled={!hasEnoughInk || saving}
+              aria-label="Confirmar"
+              title="Confirmar"
             >
-              Confirmar
+              <Check className={styles.icon} size={18} aria-hidden="true" />
+              <span className={styles.btnLabel}>Confirmar</span>
             </button>
           </div>
         </footer>

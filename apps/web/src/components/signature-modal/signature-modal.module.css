@@ -177,6 +177,12 @@
   outline-offset: 2px;
 }
 
+/* Ícones só aparecem no modo paisagem (ver @media abaixo). */
+.icon {
+  display: none;
+  flex-shrink: 0;
+}
+
 /* ── Desktop: dialog centralizado ─────────────────────────────────────────── */
 
 /* Dialog centralizado só com tela larga E alta o bastante; celular em paisagem
@@ -205,6 +211,143 @@
     flex: none;
     height: 260px;
     min-height: 0;
+  }
+}
+
+/* ── Celular em paisagem: canvas em tela inteira, ações como ícones ──────── */
+
+/* Complementar à regra desktop (min-height: 560px), sem sobreposição. */
+@media (orientation: landscape) and (max-height: 559px) {
+  .dialog {
+    display: block;
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* O canvas ocupa a tela toda, respeitando só os recortes de safe-area (notch). */
+  .canvasArea {
+    position: absolute;
+    top: env(safe-area-inset-top, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+    left: env(safe-area-inset-left, 0px);
+    flex: none;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+
+  .baseline {
+    bottom: 32%;
+  }
+
+  /* Overlays de texto: não capturam toque, para não atrapalhar o desenho. */
+  .header {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
+    pointer-events: none;
+    gap: 0;
+  }
+
+  .title {
+    font-size: 0.875rem;
+    color: var(--text-2, #475569);
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .consent {
+    position: absolute;
+    left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+    max-width: min(36rem, 70%);
+    margin: 0;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--text-muted, #94a3b8);
+    pointer-events: none;
+  }
+
+  /* Ações: canto superior direito, sobrepostas ao canvas, na ordem Limpar, Cancelar, Confirmar. */
+  .actions {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    right: calc(env(safe-area-inset-right, 0px) + 0.5rem);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: auto;
+  }
+
+  .rightActions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .icon {
+    display: block;
+  }
+
+  /* Texto só para leitores de tela (visually-hidden, não display: none). */
+  .btnLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .clearBtn,
+  .cancelBtn,
+  .confirmBtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    touch-action: manipulation;
+  }
+
+  .clearBtn,
+  .cancelBtn {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--border, #e2e8f0);
+    color: var(--text-2, #475569);
+  }
+
+  .clearBtn:hover:not(:disabled),
+  .cancelBtn:hover:not(:disabled) {
+    background: #ffffff;
+    color: var(--text, #0f172a);
+  }
+
+  .clearBtn:disabled,
+  .cancelBtn:disabled,
+  .confirmBtn:disabled {
+    opacity: 0.5;
+  }
+
+  .confirmBtn {
+    background: var(--teal, #38bec8);
+    border: none;
+    color: #ffffff;
   }
 }
 
