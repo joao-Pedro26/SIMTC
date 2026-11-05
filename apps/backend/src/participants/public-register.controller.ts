@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Post,
   HttpCode,
@@ -22,7 +23,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { catchError, Observable, throwError } from 'rxjs';
 import { ParticipantsService } from './participants.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
-import { SIGNATURE_MAX_BYTES } from './signature.constants';
+import { SIGNATURE_LOOKUP_THROTTLE, SIGNATURE_MAX_BYTES } from './signature.constants';
 import { SignatureLookupDto } from './dto/signature-lookup.dto';
 
 /** Arquivo acima do limite do multer vira 400 com mensagem clara (e não 413). */
@@ -70,9 +71,19 @@ export class PublicRegisterController {
   @Post('register/:qrToken/signature-preview')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 20, ttl: 3600_000 } })
+  @Throttle(SIGNATURE_LOOKUP_THROTTLE)
   @ApiOperation({ summary: 'Prévia da assinatura salva, liberada só com CPF e e-mail que conferem — sem autenticação' })
   signaturePreview(@Param('qrToken') qrToken: string, @Body() dto: SignatureLookupDto) {
     return this.service.signaturePreview(qrToken, dto);
+  }
+
+  /** Remoção da própria assinatura: mesma conferência de CPF + e-mail da prévia e mesmo throttle. */
+  @Delete('register/:qrToken/signature')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle(SIGNATURE_LOOKUP_THROTTLE)
+  @ApiOperation({ summary: 'Remove a assinatura salva do participante, com CPF e e-mail que conferem — sem autenticação' })
+  removeSignature(@Param('qrToken') qrToken: string, @Body() dto: SignatureLookupDto) {
+    return this.service.removeOwnSignature(qrToken, dto);
   }
 }

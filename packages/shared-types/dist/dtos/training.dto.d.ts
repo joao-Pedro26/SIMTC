@@ -56,6 +56,10 @@ export type SignaturePreviewResponse = {
 } | {
     status: 'locked';
 };
+/** Remoção da assinatura pelo aluno. `removed: false` quando não havia assinatura para o CPF. */
+export interface SignatureRemoveResponse {
+    removed: boolean;
+}
 export interface UpdateParticipantTypeDto {
     participationType: ParticipationType;
 }

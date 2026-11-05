@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailService } from 'src/email/email.service';
@@ -494,6 +494,89 @@ describe('ParticipantsService', () => {
       mockStorage.getSignedUrl.mockRejectedValue(new Error('storage fora do ar'));
       const result = await service.signaturePreview('token', { cpf: CPF, email: 'joao@mail.com' });
       expect(result).toEqual({ status: 'none' });
+    });
+  });
+
+  // ─── removeOwnSignature ──────────────────────────────────────────────────
+
+  describe('removeOwnSignature', () => {
+    const CPF = '52998224725';
+    const SIG_PATH = 'participants/part-1/123.png';
+    const withSignature = (over: Record<string, unknown> = {}) => ({
+      id: 'part-1',
+      name: 'João Segredo',
+      cpf: CPF,
+      cnhCategory: 'B',
+      email: 'joao@mail.com',
+      signaturePath: SIG_PATH,
+      signatureUpdatedAt: new Date('2026-10-01T12:00:00.000Z'),
+      ...over,
+    });
+
+    beforeEach(() => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+    });
+
+    it('remove quando CPF e e-mail conferem: zera o banco antes e apaga o arquivo depois', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      const result = await service.removeOwnSignature('token', { cpf: CPF, email: '  JOAO@mail.com ' });
+
+      expect(result).toEqual({ removed: true });
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'part-1', signaturePath: SIG_PATH },
+        data: { signaturePath: null, signatureUpdatedAt: null },
+      });
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', SIG_PATH);
+      const dbOrder = mockPrisma.participant.updateMany.mock.invocationCallOrder[0];
+      const storageOrder = mockStorage.delete.mock.invocationCallOrder[0];
+      expect(dbOrder).toBeLessThan(storageOrder);
+    });
+
+    it('403 quando o e-mail não confere, sem tocar em banco nem storage', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      await expect(
+        service.removeOwnSignature('token', { cpf: CPF, email: 'outro@mail.com' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('{ removed: false } quando o CPF não está cadastrado', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      const result = await service.removeOwnSignature('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ removed: false });
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('{ removed: false } quando o participante não tem assinatura', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature({ signaturePath: null, signatureUpdatedAt: null }));
+      const result = await service.removeOwnSignature('token', { cpf: CPF, email: 'joao@mail.com' });
+      expect(result).toEqual({ removed: false });
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('falha do storage não desfaz a remoção no banco', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockPrisma.participant.findUnique.mockResolvedValue(withSignature());
+      mockStorage.delete.mockRejectedValue(new Error('storage fora do ar'));
+
+      const result = await service.removeOwnSignature('token', { cpf: CPF, email: 'joao@mail.com' });
+
+      expect(result).toEqual({ removed: true });
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledTimes(1);
+      errorSpy.mockRestore();
+    });
+
+    it('sessão encerrada: BadRequestException, sem tocar em banco', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'CONCLUIDO' });
+      await expect(
+        service.removeOwnSignature('token', { cpf: CPF, email: 'joao@mail.com' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.participant.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
     });
   });
 

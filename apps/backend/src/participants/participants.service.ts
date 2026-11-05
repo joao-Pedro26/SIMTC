@@ -1,9 +1,9 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { StorageService } from '../storage/storage.service';
 import { randomUUID } from 'crypto';
-import { RegisterParticipantPublicDto, SignatureAction, SignaturePreviewResponse } from '@simtc/shared-types';
+import { RegisterParticipantPublicDto, SignatureAction, SignaturePreviewResponse, SignatureRemoveResponse } from '@simtc/shared-types';
 import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto';
 import { SignatureLookupDto } from './dto/signature-lookup.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
@@ -318,6 +318,27 @@ export class ParticipantsService {
   }
 
   /**
+   * Remoção da assinatura pelo próprio aluno, com a mesma conferência de CPF + e-mail
+   * da prévia. Sem assinatura → `removed: false`; e-mail não confere → 403. Primeiro
+   * zera o banco (condicionado ao caminho lido, para não apagar assinatura trocada
+   * no meio); depois apaga o arquivo. Falha no storage só é registrada.
+   */
+  async removeOwnSignature(qrToken: string, dto: SignatureLookupDto): Promise<SignatureRemoveResponse> {
+    const access = await this.checkSignatureAccess(qrToken, dto);
+    if (access.status === 'locked') throw new ForbiddenException('E-mail não confere com o cadastro');
+    if (access.status !== 'found') return { removed: false };
+
+    const { count } = await this.prisma.participant.updateMany({
+      where: { id: access.participantId, signaturePath: access.signaturePath },
+      data: { signaturePath: null, signatureUpdatedAt: null },
+    });
+    if (count === 0) return { removed: false };
+
+    await this.removeSignatureFile(access.signaturePath);
+    return { removed: true };
+  }
+
+  /**
    * Conferência de acesso à assinatura pelo formulário público: sessão do token
    * (404 se não existe, 400 se encerrada) → CPF normalizado só com dígitos →
    * participante → `none` (sem cadastro ou sem assinatura), `locked` (e-mail não
@@ -329,7 +350,7 @@ export class ParticipantsService {
   ): Promise<
     | { status: 'none' }
     | { status: 'locked' }
-    | { status: 'found'; signaturePath: string; signatureUpdatedAt: Date | null }
+    | { status: 'found'; participantId: string; signaturePath: string; signatureUpdatedAt: Date | null }
   > {
     const session = await this.prisma.trainingSession.findUnique({
       where: { qrCodeToken: qrToken },
@@ -347,6 +368,7 @@ export class ParticipantsService {
 
     return {
       status: 'found',
+      participantId: participant.id,
       signaturePath: participant.signaturePath,
       signatureUpdatedAt: participant.signatureUpdatedAt,
     };
