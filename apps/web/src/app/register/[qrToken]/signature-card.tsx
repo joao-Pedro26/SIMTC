@@ -48,6 +48,20 @@ export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardPr
   const [modalOpen, setModalOpen] = useState(false)
   const [removeError, setRemoveError] = useState('')
   const [removing, setRemoving] = useState(false)
+  // Falhas de carregamento da prévia, por consulta (CPF + e-mail). Uma nova consulta ou uma imagem
+  // carregada zera o contador. Depois de uma nova tentativa que também falha, vira estado A.
+  const queryKey = `${cpf.replace(/\D/g, '')}|${email.trim()}`
+  const [imgFailures, setImgFailures] = useState<{ key: string; count: number } | null>(null)
+  const imgGaveUp = imgFailures !== null && imgFailures.key === queryKey && imgFailures.count >= 2
+
+  function handlePreviewError() {
+    if (imgFailures?.key === queryKey && imgFailures.count >= 1) {
+      setImgFailures({ key: queryKey, count: 2 })
+      return
+    }
+    setImgFailures({ key: queryKey, count: 1 })
+    preview.refetch()
+  }
 
   // Dono da objectURL da nova assinatura: revoga ao trocar o draft e ao desmontar.
   useEffect(() => {
@@ -66,7 +80,7 @@ export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardPr
     ? 'C'
     : preview.state === 'loading'
       ? 'loading'
-      : preview.state === 'found'
+      : preview.state === 'found' && !imgGaveUp
         ? 'B'
         : preview.state === 'locked'
           ? 'D'
@@ -144,7 +158,8 @@ export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardPr
               src={preview.previewUrl}
               alt="Assinatura salva"
               className={styles.previewImg}
-              onError={() => preview.refetch()}
+              onLoad={() => setImgFailures(null)}
+              onError={handlePreviewError}
             />
           </div>
           {savedDate && <p className={styles.meta}>Assinatura salva em {savedDate}</p>}

@@ -25,6 +25,8 @@ export interface SignaturePreview {
 }
 
 interface Result {
+  /** Chave (CPF normalizado + e-mail aparado) a que este resultado pertence. */
+  key: string
   state: SignaturePreviewState
   previewUrl?: string
   updatedAt?: string
@@ -38,19 +40,21 @@ interface Result {
  * - Erro de rede ou HTTP cai em 'error', que o card trata como vazio (estado A).
  */
 export function useSignaturePreview(qrToken: string, cpf: string, email: string): SignaturePreview {
-  const [result, setResult] = useState<Result>({ state: 'idle' })
+  const [result, setResult] = useState<Result>({ key: '', state: 'idle' })
   const [tick, setTick] = useState(0)
 
   const digits = cpf.replace(/\D/g, '')
   const mail = email.trim()
+  const key = `${digits}|${mail}`
+  const valid = validateCpf(digits) && isValidEmail(mail)
 
   useEffect(() => {
-    if (!validateCpf(digits) || !isValidEmail(mail)) {
-      setResult({ state: 'idle' })
+    if (!valid) {
+      setResult({ key, state: 'idle' })
       return
     }
 
-    setResult({ state: 'loading' })
+    setResult({ key, state: 'loading' })
     const controller = new AbortController()
 
     const timer = setTimeout(async () => {
@@ -65,13 +69,13 @@ export function useSignaturePreview(qrToken: string, cpf: string, email: string)
         const data = (await res.json()) as SignaturePreviewResponse
         if (controller.signal.aborted) return
         if (data.status === 'found') {
-          setResult({ state: 'found', previewUrl: data.previewUrl, updatedAt: data.updatedAt })
+          setResult({ key, state: 'found', previewUrl: data.previewUrl, updatedAt: data.updatedAt })
         } else {
-          setResult({ state: data.status })
+          setResult({ key, state: data.status })
         }
       } catch {
         if (controller.signal.aborted) return
-        setResult({ state: 'error' })
+        setResult({ key, state: 'error' })
       }
     }, DEBOUNCE_MS)
 
@@ -79,9 +83,13 @@ export function useSignaturePreview(qrToken: string, cpf: string, email: string)
       clearTimeout(timer)
       controller.abort()
     }
-  }, [qrToken, digits, mail, tick])
+  }, [qrToken, digits, mail, key, valid, tick])
 
   const refetch = useCallback(() => setTick((t) => t + 1), [])
 
-  return { ...result, refetch }
+  // Resultado de outra chave (CPF/e-mail acabaram de mudar) nunca vaza: vira loading,
+  // ou idle se os valores atuais não forem válidos. Assim o 'keep' antigo não é emitido.
+  if (!valid) return { state: 'idle', refetch }
+  if (result.key !== key) return { state: 'loading', refetch }
+  return { state: result.state, previewUrl: result.previewUrl, updatedAt: result.updatedAt, refetch }
 }
