@@ -1,0 +1,209 @@
+/* ── Overlay ──────────────────────────────────────────────────────────────── */
+
+/* Celular: tela cheia. Desktop: dialog centralizado (ver @media abaixo). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(10, 20, 35, 0.48);
+  display: flex;
+  overscroll-behavior: contain;
+  animation: fadeIn 0.18s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Dialog ───────────────────────────────────────────────────────────────── */
+
+.dialog {
+  background: var(--surface, #ffffff);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--text-2, #475569);
+  margin: 0;
+}
+
+/* ── Canvas e linha de base ───────────────────────────────────────────────── */
+
+.canvasArea {
+  position: relative;
+  flex: 1;
+  min-height: 200px;
+  margin: 0.875rem 0;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Impede o navegador de rolar/dar zoom enquanto o dedo desenha (iOS Safari e Chrome Android). */
+  touch-action: none;
+}
+
+.baseline {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 28%;
+  border-top: 1.5px solid #cbd5e1;
+  pointer-events: none;
+}
+
+.baselineLabel {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+/* ── Consentimento ────────────────────────────────────────────────────────── */
+
+.consent {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-2, #475569);
+  margin: 0 0 0.875rem;
+}
+
+/* ── Ações ────────────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+
+.rightActions {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.clearBtn,
+.cancelBtn,
+.confirmBtn {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.clearBtn:disabled,
+.cancelBtn:disabled,
+.confirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clearBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-2, #475569);
+  padding-left: 0.25rem;
+}
+
+.clearBtn:hover:not(:disabled) {
+  color: var(--text, #0f172a);
+}
+
+.cancelBtn {
+  background: #ffffff;
+  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text-2, #475569);
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: var(--bg, #f8fafc);
+  color: var(--text, #0f172a);
+}
+
+.confirmBtn {
+  background: var(--teal, #38bec8);
+  border: none;
+  color: #ffffff;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  background: var(--teal-dark, #2aa8b4);
+}
+
+.confirmBtn:focus-visible,
+.cancelBtn:focus-visible,
+.clearBtn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* ── Desktop: dialog centralizado ─────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .overlay {
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .dialog {
+    width: 100%;
+    max-width: 560px;
+    height: auto;
+    max-height: 92vh;
+    border-radius: 14px;
+    padding: 1.75rem;
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.22),
+      0 4px 16px rgba(0, 0, 0, 0.10);
+    border-top: 3px solid var(--charcoal, #1e2a34);
+  }
+
+  .canvasArea {
+    flex: none;
+    height: 260px;
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay { animation: none; }
+}
