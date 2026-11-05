@@ -23,7 +23,11 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { catchError, Observable, throwError } from 'rxjs';
 import { ParticipantsService } from './participants.service';
 import { RegisterParticipantPublicDto } from '@simtc/shared-types';
-import { SIGNATURE_LOOKUP_THROTTLE, SIGNATURE_MAX_BYTES } from './signature.constants';
+import {
+  SIGNATURE_MAX_BYTES,
+  SIGNATURE_PREVIEW_THROTTLE,
+  SIGNATURE_REMOVE_THROTTLE,
+} from './signature.constants';
 import { SignatureLookupDto } from './dto/signature-lookup.dto';
 
 /** Arquivo acima do limite do multer vira 400 com mensagem clara (e não 413). */
@@ -53,7 +57,7 @@ export class PublicRegisterController {
 
   @Post('register/:qrToken')
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 10, ttl: 3600_000 } })
+  @Throttle({ default: { limit: 100, ttl: 3600_000 } })
   @ApiOperation({ summary: 'Formulário público de inscrição via QR Code — sem autenticação' })
   @UseInterceptors(
     SignatureTooLargeInterceptor,
@@ -71,7 +75,7 @@ export class PublicRegisterController {
   @Post('register/:qrToken/signature-preview')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle(SIGNATURE_LOOKUP_THROTTLE)
+  @Throttle(SIGNATURE_PREVIEW_THROTTLE)
   @ApiOperation({ summary: 'Prévia da assinatura salva, liberada só com CPF e e-mail que conferem — sem autenticação' })
   signaturePreview(@Param('qrToken') qrToken: string, @Body() dto: SignatureLookupDto) {
     return this.service.signaturePreview(qrToken, dto);
@@ -81,7 +85,7 @@ export class PublicRegisterController {
   @Delete('register/:qrToken/signature')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  @Throttle(SIGNATURE_LOOKUP_THROTTLE)
+  @Throttle(SIGNATURE_REMOVE_THROTTLE)
   @ApiOperation({ summary: 'Remove a assinatura salva do participante, com CPF e e-mail que conferem — sem autenticação' })
   removeSignature(@Param('qrToken') qrToken: string, @Body() dto: SignatureLookupDto) {
     return this.service.removeOwnSignature(qrToken, dto);

@@ -1,10 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Atrás do proxy do EasyPanel: sem trust proxy, req.ip é sempre o IP do proxy
+  // e o throttle vira um limite global em vez de por cliente.
+  app.set('trust proxy', 1);
 
   // Prefixo global da API
   app.setGlobalPrefix('api');
