@@ -402,6 +402,7 @@ export class ParticipantsService {
       throw new BadRequestException('Não é possível remover participante em avaliação');
     }
 
+    let signaturePaths: string[] = [];
     const deleted = await this.prisma.$transaction(async (tx) => {
       if (record.assessment) {
         await tx.assessmentItem.deleteMany({ where: { assessmentId: record.assessment.id } });
@@ -411,7 +412,7 @@ export class ParticipantsService {
         await tx.certificate.delete({ where: { id: record.certificate.id } });
       }
       const result = await tx.trainingParticipant.delete({ where: { id: participantId } });
-      await deleteOrphanedParticipants(tx, [record.participantId]);
+      signaturePaths = await deleteOrphanedParticipants(tx, [record.participantId]);
       return result;
     });
 
@@ -422,6 +423,9 @@ export class ParticipantsService {
     if (record.certificate?.pdfUrl) {
       const path = record.certificate.pdfUrl.split('/certificates/')[1];
       if (path) await this.storage.delete('certificates', path).catch(() => null);
+    }
+    for (const path of signaturePaths) {
+      await this.storage.delete(SIGNATURE_BUCKET, path).catch(() => null);
     }
 
     return deleted;

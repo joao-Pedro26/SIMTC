@@ -16,13 +16,17 @@ import { Prisma } from '@prisma/client';
  * `Participant` só é referenciado por `TrainingParticipant.participantId`
  * (nenhum outro model tem FK para `Participant`), então essa checagem é
  * suficiente.
+ *
+ * Devolve os `signaturePath` dos cadastros apagados (vazio se nenhum): o
+ * arquivo da assinatura fica no bucket `signatures` e precisa ser apagado
+ * pelo chamador DEPOIS do commit da transação, com `.catch(() => null)`.
  */
 export async function deleteOrphanedParticipants(
   tx: Prisma.TransactionClient,
   participantIds: (string | null | undefined)[],
-): Promise<void> {
+): Promise<string[]> {
   const uniqueIds = Array.from(new Set(participantIds.filter((id): id is string => !!id)));
-  if (uniqueIds.length === 0) return;
+  if (uniqueIds.length === 0) return [];
 
   const stillLinked = await tx.trainingParticipant.findMany({
     where: { participantId: { in: uniqueIds } },
@@ -32,7 +36,15 @@ export async function deleteOrphanedParticipants(
   const stillLinkedIds = new Set(stillLinked.map((r) => r.participantId));
 
   const orphanIds = uniqueIds.filter((id) => !stillLinkedIds.has(id));
-  if (orphanIds.length === 0) return;
+  if (orphanIds.length === 0) return [];
 
+  const orphans = await tx.participant.findMany({
+    where: { id: { in: orphanIds } },
+    select: { id: true, signaturePath: true },
+  });
   await tx.participant.deleteMany({ where: { id: { in: orphanIds } } });
+
+  return orphans
+    .map((p) => p.signaturePath)
+    .filter((path): path is string => !!path);
 }

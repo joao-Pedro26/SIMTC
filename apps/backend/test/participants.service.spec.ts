@@ -13,7 +13,7 @@ const mockStorage = { upload: jest.fn(), delete: jest.fn() };
 
 const mockPrisma = {
   trainingSession: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
-  participant: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), deleteMany: jest.fn() },
+  participant: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), deleteMany: jest.fn() },
   trainingParticipant: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
   // A transação interativa roda com o próprio mock no papel do `tx`.
   $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma)),
@@ -38,6 +38,7 @@ describe('ParticipantsService', () => {
     jest.clearAllMocks();
     mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
     mockPrisma.participant.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.participant.findMany.mockResolvedValue([]);
     mockStorage.upload.mockResolvedValue('https://storage/x.png');
     mockStorage.delete.mockResolvedValue(undefined);
   });
@@ -425,6 +426,37 @@ describe('ParticipantsService', () => {
       mockPrisma.trainingParticipant.delete.mockResolvedValue({ id: 'tp-1' });
       await service.removeParticipant('tp-1');
       expect(mockPrisma.trainingParticipant.delete).toHaveBeenCalledWith({ where: { id: 'tp-1' } });
+    });
+
+    it('removeParticipant apaga a assinatura do último vínculo', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+        id: 'tp-1', status: 'PENDENTE', participantId: 'p1', assessment: null, certificate: null,
+      });
+      mockPrisma.trainingParticipant.delete.mockResolvedValue({ id: 'tp-1' });
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.participant.findMany.mockResolvedValue([
+        { id: 'p1', signaturePath: 'participants/p1/123.png' },
+      ]);
+
+      await service.removeParticipant('tp-1');
+
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', 'participants/p1/123.png');
+      expect(mockStorage.delete.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockPrisma.$transaction.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('removeParticipant não apaga a assinatura se o participante continua em outro treinamento', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({
+        id: 'tp-1', status: 'PENDENTE', participantId: 'p1', assessment: null, certificate: null,
+      });
+      mockPrisma.trainingParticipant.delete.mockResolvedValue({ id: 'tp-1' });
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([{ participantId: 'p1' }]);
+
+      await service.removeParticipant('tp-1');
+
+      expect(mockPrisma.participant.deleteMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalledWith('signatures', expect.anything());
     });
   });
 });

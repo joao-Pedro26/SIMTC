@@ -6,6 +6,7 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateContactUserDto } from './dto/create-contact-user.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
+import { SIGNATURE_BUCKET } from '../participants/signature.constants';
 
 @Injectable()
 export class CompaniesService {
@@ -105,7 +106,8 @@ export class CompaniesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    let signaturePaths: string[] = [];
+    const deleted = await this.prisma.$transaction(async (tx) => {
       // Busca todas as sessões da empresa (canceladas/concluídas)
       const sessions = await tx.trainingSession.findMany({
         where: { companyId: id },
@@ -150,7 +152,7 @@ export class CompaniesService {
           });
           // Cadastro de Participant (CPF, compartilhado entre treinamentos)
           // só é apagado se não sobrar nenhuma outra inscrição dele
-          await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
+          signaturePaths = await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
         }
 
         // Deleta consultores vinculados às sessões e as sessões em si
@@ -172,6 +174,12 @@ export class CompaniesService {
 
       return tx.company.delete({ where: { id } });
     });
+
+    for (const path of signaturePaths) {
+      await this.storage.delete(SIGNATURE_BUCKET, path).catch(() => null);
+    }
+
+    return deleted;
   }
 
   async addContact(companyId: string, dto: CreateContactUserDto) {

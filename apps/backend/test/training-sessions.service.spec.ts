@@ -262,3 +262,63 @@ describe('TrainingSessionsService: ciclo de vida (Fase 8D-1)', () => {
     expect(prisma.trainingParticipant.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe('TrainingSessionsService.deleteSession — assinatura do participante', () => {
+  function build(linkedAfterDelete: { participantId: string }[], orphans: { id: string; signaturePath: string | null }[]) {
+    const tx = {
+      certificate: { deleteMany: jest.fn() },
+      trainingParticipant: {
+        deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue(linkedAfterDelete),
+      },
+      sessionConsultant: { deleteMany: jest.fn() },
+      bulkOperationJob: { deleteMany: jest.fn() },
+      trainingSession: { delete: jest.fn().mockResolvedValue({ id: 's1' }) },
+      participant: {
+        findMany: jest.fn().mockResolvedValue(orphans),
+        deleteMany: jest.fn(),
+      },
+    };
+    const prisma = {
+      trainingSession: { findUnique: jest.fn().mockResolvedValue({ id: 's1', consultants: [] }) },
+      trainingParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'tp-1', participantId: 'p1', assessment: null, certificate: null },
+        ]),
+      },
+      bulkOperationJob: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((fn: (t: unknown) => unknown) => fn(tx)),
+    };
+    const storage = { delete: jest.fn().mockResolvedValue(undefined) };
+    const service = new TrainingSessionsService(
+      prisma as unknown as PrismaService,
+      {} as EmailService,
+      storage as unknown as StorageService,
+    );
+    return { service, prisma, tx, storage };
+  }
+
+  it('deleteSession apaga a assinatura do último vínculo, depois do commit', async () => {
+    const { service, prisma, tx, storage } = build([], [
+      { id: 'p1', signaturePath: 'participants/p1/123.png' },
+    ]);
+
+    await service.deleteSession('s1');
+
+    expect(tx.participant.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['p1'] } } });
+    expect(storage.delete).toHaveBeenCalledWith('signatures', 'participants/p1/123.png');
+    expect(storage.delete.mock.invocationCallOrder[0]).toBeGreaterThan(
+      prisma.$transaction.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('deleteSession não apaga a assinatura se o participante continua em outro treinamento', async () => {
+    const { service, tx, storage } = build([{ participantId: 'p1' }], []);
+
+    await service.deleteSession('s1');
+
+    expect(tx.participant.findMany).not.toHaveBeenCalled();
+    expect(tx.participant.deleteMany).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalledWith('signatures', expect.anything());
+  });
+});

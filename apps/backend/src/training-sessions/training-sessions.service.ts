@@ -8,6 +8,7 @@ import { CreateTrainingSessionDto } from './dto/create-training-session.dto';
 import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
+import { SIGNATURE_BUCKET } from '../participants/signature.constants';
 import {
   releaseHeldParticipants,
   releaseParticipantsOfConsultants,
@@ -309,6 +310,7 @@ export class TrainingSessionsService {
     select: { resultFilePath: true },
   });
 
+  let signaturePaths: string[] = [];
   await this.prisma.$transaction(async (tx) => {
     const assessmentIds = participants
       .filter((p) => p.assessment)
@@ -326,7 +328,7 @@ export class TrainingSessionsService {
     await tx.bulkOperationJob.deleteMany({ where: { trainingSessionId: id } });
 
     const result = await tx.trainingSession.delete({ where: { id } });
-    await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
+    signaturePaths = await deleteOrphanedParticipants(tx, participants.map((p) => p.participantId));
     return result;
   });
 
@@ -344,6 +346,9 @@ export class TrainingSessionsService {
 
   await Promise.allSettled(reportPaths.map((path) => this.storage.delete('reports', path)));
   await Promise.allSettled(certificatePaths.map((path) => this.storage.delete('certificates', path)));
+  await Promise.all(
+    signaturePaths.map((path) => this.storage.delete(SIGNATURE_BUCKET, path).catch(() => null)),
+  );
 
   for (const job of bulkJobs) {
     if (job.resultFilePath) {
