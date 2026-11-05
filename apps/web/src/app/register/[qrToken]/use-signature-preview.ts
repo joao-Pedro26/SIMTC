@@ -7,6 +7,8 @@ import { validateCpf } from '@/lib/validate-cpf'
 export const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 
 const DEBOUNCE_MS = 600
+/** Tempo máximo da consulta da prévia; depois disso o card cai em A e o envio segue liberado. */
+const REQUEST_TIMEOUT_MS = 8000
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function isValidEmail(email: string): boolean {
@@ -56,9 +58,16 @@ export function useSignaturePreview(qrToken: string, cpf: string, email: string)
 
     setResult({ key, state: 'loading' })
     const controller = new AbortController()
+    // Timeout próprio: a prévia é opcional, então uma consulta travada vira 'error' (card em A)
+    let requestTimeout: ReturnType<typeof setTimeout> | undefined
+    let timedOut = false
 
     const timer = setTimeout(async () => {
       try {
+        requestTimeout = setTimeout(() => {
+          timedOut = true
+          controller.abort()
+        }, REQUEST_TIMEOUT_MS)
         const res = await fetch(`${PUBLIC_API_URL}/public/register/${qrToken}/signature-preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -74,13 +83,17 @@ export function useSignaturePreview(qrToken: string, cpf: string, email: string)
           setResult({ key, state: data.status })
         }
       } catch {
-        if (controller.signal.aborted) return
-        setResult({ key, state: 'error' })
+        // Timeout vira erro; abort por cleanup (CPF/e-mail mudou ou desmontou) é descartado em silêncio
+        if (timedOut) setResult({ key, state: 'error' })
+        else if (!controller.signal.aborted) setResult({ key, state: 'error' })
+      } finally {
+        clearTimeout(requestTimeout)
       }
     }, DEBOUNCE_MS)
 
     return () => {
       clearTimeout(timer)
+      clearTimeout(requestTimeout)
       controller.abort()
     }
   }, [qrToken, digits, mail, key, valid, tick])
