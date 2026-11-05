@@ -1,0 +1,205 @@
+/* Card "Assinatura" do formulário de inscrição. Tokens vêm de globals.css. */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.125rem 1.125rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+  border-radius: 99px;
+  padding: 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+/* ── A: vazio ─────────────────────────────────────────────── */
+
+.empty {
+  width: 100%;
+  min-height: 96px;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.empty:hover {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+/* ── Skeleton (loading) ───────────────────────────────────── */
+
+.skeleton {
+  height: 96px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg) 0%, var(--border) 50%, var(--bg) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* ── Prévia (B e C) ───────────────────────────────────────── */
+
+.previewBox {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.previewImg {
+  max-width: 90%;
+  max-height: 84px;
+  object-fit: contain;
+  display: block;
+}
+
+.newBadge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--teal-dark);
+  background: var(--teal-soft);
+  border-radius: 99px;
+  padding: 0.15rem 0.55rem;
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.optionSelected,
+.optionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 0;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.optionSelected {
+  background: var(--teal-soft);
+  border: 1.5px solid var(--teal);
+  color: var(--teal-dark);
+}
+
+.optionBtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.optionBtn:hover {
+  border-color: var(--teal);
+}
+
+.linkBtn {
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  font-family: var(--font);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── D: locked ────────────────────────────────────────────── */
+
+.locked {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.875rem;
+}
+
+.lockedIcon {
+  color: var(--teal-dark);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.lockedText {
+  font-size: 0.875rem;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.error {
+  font-size: 0.8125rem;
+  color: #b42318;
+}
