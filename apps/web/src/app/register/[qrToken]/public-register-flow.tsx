@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import type { RegisterParticipantPublicResponse, SignatureAction } from '@simtc/shared-types'
 import { validateCpf } from '@/lib/validate-cpf'
-import { SignatureCard, type SignatureCardHandle, type SignatureValue } from './signature-card'
+import {
+  SignatureCard,
+  type SignatureCardHandle,
+  type SignatureCardState,
+  type SignatureValue,
+} from './signature-card'
 import styles from './public-register.module.css'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
@@ -31,11 +36,17 @@ interface FormState {
 
 const CNH_CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'] as const
 
-function outcomeOf(sent: SignatureAction, res: Partial<RegisterParticipantPublicResponse>): SignatureOutcome {
+function outcomeOf(
+  sent: SignatureAction,
+  cardState: SignatureCardState,
+  res: Partial<RegisterParticipantPublicResponse>,
+): SignatureOutcome {
   if (res.signatureSaved) return 'saved'
   if (sent === 'replace' || res.signatureIgnored) return 'ignored'
   // 'keep' só é enviado com assinatura salva (estado B), que continua valendo
   if (sent === 'keep') return 'saved'
+  // D: CPF já tem assinatura salva (e-mail não confere); o backend mantém a antiga
+  if (cardState === 'D') return 'saved'
   return 'none'
 }
 
@@ -93,6 +104,9 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
   }
 
   async function handleSubmit() {
+    // Com a prévia em consulta o envio é bloqueado: o botão fica disabled, e esta guarda cobre outros caminhos
+    if (sig.cardState === 'loading') return
+
     const rawCpf = form.cpf.replace(/\D/g, '')
 
     setCpfInvalid(false)
@@ -120,6 +134,7 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
 
   async function submitRegistration() {
     const sentAction = sig.action
+    const sentCardState = sig.cardState
     const fields: Record<string, string> = {
       name: form.name.trim(),
       cpf: form.cpf.replace(/\D/g, ''),
@@ -154,7 +169,7 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
         throw new Error(body.message ?? 'Erro ao realizar inscrição.')
       }
       const result: Partial<RegisterParticipantPublicResponse> = await res.json().catch(() => ({}))
-      setOutcome(outcomeOf(sentAction, result))
+      setOutcome(outcomeOf(sentAction, sentCardState, result))
       setSuccessKey((k) => k + 1)
       setScreen('success')
     } catch (e) {
@@ -355,9 +370,13 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
               <button
                 className={styles.btnCta}
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || sig.cardState === 'loading'}
               >
-                {submitting ? 'Enviando...' : 'Confirmar inscrição'}
+                {submitting
+                  ? 'Enviando...'
+                  : sig.cardState === 'loading'
+                    ? 'Verificando assinatura...'
+                    : 'Confirmar inscrição'}
               </button>
 
               <button className={styles.btnGhost} onClick={goBack}>
