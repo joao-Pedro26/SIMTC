@@ -45,9 +45,13 @@ export function useSignaturePad() {
     }
 
     let lastKey = ''
+    // Dimensões CSS anteriores, usadas para reescalar os traços na rotação.
+    let lastWidth = 0
+    let lastHeight = 0
     // Redimensiona o canvas (rotação, resize da janela) sem perder o desenho:
-    // guarda os traços com toData() e redesenha com fromData(). Os pontos ficam
-    // em coordenadas CSS, então o contexto recebe scale(ratio) a cada mudança.
+    // guarda os traços com toData(), reescala x/y pela proporção das dimensões
+    // CSS antigas para as novas e redesenha com fromData(). Os pontos ficam em
+    // coordenadas CSS, então o contexto recebe scale(ratio) a cada mudança.
     const resize = () => {
       const width = canvas.clientWidth
       const height = canvas.clientHeight
@@ -58,7 +62,21 @@ export function useSignaturePad() {
       if (key === lastKey) return
       lastKey = key
 
-      const data = pad.toData()
+      // Sem dimensão anterior (primeira medição) não há o que reescalar.
+      const scaleX = lastWidth > 0 ? width / lastWidth : 1
+      const scaleY = lastHeight > 0 ? height / lastHeight : 1
+      lastWidth = width
+      lastHeight = height
+
+      const data = pad.toData().map((group) => ({
+        ...group,
+        points: group.points.map((point) => ({
+          ...point,
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+        })),
+      }))
+
       canvas.width = Math.round(width * ratio)
       canvas.height = Math.round(height * ratio)
       canvas.getContext('2d')?.scale(ratio, ratio)
