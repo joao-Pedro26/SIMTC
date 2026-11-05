@@ -13,6 +13,11 @@ export interface CreateTrainingSessionDto {
 export interface UpdateTrainingSessionDto extends Partial<CreateTrainingSessionDto> {
     status?: TrainingStatus;
 }
+/**
+ * O que fazer com a assinatura do participante na inscrição pública:
+ * 'replace' envia a nova (arquivo PNG), 'keep' mantém a atual, 'none' não toca nela.
+ */
+export type SignatureAction = 'keep' | 'replace' | 'none';
 export interface RegisterParticipantPublicDto {
     name: string;
     cpf: string;
@@ -20,6 +25,22 @@ export interface RegisterParticipantPublicDto {
     cnhCategory?: string;
     cnhExpiration?: string;
     participationType?: ParticipationType;
+    signatureAction?: SignatureAction;
+}
+/**
+ * Resposta da inscrição pública: a linha `TrainingParticipant` criada, mais
+ * o resultado da assinatura. `signatureIgnored` só aparece quando a nova
+ * assinatura foi recusada (e-mail não confere ou conflito de gravação).
+ */
+export interface RegisterParticipantPublicResponse {
+    id: string;
+    trainingSessionId: string;
+    participantId: string;
+    participationType: ParticipationType;
+    status: string;
+    registeredAt: string;
+    signatureSaved: boolean;
+    signatureIgnored?: boolean;
 }
 export interface UpdateParticipantTypeDto {
     participationType: ParticipationType;

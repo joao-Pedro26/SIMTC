@@ -199,6 +199,8 @@ model Participant {
   cnhCategory   String?
   cnhExpiration DateTime?
   createdAt     DateTime  @default(now())
+  signaturePath      String?
+  signatureUpdatedAt DateTime?
 
   trainings TrainingParticipant[]
 }

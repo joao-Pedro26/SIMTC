@@ -2,10 +2,15 @@ import { Injectable, ConflictException, BadRequestException, NotFoundException }
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { StorageService } from '../storage/storage.service';
-import { RegisterParticipantPublicDto } from '@simtc/shared-types';
+import { randomUUID } from 'crypto';
+import { RegisterParticipantPublicDto, SignatureAction } from '@simtc/shared-types';
 import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { deleteOrphanedParticipants } from './participant-cleanup.util';
+import { assertValidSignaturePng } from './png-signature.util';
+import { SIGNATURE_BUCKET } from './signature.constants';
+
+const SIGNATURE_ACTIONS: SignatureAction[] = ['keep', 'replace', 'none'];
 
 @Injectable()
 export class ParticipantsService {
@@ -116,8 +121,36 @@ export class ParticipantsService {
     });
   }
 
-  /** Rota pública — auto-cadastro via QR Code */
-  async registerPublic(qrCodeToken: string, dto: RegisterParticipantPublicDto) {
+  /**
+   * Rota pública — auto-cadastro via QR Code, com assinatura opcional.
+   *
+   * Ordem: validações → sessão → dedupe por CPF → conferência de e-mail (só
+   * quando já há assinatura) → upload → transação (cadastro, vínculo e caminho
+   * da assinatura) → apaga a assinatura antiga após o commit. Falha no upload
+   * não cancela a inscrição (`signatureSaved: false`); falha na transação
+   * apaga o arquivo recém-enviado e propaga o erro.
+   */
+  async registerPublic(
+    qrCodeToken: string,
+    dto: RegisterParticipantPublicDto,
+    signature?: Express.Multer.File,
+  ) {
+    // 0. Validação manual: o DTO é uma interface e o ValidationPipe não valida o corpo
+    const signatureAction: SignatureAction = dto.signatureAction ?? 'none';
+    if (!SIGNATURE_ACTIONS.includes(signatureAction)) {
+      throw new BadRequestException('Ação de assinatura inválida');
+    }
+    if (
+      dto.participationType !== undefined &&
+      !(Object.values(ParticipationType) as string[]).includes(dto.participationType)
+    ) {
+      throw new BadRequestException('Tipo de participação inválido');
+    }
+    if (signatureAction === 'replace') {
+      if (!signature) throw new BadRequestException('Envie a assinatura em PNG para substituir a atual');
+      assertValidSignaturePng(signature.buffer);
+    }
+
     // 1. Encontra a sessão pelo token
     const session = await this.prisma.trainingSession.findUniqueOrThrow({
       where: { qrCodeToken },
@@ -131,19 +164,100 @@ export class ParticipantsService {
       throw new BadRequestException('Inscrições encerradas para este treinamento');
     }
 
-    // 2. De-duplicação por CPF: reutiliza o participante, atualizando os
-    // dados com o que veio nesta nova inscrição; recusa quem já está inscrito
-    // (ver findOrUpdateParticipantForSession)
-    const participant = await this.findOrUpdateParticipantForSession(session.id, dto);
+    // 2. De-duplicação por CPF; recusa quem já está inscrito nesta sessão
+    // (mesma regra de findOrUpdateParticipantForSession, que segue usada pelo admin)
+    const existing = await this.prisma.participant.findUnique({ where: { cpf: dto.cpf } });
+    if (existing) {
+      const enrolled = await this.prisma.trainingParticipant.findUnique({
+        where: {
+          trainingSessionId_participantId: { trainingSessionId: session.id, participantId: existing.id },
+        },
+      });
+      if (enrolled) throw new ConflictException('CPF já inscrito neste treinamento');
+    }
+    // Cadastro novo recebe o id já aqui, porque o caminho da assinatura depende dele
+    const participantId = existing?.id ?? randomUUID();
+    const previousSignaturePath = existing?.signaturePath ?? null;
 
-    // 3. Vincula participante à sessão
-    const trainingParticipant = await this.prisma.trainingParticipant.create({
-      data: {
-        trainingSessionId: session.id,
-        participantId: participant.id,
-        participationType: dto.participationType,
-      },
-    });
+    // 3. Assinatura: conferência de e-mail e upload (antes da transação)
+    let uploadedPath: string | null = null;
+    let signatureIgnored = false;
+    if (signatureAction === 'replace' && signature) {
+      if (previousSignaturePath && !this.emailMatches(existing?.email ?? null, dto.email)) {
+        // Já há assinatura e o e-mail não confere: quem troca precisa ser o titular
+        signatureIgnored = true;
+      } else {
+        const path = `participants/${participantId}/${Date.now()}.png`;
+        try {
+          await this.storage.upload(SIGNATURE_BUCKET, path, signature.buffer, 'image/png');
+          uploadedPath = path;
+        } catch (err) {
+          console.error('Falha ao enviar assinatura do participante:', err);
+        }
+      }
+    }
+
+    // 4. Transação: cadastro + vínculo + caminho da assinatura
+    const txResult = await this.prisma
+      .$transaction(async (tx) => {
+        const participant = existing
+          ? await tx.participant.update({
+              where: { id: existing.id },
+              data: {
+                name: dto.name,
+                email: dto.email ? dto.email : undefined,
+                cnhCategory: dto.cnhCategory ? dto.cnhCategory : undefined,
+                cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
+              },
+            })
+          : await tx.participant.create({
+              data: {
+                id: participantId,
+                name: dto.name,
+                cpf: dto.cpf,
+                email: dto.email,
+                cnhCategory: dto.cnhCategory,
+                cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
+              },
+            });
+
+        const trainingParticipant = await tx.trainingParticipant.create({
+          data: {
+            trainingSessionId: session.id,
+            participantId,
+            participationType: dto.participationType,
+          },
+        });
+
+        let replaced = false;
+        if (uploadedPath) {
+          // Condicional ao caminho lido antes: se outra gravação trocou a assinatura
+          // no meio do caminho, nada é gravado e o arquivo recém-enviado é descartado
+          const { count } = await tx.participant.updateMany({
+            where: { id: participantId, signaturePath: previousSignaturePath },
+            data: { signaturePath: uploadedPath, signatureUpdatedAt: new Date() },
+          });
+          replaced = count > 0;
+        }
+
+        return { participant, trainingParticipant, replaced };
+      })
+      .catch(async (err: unknown) => {
+        if (uploadedPath) await this.removeSignatureFile(uploadedPath);
+        throw err;
+      });
+
+    const { participant, trainingParticipant, replaced } = txResult;
+
+    // 5. Depois do commit: apaga a assinatura antiga, ou descarta a nova se não foi gravada
+    if (uploadedPath) {
+      if (replaced) {
+        if (previousSignaturePath) await this.removeSignatureFile(previousSignaturePath);
+      } else {
+        await this.removeSignatureFile(uploadedPath);
+        signatureIgnored = true;
+      }
+    }
 
     if (participant.email) {
       await this.email
@@ -157,7 +271,27 @@ export class ParticipantsService {
         .catch((err) => console.error('Falha ao enviar e-mail de confirmação de inscrição:', err));
     }
 
-    return trainingParticipant;
+    return {
+      ...trainingParticipant,
+      signatureSaved: replaced,
+      ...(signatureIgnored ? { signatureIgnored: true } : {}),
+    };
+  }
+
+  /** Compara e-mails ignorando caixa e espaços; falso se algum dos lados estiver vazio. */
+  private emailMatches(stored: string | null, given?: string): boolean {
+    const a = stored?.trim().toLowerCase() ?? '';
+    const b = given?.trim().toLowerCase() ?? '';
+    return a !== '' && b !== '' && a === b;
+  }
+
+  /** Apaga um arquivo de assinatura. Falha só é registrada: o arquivo fica órfão, mas a ação não trava. */
+  private async removeSignatureFile(path: string): Promise<void> {
+    try {
+      await this.storage.delete(SIGNATURE_BUCKET, path);
+    } catch (err) {
+      console.error('Falha ao apagar arquivo de assinatura:', err);
+    }
   }
 
   async addParticipant(trainingSessionId: string, dto: AddParticipantDto) {

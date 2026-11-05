@@ -9,9 +9,11 @@ import { AddParticipantDto } from 'src/participants/dto/add-participant.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
+const mockStorage = { upload: jest.fn(), delete: jest.fn() };
+
 const mockPrisma = {
   trainingSession: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
-  participant: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), deleteMany: jest.fn() },
+  participant: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn(), deleteMany: jest.fn() },
   trainingParticipant: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
   // A transação interativa roda com o próprio mock no papel do `tx`.
   $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma)),
@@ -28,13 +30,16 @@ describe('ParticipantsService', () => {
         // O serviço passou a mandar e-mail e guardar arquivos: nos testes,
         // os dois só precisam existir.
         { provide: EmailService, useValue: {} },
-        { provide: StorageService, useValue: {} },
+        { provide: StorageService, useValue: mockStorage },
       ],
     }).compile();
 
     service = module.get<ParticipantsService>(ParticipantsService);
     jest.clearAllMocks();
     mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
+    mockPrisma.participant.updateMany.mockResolvedValue({ count: 1 });
+    mockStorage.upload.mockResolvedValue('https://storage/x.png');
+    mockStorage.delete.mockResolvedValue(undefined);
   });
 
   // ─── registerPublic ──────────────────────────────────────────────────────
@@ -101,7 +106,204 @@ describe('ParticipantsService', () => {
     });
   });
 
-  // ─── addParticipant ──────────────────────────────────────────────────────
+  // ─── registerPublic — assinatura ─────────────────────────────────────────
+
+  describe('registerPublic — assinatura', () => {
+    const baseDto = {
+      name: 'João',
+      cpf: '12345678901',
+      email: 'joao@mail.com',
+      cnhCategory: 'B',
+      participationType: 'TEORICA_E_PRATICA',
+    };
+    const pngBuffer = () => {
+      const buf = Buffer.alloc(33);
+      Buffer.from('89504E470D0A1A0A', 'hex').copy(buf, 0);
+      buf.writeUInt32BE(13, 8);
+      buf.write('IHDR', 12, 'ascii');
+      buf.writeUInt32BE(100, 16);
+      buf.writeUInt32BE(50, 20);
+      return buf;
+    };
+    const pngFile = (buffer: Buffer = pngBuffer()) =>
+      ({ buffer, mimetype: 'image/png', size: buffer.length, originalname: 'assinatura.png' }) as Express.Multer.File;
+    const existing = (over: Record<string, unknown> = {}) => ({
+      id: 'part-1',
+      email: 'joao@mail.com',
+      signaturePath: null,
+      ...over,
+    });
+    const NEW_PATH = /^participants\/part-1\/\d+\.png$/;
+
+    beforeEach(() => {
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({
+        id: 'sess-1',
+        status: 'PLANEJADO',
+        course: { name: 'NR-11' },
+        company: { name: 'Acme', logoUrl: null },
+      });
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
+      mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.participant.create.mockResolvedValue({ id: 'part-novo' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1', participantId: 'part-1' });
+    });
+
+    it('salva assinatura nova: sobe o PNG antes da transação e grava o caminho', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(existing());
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile());
+
+      expect(mockStorage.upload).toHaveBeenCalledWith('signatures', expect.stringMatching(NEW_PATH), expect.any(Buffer), 'image/png');
+      expect(mockStorage.upload.mock.invocationCallOrder[0]).toBeLessThan(mockPrisma.$transaction.mock.invocationCallOrder[0]);
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'part-1', signaturePath: null },
+        data: { signaturePath: expect.stringMatching(NEW_PATH), signatureUpdatedAt: expect.any(Date) },
+      });
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: true }));
+      expect(result).not.toHaveProperty('signatureIgnored');
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('participante novo: cria o cadastro com id gerado e grava a assinatura nele', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile());
+
+      const id = mockPrisma.participant.create.mock.calls[0][0].data.id;
+      expect(typeof id).toBe('string');
+      expect(mockStorage.upload).toHaveBeenCalledWith(
+        'signatures',
+        expect.stringMatching(new RegExp(`^participants/${id}/\\d+\\.png$`)),
+        expect.any(Buffer),
+        'image/png',
+      );
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledWith({
+        where: { id, signaturePath: null },
+        data: expect.objectContaining({ signaturePath: expect.any(String) }),
+      });
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: true }));
+    });
+
+    it.each([['keep'], ['none']])('signatureAction %s: não sobe nada e não marca como salva', async (action) => {
+      mockPrisma.participant.findUnique.mockResolvedValue(existing({ signaturePath: 'participants/part-1/1.png' }));
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: action } as any, pngFile());
+
+      expect(mockStorage.upload).not.toHaveBeenCalled();
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: false }));
+      expect(result).not.toHaveProperty('signatureIgnored');
+    });
+
+    it('sem signatureAction (ausente = none): não sobe nada', async () => {
+      const result = await service.registerPublic('token', { ...baseDto } as any);
+
+      expect(mockStorage.upload).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: false }));
+      expect(result).not.toHaveProperty('signatureIgnored');
+    });
+
+    it('replace com assinatura já salva e e-mail diferente: mantém a antiga e marca signatureIgnored', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(
+        existing({ email: 'outro@mail.com', signaturePath: 'participants/part-1/old.png' }),
+      );
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile());
+
+      expect(mockStorage.upload).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.trainingParticipant.create).toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: false, signatureIgnored: true }));
+    });
+
+    it('replace com assinatura já salva e e-mail igual (caixa e espaços): sobe a nova e apaga a antiga após o commit', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(
+        existing({ email: 'joao@mail.com', signaturePath: 'participants/part-1/old.png' }),
+      );
+
+      const result = await service.registerPublic(
+        'token',
+        { ...baseDto, email: '  JOAO@Mail.com ', signatureAction: 'replace' } as any,
+        pngFile(),
+      );
+
+      expect(mockStorage.upload).toHaveBeenCalledWith('signatures', expect.stringMatching(NEW_PATH), expect.any(Buffer), 'image/png');
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'part-1', signaturePath: 'participants/part-1/old.png' },
+        data: { signaturePath: expect.stringMatching(NEW_PATH), signatureUpdatedAt: expect.any(Date) },
+      });
+      expect(mockStorage.delete).toHaveBeenCalledTimes(1);
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', 'participants/part-1/old.png');
+      expect(mockStorage.delete.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockPrisma.$transaction.mock.invocationCallOrder[0],
+      );
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: true }));
+      expect(result).not.toHaveProperty('signatureIgnored');
+    });
+
+    it('falha no upload: inscrição criada, signatureSaved false', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(existing());
+      mockStorage.upload.mockRejectedValue(new Error('bucket fora do ar'));
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile());
+
+      expect(mockPrisma.trainingParticipant.create).toHaveBeenCalled();
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: false }));
+      expect(result).not.toHaveProperty('signatureIgnored');
+    });
+
+    it('falha na transação: apaga o arquivo recém-enviado e propaga o erro', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(existing());
+      mockPrisma.trainingParticipant.create.mockRejectedValue(new Error('falha no banco'));
+
+      await expect(
+        service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile()),
+      ).rejects.toThrow('falha no banco');
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', expect.stringMatching(NEW_PATH));
+    });
+
+    it('updateMany sem linhas (outra gravação ganhou a corrida): apaga o novo arquivo e marca signatureIgnored', async () => {
+      mockPrisma.participant.findUnique.mockResolvedValue(existing());
+      mockPrisma.participant.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile());
+
+      expect(mockStorage.delete).toHaveBeenCalledTimes(1);
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', expect.stringMatching(NEW_PATH));
+      expect(result).toEqual(expect.objectContaining({ signatureSaved: false, signatureIgnored: true }));
+    });
+
+    it('replace sem arquivo: BadRequestException', async () => {
+      await expect(
+        service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockStorage.upload).not.toHaveBeenCalled();
+    });
+
+    it('arquivo que não é PNG: BadRequestException', async () => {
+      await expect(
+        service.registerPublic('token', { ...baseDto, signatureAction: 'replace' } as any, pngFile(Buffer.alloc(40))),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockStorage.upload).not.toHaveBeenCalled();
+    });
+
+    it('signatureAction desconhecido: BadRequestException', async () => {
+      await expect(
+        service.registerPublic('token', { ...baseDto, signatureAction: 'apagar' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('participationType fora do enum: BadRequestException', async () => {
+      await expect(
+        service.registerPublic('token', { ...baseDto, participationType: 'OUTRO', signatureAction: 'none' } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── addParticipant──────────────────────────────────────────────────────
 
   describe('addParticipant', () => {
     const dto = { cpf: '12345678901', name: 'Maria', email: null, cnhCategory: null, cnhExpiration: null };
