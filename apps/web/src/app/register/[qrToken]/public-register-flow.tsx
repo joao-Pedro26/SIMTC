@@ -1,12 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import type { RegisterParticipantPublicResponse, SignatureAction } from '@simtc/shared-types'
+import { validateCpf } from '@/lib/validate-cpf'
+import { SignatureCard, type SignatureCardHandle, type SignatureValue } from './signature-card'
 import styles from './public-register.module.css'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 
 type Screen = 'confirm' | 'form' | 'success'
+
+/** Resultado da assinatura mostrado na tela de sucesso. */
+type SignatureOutcome = 'saved' | 'ignored' | 'none'
 
 interface Props {
   companyName: string
@@ -25,19 +31,12 @@ interface FormState {
 
 const CNH_CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'] as const
 
-function validateCpf(cpf: string): boolean {
-  const digits = cpf.replace(/\D/g, '')
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false
-  let sum = 0
-  for (let i = 0; i < 9; i++) sum += Number(digits[i]) * (10 - i)
-  let check = (sum * 10) % 11
-  if (check === 10 || check === 11) check = 0
-  if (check !== Number(digits[9])) return false
-  sum = 0
-  for (let i = 0; i < 10; i++) sum += Number(digits[i]) * (11 - i)
-  check = (sum * 10) % 11
-  if (check === 10 || check === 11) check = 0
-  return check === Number(digits[10])
+function outcomeOf(sent: SignatureAction, res: Partial<RegisterParticipantPublicResponse>): SignatureOutcome {
+  if (res.signatureSaved) return 'saved'
+  if (sent === 'replace' || res.signatureIgnored) return 'ignored'
+  // 'keep' só é enviado com assinatura salva (estado B), que continua valendo
+  if (sent === 'keep') return 'saved'
+  return 'none'
 }
 
 function applyCpfMask(value: string): string {
@@ -64,6 +63,18 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
   const [cpfInvalid, setCpfInvalid] = useState(false)
   // Key para re-montar a tela de sucesso e re-disparar animações
   const [successKey, setSuccessKey] = useState(0)
+  // Valor do card de assinatura (ação, blob e estado A/B/C/D)
+  const [sig, setSig] = useState<SignatureValue>({ action: 'none', cardState: 'loading' })
+  const [outcome, setOutcome] = useState<SignatureOutcome>('none')
+  const [reminderOpen, setReminderOpen] = useState(false)
+  // Lembrete aparece uma vez por página; a ref não causa re-render
+  const reminderShownRef = useRef(false)
+  const cardRef = useRef<SignatureCardHandle>(null)
+  const reminderPrimaryRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (reminderOpen) reminderPrimaryRef.current?.focus()
+  }, [reminderOpen])
 
   function setField(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -97,23 +108,53 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
       return
     }
 
-    setSubmitting(true)
-    try {
-      const res = await fetch(`${API_URL}/public/register/${qrToken}`, {
+    // Lembrete de assinatura: uma vez por página, só com o card vazio (estado A)
+    if (sig.cardState === 'A' && !reminderShownRef.current) {
+      reminderShownRef.current = true
+      setReminderOpen(true)
+      return
+    }
+
+    await submitRegistration()
+  }
+
+  async function submitRegistration() {
+    const sentAction = sig.action
+    const fields: Record<string, string> = {
+      name: form.name.trim(),
+      cpf: form.cpf.replace(/\D/g, ''),
+      email: form.email.trim(),
+      cnhCategory: form.cnhCategory,
+      cnhExpiration: form.cnhExpiration,
+      signatureAction: sentAction,
+    }
+    // Campos vazios são omitidos: o backend responde 400 para string vazia
+    const present = Object.entries(fields).filter(([, value]) => value !== '')
+
+    let init: RequestInit
+    if (sig.blob) {
+      // Multipart: não definir Content-Type à mão, o browser coloca o boundary
+      const data = new FormData()
+      for (const [key, value] of present) data.append(key, value)
+      data.append('signature', new File([sig.blob], 'assinatura.png', { type: 'image/png' }))
+      init = { method: 'POST', body: data }
+    } else {
+      init = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          cpf: rawCpf,
-          email: form.email.trim(),
-          cnhCategory: form.cnhCategory,
-          cnhExpiration: form.cnhExpiration,
-        }),
-      })
+        body: JSON.stringify(Object.fromEntries(present)),
+      }
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch(`${API_URL}/public/register/${qrToken}`, init)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.message ?? 'Erro ao realizar inscrição.')
       }
+      const result: Partial<RegisterParticipantPublicResponse> = await res.json().catch(() => ({}))
+      setOutcome(outcomeOf(sentAction, result))
       setSuccessKey((k) => k + 1)
       setScreen('success')
     } catch (e) {
@@ -121,6 +162,16 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function signNowFromReminder() {
+    setReminderOpen(false)
+    cardRef.current?.openModal()
+  }
+
+  function sendWithoutSignatureFromReminder() {
+    setReminderOpen(false)
+    void submitRegistration()
   }
 
   return (
@@ -282,6 +333,14 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                 </div>
               </div>
 
+              <SignatureCard
+                ref={cardRef}
+                qrToken={qrToken}
+                cpf={form.cpf}
+                email={form.email}
+                onChange={setSig}
+              />
+
               {errorMsg && (
                 <div className={styles.errBox}>
                   <svg className={styles.errIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
@@ -354,6 +413,14 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                   </div>
                 </div>
 
+                <p
+                  className={`${styles.successSignature}${outcome === 'ignored' ? ` ${styles.sigWarn}` : ''}`}
+                >
+                  {outcome === 'saved' && '✓ Assinatura salva para o certificado.'}
+                  {outcome === 'ignored' && 'Inscrição feita, mas a assinatura não pôde ser salva.'}
+                  {outcome === 'none' && 'Você se inscreveu sem assinatura.'}
+                </p>
+
                 <p className={styles.successFootnote}>
                   Esta página pode ser fechada com segurança.
                 </p>
@@ -363,6 +430,39 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
 
         </div>
       </div>
+
+      {/* ── Lembrete de assinatura (uma vez) ─────────────────── */}
+      {reminderOpen && (
+        <div className={styles.dialogBackdrop}>
+          <div
+            className={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reminder-title"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setReminderOpen(false)
+            }}
+          >
+            <h2 id="reminder-title" className={styles.dialogTitle}>Assinatura</h2>
+            <p className={styles.dialogText}>
+              Seu certificado sairá sem a sua assinatura. Deseja assinar agora?
+            </p>
+            <div className={styles.dialogActions}>
+              <button
+                ref={reminderPrimaryRef}
+                type="button"
+                className={styles.btnCta}
+                onClick={signNowFromReminder}
+              >
+                Assinar agora
+              </button>
+              <button type="button" className={styles.btnGhost} onClick={sendWithoutSignatureFromReminder}>
+                Enviar sem assinatura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

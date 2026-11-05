@@ -1,16 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Check, PenLine, RotateCcw, Trash2 } from 'lucide-react'
 import type { SignatureAction } from '@simtc/shared-types'
 import { SignatureModal } from '@/components/signature-modal/signature-modal'
 import { PUBLIC_API_URL, useSignaturePreview } from './use-signature-preview'
 import styles from './signature-card.module.css'
 
-/** Valor entregue ao fluxo do formulário a cada mudança. `blob` só existe no estado C. */
+/** Estado visual do card. `loading` = prévia ainda sendo consultada (ação enviada: none). */
+export type SignatureCardState = 'A' | 'B' | 'C' | 'D' | 'loading'
+
+/**
+ * Valor entregue ao fluxo do formulário a cada mudança. `blob` só existe no estado C.
+ * `cardState` diferencia A (vazio) de D (bloqueado), que enviam a mesma ação 'none'.
+ */
 export interface SignatureValue {
   action: SignatureAction
   blob?: Blob
+  cardState: SignatureCardState
 }
 
 export interface SignatureCardProps {
@@ -19,8 +26,13 @@ export interface SignatureCardProps {
   cpf: string
   /** E-mail digitado; aparado internamente. */
   email: string
-  /** Chamado sempre que a ação ou o blob mudam. A função pode mudar de identidade sem problema. */
+  /** Chamado sempre que a ação, o blob ou o estado mudam. A função pode mudar de identidade sem problema. */
   onChange: (value: SignatureValue) => void
+}
+
+/** Permite ao formulário abrir o modal de assinatura (ex.: botão "Assinar agora" do lembrete). */
+export interface SignatureCardHandle {
+  openModal(): void
 }
 
 interface Draft {
@@ -42,10 +54,14 @@ function formatDate(iso: string): string {
  * - C: nova assinatura desenhada no aparelho (objectURL local). Refazer / Remover.
  * - D: CPF com assinatura, mas e-mail não confere (locked). Sem ações.
  */
-export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardProps) {
+export const SignatureCard = forwardRef<SignatureCardHandle, SignatureCardProps>(function SignatureCard(
+  { qrToken, cpf, email, onChange },
+  ref,
+) {
   const preview = useSignaturePreview(qrToken, cpf, email)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  useImperativeHandle(ref, () => ({ openModal: () => setModalOpen(true) }), [])
   const [removeError, setRemoveError] = useState('')
   const [removing, setRemoving] = useState(false)
   // Falhas de carregamento da prévia, por consulta (CPF + e-mail). Uma nova consulta ou uma imagem
@@ -90,8 +106,8 @@ export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardPr
   const action: SignatureAction = mode === 'C' ? 'replace' : mode === 'B' ? 'keep' : 'none'
 
   useEffect(() => {
-    onChangeRef.current({ action, blob })
-  }, [action, blob])
+    onChangeRef.current({ action, blob, cardState: mode })
+  }, [mode, action, blob])
 
   const handleConfirm = useCallback((newBlob: Blob, previewUrl: string) => {
     setDraft({ blob: newBlob, previewUrl })
@@ -214,4 +230,4 @@ export function SignatureCard({ qrToken, cpf, email, onChange }: SignatureCardPr
       <SignatureModal open={modalOpen} onCancel={closeModal} onConfirm={handleConfirm} />
     </section>
   )
-}
+})

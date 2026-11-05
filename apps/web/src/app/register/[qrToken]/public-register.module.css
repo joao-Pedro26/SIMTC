@@ -660,3 +660,65 @@
   line-height: 1.7;
   max-width: 240px;
 }
+
+/* ════════════════════════════════════════════════════════════
+   LEMBRETE DE ASSINATURA (diálogo modal)
+   ════════════════════════════════════════════════════════════ */
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem 1.25rem 1.25rem;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.25);
+  animation: regFadeUp 0.25s both;
+}
+
+.dialogTitle {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.dialogText {
+  font-size: 0.9375rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+
+.dialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   LINHA DE ASSINATURA NA TELA DE SUCESSO
+   ════════════════════════════════════════════════════════════ */
+
+.successSignature {
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  animation: regFadeUp 0.4s 0.5s both;
+}
+
+.sigWarn {
+  color: #b45309;
+}
