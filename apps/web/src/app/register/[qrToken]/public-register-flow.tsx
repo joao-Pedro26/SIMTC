@@ -21,10 +21,9 @@ interface FormState {
   email: string
   cnhCategory: string
   cnhExpiration: string
-  participationType: 'SOMENTE_TEORICA' | 'TEORICA_E_PRATICA' | ''
 }
 
-const CNH_CATEGORIES = ['A', 'B', 'AB', 'C', 'D', 'E'] as const
+const CNH_CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'] as const
 
 function validateCpf(cpf: string): boolean {
   const digits = cpf.replace(/\D/g, '')
@@ -55,7 +54,6 @@ const emptyForm: FormState = {
   email: '',
   cnhCategory: '',
   cnhExpiration: '',
-  participationType: '',
 }
 
 export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qrToken }: Props) {
@@ -89,7 +87,7 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
     setCpfInvalid(false)
     setErrorMsg('')
 
-    if (!form.name.trim() || !form.cpf || !form.email.trim() || !form.cnhCategory || !form.cnhExpiration || !form.participationType) {
+    if (!form.name.trim() || !form.cpf || !form.email.trim() || !form.cnhCategory || !form.cnhExpiration) {
       setErrorMsg('Preencha todos os campos para continuar.')
       return
     }
@@ -110,7 +108,6 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
           email: form.email.trim(),
           cnhCategory: form.cnhCategory,
           cnhExpiration: form.cnhExpiration,
-          participationType: form.participationType,
         }),
       })
       if (!res.ok) {
@@ -282,29 +279,6 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                   <label className={styles.flLabelDate} htmlFor="reg-date">
                     Vencimento da CNH
                   </label>
-                </div>
-              </div>
-
-              {/* 03 — Tipo de participação */}
-              <p className={styles.sectionLabel}>
-                <span className={styles.slNum}>03</span> Tipo de participação
-              </p>
-
-              <div className={styles.cnhSection}>
-                <div className={styles.participationGrid}>
-                  {([
-                    { value: 'SOMENTE_TEORICA',   label: 'Teoria' },
-                    { value: 'TEORICA_E_PRATICA',  label: 'Teoria + Prática' },
-                  ] as const).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`${styles.cnhBtn}${form.participationType === value ? ` ${styles.cnhBtnActive}` : ''}`}
-                      onClick={() => setField('participationType', value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
                 </div>
               </div>
 
