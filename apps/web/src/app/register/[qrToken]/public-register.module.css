@@ -308,6 +308,14 @@
   letter-spacing: 0.05em;
 }
 
+/* "(Opcional)" ao lado do título da seção: secundário e discreto */
+.slOptional {
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
 .fieldStack {
   display: flex;
   flex-direction: column;
