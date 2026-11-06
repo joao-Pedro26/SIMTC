@@ -158,7 +158,7 @@ export const SignatureCard = forwardRef<SignatureCardHandle, SignatureCardProps>
 
       {mode === 'A' && (
         <button type="button" className={styles.empty} onClick={() => setModalOpen(true)}>
-          ✍️ Toque para assinar
+          <PenLine size={18} aria-hidden="true" /> Toque para assinar
         </button>
       )}
 

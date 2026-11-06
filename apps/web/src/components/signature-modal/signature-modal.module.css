@@ -187,9 +187,17 @@
   outline-offset: 2px;
 }
 
-/* Ícones e rótulos ocultos só aparecem no modo sobreposto (ver abaixo). */
+/* Ícone + texto em todos os modos. No celular o texto vira só para leitor de tela (ver abaixo). */
+.clearBtn,
+.cancelBtn,
+.confirmBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .icon {
-  display: none;
+  display: block;
   flex-shrink: 0;
 }
 
@@ -277,10 +285,6 @@
 
   .rightActions {
     gap: 0.5rem;
-  }
-
-  .icon {
-    display: block;
   }
 
   /* Texto só para leitores de tela (visually-hidden, não display: none). */

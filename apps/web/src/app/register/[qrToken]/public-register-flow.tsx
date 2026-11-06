@@ -348,13 +348,20 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                 </div>
               </div>
 
-              <SignatureCard
-                ref={cardRef}
-                qrToken={qrToken}
-                cpf={form.cpf}
-                email={form.email}
-                onChange={setSig}
-              />
+              {/* 03 — Assinatura */}
+              <p className={styles.sectionLabel}>
+                <span className={styles.slNum}>03</span> Assinatura
+              </p>
+
+              <div className={styles.sigSection}>
+                <SignatureCard
+                  ref={cardRef}
+                  qrToken={qrToken}
+                  cpf={form.cpf}
+                  email={form.email}
+                  onChange={setSig}
+                />
+              </div>
 
               {errorMsg && (
                 <div className={styles.errBox}>
