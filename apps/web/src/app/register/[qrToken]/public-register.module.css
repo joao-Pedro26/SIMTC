@@ -307,6 +307,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
 }
+
 .fieldStack {
   display: flex;
   flex-direction: column;
@@ -331,7 +332,6 @@
   border: 1.5px solid var(--border);
   border-radius: 6px;
   font-size: 0.9375rem;
-  line-height: 1.2;
   color: var(--text);
   background: var(--surface);
   outline: none;
@@ -339,23 +339,6 @@
   font-family: var(--font);
   -webkit-appearance: none;
   appearance: none;
-}
-
-/* Data nativa: texto e calendário sempre legíveis, vazio ou preenchido, inclusive no modo escuro do aparelho */
-.flInput[type='date'] {
-  color: var(--text);
-  color-scheme: light;
-  text-align: left;
-  -webkit-min-logical-width: 0;
-}
-
-.flInput[type='date']::-webkit-datetime-edit,
-.flInput[type='date']::-webkit-datetime-edit-fields-wrapper,
-.flInput[type='date']::-webkit-datetime-edit-text,
-.flInput[type='date']::-webkit-datetime-edit-day-field,
-.flInput[type='date']::-webkit-datetime-edit-month-field,
-.flInput[type='date']::-webkit-datetime-edit-year-field {
-  color: var(--text);
 }
 
 .flInput:focus {
