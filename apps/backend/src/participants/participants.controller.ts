@@ -59,6 +59,15 @@ export class ParticipantsController {
     return this.service.lookupByCpf(trainingSessionId, cpf);
   }
 
+  @Delete('participants/:participantId/signature')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin remove a assinatura do participante (pela inscrição)' })
+  removeSignature(@Param('participantId') participantId: string) {
+    return this.service.removeSignature(participantId);
+  }
+
   @Delete('participants/:participantId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -341,6 +341,31 @@ export class ParticipantsService {
   }
 
   /**
+   * Remoção da assinatura pelo admin, pela inscrição (`TrainingParticipant.id`), sem
+   * conferência de CPF/e-mail. Mesma ordem do `removeOwnSignature`: zera o banco
+   * (condicionado ao caminho lido) e só depois apaga o arquivo, best-effort.
+   */
+  async removeSignature(trainingParticipantId: string): Promise<SignatureRemoveResponse> {
+    const record = await this.prisma.trainingParticipant.findUnique({
+      where: { id: trainingParticipantId },
+      select: { id: true, participant: { select: { id: true, signaturePath: true } } },
+    });
+    if (!record) throw new NotFoundException('Participante não encontrado');
+
+    const { id: participantId, signaturePath } = record.participant;
+    if (!signaturePath) return { removed: false };
+
+    const { count } = await this.prisma.participant.updateMany({
+      where: { id: participantId, signaturePath },
+      data: { signaturePath: null, signatureUpdatedAt: null },
+    });
+    if (count === 0) return { removed: false };
+
+    await this.storage.delete(SIGNATURE_BUCKET, signaturePath).catch(() => null);
+    return { removed: true };
+  }
+
+  /**
    * Conferência de acesso à assinatura pelo formulário público: sessão do token
    * (404 se não existe, 400 se encerrada) → CPF normalizado só com dígitos →
    * participante → `none` (sem cadastro ou sem assinatura), `locked` (e-mail não

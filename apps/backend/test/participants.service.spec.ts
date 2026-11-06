@@ -1,5 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { UserRole } from '@simtc/shared-types';
+import { ROLES_KEY } from 'src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailService } from 'src/email/email.service';
@@ -577,6 +583,90 @@ describe('ParticipantsService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(mockPrisma.participant.findUnique).not.toHaveBeenCalled();
       expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── removeSignature (admin) ─────────────────────────────────────────────
+
+  describe('removeSignature', () => {
+    const SIG_PATH = 'participants/part-1/123.png';
+    const inscricao = (signaturePath: string | null = SIG_PATH) => ({
+      id: 'tp-1',
+      participant: { id: 'part-1', signaturePath },
+    });
+
+    it('zera o banco e só depois apaga do storage', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(inscricao());
+
+      const result = await service.removeSignature('tp-1');
+
+      expect(result).toEqual({ removed: true });
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'part-1', signaturePath: SIG_PATH },
+        data: { signaturePath: null, signatureUpdatedAt: null },
+      });
+      expect(mockStorage.delete).toHaveBeenCalledWith('signatures', SIG_PATH);
+      const dbOrder = mockPrisma.participant.updateMany.mock.invocationCallOrder[0];
+      const storageOrder = mockStorage.delete.mock.invocationCallOrder[0];
+      expect(dbOrder).toBeLessThan(storageOrder);
+    });
+
+    it('404 se a inscrição não existe, sem tocar em banco de participante nem storage', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
+
+      await expect(service.removeSignature('tp-x')).rejects.toThrow(NotFoundException);
+      await expect(service.removeSignature('tp-x')).rejects.toThrow('Participante não encontrado');
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('{ removed: false } sem assinatura, sem tocar em banco nem storage', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(inscricao(null));
+
+      const result = await service.removeSignature('tp-1');
+
+      expect(result).toEqual({ removed: false });
+      expect(mockPrisma.participant.updateMany).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('falha do storage não desfaz a remoção no banco e não propaga o erro', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(inscricao());
+      mockStorage.delete.mockRejectedValue(new Error('storage fora do ar'));
+
+      const result = await service.removeSignature('tp-1');
+
+      expect(result).toEqual({ removed: true });
+      expect(mockPrisma.participant.updateMany).toHaveBeenCalledTimes(1);
+      errorSpy.mockRestore();
+    });
+
+    it('count === 0 (assinatura trocada no meio do caminho): { removed: false } sem tocar o storage', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(inscricao());
+      mockPrisma.participant.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.removeSignature('tp-1');
+
+      expect(result).toEqual({ removed: false });
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── removeSignature: quem pode chamar ───────────────────────────────────
+
+  describe('ParticipantsController.removeSignature: quem pode remover', () => {
+    // A remoção pelo admin apaga a assinatura de vez: só ADMIN. Mesmo padrão
+    // de metadado de guard dos outros endpoints admin (ver participants-lookup.spec.ts).
+    const handler = ParticipantsController.prototype.removeSignature;
+    const reflector = new Reflector();
+
+    it('exige o papel ADMIN', () => {
+      expect(reflector.get<UserRole[]>(ROLES_KEY, handler)).toEqual([UserRole.ADMIN]);
+    });
+
+    it('passa pelo JwtAuthGuard e, depois dele, pelo RolesGuard', () => {
+      expect(reflector.get(GUARDS_METADATA, handler)).toEqual([JwtAuthGuard, RolesGuard]);
     });
   });
 
