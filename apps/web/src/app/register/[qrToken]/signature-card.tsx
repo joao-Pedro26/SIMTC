@@ -149,9 +149,8 @@ export const SignatureCard = forwardRef<SignatureCardHandle, SignatureCardProps>
   const savedDate = preview.updatedAt ? formatDate(preview.updatedAt) : ''
 
   return (
-    <section className={styles.card} aria-labelledby="signature-card-title">
+    <section className={styles.card} aria-label="Assinatura do participante">
       <header className={styles.head}>
-        <h3 id="signature-card-title" className={styles.title}>Assinatura</h3>
         <span className={styles.badge}>Recomendado</span>
       </header>
       <p className={styles.hint}>Sua assinatura aparecerá no seu certificado.</p>
