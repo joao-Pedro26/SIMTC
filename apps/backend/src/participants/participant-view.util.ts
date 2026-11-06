@@ -16,8 +16,8 @@ export function toPublicParticipant<T extends WithSignature>(p: T): PublicPartic
 }
 
 /** Aplica `toPublicParticipant` ao `participant` aninhado de um registro (ex.: TrainingParticipant). */
-export function withPublicParticipant<P extends WithSignature, T extends { participant: P }>(
+export function withPublicParticipant<T extends { participant: WithSignature }>(
   record: T,
-): Omit<T, 'participant'> & { participant: PublicParticipant<P> } {
+): Omit<T, 'participant'> & { participant: PublicParticipant<T['participant']> } {
   return { ...record, participant: toPublicParticipant(record.participant) };
 }

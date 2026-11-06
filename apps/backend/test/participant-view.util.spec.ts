@@ -36,4 +36,17 @@ describe('participant-view.util', () => {
       participant: { ...base, hasSignature: true },
     });
   });
+
+  it('withPublicParticipant preserva o tipo dos campos do participante (inclusive em map)', () => {
+    const rec = {
+      id: 'tp1',
+      participant: { ...base, signaturePath: 'x.png', signatureUpdatedAt: new Date() },
+    };
+    const one = withPublicParticipant(rec);
+    const name: string = one.participant.name;
+    const cpf: string = one.participant.cpf;
+    const has: boolean = one.participant.hasSignature;
+    const [mapped] = [rec].map(withPublicParticipant);
+    expect([name, cpf, has, mapped.participant.name]).toEqual(['Maria', '123', true, 'Maria']);
+  });
 });
