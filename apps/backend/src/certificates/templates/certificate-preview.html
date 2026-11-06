@@ -108,28 +108,42 @@
       gap: 80px;
       padding: 0 10px;
       margin-bottom: 158px;
-      align-items: flex-end;
+      align-items: flex-start;
     }
 
     .sig { text-align: center; }
 
+    /* Mesmo CSS do certificate.html: área da assinatura de 58px + 2px, com ou sem imagem. */
+    .sig-img,
     .sig-img-placeholder {
+      box-sizing: border-box;
       width: 200px;
       height: 58px;
-      border: 1px dashed #aaa;
       display: flex;
       align-items: center;
       justify-content: center;
+      margin: 0 auto 2px;
+    }
+
+    .sig-img {
+      display: block;
+      object-fit: contain;
+    }
+
+    .sig-img-placeholder {
+      border: 1px dashed #aaa;
       color: #aaa;
       font-size: 12px;
-      margin: 0 auto 2px;
     }
 
     .sig-line {
       border-top: 1px solid #333;
       width: 280px;
-      margin: 0 auto 6px;
+      margin: 60px auto 6px;
     }
+
+    .sig-img + .sig-line,
+    .sig-img-placeholder + .sig-line { margin-top: 0; }
 
     .sig-name {
       font-size: 14px;
@@ -178,6 +192,7 @@
         <p class="sig-info">Reg. MTE 62386/SP</p>
       </div>
       <div class="sig">
+        <img class="sig-img" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='58' viewBox='0 0 200 58'%3E%3Cpath d='M8 44 C 30 8, 48 52, 72 26 S 110 6, 128 30 S 170 52, 192 14' fill='none' stroke='%23111' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" alt="Assinatura do participante">
         <div class="sig-line"></div>
         <p class="sig-name">Dercilio Leoveral De Oliveira Filho</p>
       </div>

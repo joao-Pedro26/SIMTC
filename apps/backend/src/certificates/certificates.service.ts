@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PdfGeneratorService } from './pdf-generator.service';
 import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../email/email.service';
+import { SIGNATURE_BUCKET } from '../participants/signature.constants';
 import {
   JwtPayload,
   calculateCategoryScore,
@@ -138,13 +139,24 @@ export class CertificatesService {
       signatureUrl = await this.storage.getSignedUrl('signatures', sigPath, 300).catch(() => null);
     }
 
+    // Assinatura do participante: mesmo padrão (bucket privado, signed URL de 300s).
+    // Sem signaturePath não chama o storage; falha na signed URL segue sem assinatura.
+    // O signaturePath não vai ao template — só a signed URL resolvida.
+    const { signaturePath, ...participantData } = trainingParticipant.participant;
+    let participantSignatureUrl: string | null = null;
+    if (signaturePath) {
+      participantSignatureUrl = await this.storage
+        .getSignedUrl(SIGNATURE_BUCKET, signaturePath, 300)
+        .catch(() => null);
+    }
+
     // Garante que contentItems é um array (campo Json? pode vir como null)
     const contentItems = Array.isArray(session.course.contentItems)
       ? session.course.contentItems
       : null;
 
     const pdf = await this.pdfGenerator.renderCertificate({
-      participant: trainingParticipant.participant,
+      participant: { ...participantData, signatureUrl: participantSignatureUrl },
       session: { ...session, date: sessionDate },
       company: session.company,
       course: { ...session.course, contentItems },

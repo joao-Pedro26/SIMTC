@@ -98,11 +98,13 @@
       gap: 80px;
       padding: 0 10px;
       margin-bottom: 158px;
-      align-items: flex-end;
+      align-items: flex-start;
     }
 
     .sig { text-align: center; }
 
+    /* Área da assinatura sempre reservada (58px + 2px), com ou sem imagem:
+       as linhas e os nomes das duas colunas ficam na mesma altura. */
     .sig-img {
       height: 58px;
       display: block;
@@ -112,8 +114,10 @@
     .sig-line {
       border-top: 1px solid #333;
       width: 280px;
-      margin: 0 auto 6px;
+      margin: 60px auto 6px;
     }
+
+    .sig-img + .sig-line { margin-top: 0; }
 
     .sig-name {
       font-size: 14px;
@@ -290,6 +294,7 @@
         {{#if consultant.regMte}}<p class="sig-info">{{consultant.regMte}}</p>{{/if}}
       </div>
       <div class="sig">
+        {{#if participant.signatureUrl}}<img class="sig-img" src="{{{participant.signatureUrl}}}" alt="Assinatura do participante">{{/if}}
         <div class="sig-line"></div>
         <p class="sig-name">{{participant.name}}</p>
       </div>
