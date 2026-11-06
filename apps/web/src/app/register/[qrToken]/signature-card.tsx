@@ -202,7 +202,6 @@ export const SignatureCard = forwardRef<SignatureCardHandle, SignatureCardProps>
           <div className={styles.previewBox}>
             {/* eslint-disable-next-line @next/next/no-img-element -- objectURL local */}
             <img src={draft.previewUrl} alt="Nova assinatura" className={styles.previewImg} />
-            <span className={styles.newBadge}>Nova</span>
           </div>
           <div className={styles.options}>
             <button type="button" className={styles.optionBtn} onClick={() => setModalOpen(true)}>
