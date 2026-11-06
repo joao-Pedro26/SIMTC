@@ -439,13 +439,16 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                   </div>
                 </div>
 
-                <p
-                  className={`${styles.successSignature}${outcome === 'ignored' ? ` ${styles.sigWarn}` : ''}`}
-                >
-                  {outcome === 'saved' && '✓ Assinatura salva para o certificado.'}
-                  {outcome === 'ignored' && 'Inscrição feita, mas a assinatura não pôde ser salva.'}
-                  {outcome === 'none' && 'Você se inscreveu sem assinatura.'}
-                </p>
+                {/* Com assinatura salva não há linha: só aparece quando falta ou falhou */}
+                {outcome !== 'saved' && (
+                  <p
+                    className={`${styles.successSignature}${outcome === 'ignored' ? ` ${styles.sigWarn}` : ''}`}
+                  >
+                    {outcome === 'ignored'
+                      ? 'Inscrição feita, mas a assinatura não pôde ser salva.'
+                      : 'Você se inscreveu sem assinatura.'}
+                  </p>
+                )}
 
                 <p className={styles.successFootnote}>
                   Esta página pode ser fechada com segurança.
