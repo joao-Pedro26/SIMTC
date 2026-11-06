@@ -11,7 +11,7 @@ const mockPdfGenerator = { renderCertificate: jest.fn(), renderAssessmentReport:
 const mockPrisma = {
   trainingParticipant: { findUniqueOrThrow: jest.fn() },
   trainingSession: { findUniqueOrThrow: jest.fn() },
-  certificate: { upsert: jest.fn(), update: jest.fn() },
+  certificate: { upsert: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
 };
 
 const PARTICIPANT_SIGNATURE_PATH = 'participants/p1/1730000000000.png';
@@ -144,6 +144,25 @@ describe('CertificatesService', () => {
       const data = mockPdfGenerator.renderCertificate.mock.calls[0][0];
       expect(data.participant).not.toHaveProperty('signaturePath');
       expect(JSON.stringify(data)).not.toContain('"signaturePath"');
+    });
+  });
+
+  describe('findById: assinatura do participante', () => {
+    it('não expõe signaturePath/signatureUpdatedAt e devolve hasSignature', async () => {
+      mockPrisma.certificate.findUnique.mockResolvedValue({
+        id: 'cert1',
+        trainingParticipant: {
+          id: 'tp1',
+          training: { id: 's1' },
+          participant: { id: 'p1', name: 'Maria', signaturePath: PARTICIPANT_SIGNATURE_PATH, signatureUpdatedAt: new Date() },
+        },
+      });
+      const result = (await service.findById('cert1')) as any;
+      const p = result.trainingParticipant.participant;
+      expect(p.hasSignature).toBe(true);
+      expect(p).not.toHaveProperty('signaturePath');
+      expect(p).not.toHaveProperty('signatureUpdatedAt');
+      expect(result.trainingParticipant.training).toEqual({ id: 's1' });
     });
   });
 });

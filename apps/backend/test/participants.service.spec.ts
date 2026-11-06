@@ -346,7 +346,7 @@ describe('ParticipantsService', () => {
       mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
       mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
       mockPrisma.participant.update.mockResolvedValue({ id: 'part-1' });
-      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1', participant: { id: 'part-1' } });
 
       await service.addParticipant('sess-1', { cpf: '12345678901', name: 'Maria Nova', email: 'maria@nova.com' } as any);
 
@@ -363,7 +363,7 @@ describe('ParticipantsService', () => {
       mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
       mockPrisma.participant.findUnique.mockResolvedValue(null);
       mockPrisma.participant.create.mockResolvedValue({ id: 'part-novo' });
-      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp-1', participant: { id: 'part-1' } });
 
       await service.addParticipant('sess-1', dto as any);
 
@@ -629,6 +629,51 @@ describe('ParticipantsService', () => {
 
       expect(mockPrisma.participant.deleteMany).not.toHaveBeenCalled();
       expect(mockStorage.delete).not.toHaveBeenCalledWith('signatures', expect.anything());
+    });
+  });
+
+  // --- hasSignature sem vazar o path ---------------------------------------
+
+  describe('participante nas respostas: hasSignature sem signaturePath', () => {
+    const withSig = {
+      id: 'p1', name: 'Maria', cpf: '1', signaturePath: 'participants/p1/1.png', signatureUpdatedAt: new Date(),
+    };
+    const noSig = { id: 'p2', name: 'Joao', cpf: '2', signaturePath: null, signatureUpdatedAt: null };
+
+    function expectPublic(participant: Record<string, unknown>, has: boolean) {
+      expect(participant.hasSignature).toBe(has);
+      expect(participant).not.toHaveProperty('signaturePath');
+      expect(participant).not.toHaveProperty('signatureUpdatedAt');
+    }
+
+    it('findBySession não expõe signaturePath/signatureUpdatedAt e devolve hasSignature true/false', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { id: 'tp1', participant: withSig, assessment: null },
+        { id: 'tp2', participant: noSig, assessment: { id: 'a1' } },
+      ]);
+      const result = (await service.findBySession('s1')) as any[];
+      expectPublic(result[0].participant, true);
+      expectPublic(result[1].participant, false);
+      expect(result[1].assessment).toEqual({ id: 'a1' });
+      expect(result[0].id).toBe('tp1');
+    });
+
+    it('addParticipant devolve o participante sem o caminho da assinatura', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: 's1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue(null);
+      mockPrisma.participant.create.mockResolvedValue({ id: 'p1' });
+      mockPrisma.trainingParticipant.create.mockResolvedValue({ id: 'tp1', participant: withSig });
+      const result = (await service.addParticipant('s1', {
+        cpf: '1', name: 'Maria', email: null, cnhCategory: null, cnhExpiration: null, participationType: 'TEORICA_E_PRATICA',
+      } as any)) as any;
+      expectPublic(result.participant, true);
+    });
+
+    it('updateParticipationType devolve o participante sem o caminho da assinatura', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp1' });
+      mockPrisma.trainingParticipant.update.mockResolvedValue({ id: 'tp1', participant: noSig });
+      const result = (await service.updateParticipationType('tp1', { participationType: 'SOMENTE_TEORICA' } as any)) as any;
+      expectPublic(result.participant, false);
     });
   });
 });

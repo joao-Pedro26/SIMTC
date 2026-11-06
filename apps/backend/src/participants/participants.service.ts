@@ -10,6 +10,7 @@ import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { deleteOrphanedParticipants } from './participant-cleanup.util';
 import { assertValidSignaturePng } from './png-signature.util';
 import { SIGNATURE_BUCKET } from './signature.constants';
+import { withPublicParticipant } from './participant-view.util';
 
 const SIGNATURE_ACTIONS: SignatureAction[] = ['keep', 'replace', 'none'];
 /** Validade da signed URL da prévia: basta para o `<img>` carregar, não serve para compartilhar. */
@@ -23,12 +24,13 @@ export class ParticipantsService {
     private readonly storage: StorageService,
   ) {}
 
-  findBySession(trainingSessionId: string) {
-    return this.prisma.trainingParticipant.findMany({
+  async findBySession(trainingSessionId: string) {
+    const records = await this.prisma.trainingParticipant.findMany({
       where: { trainingSessionId },
       include: { participant: true, assessment: true },
       orderBy: { registeredAt: 'asc' },
     });
+    return records.map(withPublicParticipant);
   }
 
   async findByToken(qrToken: string): Promise<{
@@ -389,7 +391,7 @@ export class ParticipantsService {
     // (ver findOrUpdateParticipantForSession)
     const participant = await this.findOrUpdateParticipantForSession(trainingSessionId, dto);
 
-    return this.prisma.trainingParticipant.create({
+    const created = await this.prisma.trainingParticipant.create({
       data: {
         trainingSessionId,
         participantId: participant.id,
@@ -397,6 +399,7 @@ export class ParticipantsService {
       },
       include: { participant: true },
     });
+    return withPublicParticipant(created);
   }
 
   /**
@@ -445,7 +448,7 @@ export class ParticipantsService {
       where: { id: participantId },
       data: { participationType: dto.participationType },
       include: { participant: true },
-    });
+    }).then(withPublicParticipant);
   }
 
   /**

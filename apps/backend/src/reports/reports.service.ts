@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from '@simtc/shared-types';
+import { withPublicParticipant } from '../participants/participant-view.util';
 
 @Injectable()
 export class ReportsService {
@@ -69,7 +70,7 @@ export class ReportsService {
       }
     }
 
-    return session;
+    return { ...session, participants: session.participants.map(withPublicParticipant) };
   }
 
   async getCompanyHistory(companyId: string, user: JwtPayload) {

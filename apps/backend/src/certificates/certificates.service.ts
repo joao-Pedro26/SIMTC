@@ -4,6 +4,7 @@ import { PdfGeneratorService } from './pdf-generator.service';
 import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../email/email.service';
 import { SIGNATURE_BUCKET } from '../participants/signature.constants';
+import { withPublicParticipant } from '../participants/participant-view.util';
 import {
   JwtPayload,
   calculateCategoryScore,
@@ -546,7 +547,10 @@ export class CertificatesService {
       },
     });
     if (!cert) throw new NotFoundException('Certificado não encontrado');
-    return cert;
+    return {
+      ...cert,
+      trainingParticipant: withPublicParticipant(cert.trainingParticipant),
+    };
   }
 
   async getDownloadUrl(id: string, user: JwtPayload): Promise<{ url: string }> {

@@ -9,6 +9,7 @@ import { UpdateTrainingSessionDto } from './dto/update-training-session.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { deleteOrphanedParticipants } from '../participants/participant-cleanup.util';
 import { SIGNATURE_BUCKET } from '../participants/signature.constants';
+import { withPublicParticipant } from '../participants/participant-view.util';
 import {
   releaseHeldParticipants,
   releaseParticipantsOfConsultants,
@@ -113,7 +114,16 @@ export class TrainingSessionsService {
     return stats;
   }
 
+  /**
+   * Resposta da API: o `participant` de cada inscrição sai sem o caminho da
+   * assinatura (só `hasSignature`). Uso interno usa `loadTrainingSession`.
+   */
   async findTrainingSessionById(id: string, user?: JwtPayload) {
+    const session = await this.loadTrainingSession(id, user);
+    return { ...session, participants: session.participants.map(withPublicParticipant) };
+  }
+
+  private async loadTrainingSession(id: string, user?: JwtPayload) {
     const session = await this.prisma.trainingSession.findUnique({
       where: { id },
       include: {
@@ -298,7 +308,7 @@ export class TrainingSessionsService {
   * `deleteOrphanedParticipants` em `participant-cleanup.util.ts`.
   */
  async deleteSession(id: string) {
-  await this.findTrainingSessionById(id);
+  await this.loadTrainingSession(id);
 
   const participants = await this.prisma.trainingParticipant.findMany({
     where: { trainingSessionId: id },
@@ -358,7 +368,7 @@ export class TrainingSessionsService {
 }
 
   async cancelSession(id: string) {
-    const session = await this.findTrainingSessionById(id);
+    const session = await this.loadTrainingSession(id);
     if (session.status === 'CONCLUIDO') {
       throw new ForbiddenException('Não é possível cancelar um treinamento já concluído');
     }
@@ -464,7 +474,7 @@ export class TrainingSessionsService {
   }
 
   async updateSession (id: string, dto: UpdateTrainingSessionDto) {
-    const session = await this.findTrainingSessionById(id);
+    const session = await this.loadTrainingSession(id);
 
     this.assertEditable(session.status);
 

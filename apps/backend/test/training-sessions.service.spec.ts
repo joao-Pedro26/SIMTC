@@ -322,3 +322,43 @@ describe('TrainingSessionsService.deleteSession — assinatura do participante',
     expect(storage.delete).not.toHaveBeenCalledWith('signatures', expect.anything());
   });
 });
+
+
+describe('TrainingSessionsService.findTrainingSessionById: assinatura do participante', () => {
+  const prisma = { trainingSession: { findUnique: jest.fn() } };
+  const service = new TrainingSessionsService(
+    prisma as unknown as PrismaService,
+    {} as EmailService,
+    {} as StorageService,
+  );
+
+  it('não expõe signaturePath/signatureUpdatedAt e devolve hasSignature true/false', async () => {
+    prisma.trainingSession.findUnique.mockResolvedValue({
+      id: 's1',
+      status: 'PLANEJADO',
+      consultants: [],
+      participants: [
+        {
+          id: 'tp1',
+          certificate: null,
+          participant: { id: 'p1', name: 'Maria', signaturePath: 'participants/p1/1.png', signatureUpdatedAt: new Date() },
+        },
+        {
+          id: 'tp2',
+          certificate: { id: 'c1' },
+          participant: { id: 'p2', name: 'Joao', signaturePath: null, signatureUpdatedAt: null },
+        },
+      ],
+    });
+    const result = await service.findTrainingSessionById('s1', admin);
+    const [a, b] = result.participants as any[];
+    expect(a.participant.hasSignature).toBe(true);
+    expect(b.participant.hasSignature).toBe(false);
+    for (const p of [a.participant, b.participant]) {
+      expect(p).not.toHaveProperty('signaturePath');
+      expect(p).not.toHaveProperty('signatureUpdatedAt');
+    }
+    expect(b.certificate).toEqual({ id: 'c1' });
+    expect(result.id).toBe('s1');
+  });
+});
