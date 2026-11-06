@@ -350,8 +350,7 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
 
               {/* 03 — Assinatura */}
               <p className={styles.sectionLabel}>
-                <span className={styles.slNum}>03</span> Assinatura{' '}
-                <span className={styles.slOptional}>(Opcional)</span>
+                <span className={styles.slNum}>03</span> Assinatura (Opcional)
               </p>
 
               <div className={styles.sigSection}>
