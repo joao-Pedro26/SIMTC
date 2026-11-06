@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, Eraser, X } from 'lucide-react'
 import { useSignaturePad } from '@/lib/signature/use-signature-pad'
 import styles from './signature-modal.module.css'
@@ -13,8 +14,20 @@ interface SignatureModalProps {
 }
 
 export function SignatureModal({ open, onCancel, onConfirm }: SignatureModalProps) {
-  if (!open) return null
-  return <SignatureModalContent onCancel={onCancel} onConfirm={onConfirm} />
+  // O portal só existe no cliente: marca "montado" depois do primeiro render para evitar erro de hidratação/SSR.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!open || !mounted) return null
+
+  // Renderiza direto no body: ancestrais com transform (ex.: animação do formulário público)
+  // viram containing block de position: fixed e cortariam o overlay.
+  return createPortal(
+    <SignatureModalContent onCancel={onCancel} onConfirm={onConfirm} />,
+    document.body,
+  )
 }
 
 function SignatureModalContent({ onCancel, onConfirm }: Omit<SignatureModalProps, 'open'>) {
