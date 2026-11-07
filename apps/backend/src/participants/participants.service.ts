@@ -463,17 +463,18 @@ export class ParticipantsService {
     };
   }
 
-  updateParticipationType( participantId: string, dto: UpdateParticipantTypeDto) {
-    const record = this.prisma.trainingParticipant.findUnique({
+  async updateParticipationType(participantId: string, dto: UpdateParticipantTypeDto) {
+    const record = await this.prisma.trainingParticipant.findUnique({
       where: { id: participantId },
     });
     if (!record) throw new NotFoundException('Participante não encontrado');
 
-    return this.prisma.trainingParticipant.update({
+    const updated = await this.prisma.trainingParticipant.update({
       where: { id: participantId },
       data: { participationType: dto.participationType },
       include: { participant: true },
-    }).then(withPublicParticipant);
+    });
+    return withPublicParticipant(updated);
   }
 
   /**

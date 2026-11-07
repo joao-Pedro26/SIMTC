@@ -6,6 +6,7 @@ import { UserRole } from '@simtc/shared-types';
 import { ValidateCpfPipe } from '../common/pipes/validate-cpf.pipe';
 import { AddParticipantDto } from './dto/add-participant.dto';
 import { LookupParticipantDto } from './dto/lookup-participant.dto';
+import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 
@@ -57,6 +58,18 @@ export class ParticipantsController {
   ) {
     const cpf = new ValidateCpfPipe().transform(dto.cpf);
     return this.service.lookupByCpf(trainingSessionId, cpf);
+  }
+
+  @Patch('participants/:participantId/type')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin define se o participante faz só teoria ou teoria + prática' })
+  updateParticipationType(
+    @Param('participantId') participantId: string,
+    @Body() dto: UpdateParticipantTypeDto,
+  ) {
+    return this.service.updateParticipationType(participantId, dto);
   }
 
   @Delete('participants/:participantId/signature')
