@@ -1,4 +1,5 @@
-import { IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsEnum, IsIn, IsOptional, IsString } from "class-validator";
+import { CNH_CATEGORIES } from "../cnh.constants";
 
 export enum ParticipationType {
     SOMENTE_TEORICA = 'SOMENTE_TEORICA',
@@ -17,7 +18,7 @@ export class AddParticipantDto {
     @IsOptional()
     email?: string;
 
-    @IsString()
+    @IsIn(CNH_CATEGORIES, { message: `Categoria de CNH inválida (use: ${CNH_CATEGORIES.join(', ')})` })
     @IsOptional()
     cnhCategory?: string;
 

@@ -11,6 +11,8 @@ import { deleteOrphanedParticipants } from './participant-cleanup.util';
 import { assertValidSignaturePng } from './png-signature.util';
 import { SIGNATURE_BUCKET } from './signature.constants';
 import { withPublicParticipant } from './participant-view.util';
+import { ValidateCpfPipe } from '../common/pipes/validate-cpf.pipe';
+import { isValidCnhCategory } from './cnh.constants';
 
 const SIGNATURE_ACTIONS: SignatureAction[] = ['keep', 'replace', 'none'];
 /** Validade da signed URL da prévia: basta para o `<img>` carregar, não serve para compartilhar. */
@@ -150,6 +152,12 @@ export class ParticipantsService {
       !(Object.values(ParticipationType) as string[]).includes(dto.participationType)
     ) {
       throw new BadRequestException('Tipo de participação inválido');
+    }
+    // CPF: dígitos verificadores + normaliza para só dígitos (como é gravado)
+    if (typeof dto.cpf !== 'string') throw new BadRequestException('CPF inválido');
+    dto = { ...dto, cpf: new ValidateCpfPipe().transform(dto.cpf) };
+    if (dto.cnhCategory && !isValidCnhCategory(dto.cnhCategory)) {
+      throw new BadRequestException('Categoria de CNH inválida');
     }
     if (signatureAction === 'replace') {
       if (!signature) throw new BadRequestException('Envie a assinatura em PNG para substituir a atual');

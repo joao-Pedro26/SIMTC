@@ -53,7 +53,27 @@ describe('ParticipantsService', () => {
   // ─── registerPublic ──────────────────────────────────────────────────────
 
   describe('registerPublic', () => {
-    const dto = { name: 'João', cpf: '12345678901', email: 'j@j.com', cnhCategory: 'B', cnhExpiration: null };
+    // CPF válido: registerPublic agora confere os dígitos verificadores
+    const dto = { name: 'João', cpf: '52998224725', email: 'j@j.com', cnhCategory: 'B', cnhExpiration: null };
+
+    it('lança 400 com CPF inválido, antes de consultar a sessão', async () => {
+      await expect(service.registerPublic('token', { ...dto, cpf: '12345678901' } as any))
+        .rejects.toThrow('CPF inválido');
+      expect(mockPrisma.trainingSession.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it('lança 400 com categoria de CNH fora da lista', async () => {
+      await expect(service.registerPublic('token', { ...dto, cnhCategory: 'Z' } as any))
+        .rejects.toThrow('Categoria de CNH inválida');
+    });
+
+    it('normaliza CPF mascarado para só dígitos', async () => {
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({ id: 'sess-1', status: 'PLANEJADO' });
+      mockPrisma.participant.findUnique.mockResolvedValue({ id: 'part-1' });
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
+      await expect(service.registerPublic('token', { ...dto, cpf: '529.982.247-25' } as any)).rejects.toThrow();
+      expect(mockPrisma.participant.findUnique).toHaveBeenCalledWith({ where: { cpf: '52998224725' } });
+    });
 
     it('lança 400 se sessão está CANCELADO', async () => {
       mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({ id: '1', status: 'CANCELADO' });
@@ -119,7 +139,7 @@ describe('ParticipantsService', () => {
   describe('registerPublic — assinatura', () => {
     const baseDto = {
       name: 'João',
-      cpf: '12345678901',
+      cpf: '52998224725',
       email: 'joao@mail.com',
       cnhCategory: 'B',
       participationType: 'TEORICA_E_PRATICA',
