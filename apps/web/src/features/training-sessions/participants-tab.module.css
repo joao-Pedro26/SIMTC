@@ -206,6 +206,7 @@
 .deleteBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .signatureBtn {
+  margin-right: 0.75rem;
   background: none;
   border: none;
   cursor: pointer;
