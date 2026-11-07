@@ -104,7 +104,9 @@ async function downloadFile(path: string, fallbackName: string, isRetry = false)
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  // Revogar a object URL no mesmo tick do click() cancela o download em
+  // alguns navegadores (Firefox/Safari, às vezes Edge) sem lançar erro.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 export const clientApi = {
