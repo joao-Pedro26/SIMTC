@@ -125,6 +125,9 @@ export class PdfGeneratorService {
     // Tenta primeiro em __dirname (dist/), depois sobe para src/ (ts-node / teste)
     const candidates = [
       path.join(__dirname, 'templates', filename),
+      // build do Nest: os assets (html/png) vão para dist/certificates/templates,
+      // fora de dist/src/ onde roda o código compilado
+      path.join(__dirname, '..', '..', 'certificates', 'templates', filename),
       path.join(__dirname, '..', '..', 'src', 'certificates', 'templates', filename),
       path.resolve(process.cwd(), 'src', 'certificates', 'templates', filename),
     ];
@@ -146,6 +149,9 @@ export class PdfGeneratorService {
     // Mesma estratégia de caminhos candidatos do compileTemplate
     const candidates = [
       path.join(__dirname, 'templates', filename),
+      // build do Nest: os assets (html/png) vão para dist/certificates/templates,
+      // fora de dist/src/ onde roda o código compilado
+      path.join(__dirname, '..', '..', 'certificates', 'templates', filename),
       path.join(__dirname, '..', '..', 'src', 'certificates', 'templates', filename),
       path.resolve(process.cwd(), 'src', 'certificates', 'templates', filename),
     ];
