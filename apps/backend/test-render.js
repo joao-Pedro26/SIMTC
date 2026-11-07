@@ -1,0 +1,1 @@
+// Scratch file created by Claude to simulate the deletion-order logic for removeParticipant/deleteSession (FK-safe child-before-parent order + storage path extraction). Not part of the app — safe to delete.
