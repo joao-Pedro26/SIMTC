@@ -401,6 +401,18 @@
   flex-shrink: 0;
 }
 
+.typeSelect {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.375rem;
+  border-radius: 6px;
+  border: 1.5px solid #cbd5e0;
+  background-color: white;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.typeSelect:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ── Status badges ───────────────────────────────────────────────────────────── */
 
 .statusBadge {

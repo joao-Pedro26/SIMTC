@@ -293,6 +293,20 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
     }
   }
 
+  /** Admin define se o participante faz só teoria ou teoria + prática */
+  async function handleChangeType(p: BackendParticipant, participationType: string) {
+    setBusy(true)
+    setSaveError('')
+    try {
+      await clientApi.patch(`/participants/${p.id}/type`, { participationType })
+      await fetchData()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Erro ao alterar o tipo do participante')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // ── Avaliação ─────────────────────────────────────────────────────────────────
 
   /** Apenas atribui o participante ao consultor logado, sem abrir o checklist */
@@ -650,7 +664,9 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                 <p className={styles.participantEmpty}>Nenhum participante inscrito.</p>
               ) : (
                 <div className={styles.participantList}>
-                  {participants.map((p) => {
+                  {[...participants]
+                    .sort((a, b) => a.participant.name.localeCompare(b.participant.name, 'pt-BR', { sensitivity: 'base' }))
+                    .map((p) => {
                     const action = getAction(p, consultantId, session.status, isAdmin)
                     const displayStatus = getDisplayStatus(p)
                     return (
@@ -660,6 +676,18 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                           <span className={styles.participantCpf}>{formatCpf(p.participant.cpf)}</span>
                         </div>
                         <div className={styles.participantRight}>
+                          {isAdmin && (
+                            <select
+                              className={styles.typeSelect}
+                              value={p.participationType}
+                              onChange={(e) => handleChangeType(p, e.target.value)}
+                              disabled={busy}
+                              aria-label={`Tipo de participação de ${p.participant.name}`}
+                            >
+                              <option value="TEORICA_E_PRATICA">Teoria + Prática</option>
+                              <option value="SOMENTE_TEORICA">Teoria</option>
+                            </select>
+                          )}
                           <span className={`${styles.statusBadge} ${statusCssMap[displayStatus] ?? ''}`}>
                             {statusLabels[displayStatus] ?? displayStatus}
                           </span>
