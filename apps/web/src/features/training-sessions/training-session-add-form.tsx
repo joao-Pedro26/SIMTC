@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
+import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
 import type { TrainingCompany, TrainingCourse, TrainingConsultant } from './types'
 import styles from './training-session-add-form.module.css'
 
@@ -17,11 +18,6 @@ export interface TrainingSessionFormData {
   participantCount: string
   notes: string
 }
-
-const BR_STATES = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA',
-  'PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
-]
 
 interface TrainingSessionAddFormProps {
   companies: TrainingCompany[]
@@ -120,20 +116,23 @@ export function TrainingSessionAddForm({
         <div className={styles.row2}>
           <div className={styles.field}>
             <label className={styles.label}>Cidade <span className={styles.required}>*</span></label>
-            <input
-              className={styles.input}
+            <CityAutocomplete
+              inputClassName={styles.input}
               value={form.city}
-              onChange={(e) => set('city', e.target.value)}
-              placeholder="Ex: Guarulhos"
+              // Digitar limpa a UF; ela só volta ao escolher uma sugestão
+              onChange={(city, uf) => setForm((prev) => ({ ...prev, city, state: uf ?? '' }))}
+              placeholder="Digite e escolha a cidade"
             />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>UF <span className={styles.required}>*</span></label>
-            <Select
+            <input
+              className={styles.input}
               value={form.state}
-              onChange={(v) => set('state', v)}
-              options={BR_STATES.map((s) => ({ label: s, value: s }))}
-              placeholder="UF"
+              readOnly
+              tabIndex={-1}
+              title="Preenchido automaticamente ao escolher a cidade"
+              style={{ cursor: 'not-allowed', opacity: 0.8 }}
             />
           </div>
         </div>
