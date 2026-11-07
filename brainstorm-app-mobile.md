@@ -1,7 +1,7 @@
 # Brainstorm — App Mobile SIMTC (Flutter)
 
 **Data:** 11/09/2026
-**Escopo:** App exclusivo para o fluxo de avaliação prática de participantes. Sem dashboards, sem gestão de empresas/consultores/cursos — só "encontrar meu treinamento → atribuir participante → preencher checklist → assinar → sincronizar".
+**Escopo:** App exclusivo para o fluxo de avaliação prática de participantes. Sem dashboards, sem gestão de empresas/consultores/cursos — só "encontrar meu treinamento → atribuir participante → preencher checklist → sincronizar".
 
 ---
 
@@ -12,7 +12,7 @@ Confirmadas via perguntas diretas:
 1. **Acesso à sessão:** ao logar, o consultor já vê a lista de treinamentos (`TrainingSession`) em que foi vinculado previamente no painel web/admin (relação `SessionConsultant`). Não há leitura de QR code no app.
 2. **Atribuição:** é autoatribuição dentro do app. O consultor vê os participantes `PENDENTE` de uma sessão e toca em "Atribuir a mim", que chama `POST /practical-assessments/assign`. Isso reserva o participante (`assignedConsultantId` = ele, `status` → `EM_AVALIACAO`) e impede que outro consultor pegue o mesmo participante.
 3. **Offline obrigatório:** o app precisa funcionar sem internet durante o preenchimento da avaliação (o local do treinamento pode não ter sinal). Tudo é salvo localmente (Drift/SQLite) e sincronizado depois via `POST /practical-assessments/sync`, quando houver conexão (`connectivity_plus`).
-4. **Assinatura do participante:** será capturada no app ao final da avaliação, como confirmação de que ele foi avaliado. **Gap identificado:** hoje `PracticalAssessment` não tem campo de assinatura nem endpoint de upload — será necessário criar uma migration (`signatureUrl` ou similar em `PracticalAssessment`) e um endpoint/bucket de upload no backend antes de ativar essa funcionalidade em produção. O app já nasce preparado (captura + armazenamento local + fila de upload), mas o envio ao backend fica bloqueado até esse trabalho ser feito.
+4. ~~Assinatura do participante: será capturada no app ao final da avaliação, como confirmação de que ele foi avaliado.~~ **Mudou em 20/09/2026:** o app **não captura mais assinatura**. A assinatura do participante agora é opcional e é coletada no formulário público de inscrição (web, via QR code, antes do treinamento acontecer), só para aparecer no certificado — deixou de estar ligada à confirmação do resultado da avaliação prática. Isso deixa órfão o trabalho já feito na Fase 0 do mobile (`PracticalAssessment.participantSignatureUrl` + endpoints `PATCH/GET .../participant-signature`) — ver seção 5, item 1.
    Fotos de evidência ficam **fora de escopo** por enquanto.
 
 Inferências necessárias para o fluxo (a validar com o usuário durante a implementação, mas assumidas para não travar o planejamento):
@@ -77,20 +77,17 @@ Lista os consultores atualmente vinculados à sessão (via `SessionConsultant`),
 Tela principal do app. Cabeçalho com nome do participante e cronômetro discreto (tempo decorrido desde `startTime`). Corpo em lista expansível por `AssessmentCategory` (accordion), cada categoria mostrando suas `Infraction`; cada infração tem um seletor de 4 opções (Sem infração / B / PM / M), com o texto de `InfractionNote.comment` visível ao selecionar B/PM/M. Barra de progresso mostrando quantas categorias já foram revisadas. Botão flutuante "Finalizar avaliação" (habilitado mesmo com categorias não abertas — assume-se sem infração se não revisada, mas exibe confirmação antes de finalizar se houver categorias não abertas). Autosave local a cada alteração (Drift), permitindo fechar o app e retomar depois.
 
 ### 1.6 Resumo da Avaliação
-Ao finalizar o checklist: mostra o score calculado localmente (mesmo algoritmo de `scoring.ts`, portado para Dart), o resultado (`Aprovado` ✅ ou `Necessita Reavaliação` ⚠️, com o corte de 70%), e um resumo por categoria (percentual de cada uma). Botão "Confirmar e assinar".
+Ao finalizar o checklist: mostra o score calculado localmente (mesmo algoritmo de `scoring.ts`, portado para Dart), o resultado (`Aprovado` ✅ ou `Necessita Reavaliação` ⚠️, com o corte de 70%), e um resumo por categoria (percentual de cada uma). Botão "Confirmar". Ao confirmar, marca a avaliação como `finalizada` (pendente de sync) — não há mais etapa de assinatura no app (mudou em 20/09/2026, ver seção 0 item 4).
 
-### 1.7 Assinatura do Participante
-Canvas de assinatura em tela cheia (dedo/caneta), com botões "Limpar" e "Confirmar". Texto curto acima explicando que a assinatura confirma a ciência do participante sobre o resultado. Ao confirmar, salva a imagem localmente e marca a avaliação como `finalizada` (pendente de sync).
+### 1.7 Resultado (somente leitura)
+Para participantes já avaliados (`APROVADO`/`NECESSITA_REAVALIACAO`). Mostra o mesmo resumo por categoria, score final e data/hora da avaliação. Se `NECESSITA_REAVALIACAO`, exibe botão "Reavaliar" que reabre o Formulário de Avaliação (novo ciclo, reaproveitando o registro).
 
-### 1.8 Resultado (somente leitura)
-Para participantes já avaliados (`APROVADO`/`NECESSITA_REAVALIACAO`). Mostra o mesmo resumo por categoria, score final, data/hora da avaliação, e a assinatura capturada (se houver). Se `NECESSITA_REAVALIACAO`, exibe botão "Reavaliar" que reabre o Formulário de Avaliação (novo ciclo, reaproveitando o registro).
-
-### 1.9 Sincronização
+### 1.8 Sincronização
 Lista das avaliações pendentes de envio (com status: aguardando conexão / enviando / erro) e das últimas sincronizadas com sucesso. **A sincronização é 100% automática, sem botão manual:** assim que o app detecta que a conexão voltou (via `connectivity_plus`), a fila de avaliações pendentes é enviada sozinha em background, sem qualquer ação do consultor. Essa tela existe apenas como um painel de visibilidade (o que está pendente, o que já foi enviado, e detalhes de erro por item — ex: "participante já avaliado por outro consultor — conflito", replicando as validações do `assign`/`sync` do backend). Itens com erro ficam na fila e são reprocessados automaticamente na próxima janela de conectividade (com backoff), sem precisar de intervenção manual.
 
 *Nota técnica:* o disparo automático deve acontecer em qualquer tela do app (não só quando o usuário está na tela de Sincronização) — o `ConnectivityService` deve notificar o `SyncViewModel`/uma camada de serviço global assim que o status mudar de offline para online, iniciando o envio da fila imediatamente. O badge de "itens pendentes" na Home (1.3) deve atualizar em tempo real conforme os itens vão sendo sincronizados.
 
-### 1.10 Perfil / Configurações
+### 1.9 Perfil / Configurações
 Dados do consultor logado (nome, e-mail, foto se houver). Botão "Sair" (logout, limpa token e — com confirmação — dados locais não sincronizados). Informação de versão do app. Futuro: alternar ambiente (prod/staging) só em build de debug.
 
 ---
@@ -120,9 +117,7 @@ Detalhe da Sessão
 
 Formulário de Avaliação → [Finalizar avaliação] → Resumo da Avaliação
 
-Resumo da Avaliação → [Confirmar e assinar] → Assinatura do Participante
-
-Assinatura do Participante → [Confirmar] → volta para Detalhe da Sessão
+Resumo da Avaliação → [Confirmar] → volta para Detalhe da Sessão
   (item agora aparece como APROVADO ou NECESSITA_REAVALIACAO, avaliação na fila de sync)
 
 Resultado (somente leitura)
@@ -147,9 +142,7 @@ Perfil/Configurações → [Sair] → Login
 
 **Formulário de Avaliação:** O consultor percorre cada categoria de avaliação e, para cada infração possível, marca se ela ocorreu e com qual gravidade (Básica, Média ou Grave). Ele pode fechar o app no meio da avaliação e retomar depois de onde parou, mesmo sem internet. Ao final, toca em "Finalizar avaliação".
 
-**Resumo da Avaliação:** O consultor revê o resultado calculado (aprovado ou não, e o desempenho por categoria) antes de confirmar, podendo voltar ao checklist se perceber um erro.
-
-**Assinatura do Participante:** O consultor entrega o celular ao participante (ou assina em nome dele conforme processo da empresa) para capturar a assinatura confirmando o resultado, finalizando a avaliação daquele participante.
+**Resumo da Avaliação:** O consultor revê o resultado calculado (aprovado ou não, e o desempenho por categoria) antes de confirmar, podendo voltar ao checklist se perceber um erro. Ao confirmar, a avaliação daquele participante é finalizada (entra na fila de sync) — sem etapa de assinatura no app.
 
 **Resultado (somente leitura):** O consultor (ou outro consultor da mesma sessão) pode conferir o resultado de uma avaliação já concluída sem risco de alterá-la. Se o participante precisar de reavaliação, há um botão dedicado para reabrir o processo.
 
@@ -172,7 +165,6 @@ Perfil/Configurações → [Sair] → Login
 - `AdminSessionConsultantsViewModel` — lista/adiciona/remove consultores vinculados à sessão (só ADMIN, só online).
 - `EvaluationFormViewModel` — estado do checklist (categorias/infrações/notas selecionadas), autosave local, cronômetro, validações antes de finalizar.
 - `EvaluationSummaryViewModel` — cálculo do score local (mirror do `scoring.ts` em Dart), montagem do resumo por categoria.
-- `SignatureViewModel` — captura/validação da assinatura, persistência local da imagem.
 - `EvaluationResultViewModel` — exibição somente leitura de uma avaliação já concluída, ação de reavaliar.
 - `SyncViewModel` — expõe só leitura da fila de sincronização e status por item (sem ação de disparo manual); o disparo em si é automático, feito pelo `ConnectivityService`/`AssessmentRepository` assim que detecta conexão, e trata conflitos retornados pelo backend com retry automático (backoff) para itens com erro.
 - `ProfileViewModel` — dados do usuário logado, logout.
@@ -185,7 +177,6 @@ Perfil/Configurações → [Sair] → Login
 - `SessionConsultantsRepository` — para ADMIN online: lista consultores vinculados a uma sessão e salva a lista completa (adições/remoções aplicadas localmente) via `PATCH /training-sessions/:id` (`additionalConsultantsIds`), reaproveitando o replace total já existente no backend — sem endpoints granulares.
 - `AssessmentCatalogRepository` — busca e cacheia localmente `AssessmentCategory` + `Infraction` + `InfractionNote` (catálogo estático, refresh periódico ou manual).
 - `AssessmentRepository` — CRUD local do rascunho de `PracticalAssessment` + `AssessmentItem[]` (Drift), cálculo do score local, leitura de avaliação existente (`GET /practical-assessments/by-participant/:id`), envio via `POST /practical-assessments/sync`, e gestão da fila de sincronização (itens pendentes/erro/enviados).
-- `SignatureRepository` — armazenamento local da imagem de assinatura e (futuramente, após criação do endpoint no backend) upload junto ao `sync`.
 - `ConnectivityService` (não é bem um repository, mas um serviço transversal, deve ser inicializado no nível do app, não só dentro de uma tela) — expõe estado online/offline (`connectivity_plus`) e **dispara automaticamente** a sincronização da fila (`AssessmentRepository.syncPending()`) assim que detecta a transição offline → online, independente da tela em que o consultor esteja.
 
 ### Persistência local (Drift/SQLite)
@@ -195,13 +186,12 @@ Tabelas novas a substituir o placeholder atual (`EvaluationTable`):
 - `AssessmentCategoriesTable`, `InfractionsTable`, `InfractionNotesTable` (catálogo)
 - `LocalAssessmentTable` (rascunho da avaliação em andamento/concluída localmente, com campo `syncStatus`: `draft` / `pendingSync` / `synced` / `error`)
 - `LocalAssessmentItemTable` (infrações marcadas em cada avaliação local)
-- `LocalSignatureTable` ou apenas caminho de arquivo de imagem referenciado em `LocalAssessmentTable`
 
 ---
 
 ## 5. Gaps e Pendências Técnicas Identificadas (para tratar antes/durante a implementação)
 
-1. **Assinatura do participante:** não existe campo/endpoint no backend hoje. Precisa de migration em `PracticalAssessment` (ex.: `participantSignatureUrl`) + endpoint de upload (Supabase Storage, seguindo o mesmo padrão de bucket usado para `signatureUrl` do consultor). **Único gap real pendente** (ver item 2 abaixo, já validado).
+1. ~~Assinatura do participante: não existe campo/endpoint no backend hoje. Precisa de migration em `PracticalAssessment`...~~ **Resolvido na Fase 0, depois superado em 20/09/2026:** a migration e os endpoints (`PracticalAssessment.participantSignatureUrl`, `PATCH`/`GET .../participant-signature`) foram criados, mas o app deixou de precisar deles — a assinatura do participante agora é capturada no formulário web de inscrição (QR code), não mais no app mobile ao final da avaliação. Esse código de backend fica órfão do ponto de vista do mobile; decisão de remover ou não é separada.
 2. ~~Endpoint "minhas sessões" para consultor~~ — **validado em 11/09/2026: já existe.** `GET /training-sessions` (`training-sessions.controller.ts` + `.service.ts`) já filtra automaticamente por consultor logado via JWT, sem precisar de query param: `where: user.role === 'CONSULTANT' ? { consultants: { some: { consultantId: user.consultantId } } } : {}`. O app mobile só precisa chamar `GET /training-sessions?page=1&limit=20` com o token do consultor. `GET /training-sessions/:id` também já bloqueia acesso (`ForbiddenException`) se o consultor não estiver vinculado à sessão. Nenhum código novo é necessário aqui.
 3. **Scaffold atual do mobile é só um placeholder:** login e "avaliação" genérica (slider 0-10) não refletem o domínio real e devem ser substituídos — não há reaproveitamento de lógica, só de estrutura de pastas/dependências já instaladas (Drift, Provider, go_router, dio, flutter_secure_storage já estão no `pubspec.yaml`).
 4. **Mock/fallback no `AuthRepository` e `EvaluationRepository` atuais** precisam ser removidos para não mascarar erros reais de API em produção.
@@ -212,7 +202,7 @@ Tabelas novas a substituir o placeholder atual (`EvaluationTable`):
 
 ---
 
-*Próximo passo sugerido: decidir o formato exato da migration/endpoint de assinatura do participante (gap #1, o único que resta) antes de iniciar a implementação das telas.*
+*Próximo passo sugerido: nenhum gap real pendente no momento (gap #1 foi resolvido e depois superado — ver acima).*
 
 ---
 
@@ -235,29 +225,28 @@ O mobile reaproveita os design tokens já definidos para o web (`apps/web/src/ap
 ### 6.2 Paleta semântica de status/severidade (separada da marca)
 Cor de marca (chrome do app, botões primários) e cor semântica de status/severidade são **paletas conceitualmente distintas**, mesmo que os tons se aproximem. Isso evita ambiguidade no checklist (ex: botão de ação laranja vs. indicador de infração grave também laranja).
 
-Precisam de escala semântica própria:
-- Status de `TrainingParticipant`: `PENDENTE` (cinza), `EM_AVALIACAO` (amarelo), `APROVADO` (verde), `NECESSITA_REAVALIACAO` (vermelho/laranja)
-- Severidade de `InfractionNote`: `B` (leve), `PM` (média), `M` (grave) — precisa de 3 tons numa escala de severidade crescente
-- Acessibilidade: nunca comunicar status/severidade só por cor — sempre acompanhar de ícone e/ou texto curto (daltonismo, legibilidade sob sol forte)
+- **Severidade de `InfractionNote` (B/PM/M): reaproveitar as cores já em produção no web**, não inventar uma escala nova — confirmado em `apps/web/src/features/assessment-categories/infraction-form.module.css`: `B` = fundo `#DCFCE7`/texto `#16A34A` (verde), `PM` = fundo `#FEF9C3`/texto `#CA8A04` (âmbar), `M` = fundo `#FEE2E2`/texto `#DC2626` (vermelho). **Decisão do usuário (13/09/2026): manter essas cores como estão, não trocar por uma escala nova** mesmo que o verde do "B" esteja próximo do verde usado em "Aprovado" — prevalece a consistência com o padrão já existente no web sobre a separação conceitual perfeita.
+- Status de `TrainingParticipant`: `PENDENTE` (cinza), `EM_AVALIACAO` (amarelo), `APROVADO` (verde), `NECESSITA_REAVALIACAO` (vermelho/laranja) — não usar o laranja de marca/CTA (`#F5A520`) aqui, para não confundir com botão de ação.
+- Acessibilidade: nunca comunicar status/severidade só por cor — sempre acompanhar de ícone e/ou texto curto (daltonismo, legibilidade sob luz variável dentro do veículo e leitura rápida com atenção dividida)
 
-**Why:** decisão tomada para evitar que a cor de CTA/marca colida visualmente com a cor de aviso/erro no fluxo mais crítico do app (checklist de infrações).
+**Why:** a intenção original era evitar que a cor de CTA/marca colidisse com a cor de aviso/erro no checklist — mas para B/PM/M especificamente, o usuário priorizou manter a convenção já estabelecida no web (que os admins já reconhecem) em vez de uma separação conceitual mais rigorosa.
 
 ### 6.3 Navegação: modelo híbrido (celular)
 - **Nível superior (3 abas fixas):** Minhas Sessões / Sincronização / Perfil — sempre acessíveis, navegação livre entre elas a qualquer momento.
-- **Fluxo de avaliação (imersivo, sem abas):** ao entrar em uma sessão específica (Detalhe da Sessão → Formulário de Avaliação → Resumo → Assinatura), a barra de navegação desaparece e vira uma pilha simples (stack) com botão voltar — o consultor está "dentro" de uma tarefa focada, não navegando entre seções.
+- **Fluxo de avaliação (imersivo, sem abas):** ao entrar em uma sessão específica (Detalhe da Sessão → Formulário de Avaliação → Resumo), a barra de navegação desaparece e vira uma pilha simples (stack) com botão voltar — o consultor está "dentro" de uma tarefa focada, não navegando entre seções.
 
 **Why:** dá liberdade de navegação entre as áreas paralelas do app, sem comprometer o espaço de tela e o foco durante o preenchimento do checklist (a tela mais densa do app).
 
 ### 6.4 Estilo visual da navbar
 Barra de navegação em formato **pill/flutuante arredondado** (tendência atual, ex: Netflix, WhatsApp iOS) em vez da `NavigationBar` padrão engessada do Material 3.
-**Decisão de opacidade/blur deixada a critério do Claude Design:** avaliar entre fundo sólido/opaco (mais contraste, melhor para uso em campo sob sol forte) vs. efeito glassmorphism/blur (mais alinhado à tendência visual, risco de contraste reduzido) — o prompt final pede para ele decidir e justificar com base no contexto de uso outdoor.
+**Decisão de opacidade/blur deixada a critério do Claude Design:** avaliar entre fundo sólido/opaco (mais contraste, mais previsível sob a luz variável de dentro do veículo) vs. efeito glassmorphism/blur (mais alinhado à tendência visual, risco de contraste reduzido) — o prompt final pede para ele decidir e justificar com base no contexto real de uso (consultor sentado dentro do carro durante a avaliação, não em pé ao ar livre).
 
 ### 6.5 Fidelidade
-Alta fidelidade completa: cores, tipografia e componentes reais (chips de status, checklist, assinatura, navbar flutuante) prontos para servir de referência direta na implementação Flutter — não wireframes.
+Alta fidelidade completa: cores, tipografia e componentes reais (chips de status, checklist, navbar flutuante) prontos para servir de referência direta na implementação Flutter — não wireframes.
 
 ### 6.6 Considerações gerais de UX já incorporadas ao brief
 - Plataforma-base: Material Design 3 (Android nativo, ver [[simtc-mobile-app-strategy]])
-- Contexto de uso: campo, sol forte, uma mão ocupada — contraste alto, alvos de toque grandes (mín. 48dp), sem depender só de cor para status crítico
+- Contexto de uso: consultor sentado **dentro do veículo** durante a avaliação prática, observando o participante dirigir enquanto preenche o checklist — luz variável e imprevisível (sol de lado pela janela, sombra, túnel), veículo em movimento/vibração afetando a precisão do toque, e atenção dividida entre a tela e o participante. Contraste alto e alvos de toque grandes (mín. 48dp) continuam prioridade, mas o motivo principal é toque confiável sob vibração e uso com atenção parcial, não ofuscamento solar direto — sem depender só de cor para status crítico
 - Diferenciação ADMIN × CONSULTANT: mesmas telas, affordances extras aparecem só para admin (progressive disclosure), sem tela/tema separado — indicador discreto de "modo admin" no perfil
 - Skeleton screens no lugar de spinners genéricos ao carregar listas/dados (melhora performance percebida)
 - Tipografia dinâmica: layout não pode quebrar se o usuário aumentar a fonte do sistema (acessibilidade, baixa visão)
@@ -267,7 +256,7 @@ Alta fidelidade completa: cores, tipografia e componentes reais (chips de status
 O app também será usado em tablet, não só celular — isso muda a arquitetura de layout, não é só "esticar" o design do celular. Decisões:
 
 - **Estratégia geral:** adaptação real por breakpoint, seguindo o sistema oficial de "adaptive layouts" do Material Design 3 (compact <600dp = celular, medium 600–839dp, expanded ≥840dp = tablet). Uma única base de design/código que se reorganiza sozinha conforme a largura da tela — não duas versões separadas de app. Em Flutter, isso mapeia diretamente para o pacote `flutter_adaptive_scaffold` (mantido pelo próprio time do Flutter/Material).
-- **Master-detail (split view):** aplicado apenas à dupla **Minhas Sessões + Detalhe da Sessão** — no tablet, a lista de treinamentos fica numa coluna à esquerda e os participantes daquele treinamento aparecem à direita, sem trocar de tela (padrão Gmail/Configurações). O fluxo de avaliação em si (Formulário de Avaliação, Resumo, Assinatura) **permanece em tela cheia mesmo no tablet** — não vira master-detail, para preservar o foco durante o preenchimento do checklist.
+- **Master-detail (split view):** aplicado apenas à dupla **Minhas Sessões + Detalhe da Sessão** — no tablet, a lista de treinamentos fica numa coluna à esquerda e os participantes daquele treinamento aparecem à direita, sem trocar de tela (padrão Gmail/Configurações). O fluxo de avaliação em si (Formulário de Avaliação, Resumo) **permanece em tela cheia mesmo no tablet** — não vira master-detail, para preservar o foco durante o preenchimento do checklist.
 - **Navegação no tablet:** a mesma pill flutuante arredondada decidida para o celular (seção 6.4), só que **reposicionada verticalmente na lateral** da tela — mantém a identidade visual entre celular e tablet, e ao mesmo tempo respeita a ergonomia de "toque lateral" (o usuário segura o tablet pelas bordas, diferente do polegar central do celular).
 - **Orientação:** o celular permanece fixo em retrato; o **tablet suporta retrato e paisagem**, com os layouts (inclusive o master-detail) se adaptando a cada orientação — reflete o uso real de tablet (na mão vs. apoiado numa mesa/suporte durante o treinamento).
 - **Telas administrativas em tablet (1.4.1, 1.4.2, 1.4.3):** no tablet, abrem como diálogo/popover flutuante ancorado (mantendo o contexto da tela de fundo visível), em vez de ocupar a tela inteira como acontece no celular.
