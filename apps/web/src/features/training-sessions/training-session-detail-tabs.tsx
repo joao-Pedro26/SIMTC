@@ -46,6 +46,7 @@ interface BackendDetailSession {
       email: string
       cnhCategory?: string | null
       cnhExpiration?: string | null
+      hasSignature?: boolean
     }
     assessment?: { score?: number | null } | null
     certificate?: { id: string; pdfUrl?: string | null } | null
@@ -88,6 +89,7 @@ function mapDetailSession(s: BackendDetailSession): TrainingSession {
       certificateGenerated: !!tp.certificate,
       certificateId: tp.certificate?.id ?? null,
       certificatePdfUrl: tp.certificate?.pdfUrl ?? null,
+      hasSignature: tp.participant.hasSignature ?? false,
       assignedConsultantId: tp.assignedConsultantId ?? null,
       assignedConsultant: tp.assignedConsultant ?? null,
     })),
