@@ -73,6 +73,17 @@
   box-shadow: 0 0 0 0.125rem rgba(56, 190, 200, 0.15);
 }
 
+.inputInvalid,
+.inputInvalid:focus {
+  border-color: var(--error, #c53030);
+  box-shadow: 0 0 0 0.125rem rgba(197, 48, 48, 0.12);
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  color: var(--error, #c53030);
+}
+
 .addFormActions {
   display: flex;
   justify-content: flex-end;

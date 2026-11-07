@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button/button'
 import { ColumnFilter } from '@/components/ui/column-filter/column-filter'
 import { clientApi } from '@/lib/client-api'
 import { formatCpf } from '@/lib/utils'
+import { CNH_CATEGORIES, CPF_PATTERN, cpfError, maskCpf, validateCpf } from '@/lib/validate-cpf'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
@@ -116,18 +117,27 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     }
   }
 
+  // CPF: o erro "incompleto" só aparece depois de sair do campo; o de dígito
+  // verificador aparece assim que os 11 dígitos são digitados.
+  const [cpfTouched, setCpfTouched] = useState(false)
+  const cpfDigits = form.cpf.replace(/\D/g, '')
+  const cpfIsValid = validateCpf(cpfDigits)
+  const visibleCpfError = cpfTouched || cpfDigits.length === 11 ? cpfError(form.cpf) : null
+
   async function addParticipant() {
-    if (!form.name.trim() || !form.cpf.trim()) return
+    setCpfTouched(true)
+    if (!form.name.trim() || !cpfIsValid) return
     await run(() =>
       clientApi.post(`/training-sessions/${sessionId}/participants`, {
         name: form.name.trim(),
-        cpf: form.cpf.replace(/\D/g, ''),
+        cpf: cpfDigits,
         email: form.email.trim() || undefined,
         cnhCategory: form.cnhCategory || undefined,
         cnhExpiration: form.cnhExpiration || undefined,
       })
     )
     setForm(emptyForm)
+    setCpfTouched(false)
     setShowAddForm(false)
   }
 
@@ -243,16 +253,43 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
               <input className={styles.input} value={form.name} onChange={(e) => setField('name', e.target.value)} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>CPF *</label>
-              <input className={styles.input} value={form.cpf} onChange={(e) => setField('cpf', e.target.value)} placeholder="00000000000" />
+              <label className={styles.label} htmlFor="add-participant-cpf">CPF *</label>
+              <input
+                id="add-participant-cpf"
+                className={`${styles.input}${visibleCpfError ? ` ${styles.inputInvalid}` : ''}`}
+                value={form.cpf}
+                onChange={(e) => setField('cpf', maskCpf(e.target.value))}
+                onBlur={() => setCpfTouched(true)}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={14}
+                pattern={CPF_PATTERN}
+                title="CPF no formato 000.000.000-00"
+                aria-invalid={!!visibleCpfError}
+                aria-describedby={visibleCpfError ? 'add-participant-cpf-error' : undefined}
+              />
+              {visibleCpfError && (
+                <span id="add-participant-cpf-error" className={styles.fieldError}>{visibleCpfError}</span>
+              )}
             </div>
             <div className={styles.field}>
               <label className={styles.label}>E-mail</label>
               <input className={styles.input} type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Cat. CNH</label>
-              <input className={styles.input} value={form.cnhCategory} onChange={(e) => setField('cnhCategory', e.target.value)} placeholder="B" />
+              <label className={styles.label} htmlFor="add-participant-cnh">Cat. CNH</label>
+              <select
+                id="add-participant-cnh"
+                className={styles.input}
+                value={form.cnhCategory}
+                onChange={(e) => setField('cnhCategory', e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {CNH_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Vencimento CNH</label>
@@ -260,11 +297,11 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
             </div>
           </div>
           <div className={styles.addFormActions}>
-            <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(false); setForm(emptyForm) }}>Cancelar</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(false); setForm(emptyForm); setCpfTouched(false) }}>Cancelar</Button>
             <Button
               variant="primary"
               size="sm"
-              disabled={!form.name.trim() || !form.cpf.trim() || busy}
+              disabled={!form.name.trim() || !cpfIsValid || busy}
               onClick={addParticipant}
             >
               <Check size={14} /> Confirmar

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import type { RegisterParticipantPublicResponse, SignatureAction } from '@simtc/shared-types'
-import { validateCpf } from '@/lib/validate-cpf'
+import { CNH_CATEGORIES, CPF_PATTERN, maskCpf, validateCpf } from '@/lib/validate-cpf'
 import {
   SignatureCard,
   type SignatureCardHandle,
@@ -34,8 +34,6 @@ interface FormState {
   cnhExpiration: string
 }
 
-const CNH_CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'] as const
-
 function outcomeOf(
   sent: SignatureAction,
   cardState: SignatureCardState,
@@ -48,14 +46,6 @@ function outcomeOf(
   // D: CPF já tem assinatura salva (e-mail não confere); o backend mantém a antiga
   if (cardState === 'D') return 'saved'
   return 'none'
-}
-
-function applyCpfMask(value: string): string {
-  const d = value.replace(/\D/g, '').slice(0, 11)
-  if (d.length <= 3) return d
-  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`
-  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
 }
 
 const emptyForm: FormState = {
@@ -286,10 +276,15 @@ export function PublicRegisterFlow({ companyName, companyLogoUrl, courseName, qr
                     id="reg-cpf"
                     placeholder=" "
                     inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={14}
+                    pattern={CPF_PATTERN}
+                    title="CPF no formato 000.000.000-00"
+                    aria-invalid={cpfInvalid}
                     value={form.cpf}
                     onChange={(e) => {
                       setCpfInvalid(false)
-                      setField('cpf', applyCpfMask(e.target.value))
+                      setField('cpf', maskCpf(e.target.value))
                     }}
                   />
                   <label className={styles.flLabel} htmlFor="reg-cpf">
