@@ -139,16 +139,20 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-top: 18px;
+      /* padding simétrico: não desloca o centro vertical */
+      padding: 18px 0;
     }
 
-    /* Caixa principal — 76% da largura da página, centralizada */
+    /* Caixa principal — 76% da largura da página, centralizada nos dois eixos.
+       margin: auto num flex container centraliza vertical e horizontalmente e,
+       ao contrário de justify-content: center, se a lista for longa demais o
+       excesso vai só para baixo (o topo nunca é cortado). */
     .p2-box {
       width: 76%;
       border: 1px solid #555;
       display: flex;
       flex-direction: column;
-      margin-bottom: 96px;
+      margin: auto;
     }
 
     /* Cabeçalho da caixa: logo SIM + título */
@@ -200,49 +204,59 @@
       flex-direction: column;
     }
 
-    /* Linha 1: info do consultor (esq.) + assinatura (dir.) */
+    /* Linha 1: texto do responsável técnico centralizado; a assinatura fica
+       solta à direita, sobreposta às linhas, para a linha não ficar alta. */
     .p2-footer-consultant {
-      display: flex;
-      align-items: center;
-      min-height: 36px;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .p2-footer-info {
-      flex: 1;
-      font-size: 10.5px;
-      color: #222;
-      padding: 4px 10px;
-    }
-
-    .p2-footer-sig-wrap {
-      border-left: 1px solid #555;
-      width: 100px;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 4px 8px;
-      min-height: 36px;
+      min-height: 40px;
+      border-bottom: 1px solid #555;
     }
+
+    .p2-footer-info {
+      font-size: 12px;
+      color: #111;
+      text-align: center;
+      /* reserva espaço lateral para o texto nunca passar por baixo da assinatura */
+      padding: 4px 130px;
+    }
+
+    .p2-footer-info .reg { margin-left: 8px; }
 
     .p2-footer-sig {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      /* cabe dentro da linha (40px) sem encostar nas bordas */
       height: 34px;
+      max-width: 110px;
       object-fit: contain;
+      z-index: 2;
     }
 
-    /* Linha 2: instagram centralizado */
+    /* Linha 2: ícone do Instagram + @ centralizados */
     .p2-footer-insta {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 5px 10px;
-      min-height: 28px;
+      gap: 10px;
+      padding: 6px 10px;
+      min-height: 34px;
+    }
+
+    .p2-footer-insta svg {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
     }
 
     .p2-footer-instagram {
-      font-size: 10.5px;
-      color: #222;
+      font-size: 12px;
+      font-weight: bold;
+      color: #111;
     }
 
     /* Texto do rodapé da página (sobre a onda) */
@@ -280,7 +294,6 @@
         realizado no dia <em>{{session.date}}</em>{{#if session.city}}
         em <em>{{session.city}}{{#if session.state}}-{{session.state}}{{/if}}</em>{{/if}}.
       </p>
-      {{#if result}}<p class="result">Resultado: {{result}}</p>{{/if}}
     </div>
 
     <div class="signatures">
@@ -332,20 +345,18 @@
       <div class="p2-footer">
 
         <div class="p2-footer-consultant">
-          <span class="p2-footer-info">
-            Responsável técnico {{consultant.name}}{{#if consultant.credentialDetran}}
-            &nbsp;&nbsp;cred. {{consultant.credentialDetran}}{{/if}}{{#if consultant.regMte}}
-            &nbsp;&nbsp;&nbsp;Reg. {{consultant.regMte}}{{/if}}
-          </span>
-          <div class="p2-footer-sig-wrap">
-            {{#if consultant.signatureUrl}}
-              <img class="p2-footer-sig" src="{{{consultant.signatureUrl}}}" alt="Assinatura">
-            {{/if}}
-          </div>
+          <span class="p2-footer-info">Responsável técnico {{consultant.name}}{{#if consultant.credentialDetran}} cred. {{consultant.credentialDetran}}{{/if}}{{#if consultant.regMte}}<span class="reg">Reg. {{consultant.regMte}}</span>{{/if}}</span>
+          {{#if consultant.signatureUrl}}
+            <img class="p2-footer-sig" src="{{{consultant.signatureUrl}}}" alt="Assinatura">
+          {{/if}}
         </div>
 
         <div class="p2-footer-insta">
-          <span class="p2-footer-instagram">&#128247; SIMTRANSITO</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="20" rx="5.5"/>
+            <circle cx="12" cy="12" r="4.6"/>
+          </svg>
+          <span class="p2-footer-instagram">SIMTRANSITO</span>
         </div>
 
       </div>
