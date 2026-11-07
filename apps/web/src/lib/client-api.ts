@@ -66,7 +66,11 @@ async function clientFetch<T>(
   }
 
   if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  // Algumas rotas (ex.: DELETE) respondem 200 com corpo vazio; res.json()
+  // estoura "Unexpected end of JSON input" mesmo com a operação já concluída.
+  const text = await res.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 // Baixa um arquivo binário (ex.: ZIP de um job em lote) autenticado com o
