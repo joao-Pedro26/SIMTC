@@ -45,6 +45,7 @@ export interface TrainingParticipant {
   certificateGenerated: boolean
   certificateId: string | null
   certificatePdfUrl: string | null
+  hasSignature?: boolean
   assignedConsultantId?: string | null
   assignedConsultant?: { id: string; name: string } | null
 }

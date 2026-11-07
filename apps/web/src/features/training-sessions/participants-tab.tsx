@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { UserPlus, Upload, Check, Trash2 } from 'lucide-react'
+import { UserPlus, Upload, Check, Trash2, PenLine } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { ColumnFilter } from '@/components/ui/column-filter/column-filter'
 import { clientApi } from '@/lib/client-api'
 import { formatCpf } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
+import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
 import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
 import type { TrainingSession, TrainingParticipant, ParticipantStatus } from './types'
@@ -56,6 +57,7 @@ const emptyForm: AddParticipantForm = { name: '', cpf: '', email: '', cnhCategor
 
 export function ParticipantsTab({ session, sessionId, onRefresh, currentConsultantId, readOnly }: ParticipantsTabProps) {
   const confirm = useConfirm()
+  const toast = useToast()
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState<AddParticipantForm>(emptyForm)
   const [busy, setBusy] = useState(false)
@@ -132,6 +134,26 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
   async function changeType(p: TrainingParticipant) {
     const participationType = p.type === 'SOMENTE_TEORICA' ? 'TEORICA_E_PRATICA' : 'SOMENTE_TEORICA'
     await run(() => clientApi.patch(`/participants/${p.id}/type`, { participationType }))
+  }
+
+  async function removeSignature(p: TrainingParticipant) {
+    const ok = await confirm({
+      title: 'Remover assinatura',
+      message: `Deseja remover a assinatura de ${p.name}? Os próximos certificados sairão sem ela.`,
+      confirmLabel: 'Remover',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      await clientApi.delete(`/participants/${p.id}/signature`)
+      toast.success('Assinatura removida.')
+      await onRefresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao remover assinatura.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function removeParticipant(id: string) {
@@ -345,6 +367,16 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
                       </td>
                       {canEdit && (
                         <td className={styles.td}>
+                          {p.hasSignature && (
+                            <button
+                              className={styles.signatureBtn}
+                              onClick={() => removeSignature(p)}
+                              disabled={busy}
+                              title="Assinatura salva. Clique para remover"
+                            >
+                              <PenLine size={14} />
+                            </button>
+                          )}
                           <button
                             className={styles.deleteBtn}
                             onClick={() => removeParticipant(p.id)}

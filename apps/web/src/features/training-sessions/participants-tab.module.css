@@ -205,6 +205,21 @@
 .deleteBtn:hover:not(:disabled) { color: #e53e3e; }
 .deleteBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+.signatureBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1d9aa4;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.signatureBtn:hover:not(:disabled) { color: #e53e3e; }
+.signatureBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* ── Botões de ação de avaliação ─────────────────────────────────────────── */
 
 .actionBtn {
