@@ -7,6 +7,8 @@ import { AssessmentDrawer } from './assessment-drawer'
 import { clientApi } from '@/lib/client-api'
 import { getSessionUser } from '@/lib/auth'
 import { formatCpf } from '@/lib/utils'
+import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
+import { CNH_CATEGORIES, CPF_PATTERN, cpfError, maskCpf, validateCpf } from '@/lib/validate-cpf'
 import type { TrainingSession, TrainingConsultant, TrainingParticipant, ParticipantStatus } from './types'
 import styles from './session-management-drawer.module.css'
 
@@ -146,6 +148,13 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   // Adicionar participante
   const [showAddParticipant, setShowAddParticipant] = useState(false)
   const [participantForm, setParticipantForm] = useState<ParticipantForm>(emptyParticipantForm)
+  // CPF: o erro "incompleto" só aparece depois de sair do campo; o de dígito
+  // verificador aparece assim que os 11 dígitos são digitados.
+  const [participantCpfTouched, setParticipantCpfTouched] = useState(false)
+  const participantCpfDigits = participantForm.cpf.replace(/\D/g, '')
+  const participantCpfValid = validateCpf(participantCpfDigits)
+  const participantCpfError =
+    participantCpfTouched || participantCpfDigits.length === 11 ? cpfError(participantForm.cpf) : null
   const [participantBusy, setParticipantBusy] = useState(false)
   const [participantError, setParticipantError] = useState('')
 
@@ -272,18 +281,20 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   }
 
   async function handleAddParticipant() {
-    if (!participantForm.name.trim() || !participantForm.cpf.trim()) return
+    setParticipantCpfTouched(true)
+    if (!participantForm.name.trim() || !participantCpfValid) return
     setParticipantBusy(true)
     setParticipantError('')
     try {
       await clientApi.post(`/training-sessions/${sessionId}/participants`, {
         name: participantForm.name.trim(),
-        cpf: participantForm.cpf.replace(/\D/g, ''),
+        cpf: participantCpfDigits,
         email: participantForm.email.trim() || undefined,
         cnhCategory: participantForm.cnhCategory || undefined,
         cnhExpiration: participantForm.cnhExpiration || undefined,
       })
       setParticipantForm(emptyParticipantForm)
+      setParticipantCpfTouched(false)
       setShowAddParticipant(false)
       await fetchData()
     } catch (e) {
@@ -438,7 +449,12 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           </button>
         )}
         {canEdit && dirty && (
-          <button className={`${styles.footerBtn} ${styles.footerBtnSave}`} onClick={handleSave} disabled={busy}>
+          <button
+            className={`${styles.footerBtn} ${styles.footerBtnSave}`}
+            onClick={handleSave}
+            disabled={busy || (city.trim() !== '' && stateField === '')}
+            title={city.trim() !== '' && stateField === '' ? 'Escolha a cidade na lista para definir a UF' : undefined}
+          >
             {busy ? <Loader2 size={14} className={styles.spin} /> : null}
             Salvar Alterações
           </button>
@@ -506,11 +522,12 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>Cidade</label>
                     {canEdit ? (
-                      <input
-                        type="text"
-                        className={styles.fieldInput}
+                      <CityAutocomplete
+                        inputClassName={styles.fieldInput}
                         value={city}
-                        onChange={(e) => { setCity(e.target.value); setDirty(true) }}
+                        // Digitar limpa a UF; ela só volta ao escolher uma sugestão
+                        onChange={(c, uf) => { setCity(c); setStateField(uf ?? ''); setDirty(true) }}
+                        placeholder="Digite o nome da cidade"
                       />
                     ) : (
                       <div className={styles.fieldReadonly}>{city || '—'}</div>
@@ -523,8 +540,11 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                         type="text"
                         className={styles.fieldInput}
                         value={stateField}
-                        maxLength={2}
-                        onChange={(e) => { setStateField(e.target.value.toUpperCase()); setDirty(true) }}
+                        readOnly
+                        tabIndex={-1}
+                        placeholder="Escolha a cidade"
+                        title="Preenchido automaticamente ao escolher a cidade"
+                        style={{ cursor: 'not-allowed', opacity: 0.8 }}
                       />
                     ) : (
                       <div className={styles.fieldReadonly}>{stateField || '—'}</div>
@@ -631,26 +651,53 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                       <input className={styles.fieldInput} value={participantForm.name} onChange={(e) => setParticipantField('name', e.target.value)} />
                     </div>
                     <div className={styles.field}>
-                      <label className={styles.fieldLabel}>CPF *</label>
-                      <input className={styles.fieldInput} value={participantForm.cpf} onChange={(e) => setParticipantField('cpf', e.target.value)} placeholder="00000000000" />
+                      <label className={styles.fieldLabel} htmlFor="drawer-participant-cpf">CPF *</label>
+                      <input
+                        id="drawer-participant-cpf"
+                        className={`${styles.fieldInput}${participantCpfError ? ` ${styles.fieldInputInvalid}` : ''}`}
+                        value={participantForm.cpf}
+                        onChange={(e) => setParticipantField('cpf', maskCpf(e.target.value))}
+                        onBlur={() => setParticipantCpfTouched(true)}
+                        placeholder="000.000.000-00"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={14}
+                        pattern={CPF_PATTERN}
+                        title="CPF no formato 000.000.000-00"
+                        aria-invalid={!!participantCpfError}
+                        aria-describedby={participantCpfError ? 'drawer-participant-cpf-error' : undefined}
+                      />
+                      {participantCpfError && (
+                        <span id="drawer-participant-cpf-error" className={styles.fieldError}>{participantCpfError}</span>
+                      )}
                     </div>
                     <div className={styles.field}>
                       <label className={styles.fieldLabel}>E-mail</label>
                       <input className={styles.fieldInput} type="email" value={participantForm.email} onChange={(e) => setParticipantField('email', e.target.value)} />
                     </div>
                     <div className={styles.field}>
-                      <label className={styles.fieldLabel}>Cat. CNH</label>
-                      <input className={styles.fieldInput} value={participantForm.cnhCategory} onChange={(e) => setParticipantField('cnhCategory', e.target.value)} placeholder="B" />
+                      <label className={styles.fieldLabel} htmlFor="drawer-participant-cnh">Cat. CNH</label>
+                      <select
+                        id="drawer-participant-cnh"
+                        className={styles.fieldInput}
+                        value={participantForm.cnhCategory}
+                        onChange={(e) => setParticipantField('cnhCategory', e.target.value)}
+                      >
+                        <option value="">Selecione…</option>
+                        {CNH_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   {participantError && <p className={styles.participantError}>{participantError}</p>}
                   <div className={styles.addParticipantActions}>
-                    <button className={styles.cancelSmallBtn} onClick={() => { setShowAddParticipant(false); setParticipantForm(emptyParticipantForm) }}>
+                    <button className={styles.cancelSmallBtn} onClick={() => { setShowAddParticipant(false); setParticipantForm(emptyParticipantForm); setParticipantCpfTouched(false) }}>
                       Cancelar
                     </button>
                     <button
                       className={styles.confirmSmallBtn}
-                      disabled={!participantForm.name.trim() || !participantForm.cpf.trim() || participantBusy}
+                      disabled={!participantForm.name.trim() || !participantCpfValid || participantBusy}
                       onClick={handleAddParticipant}
                     >
                       <Check size={13} /> Confirmar

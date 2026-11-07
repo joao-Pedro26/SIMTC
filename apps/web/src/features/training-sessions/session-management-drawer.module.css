@@ -112,6 +112,17 @@
   box-shadow: 0 0 0 0.125rem rgba(29, 154, 164, 0.15);
 }
 
+.fieldInputInvalid,
+.fieldInputInvalid:focus {
+  border-color: var(--error, #c53030);
+  box-shadow: 0 0 0 0.125rem rgba(197, 48, 48, 0.12);
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  color: var(--error, #c53030);
+}
+
 .fieldTextarea {
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--border);
