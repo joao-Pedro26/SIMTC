@@ -77,13 +77,15 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     { label: 'Não Recomendado', value: 'NAO_RECOMENDADO' },
   ]
 
-  const filteredParticipants = session.participants.filter((p) => {
-    const matchName   = p.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
-      p.cpf.includes(nameFilter)
-    const matchTipo   = tipoFilter === '' || p.type === tipoFilter
-    const matchStatus = statusFilter === '' || getDisplayStatus(p) === statusFilter
-    return matchName && matchTipo && matchStatus
-  })
+  const filteredParticipants = session.participants
+    .filter((p) => {
+      const matchName   = p.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
+        p.cpf.includes(nameFilter)
+      const matchTipo   = tipoFilter === '' || p.type === tipoFilter
+      const matchStatus = statusFilter === '' || getDisplayStatus(p) === statusFilter
+      return matchName && matchTipo && matchStatus
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
 
   // Participantes com avaliação em andamento não podem ser excluídos (mesma
   // regra do botão de excluir individual) — por isso ficam de fora da lista
@@ -125,6 +127,11 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     )
     setForm(emptyForm)
     setShowAddForm(false)
+  }
+
+  async function changeType(p: TrainingParticipant) {
+    const participationType = p.type === 'SOMENTE_TEORICA' ? 'TEORICA_E_PRATICA' : 'SOMENTE_TEORICA'
+    await run(() => clientApi.patch(`/participants/${p.id}/type`, { participationType }))
   }
 
   async function removeParticipant(id: string) {
@@ -317,9 +324,16 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
                       <td className={styles.td}>{p.name}</td>
                       <td className={styles.td}>{formatCpf(p.cpf)}</td>
                       <td className={`${styles.td} ${styles.center}`}>
-                        <span className={`${styles.typeBtn} ${p.type === 'SOMENTE_TEORICA' ? styles.typeSoloTeoria : styles.typePratica}`}>
+                        <button
+                          type="button"
+                          className={`${styles.typeBtn} ${p.type === 'SOMENTE_TEORICA' ? styles.typeSoloTeoria : styles.typePratica}`}
+                          onClick={() => changeType(p)}
+                          disabled={!canEdit || busy}
+                          title={canEdit ? 'Clique para alterar o tipo de participação' : undefined}
+                          style={canEdit ? undefined : { cursor: 'default' }}
+                        >
                           {p.type === 'SOMENTE_TEORICA' ? 'Teoria' : 'Teoria + Prática'}
-                        </span>
+                        </button>
                       </td>
                       <td className={`${styles.td} ${styles.center}`}>
                         <span className={`${styles.statusBadge} ${statusColors[displayStatus]}`}>
