@@ -129,7 +129,11 @@ export function TrainingSessionDetailTabs({ sessionId, onSessionChanged, onManag
 
   useEffect(() => { fetchDetail() }, [fetchDetail])
 
-  if (loading) {
+  // Só mostra o spinner de tela cheia no carregamento inicial. Em refreshes
+  // (onRefresh das abas) a árvore precisa continuar montada — senão o estado
+  // local das abas (ex.: modal de progresso do job em lote do ZIP, seleção)
+  // é perdido no meio do fluxo e o usuário "não vê nada acontecer".
+  if (loading && !session) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
         <Loader2 size={28} style={{ opacity: 0.4 }} />
