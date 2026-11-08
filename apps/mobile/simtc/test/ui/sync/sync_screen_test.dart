@@ -70,6 +70,11 @@ void main() {
           path: AppRoutes.sync,
           builder: (context, state) => SyncScreen(clock: () => agora),
         ),
+        GoRoute(
+          path: '/sessions/:sessionId',
+          builder: (context, state) =>
+              Scaffold(body: Text('detalhe ${state.uri}')),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -547,5 +552,36 @@ void main() {
 
       expect(find.text('home'), findsOneWidget);
     });
+  });
+
+  testWidgets('tocar num item abre o treinamento com o participante (celular)',
+      (tester) async {
+    await pump(tester, queue: filaDoCanvas());
+
+    await tester.tap(find.text('Ana Paula Ribeiro'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('detalhe /sessions/sess-1?participante=1'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('no tablet, o toque também abre o treinamento com o participante',
+      (tester) async {
+    await pump(
+      tester,
+      queue: filaDoCanvas(),
+      size: const Size(1280, 800),
+      formFactor: FormFactor.tablet,
+    );
+
+    await tester.tap(find.text('Ana Paula Ribeiro'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('detalhe /sessions/sess-1?participante=1'),
+      findsOneWidget,
+    );
   });
 }

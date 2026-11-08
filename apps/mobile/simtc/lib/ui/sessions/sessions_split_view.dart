@@ -25,9 +25,16 @@ import 'sessions_screen.dart';
 /// mudam de lugar na árvore sem recriar o estado (a ViewModel, o filtro, a
 /// rolagem).
 class SessionsSplitView extends StatefulWidget {
-  const SessionsSplitView({super.key, this.selectedSessionId});
+  const SessionsSplitView({
+    super.key,
+    this.selectedSessionId,
+    this.revealParticipantId,
+  });
 
   final String? selectedSessionId;
+
+  /// Participante que o detalhe mostra em destaque (vem da aba Sincronizar).
+  final String? revealParticipantId;
 
   @override
   State<SessionsSplitView> createState() => _SessionsSplitViewState();
@@ -88,6 +95,7 @@ class _SessionsSplitViewState extends State<SessionsSplitView> {
           SessionDetailScreen(
             key: _detailKeyFor(selected),
             sessionId: selected,
+            revealParticipantId: widget.revealParticipantId,
             onBack: _backToList,
           ),
         ],
@@ -127,6 +135,7 @@ class _SessionsSplitViewState extends State<SessionsSplitView> {
                     : SessionDetailScreen(
                         key: _detailKeyFor(selected),
                         sessionId: selected,
+                        revealParticipantId: widget.revealParticipantId,
                         embedded: true,
                       ),
               ),

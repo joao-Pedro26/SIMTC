@@ -32,8 +32,15 @@ abstract final class AppRoutes {
   /// Aba "Perfil" (tela 1.10, Fase 8A).
   static const String profile = '/profile';
 
-  /// Detalhe da sessão (tela 1.4).
-  static String sessionDetail(String sessionId) => '/sessions/$sessionId';
+  /// Detalhe da sessão (tela 1.4). [participantId]: aberto pela aba
+  /// Sincronizar — a lista rola até ele e a linha pisca.
+  static String sessionDetail(String sessionId, {String? participantId}) =>
+      Uri(
+        path: '/sessions/$sessionId',
+        queryParameters: participantId == null
+            ? null
+            : {'participante': participantId},
+      ).toString();
 
   /// "Dados do treinamento" (tela 1.12, Fase 6A), só para ADMIN.
   static String sessionEdit(String sessionId) => '/sessions/$sessionId/edit';
@@ -83,11 +90,15 @@ Page<void> _sessionsPage(
   GoRouterState state, {
   required Widget phone,
   String? selectedSessionId,
+  String? revealParticipantId,
 }) {
   if (FormFactorScope.of(context) == FormFactor.tablet) {
     return NoTransitionPage<void>(
       key: _sessionsSplitPageKey,
-      child: SessionsSplitView(selectedSessionId: selectedSessionId),
+      child: SessionsSplitView(
+        selectedSessionId: selectedSessionId,
+        revealParticipantId: revealParticipantId,
+      ),
     );
   }
   return MaterialPage<void>(key: state.pageKey, child: phone);
@@ -145,11 +156,16 @@ GoRouter createRouter(
         path: '/sessions/:sessionId',
         pageBuilder: (context, state) {
           final sessionId = state.pathParameters['sessionId']!;
+          final revealParticipantId = state.uri.queryParameters['participante'];
           return _sessionsPage(
             context,
             state,
-            phone: SessionDetailScreen(sessionId: sessionId),
+            phone: SessionDetailScreen(
+              sessionId: sessionId,
+              revealParticipantId: revealParticipantId,
+            ),
             selectedSessionId: sessionId,
+            revealParticipantId: revealParticipantId,
           );
         },
         routes: [

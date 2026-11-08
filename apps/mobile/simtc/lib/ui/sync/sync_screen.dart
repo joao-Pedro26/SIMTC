@@ -291,46 +291,64 @@ class SyncScreen extends StatelessWidget {
   ) {
     final state = queueItemStateOf(item, sending: sync.isSendingItem(item.id));
 
-    return Container(
-      key: ValueKey('sync-item-${item.id}'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
-        vertical: AppSpacing.md + 3,
-      ),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      queueItemTitle(item),
-                      style: AppTypography.cardTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpacing.xs + 1),
-                    Text(queueItemMeta(item, state, now), style: AppTypography.meta),
-                  ],
+    return InkWell(
+      onTap: () => _openParticipant(context, item),
+      child: Container(
+        key: ValueKey('sync-item-${item.id}'),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.md + 3,
+        ),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.surfaceMuted)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        queueItemTitle(item),
+                        style: AppTypography.cardTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.xs + 1),
+                      Text(queueItemMeta(item, state, now), style: AppTypography.meta),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _buildPill(state),
+                const SizedBox(width: AppSpacing.md),
+                _buildPill(state),
+              ],
+            ),
+            if (state == QueueItemState.failed) ...[
+              const SizedBox(height: AppSpacing.sm + 2),
+              _buildFailedActions(context, sync, item, isOffline),
             ],
-          ),
-          if (state == QueueItemState.failed) ...[
-            const SizedBox(height: AppSpacing.sm + 2),
-            _buildFailedActions(context, sync, item, isOffline),
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  /// Toque no item: abre o treinamento com o participante em destaque. Como na
+  /// lista de sessões, o celular empilha a tela (o voltar volta para cá) e o
+  /// tablet troca a página, em que o detalhe é o painel da aba Sessões.
+  void _openParticipant(BuildContext context, LocalAssessment item) {
+    final location = AppRoutes.sessionDetail(
+      item.sessionId,
+      participantId: item.trainingParticipantId,
+    );
+    if (context.isTablet) {
+      context.go(location);
+    } else {
+      context.push(location);
+    }
   }
 
   /// "Tentar novamente" e, só no que o servidor recusou, "Descartar" — falha

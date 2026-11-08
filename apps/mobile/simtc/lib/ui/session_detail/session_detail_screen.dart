@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -34,6 +35,7 @@ import '../core/widgets/sync_status_indicator.dart';
 import '../sessions/session_status_style.dart';
 import 'participant_filter.dart';
 import 'participant_row.dart';
+import 'reveal_flash.dart';
 import 'session_detail_viewmodel.dart';
 
 /// Tela 1.4 — detalhe da sessão, com a lista de participantes.
@@ -48,6 +50,7 @@ class SessionDetailScreen extends StatefulWidget {
     required this.sessionId,
     this.embedded = false,
     this.onBack,
+    this.revealParticipantId,
   });
 
   final String sessionId;
@@ -58,11 +61,18 @@ class SessionDetailScreen extends StatefulWidget {
   /// O voltar da barra de topo. Sem ele, desempilha a tela.
   final VoidCallback? onBack;
 
+  /// Participante tocado na aba Sincronizar: a lista rola até ele e a linha
+  /// pisca.
+  final String? revealParticipantId;
+
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
 }
 
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  /// Quantas vezes a rolagem pula em direção à linha antes de desistir.
+  static const int _maxRevealJumps = 12;
+
   late final SessionDetailViewModel _viewModel = SessionDetailViewModel(
     sessionId: widget.sessionId,
     sessionRepository: context.read<SessionRepository>(),
@@ -73,16 +83,41 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     currentUser: context.read<AuthRepository>().currentUser,
   )..init();
 
+  final ScrollController _scroll = ScrollController();
+
+  /// Uma chave por linha, para achar a linha construída e rolar até ela.
+  final Map<String, GlobalKey> _rowKeys = {};
+
+  /// Participante que ainda falta mostrar; some assim que a lista chega nele
+  /// (ou se ele não está mais no aparelho).
+  String? _pendingReveal;
+
+  /// A linha de [_flashId] pisca cada vez que [_flashSerial] muda.
+  String? _flashId;
+  int _flashSerial = 0;
+
   @override
   void initState() {
     super.initState();
+    _pendingReveal = widget.revealParticipantId;
     _viewModel.addListener(_showMessageWhenItArrives);
+  }
+
+  @override
+  void didUpdateWidget(SessionDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // No tablet, o mesmo detalhe pode receber outro participante para mostrar.
+    final reveal = widget.revealParticipantId;
+    if (reveal != null && reveal != oldWidget.revealParticipantId) {
+      _pendingReveal = reveal;
+    }
   }
 
   @override
   void dispose() {
     _viewModel.removeListener(_showMessageWhenItArrives);
     _viewModel.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -105,8 +140,99 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: _viewModel,
-      builder: (context, _) => _buildScaffold(context),
+      builder: (context, _) {
+        _maybeReveal();
+        return _buildScaffold(context);
+      },
     );
+  }
+
+  /// Quando a lista carrega, pede a rolagem até o participante, uma vez, no
+  /// próximo quadro (a rolagem não pode mexer no meio do build).
+  void _maybeReveal() {
+    final id = _pendingReveal;
+    if (id == null || _viewModel.isLoading) return;
+    _pendingReveal = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(id));
+  }
+
+  Future<void> _reveal(String id) async {
+    if (!mounted) return;
+    // A linha pode estar fora do chip ou da busca: mostra todos antes.
+    if (_viewModel.isSearching || _viewModel.filter != ParticipantFilter.todos) {
+      _viewModel.closeSearch();
+      _viewModel.setFilter(ParticipantFilter.todos);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+    if (!_viewModel.visibleParticipants.any((p) => p.id == id)) return;
+
+    final reached = await _scrollToRow(id);
+    if (!mounted || !reached) return;
+    setState(() {
+      _flashId = id;
+      _flashSerial++;
+    });
+  }
+
+  /// A lista só constrói as linhas perto da tela. Para as outras, pula para
+  /// uma estimativa e tenta de novo a cada quadro; achada a linha, ela fica à
+  /// vista. Devolve falso se não chegou.
+  Future<bool> _scrollToRow(String id) async {
+    for (var attempt = 0; attempt < _maxRevealJumps; attempt++) {
+      if (!mounted || !_scroll.hasClients) return false;
+
+      final rowContext = _rowKeys[id]?.currentContext;
+      if (rowContext != null && rowContext.mounted) {
+        await Scrollable.ensureVisible(
+          rowContext,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 300),
+        );
+        return true;
+      }
+
+      final visible = _viewModel.visibleParticipants;
+      final estimate = _estimateRowOffset(
+        visible,
+        visible.indexWhere((p) => p.id == id),
+      );
+      if (estimate == null) return false;
+
+      final position = _scroll.position;
+      _scroll.jumpTo(
+        estimate
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    return false;
+  }
+
+  /// Onde fica a linha de [index]: a rolagem que deixa a linha construída mais
+  /// acima no topo, mais a altura média das linhas já desenhadas, vezes a
+  /// distância entre as duas. Nulo se não há linha construída nenhuma.
+  double? _estimateRowOffset(List<SessionParticipant> visible, int index) {
+    if (index < 0) return null;
+
+    double? anchorOffset;
+    int? anchorIndex;
+    var totalHeight = 0.0;
+    var built = 0;
+    for (var i = 0; i < visible.length; i++) {
+      final rowContext = _rowKeys[visible[i].id]?.currentContext;
+      if (rowContext == null) continue;
+      final box = rowContext.findRenderObject() as RenderBox;
+      totalHeight += box.size.height;
+      built++;
+      anchorIndex ??= i;
+      anchorOffset ??=
+          RenderAbstractViewport.of(box).getOffsetToReveal(box, 0).offset;
+    }
+    if (anchorIndex == null || anchorOffset == null) return null;
+
+    return anchorOffset + (index - anchorIndex) * (totalHeight / built);
   }
 
   /// Recuo das laterais da lista: 20 no celular, 24 no tablet.
@@ -588,6 +714,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       color: AppColors.primary,
       onRefresh: _viewModel.refresh,
       child: ListView(
+        controller: _scroll,
         // Explícito pelo mesmo motivo da Home: puxar para atualizar precisa
         // funcionar mesmo quando a lista é mais curta que a tela.
         physics: const AlwaysScrollableScrollPhysics(),
@@ -803,33 +930,37 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         progress == LocalProgress.failed ||
         progress == LocalProgress.sent;
 
-    return ParticipantRow(
-      key: ValueKey('participante-${participant.id}'),
-      name: participant.name,
-      maskedCpf: participant.maskedCpf,
-      chip: showsLocal
-          ? _buildQueueChip(progress!)
-          : _buildSituationChip(participant, situation),
-      // O rascunho mostra só a hora do "Iniciar avaliação": o app não tem
-      // cronômetro, só registra início e fim (decisão de 30/09/2026).
-      meta: showsLocal
-          ? queueMetaFor(local!, _viewModel.now)
-          : progress == LocalProgress.draft
-              ? startedLabel(local!.startTime, _viewModel.now)
-              : assessedAtLabelFor(participant, situation, _viewModel.now),
-      blockedNote: blockedNoteFor(participant, situation),
-      muted: situation == ParticipantSituation.other,
-      horizontalInset: _inset,
-      accentColor: situation == ParticipantSituation.mine
-          ? AppColors.primary
-          : AppColors.border,
-      onTap: _tapActionFor(participant),
-      action: _viewModel.canAssign(participant)
-          ? _buildAssignButton(participant, isOffline)
-          : null,
-      menu: _viewModel.showsAdminMenu(participant)
-          ? _buildAdminMenu(participant, isOffline)
-          : null,
+    return RevealFlash(
+      key: _rowKeys.putIfAbsent(participant.id, () => GlobalKey()),
+      trigger: participant.id == _flashId ? _flashSerial : 0,
+      child: ParticipantRow(
+        key: ValueKey('participante-${participant.id}'),
+        name: participant.name,
+        maskedCpf: participant.maskedCpf,
+        chip: showsLocal
+            ? _buildQueueChip(progress!)
+            : _buildSituationChip(participant, situation),
+        // O rascunho mostra só a hora do "Iniciar avaliação": o app não tem
+        // cronômetro, só registra início e fim (decisão de 30/09/2026).
+        meta: showsLocal
+            ? queueMetaFor(local!, _viewModel.now)
+            : progress == LocalProgress.draft
+                ? startedLabel(local!.startTime, _viewModel.now)
+                : assessedAtLabelFor(participant, situation, _viewModel.now),
+        blockedNote: blockedNoteFor(participant, situation),
+        muted: situation == ParticipantSituation.other,
+        horizontalInset: _inset,
+        accentColor: situation == ParticipantSituation.mine
+            ? AppColors.primary
+            : AppColors.border,
+        onTap: _tapActionFor(participant),
+        action: _viewModel.canAssign(participant)
+            ? _buildAssignButton(participant, isOffline)
+            : null,
+        menu: _viewModel.showsAdminMenu(participant)
+            ? _buildAdminMenu(participant, isOffline)
+            : null,
+      ),
     );
   }
 

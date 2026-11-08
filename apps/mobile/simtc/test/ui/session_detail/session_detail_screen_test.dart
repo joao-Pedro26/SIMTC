@@ -37,6 +37,7 @@ import 'package:simtc/ui/core/widgets/sync_status_indicator.dart';
 import 'package:simtc/ui/result/result_screen.dart';
 import 'package:simtc/ui/session_consultants/session_consultants_screen.dart';
 import 'package:simtc/ui/session_detail/participant_row.dart';
+import 'package:simtc/ui/session_detail/reveal_flash.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/utils/result.dart';
@@ -1844,5 +1845,49 @@ void main() {
         800 - 12,
       );
     });
+  });
+
+  testWidgets(
+      'vindo da aba Sincronizar, rola até o participante, longe da tela, e o pisca',
+      (tester) async {
+    tester.view.physicalSize = const Size(420, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      withProviders(
+        const MaterialApp(
+          home: SessionDetailScreen(
+            sessionId: 'sess-1',
+            revealParticipantId: 'p-30',
+          ),
+        ),
+      ),
+    );
+    sessionStream.add(session());
+    participantsStream.add([
+      for (var i = 1; i <= 40; i++) participant('p-$i', 'Participante $i'),
+    ]);
+    localStream.add(const []);
+
+    final row = find.byKey(const ValueKey('participante-p-30'));
+    final flash = find.ancestor(of: row, matching: find.byType(RevealFlash));
+    final tint = find.descendant(of: flash, matching: find.byType(ColoredBox));
+    expect(row, findsNothing, reason: 'a linha 30 começa fora da área pintada');
+
+    var flashed = false;
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (tint.evaluate().isNotEmpty &&
+          tester.widget<ColoredBox>(tint).color.a > 0) {
+        flashed = true;
+      }
+    }
+
+    expect(row, findsOneWidget);
+    expect(tester.getRect(row).top, greaterThanOrEqualTo(0));
+    expect(tester.getRect(row).bottom, lessThanOrEqualTo(800));
+    expect(flashed, isTrue, reason: 'a linha pisca depois de chegar nela');
   });
 }
