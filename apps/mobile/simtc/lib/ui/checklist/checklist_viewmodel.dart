@@ -243,7 +243,8 @@ class ChecklistViewModel extends ChangeNotifier {
       }
       if (_disposed) return;
 
-      _catalog = await _catalogRepository.loadCatalog();
+      // Só as categorias do curso desta sessão (tópicos por curso).
+      _catalog = await _catalogRepository.loadCatalog(sessionId: sessionId);
       if (_disposed) return;
       if (isStarted) _openFirstCategory();
     } catch (_) {

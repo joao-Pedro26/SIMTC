@@ -176,6 +176,9 @@ class ParticipantRepository {
       companyName: Value(session.companyName),
       companyLogoUrl: Value(session.companyLogoUrl),
       courseName: Value(session.courseName),
+      courseId: session.courseId == null
+          ? const Value.absent()
+          : Value(session.courseId),
       city: Value(session.city),
       state: Value(session.state),
       date: Value(session.date),

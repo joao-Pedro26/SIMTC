@@ -107,7 +107,10 @@ class SummaryViewModel extends ChangeNotifier {
     if (assessment != null) {
       _endedAt = _now();
       final items = await _assessmentRepository.loadItems(assessment.id);
-      final catalog = await _catalogRepository.loadCatalog();
+      // As mesmas categorias do checklist: só as do curso da sessão.
+      final catalog = await _catalogRepository.loadCatalog(
+        sessionId: assessment.sessionId,
+      );
       if (_disposed) return;
       _sections = buildChecklistSections(catalog, items);
     }

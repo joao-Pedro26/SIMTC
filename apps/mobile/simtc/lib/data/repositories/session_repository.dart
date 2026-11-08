@@ -310,6 +310,11 @@ class SessionRepository {
                     ? const Value.absent()
                     : Value(session.companyLogoUrl),
                 courseName: session.courseName,
+                // Mesmo cuidado do logo: um backend sem o id do curso não
+                // apaga o que já está no cache.
+                courseId: session.courseId == null
+                    ? const Value.absent()
+                    : Value(session.courseId),
                 city: session.city,
                 state: session.state,
                 date: Value(session.date),

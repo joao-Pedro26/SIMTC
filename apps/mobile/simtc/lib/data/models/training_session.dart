@@ -50,6 +50,7 @@ class TrainingSession {
     required this.assessableParticipants,
     required this.assessedParticipants,
     this.companyLogoUrl,
+    this.courseId,
     this.date,
     this.notes,
     this.responsibleConsultantId,
@@ -60,6 +61,10 @@ class TrainingSession {
   final String companyName;
   final String? companyLogoUrl;
   final String courseName;
+
+  /// `Course.id`: quais categorias do catálogo valem no checklist desta
+  /// sessão (`catalogForCourse`). Nulo no cache de antes do esquema 6.
+  final String? courseId;
   final String city;
   final String state;
   final DateTime? date;
@@ -105,6 +110,7 @@ class TrainingSession {
       companyName: company['name'] as String? ?? '',
       companyLogoUrl: company['logoUrl'] as String?,
       courseName: course['name'] as String? ?? '',
+      courseId: course['id'] as String?,
       city: json['city'] as String? ?? '',
       state: json['state'] as String? ?? '',
       date: parsedDate == null
@@ -126,6 +132,7 @@ class TrainingSession {
       companyName: row.companyName,
       companyLogoUrl: row.companyLogoUrl,
       courseName: row.courseName,
+      courseId: row.courseId,
       city: row.city,
       state: row.state,
       date: row.date,

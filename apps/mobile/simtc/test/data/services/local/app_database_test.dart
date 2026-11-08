@@ -165,6 +165,19 @@ const String _sessionsV4 = '''
   )
 ''';
 
+/// A tabela `assessment_categories` como a Fase 1 a criou — nenhuma migração
+/// mexeu nela até a de tópicos por curso (esquema 6).
+const String _assessmentCategoriesV1 = '''
+  CREATE TABLE IF NOT EXISTS assessment_categories (
+    id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NULL,
+    "order" INTEGER NOT NULL,
+    PRIMARY KEY (id)
+  )
+''';
+
 /// A tabela `local_assessments` como a Fase 1 a criou — nenhuma migração
 /// mexeu nela até a Fase 5A (esquema 4).
 const String _localAssessmentsV3 = '''
@@ -407,6 +420,7 @@ void main() {
           raw.execute(_sessionsV1);
           raw.execute(_participantsV1);
           raw.execute(_localAssessmentsV3);
+          raw.execute(_assessmentCategoriesV1);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status, cached_at)
             VALUES ('sess-antiga', 'Bracell Celulose', 'Direção Preventiva',
@@ -446,6 +460,7 @@ void main() {
           raw.execute(_sessionsV2);
           raw.execute(_participantsV1);
           raw.execute(_localAssessmentsV3);
+          raw.execute(_assessmentCategoriesV1);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status,
                                   total_participants, assessable_participants,
@@ -590,6 +605,8 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
+          raw.execute(_sessionsV4);
+          raw.execute(_assessmentCategoriesV1);
           raw.execute(_localAssessmentsV3);
           raw.execute('''
             INSERT INTO local_assessments (id, training_participant_id, session_id,
@@ -669,6 +686,7 @@ void main() {
         file,
         setup: (raw) {
           raw.execute(_sessionsV4);
+          raw.execute(_assessmentCategoriesV1);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state,
                                   status, responsible_consultant_id, cached_at)
@@ -702,5 +720,47 @@ void main() {
     final row = await migrated.select(migrated.sessionConsultants).getSingle();
     expect(row.name, 'Carla Mendes');
     expect(row.email, isNull);
+  });
+
+  test(
+      'migra do esquema 5 para o 6 com o curso da sessão e os cursos de cada '
+      'categoria vazios até o próximo sync', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_v6');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          raw.execute(_sessionsV4);
+          raw.execute(_assessmentCategoriesV1);
+          raw.execute('''
+            INSERT INTO sessions (id, company_name, course_name, city, state,
+                                  status, cached_at)
+            VALUES ('sess-1', 'Bracell', 'Direção Defensiva', 'Itabira', 'MG',
+                    'EM_ANDAMENTO', 1758600000)
+          ''');
+          raw.execute('''
+            INSERT INTO assessment_categories (id, code, name, "order")
+            VALUES ('cat-cv', 'CV', 'Controle do Veículo', 1)
+          ''');
+          raw.execute('PRAGMA user_version = 5');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    final session = await migrated.select(migrated.sessions).getSingle();
+    expect(session.courseName, 'Direção Defensiva');
+    expect(session.courseId, isNull);
+
+    final category =
+        await migrated.select(migrated.assessmentCategories).getSingle();
+    expect(category.code, 'CV');
+    expect(category.courseIds, isNull);
   });
 }

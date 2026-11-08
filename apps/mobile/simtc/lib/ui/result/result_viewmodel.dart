@@ -256,7 +256,7 @@ class ResultViewModel extends ChangeNotifier {
 
     try {
       final local = await _ownLocal();
-      final catalog = await _catalogRepository.loadCatalog();
+      final catalog = await _catalogRepository.loadCatalog(sessionId: sessionId);
       if (_disposed) return;
       // O stream é o dono de `_local` assim que emite: esta leitura pode ser
       // mais velha que a última emissão dele (o envio foi aceito no meio do

@@ -21,6 +21,10 @@ class Sessions extends Table {
   TextColumn get companyName => text()();
   TextColumn get companyLogoUrl => text().nullable()();
   TextColumn get courseName => text()();
+
+  /// `Course.id` — decide quais categorias do catálogo valem no checklist
+  /// desta sessão. Nulo no cache de antes do esquema 6, até o próximo sync.
+  TextColumn get courseId => text().nullable()();
   TextColumn get city => text()();
   TextColumn get state => text()();
   DateTimeColumn get date => dateTime().nullable()();
@@ -107,6 +111,11 @@ class AssessmentCategories extends Table {
   TextColumn get name => text()();
   TextColumn get description => text().nullable()();
   IntColumn get order => integer()();
+
+  /// `courseIds` do backend, separados por vírgula (ids cuid não têm
+  /// vírgula): os cursos em que a categoria vale. Nulo no catálogo de antes
+  /// do esquema 6, até o próximo sync.
+  TextColumn get courseIds => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

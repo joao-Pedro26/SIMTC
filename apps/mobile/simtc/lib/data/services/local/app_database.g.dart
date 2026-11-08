@@ -31,6 +31,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
   late final GeneratedColumn<String> courseName = GeneratedColumn<String>(
       'course_name', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _courseIdMeta =
+      const VerificationMeta('courseId');
+  @override
+  late final GeneratedColumn<String> courseId = GeneratedColumn<String>(
+      'course_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _cityMeta = const VerificationMeta('city');
   @override
   late final GeneratedColumn<String> city = GeneratedColumn<String>(
@@ -104,6 +110,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         companyName,
         companyLogoUrl,
         courseName,
+        courseId,
         city,
         state,
         date,
@@ -152,6 +159,10 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
               data['course_name']!, _courseNameMeta));
     } else if (isInserting) {
       context.missing(_courseNameMeta);
+    }
+    if (data.containsKey('course_id')) {
+      context.handle(_courseIdMeta,
+          courseId.isAcceptableOrUnknown(data['course_id']!, _courseIdMeta));
     }
     if (data.containsKey('city')) {
       context.handle(
@@ -233,6 +244,8 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           DriftSqlType.string, data['${effectivePrefix}company_logo_url']),
       courseName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}course_name'])!,
+      courseId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}course_id']),
       city: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}city'])!,
       state: attachedDatabase.typeMapping
@@ -271,6 +284,10 @@ class Session extends DataClass implements Insertable<Session> {
   final String companyName;
   final String? companyLogoUrl;
   final String courseName;
+
+  /// `Course.id` — decide quais categorias do catálogo valem no checklist
+  /// desta sessão. Nulo no cache de antes do esquema 6, até o próximo sync.
+  final String? courseId;
   final String city;
   final String state;
   final DateTime? date;
@@ -300,6 +317,7 @@ class Session extends DataClass implements Insertable<Session> {
       required this.companyName,
       this.companyLogoUrl,
       required this.courseName,
+      this.courseId,
       required this.city,
       required this.state,
       this.date,
@@ -320,6 +338,9 @@ class Session extends DataClass implements Insertable<Session> {
       map['company_logo_url'] = Variable<String>(companyLogoUrl);
     }
     map['course_name'] = Variable<String>(courseName);
+    if (!nullToAbsent || courseId != null) {
+      map['course_id'] = Variable<String>(courseId);
+    }
     map['city'] = Variable<String>(city);
     map['state'] = Variable<String>(state);
     if (!nullToAbsent || date != null) {
@@ -351,6 +372,9 @@ class Session extends DataClass implements Insertable<Session> {
           ? const Value.absent()
           : Value(companyLogoUrl),
       courseName: Value(courseName),
+      courseId: courseId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(courseId),
       city: Value(city),
       state: Value(state),
       date: date == null && nullToAbsent ? const Value.absent() : Value(date),
@@ -378,6 +402,7 @@ class Session extends DataClass implements Insertable<Session> {
       companyName: serializer.fromJson<String>(json['companyName']),
       companyLogoUrl: serializer.fromJson<String?>(json['companyLogoUrl']),
       courseName: serializer.fromJson<String>(json['courseName']),
+      courseId: serializer.fromJson<String?>(json['courseId']),
       city: serializer.fromJson<String>(json['city']),
       state: serializer.fromJson<String>(json['state']),
       date: serializer.fromJson<DateTime?>(json['date']),
@@ -403,6 +428,7 @@ class Session extends DataClass implements Insertable<Session> {
       'companyName': serializer.toJson<String>(companyName),
       'companyLogoUrl': serializer.toJson<String?>(companyLogoUrl),
       'courseName': serializer.toJson<String>(courseName),
+      'courseId': serializer.toJson<String?>(courseId),
       'city': serializer.toJson<String>(city),
       'state': serializer.toJson<String>(state),
       'date': serializer.toJson<DateTime?>(date),
@@ -424,6 +450,7 @@ class Session extends DataClass implements Insertable<Session> {
           String? companyName,
           Value<String?> companyLogoUrl = const Value.absent(),
           String? courseName,
+          Value<String?> courseId = const Value.absent(),
           String? city,
           String? state,
           Value<DateTime?> date = const Value.absent(),
@@ -441,6 +468,7 @@ class Session extends DataClass implements Insertable<Session> {
         companyLogoUrl:
             companyLogoUrl.present ? companyLogoUrl.value : this.companyLogoUrl,
         courseName: courseName ?? this.courseName,
+        courseId: courseId.present ? courseId.value : this.courseId,
         city: city ?? this.city,
         state: state ?? this.state,
         date: date.present ? date.value : this.date,
@@ -468,6 +496,7 @@ class Session extends DataClass implements Insertable<Session> {
           : this.companyLogoUrl,
       courseName:
           data.courseName.present ? data.courseName.value : this.courseName,
+      courseId: data.courseId.present ? data.courseId.value : this.courseId,
       city: data.city.present ? data.city.value : this.city,
       state: data.state.present ? data.state.value : this.state,
       date: data.date.present ? data.date.value : this.date,
@@ -499,6 +528,7 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('companyName: $companyName, ')
           ..write('companyLogoUrl: $companyLogoUrl, ')
           ..write('courseName: $courseName, ')
+          ..write('courseId: $courseId, ')
           ..write('city: $city, ')
           ..write('state: $state, ')
           ..write('date: $date, ')
@@ -520,6 +550,7 @@ class Session extends DataClass implements Insertable<Session> {
       companyName,
       companyLogoUrl,
       courseName,
+      courseId,
       city,
       state,
       date,
@@ -539,6 +570,7 @@ class Session extends DataClass implements Insertable<Session> {
           other.companyName == this.companyName &&
           other.companyLogoUrl == this.companyLogoUrl &&
           other.courseName == this.courseName &&
+          other.courseId == this.courseId &&
           other.city == this.city &&
           other.state == this.state &&
           other.date == this.date &&
@@ -557,6 +589,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<String> companyName;
   final Value<String?> companyLogoUrl;
   final Value<String> courseName;
+  final Value<String?> courseId;
   final Value<String> city;
   final Value<String> state;
   final Value<DateTime?> date;
@@ -574,6 +607,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.companyName = const Value.absent(),
     this.companyLogoUrl = const Value.absent(),
     this.courseName = const Value.absent(),
+    this.courseId = const Value.absent(),
     this.city = const Value.absent(),
     this.state = const Value.absent(),
     this.date = const Value.absent(),
@@ -592,6 +626,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     required String companyName,
     this.companyLogoUrl = const Value.absent(),
     required String courseName,
+    this.courseId = const Value.absent(),
     required String city,
     required String state,
     this.date = const Value.absent(),
@@ -616,6 +651,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<String>? companyName,
     Expression<String>? companyLogoUrl,
     Expression<String>? courseName,
+    Expression<String>? courseId,
     Expression<String>? city,
     Expression<String>? state,
     Expression<DateTime>? date,
@@ -634,6 +670,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (companyName != null) 'company_name': companyName,
       if (companyLogoUrl != null) 'company_logo_url': companyLogoUrl,
       if (courseName != null) 'course_name': courseName,
+      if (courseId != null) 'course_id': courseId,
       if (city != null) 'city': city,
       if (state != null) 'state': state,
       if (date != null) 'date': date,
@@ -658,6 +695,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       Value<String>? companyName,
       Value<String?>? companyLogoUrl,
       Value<String>? courseName,
+      Value<String?>? courseId,
       Value<String>? city,
       Value<String>? state,
       Value<DateTime?>? date,
@@ -675,6 +713,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       companyName: companyName ?? this.companyName,
       companyLogoUrl: companyLogoUrl ?? this.companyLogoUrl,
       courseName: courseName ?? this.courseName,
+      courseId: courseId ?? this.courseId,
       city: city ?? this.city,
       state: state ?? this.state,
       date: date ?? this.date,
@@ -706,6 +745,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     }
     if (courseName.present) {
       map['course_name'] = Variable<String>(courseName.value);
+    }
+    if (courseId.present) {
+      map['course_id'] = Variable<String>(courseId.value);
     }
     if (city.present) {
       map['city'] = Variable<String>(city.value);
@@ -756,6 +798,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('companyName: $companyName, ')
           ..write('companyLogoUrl: $companyLogoUrl, ')
           ..write('courseName: $courseName, ')
+          ..write('courseId: $courseId, ')
           ..write('city: $city, ')
           ..write('state: $state, ')
           ..write('date: $date, ')
@@ -1771,8 +1814,15 @@ class $AssessmentCategoriesTable extends AssessmentCategories
   late final GeneratedColumn<int> order = GeneratedColumn<int>(
       'order', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _courseIdsMeta =
+      const VerificationMeta('courseIds');
   @override
-  List<GeneratedColumn> get $columns => [id, code, name, description, order];
+  late final GeneratedColumn<String> courseIds = GeneratedColumn<String>(
+      'course_ids', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, code, name, description, order, courseIds];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1812,6 +1862,10 @@ class $AssessmentCategoriesTable extends AssessmentCategories
     } else if (isInserting) {
       context.missing(_orderMeta);
     }
+    if (data.containsKey('course_ids')) {
+      context.handle(_courseIdsMeta,
+          courseIds.isAcceptableOrUnknown(data['course_ids']!, _courseIdsMeta));
+    }
     return context;
   }
 
@@ -1831,6 +1885,8 @@ class $AssessmentCategoriesTable extends AssessmentCategories
           .read(DriftSqlType.string, data['${effectivePrefix}description']),
       order: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}order'])!,
+      courseIds: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}course_ids']),
     );
   }
 
@@ -1847,12 +1903,18 @@ class AssessmentCategory extends DataClass
   final String name;
   final String? description;
   final int order;
+
+  /// `courseIds` do backend, separados por vírgula (ids cuid não têm
+  /// vírgula): os cursos em que a categoria vale. Nulo no catálogo de antes
+  /// do esquema 6, até o próximo sync.
+  final String? courseIds;
   const AssessmentCategory(
       {required this.id,
       required this.code,
       required this.name,
       this.description,
-      required this.order});
+      required this.order,
+      this.courseIds});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1863,6 +1925,9 @@ class AssessmentCategory extends DataClass
       map['description'] = Variable<String>(description);
     }
     map['order'] = Variable<int>(order);
+    if (!nullToAbsent || courseIds != null) {
+      map['course_ids'] = Variable<String>(courseIds);
+    }
     return map;
   }
 
@@ -1875,6 +1940,9 @@ class AssessmentCategory extends DataClass
           ? const Value.absent()
           : Value(description),
       order: Value(order),
+      courseIds: courseIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(courseIds),
     );
   }
 
@@ -1887,6 +1955,7 @@ class AssessmentCategory extends DataClass
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
       order: serializer.fromJson<int>(json['order']),
+      courseIds: serializer.fromJson<String?>(json['courseIds']),
     );
   }
   @override
@@ -1898,6 +1967,7 @@ class AssessmentCategory extends DataClass
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
       'order': serializer.toJson<int>(order),
+      'courseIds': serializer.toJson<String?>(courseIds),
     };
   }
 
@@ -1906,13 +1976,15 @@ class AssessmentCategory extends DataClass
           String? code,
           String? name,
           Value<String?> description = const Value.absent(),
-          int? order}) =>
+          int? order,
+          Value<String?> courseIds = const Value.absent()}) =>
       AssessmentCategory(
         id: id ?? this.id,
         code: code ?? this.code,
         name: name ?? this.name,
         description: description.present ? description.value : this.description,
         order: order ?? this.order,
+        courseIds: courseIds.present ? courseIds.value : this.courseIds,
       );
   AssessmentCategory copyWithCompanion(AssessmentCategoriesCompanion data) {
     return AssessmentCategory(
@@ -1922,6 +1994,7 @@ class AssessmentCategory extends DataClass
       description:
           data.description.present ? data.description.value : this.description,
       order: data.order.present ? data.order.value : this.order,
+      courseIds: data.courseIds.present ? data.courseIds.value : this.courseIds,
     );
   }
 
@@ -1932,13 +2005,15 @@ class AssessmentCategory extends DataClass
           ..write('code: $code, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('order: $order')
+          ..write('order: $order, ')
+          ..write('courseIds: $courseIds')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, code, name, description, order);
+  int get hashCode =>
+      Object.hash(id, code, name, description, order, courseIds);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1947,7 +2022,8 @@ class AssessmentCategory extends DataClass
           other.code == this.code &&
           other.name == this.name &&
           other.description == this.description &&
-          other.order == this.order);
+          other.order == this.order &&
+          other.courseIds == this.courseIds);
 }
 
 class AssessmentCategoriesCompanion
@@ -1957,6 +2033,7 @@ class AssessmentCategoriesCompanion
   final Value<String> name;
   final Value<String?> description;
   final Value<int> order;
+  final Value<String?> courseIds;
   final Value<int> rowid;
   const AssessmentCategoriesCompanion({
     this.id = const Value.absent(),
@@ -1964,6 +2041,7 @@ class AssessmentCategoriesCompanion
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.order = const Value.absent(),
+    this.courseIds = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AssessmentCategoriesCompanion.insert({
@@ -1972,6 +2050,7 @@ class AssessmentCategoriesCompanion
     required String name,
     this.description = const Value.absent(),
     required int order,
+    this.courseIds = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         code = Value(code),
@@ -1983,6 +2062,7 @@ class AssessmentCategoriesCompanion
     Expression<String>? name,
     Expression<String>? description,
     Expression<int>? order,
+    Expression<String>? courseIds,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1991,6 +2071,7 @@ class AssessmentCategoriesCompanion
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (order != null) 'order': order,
+      if (courseIds != null) 'course_ids': courseIds,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2001,6 +2082,7 @@ class AssessmentCategoriesCompanion
       Value<String>? name,
       Value<String?>? description,
       Value<int>? order,
+      Value<String?>? courseIds,
       Value<int>? rowid}) {
     return AssessmentCategoriesCompanion(
       id: id ?? this.id,
@@ -2008,6 +2090,7 @@ class AssessmentCategoriesCompanion
       name: name ?? this.name,
       description: description ?? this.description,
       order: order ?? this.order,
+      courseIds: courseIds ?? this.courseIds,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2030,6 +2113,9 @@ class AssessmentCategoriesCompanion
     if (order.present) {
       map['order'] = Variable<int>(order.value);
     }
+    if (courseIds.present) {
+      map['course_ids'] = Variable<String>(courseIds.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2044,6 +2130,7 @@ class AssessmentCategoriesCompanion
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('order: $order, ')
+          ..write('courseIds: $courseIds, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3797,6 +3884,7 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   required String companyName,
   Value<String?> companyLogoUrl,
   required String courseName,
+  Value<String?> courseId,
   required String city,
   required String state,
   Value<DateTime?> date,
@@ -3815,6 +3903,7 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<String> companyName,
   Value<String?> companyLogoUrl,
   Value<String> courseName,
+  Value<String?> courseId,
   Value<String> city,
   Value<String> state,
   Value<DateTime?> date,
@@ -3888,6 +3977,9 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<String> get courseName => $composableBuilder(
       column: $table.courseName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get courseId => $composableBuilder(
+      column: $table.courseId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get city => $composableBuilder(
       column: $table.city, builder: (column) => ColumnFilters(column));
@@ -3992,6 +4084,9 @@ class $$SessionsTableOrderingComposer
   ColumnOrderings<String> get courseName => $composableBuilder(
       column: $table.courseName, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get courseId => $composableBuilder(
+      column: $table.courseId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get city => $composableBuilder(
       column: $table.city, builder: (column) => ColumnOrderings(column));
 
@@ -4051,6 +4146,9 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<String> get courseName => $composableBuilder(
       column: $table.courseName, builder: (column) => column);
+
+  GeneratedColumn<String> get courseId =>
+      $composableBuilder(column: $table.courseId, builder: (column) => column);
 
   GeneratedColumn<String> get city =>
       $composableBuilder(column: $table.city, builder: (column) => column);
@@ -4157,6 +4255,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<String> companyName = const Value.absent(),
             Value<String?> companyLogoUrl = const Value.absent(),
             Value<String> courseName = const Value.absent(),
+            Value<String?> courseId = const Value.absent(),
             Value<String> city = const Value.absent(),
             Value<String> state = const Value.absent(),
             Value<DateTime?> date = const Value.absent(),
@@ -4175,6 +4274,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             companyName: companyName,
             companyLogoUrl: companyLogoUrl,
             courseName: courseName,
+            courseId: courseId,
             city: city,
             state: state,
             date: date,
@@ -4193,6 +4293,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             required String companyName,
             Value<String?> companyLogoUrl = const Value.absent(),
             required String courseName,
+            Value<String?> courseId = const Value.absent(),
             required String city,
             required String state,
             Value<DateTime?> date = const Value.absent(),
@@ -4211,6 +4312,7 @@ class $$SessionsTableTableManager extends RootTableManager<
             companyName: companyName,
             companyLogoUrl: companyLogoUrl,
             courseName: courseName,
+            courseId: courseId,
             city: city,
             state: state,
             date: date,
@@ -4960,6 +5062,7 @@ typedef $$AssessmentCategoriesTableCreateCompanionBuilder
   required String name,
   Value<String?> description,
   required int order,
+  Value<String?> courseIds,
   Value<int> rowid,
 });
 typedef $$AssessmentCategoriesTableUpdateCompanionBuilder
@@ -4969,6 +5072,7 @@ typedef $$AssessmentCategoriesTableUpdateCompanionBuilder
   Value<String> name,
   Value<String?> description,
   Value<int> order,
+  Value<String?> courseIds,
   Value<int> rowid,
 });
 
@@ -5017,6 +5121,9 @@ class $$AssessmentCategoriesTableFilterComposer
   ColumnFilters<int> get order => $composableBuilder(
       column: $table.order, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get courseIds => $composableBuilder(
+      column: $table.courseIds, builder: (column) => ColumnFilters(column));
+
   Expression<bool> infractionsRefs(
       Expression<bool> Function($$InfractionsTableFilterComposer f) f) {
     final $$InfractionsTableFilterComposer composer = $composerBuilder(
@@ -5062,6 +5169,9 @@ class $$AssessmentCategoriesTableOrderingComposer
 
   ColumnOrderings<int> get order => $composableBuilder(
       column: $table.order, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get courseIds => $composableBuilder(
+      column: $table.courseIds, builder: (column) => ColumnOrderings(column));
 }
 
 class $$AssessmentCategoriesTableAnnotationComposer
@@ -5087,6 +5197,9 @@ class $$AssessmentCategoriesTableAnnotationComposer
 
   GeneratedColumn<int> get order =>
       $composableBuilder(column: $table.order, builder: (column) => column);
+
+  GeneratedColumn<String> get courseIds =>
+      $composableBuilder(column: $table.courseIds, builder: (column) => column);
 
   Expression<T> infractionsRefs<T extends Object>(
       Expression<T> Function($$InfractionsTableAnnotationComposer a) f) {
@@ -5141,6 +5254,7 @@ class $$AssessmentCategoriesTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<int> order = const Value.absent(),
+            Value<String?> courseIds = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               AssessmentCategoriesCompanion(
@@ -5149,6 +5263,7 @@ class $$AssessmentCategoriesTableTableManager extends RootTableManager<
             name: name,
             description: description,
             order: order,
+            courseIds: courseIds,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -5157,6 +5272,7 @@ class $$AssessmentCategoriesTableTableManager extends RootTableManager<
             required String name,
             Value<String?> description = const Value.absent(),
             required int order,
+            Value<String?> courseIds = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               AssessmentCategoriesCompanion.insert(
@@ -5165,6 +5281,7 @@ class $$AssessmentCategoriesTableTableManager extends RootTableManager<
             name: name,
             description: description,
             order: order,
+            courseIds: courseIds,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

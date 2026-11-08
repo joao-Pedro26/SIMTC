@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -23,6 +24,7 @@ void main() {
     String id, {
     required int order,
     List<Map<String, dynamic>> infractions = const [],
+    List<String> courseIds = const [],
   }) {
     return {
       'id': id,
@@ -31,7 +33,23 @@ void main() {
       'description': null,
       'order': order,
       'infractions': infractions,
+      'courseIds': courseIds,
     };
+  }
+
+  Future<void> cacheSession(String id, {String? courseId}) {
+    return db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: id,
+            companyName: 'Bracell',
+            courseName: 'Direção Defensiva',
+            courseId: Value(courseId),
+            city: 'Itabira',
+            state: 'MG',
+            status: 'EM_ANDAMENTO',
+            cachedAt: DateTime(2026, 11, 8),
+          ),
+        );
   }
 
   Map<String, dynamic> infraction(String id, {required int order}) {
@@ -148,6 +166,56 @@ void main() {
 
     expect(result.isFailure, isTrue);
     expect(await repository.loadCatalog(), hasLength(1));
+  });
+
+  group('tópicos por curso', () {
+    setUp(() {
+      when(() => api.get<List<dynamic>>(path)).thenAnswer(
+        (_) async => ok([
+          category('cv', order: 1, courseIds: ['curso-leve', 'curso-pesado']),
+          category('rr', order: 2, courseIds: ['curso-leve']),
+          category('tp', order: 3, courseIds: ['curso-pesado']),
+        ]),
+      );
+    });
+
+    test('com a sessão, só as categorias do curso dela, na ordem da ficha',
+        () async {
+      await repository.sync();
+      await cacheSession('sess-1', courseId: 'curso-pesado');
+
+      final catalog = await repository.loadCatalog(sessionId: 'sess-1');
+
+      expect(catalog.map((c) => c.id), ['cv', 'tp']);
+    });
+
+    test('sem o curso no cache (antes do próximo sync), vale o catálogo todo',
+        () async {
+      await repository.sync();
+      await cacheSession('sess-1');
+
+      final catalog = await repository.loadCatalog(sessionId: 'sess-1');
+
+      expect(catalog.map((c) => c.id), ['cv', 'rr', 'tp']);
+    });
+
+    test('curso sem nenhuma categoria vinculada também usa o catálogo todo',
+        () async {
+      await repository.sync();
+      await cacheSession('sess-1', courseId: 'curso-teorico');
+
+      final catalog = await repository.loadCatalog(sessionId: 'sess-1');
+
+      expect(catalog.map((c) => c.id), ['cv', 'rr', 'tp']);
+    });
+
+    test('os cursos de cada categoria sobrevivem ao cache', () async {
+      await repository.sync();
+
+      final catalog = await repository.loadCatalog();
+
+      expect(catalog.first.courseIds, ['curso-leve', 'curso-pesado']);
+    });
   });
 
   test('registra no log o que ficou no aparelho, com sync ou sem', () async {

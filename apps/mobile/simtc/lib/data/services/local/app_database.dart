@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -81,6 +81,16 @@ class AppDatabase extends _$AppDatabase {
               // "Consultores" e o "N consultores" do detalhe abrirem offline.
               // Tabela nova e vazia: o próximo download do detalhe a preenche.
               await m.createTable(sessionConsultants);
+            }
+            if (from < 6) {
+              // Tópicos por curso (08/11/2026): o curso de cada sessão e os
+              // cursos de cada categoria. Anuláveis — até o próximo sync, o
+              // checklist usa todas as categorias, como antes.
+              await m.addColumn(sessions, sessions.courseId);
+              await m.addColumn(
+                assessmentCategories,
+                assessmentCategories.courseIds,
+              );
             }
           });
         },

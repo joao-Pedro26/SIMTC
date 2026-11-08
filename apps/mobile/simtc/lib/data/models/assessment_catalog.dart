@@ -9,6 +9,7 @@ class CatalogCategory {
     required this.order,
     required this.infractions,
     this.description,
+    this.courseIds = const [],
   });
 
   final String id;
@@ -20,15 +21,24 @@ class CatalogCategory {
   final int order;
   final List<CatalogInfraction> infractions;
 
+  /// Cursos em que esta categoria vale (decisão de 08/11/2026): o checklist e
+  /// a nota de uma sessão usam só as categorias do curso dela — ver
+  /// [catalogForCourse].
+  final List<String> courseIds;
+
   factory CatalogCategory.fromJson(Map<String, dynamic> json) {
     final id = json['id'] as String? ?? '';
     final infractions = json['infractions'];
+    final courseIds = json['courseIds'];
     return CatalogCategory(
       id: id,
       code: json['code'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       order: (json['order'] as num?)?.toInt() ?? 0,
+      courseIds: courseIds is List
+          ? courseIds.whereType<String>().toList(growable: false)
+          : const [],
       infractions: infractions is List
           ? infractions
               .whereType<Map<String, dynamic>>()
@@ -37,6 +47,23 @@ class CatalogCategory {
           : const [],
     );
   }
+}
+
+/// As categorias que valem para o curso [courseId], na ordem do catálogo.
+///
+/// Mesma regra do backend (`findCourseCategories`) e do web: sem curso
+/// conhecido (cache de antes da 08/11/2026, ainda não sincronizado) ou com um
+/// curso sem nenhuma categoria vinculada, valem todas — a nota nunca é
+/// calculada sobre uma lista vazia.
+List<CatalogCategory> catalogForCourse(
+  List<CatalogCategory> catalog,
+  String? courseId,
+) {
+  if (courseId == null || courseId.isEmpty) return catalog;
+  final linked = catalog
+      .where((category) => category.courseIds.contains(courseId))
+      .toList(growable: false);
+  return linked.isEmpty ? catalog : linked;
 }
 
 class CatalogInfraction {

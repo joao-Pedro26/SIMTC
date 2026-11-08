@@ -87,6 +87,7 @@ class AssessmentCatalogRepository {
               name: category.name,
               description: Value(category.description),
               order: category.order,
+              courseIds: Value(category.courseIds.join(',')),
             ),
           );
           for (final infraction in category.infractions) {
@@ -119,7 +120,26 @@ class AssessmentCatalogRepository {
 
   /// O catálogo do aparelho, na ordem da ficha oficial — o que o checklist da
   /// Fase 4 percorre.
-  Future<List<CatalogCategory>> loadCatalog() async {
+  ///
+  /// Com [sessionId], só as categorias do curso da sessão (tópicos por curso,
+  /// 08/11/2026) — é o que o checklist, o "Conferir" e o Resultado mostram e
+  /// usam na nota. Sem o curso no cache, ou com um curso sem categoria
+  /// vinculada, vale o catálogo inteiro ([catalogForCourse]).
+  Future<List<CatalogCategory>> loadCatalog({String? sessionId}) async {
+    final catalog = await _loadAll();
+    if (sessionId == null) return catalog;
+
+    final session = await (_db.select(_db.sessions)
+          ..where((t) => t.id.equals(sessionId)))
+        .getSingleOrNull();
+    return catalogForCourse(catalog, session?.courseId);
+  }
+
+  static List<String> _splitIds(String? value) => value == null || value.isEmpty
+      ? const []
+      : value.split(',').where((id) => id.isNotEmpty).toList(growable: false);
+
+  Future<List<CatalogCategory>> _loadAll() async {
     final categories = await (_db.select(_db.assessmentCategories)
           ..orderBy([(t) => OrderingTerm(expression: t.order)]))
         .get();
@@ -136,6 +156,7 @@ class AssessmentCatalogRepository {
           name: category.name,
           description: category.description,
           order: category.order,
+          courseIds: _splitIds(category.courseIds),
           infractions: [
             for (final infraction
                 in infractions.where((i) => i.categoryId == category.id))

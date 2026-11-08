@@ -165,7 +165,8 @@ void main() {
         .thenAnswer((_) async => const Success(0));
     when(() => auth.currentUser).thenReturn(consultora);
     when(() => auth.isAuthenticated).thenReturn(true);
-    when(() => catalog.loadCatalog()).thenAnswer((_) async => const []);
+    when(() => catalog.loadCatalog(sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => const []);
     // O checklist abre sem avaliação iniciada: só lê, nada é gravado.
     when(() => assessments.findCurrent(
           trainingParticipantId: any(named: 'trainingParticipantId'),
