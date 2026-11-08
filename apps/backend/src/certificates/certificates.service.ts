@@ -124,9 +124,11 @@ export class CertificatesService {
 
     const result = this.resolveResult(trainingParticipant);
     const sessionDate = session.date ? this.formatDate(new Date(session.date)) : null;
+    // Participante SOMENTE_TEORICA não fez a prática: o certificado mostra só
+    // as horas teóricas do curso.
     const cargaHoraria = this.formatCargaHoraria(
       session.course.theoryHours,
-      session.course.practiceHours,
+      trainingParticipant.participationType === 'SOMENTE_TEORICA' ? 0 : session.course.practiceHours,
     );
 
     // Bucket 'signatures' é privado — resolve o path para uma signed URL
