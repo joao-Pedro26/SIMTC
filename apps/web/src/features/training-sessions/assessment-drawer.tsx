@@ -30,6 +30,18 @@ interface AssessmentCategory {
   description?: string | null
   order: number
   infractions: AssessmentInfraction[]
+  /** Cursos em que este tópico vale */
+  courseIds?: string[]
+}
+
+/**
+ * Só os tópicos vinculados ao curso entram no checklist e na nota. Curso sem
+ * nenhum tópico vinculado cai em todos (mesma regra do backend:
+ * `findCourseCategories`).
+ */
+function categoriesForCourse(all: AssessmentCategory[], courseId: string) {
+  const linked = all.filter((c) => c.courseIds?.includes(courseId))
+  return linked.length > 0 ? linked : all
 }
 
 interface SelectedNote {
@@ -45,6 +57,8 @@ interface AssessmentDrawerProps {
   open: boolean
   participantName: string
   trainingParticipantId: string
+  /** Curso do treinamento — define quais tópicos aparecem no checklist */
+  courseId: string
   onClose: () => void
   onSaved: () => void
 }
@@ -55,6 +69,7 @@ export function AssessmentDrawer({
   open,
   participantName,
   trainingParticipantId,
+  courseId,
   onClose,
   onSaved,
 }: AssessmentDrawerProps) {
@@ -79,7 +94,8 @@ export function AssessmentDrawer({
       setLoadingCategories(true)
       setSaveError('')
       try {
-        const data = await clientApi.get<AssessmentCategory[]>('/assessment-categories')
+        const all = await clientApi.get<AssessmentCategory[]>('/assessment-categories')
+        const data = categoriesForCourse(all, courseId)
         setCategories(data)
         setSelectedCategoryId(data[0]?.id ?? null)
       } catch {
@@ -90,7 +106,7 @@ export function AssessmentDrawer({
     }
 
     loadCategories()
-  }, [open])
+  }, [open, courseId])
 
   // Reseta estado ao fechar
   useEffect(() => {

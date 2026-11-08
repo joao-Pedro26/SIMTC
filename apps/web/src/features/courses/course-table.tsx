@@ -13,12 +13,16 @@ export interface Course {
   description: string
   vehicleType?: string
   contentItems?: any[]
+  /** Tópicos de avaliação prática vinculados ao curso */
+  categoryIds?: string[]
 }
 
 interface CourseTableProps {
   courses: Course[]
   onEdit: (course: Course) => void
   onDelete: (course: Course) => void
+  /** Código (CV, RR, ...) de cada tópico, por id — para a coluna "Tópicos" */
+  topicCodes?: Map<string, string>
   /** Modo somente-leitura (ex.: CONSULTANT) — some com a coluna de ações; clique na linha ainda abre visualização */
   readOnly?: boolean
 }
@@ -35,7 +39,7 @@ const vehicleLabels: Record<string, string> = {
   MOTO:   'Moto',
 }
 
-export function CourseTable({ courses, onEdit, onDelete, readOnly = false }: CourseTableProps) {
+export function CourseTable({ courses, onEdit, onDelete, topicCodes, readOnly = false }: CourseTableProps) {
   const [nameFilter,    setNameFilter]    = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
 
@@ -71,6 +75,7 @@ export function CourseTable({ courses, onEdit, onDelete, readOnly = false }: Cou
             />
             <th className={`${styles.th} ${styles.center}`}>Horas Práticas</th>
             <th className={`${styles.th} ${styles.center}`}>Horas Teóricas</th>
+            <th className={`${styles.th} ${styles.center}`}>Tópicos</th>
             <th className={styles.th}>Descrição</th>
             <th className={styles.th} />
           </tr>
@@ -78,7 +83,7 @@ export function CourseTable({ courses, onEdit, onDelete, readOnly = false }: Cou
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan={6} className={styles.empty}>
+              <td colSpan={7} className={styles.empty}>
                 Nenhum resultado com os filtros aplicados.
               </td>
             </tr>
@@ -91,6 +96,14 @@ export function CourseTable({ courses, onEdit, onDelete, readOnly = false }: Cou
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>{c.practicalHours}h</td>
                 <td className={`${styles.td} ${styles.center}`}>{c.theoreticalHours}h</td>
+                <td className={`${styles.td} ${styles.center}`}>
+                  {c.categoryIds && c.categoryIds.length > 0 && topicCodes
+                    ? Array.from(topicCodes)
+                        .filter(([id]) => c.categoryIds!.includes(id))
+                        .map(([, code]) => code)
+                        .join(', ')
+                    : '—'}
+                </td>
                 <td className={styles.td}>
                   <div className={styles.descClamp}>{c.description}</div>
                 </td>

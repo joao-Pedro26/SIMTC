@@ -8,6 +8,7 @@ import { CourseTable, type Course } from '@/features/courses/course-table'
 import { Drawer } from '@/components/ui/drawer/drawer'
 import { CourseEditForm, type CourseFormData } from '@/features/courses/course-edit-form'
 import { CourseAddForm } from '@/features/courses/course-add-form'
+import type { CourseTopicOption } from '@/features/courses/course-topics-picker'
 import { clientApi } from '@/lib/client-api'
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
@@ -24,6 +25,7 @@ interface BackendCourse {
   practiceHours: number
   description: string
   contentItems?: any[]
+  categoryIds?: string[]
 }
 
 function mapCourse(c: BackendCourse): Course & { vehicleType: string } {
@@ -35,6 +37,19 @@ function mapCourse(c: BackendCourse): Course & { vehicleType: string } {
     practicalHours: c.practiceHours,
     description: c.description,
     contentItems: c.contentItems,
+    categoryIds: c.categoryIds ?? [],
+  }
+}
+
+function toPayload(data: CourseFormData) {
+  return {
+    name: data.name,
+    vehicleType: data.vehicleType,
+    theoryHours: Number(data.theoreticalHours),
+    practiceHours: Number(data.practicalHours),
+    description: data.description,
+    contentItems: data.contentItems.length > 0 ? data.contentItems : null,
+    categoryIds: data.categoryIds,
   }
 }
 
@@ -63,7 +78,25 @@ export default function CursosPage() {
     }
   }
 
-  useEffect(() => { fetchCourses() }, [])
+  // Tópicos de avaliação (CV, RR, ...) para escolher em cada curso
+  const [topics, setTopics] = useState<CourseTopicOption[]>([])
+  const [topicsLoading, setTopicsLoading] = useState(true)
+
+  async function fetchTopics() {
+    try {
+      setTopicsLoading(true)
+      const data = await clientApi.get<CourseTopicOption[]>('/assessment-categories')
+      setTopics(data.map(({ id, code, name }) => ({ id, code, name })))
+    } catch {
+      toast.error('Erro ao carregar os tópicos de avaliação.')
+    } finally {
+      setTopicsLoading(false)
+    }
+  }
+
+  const topicCodes = new Map(topics.map((t) => [t.id, t.code]))
+
+  useEffect(() => { fetchCourses(); fetchTopics() }, [])
 
   function openEdit(c: Course) { setSelected(courses.find(x => x.id === c.id) ?? null); setDrawerMode('edit') }
   function openAdd() { setSelected(null); setDrawerMode('add') }
@@ -72,14 +105,7 @@ export default function CursosPage() {
   async function handleSave(data: CourseFormData) {
     if (!selected) return
     try {
-      await clientApi.patch(`/courses/${selected.id}`, {
-        name: data.name,
-        vehicleType: data.vehicleType,
-        theoryHours: Number(data.theoreticalHours),
-        practiceHours: Number(data.practicalHours),
-        description: data.description,
-        contentItems: data.contentItems.length > 0 ? data.contentItems : null,
-      })
+      await clientApi.patch(`/courses/${selected.id}`, toPayload(data))
       await fetchCourses()
       closeDrawer()
       toast.success('Curso atualizado com sucesso.')
@@ -90,14 +116,7 @@ export default function CursosPage() {
 
   async function handleAdd(data: CourseFormData) {
     try {
-      await clientApi.post('/courses', {
-        name: data.name,
-        vehicleType: data.vehicleType,
-        theoryHours: Number(data.theoreticalHours),
-        practiceHours: Number(data.practicalHours),
-        description: data.description,
-        contentItems: data.contentItems.length > 0 ? data.contentItems : null,
-      })
+      await clientApi.post('/courses', toPayload(data))
       await fetchCourses()
       closeDrawer()
       toast.success('Curso adicionado com sucesso.')
@@ -155,6 +174,7 @@ export default function CursosPage() {
               )}
               onEdit={openEdit}
               onDelete={(c) => handleDelete(c.id)}
+              topicCodes={topicCodes}
               readOnly={isConsultant}
             />
           </div>
@@ -173,6 +193,8 @@ export default function CursosPage() {
         {drawerMode === 'edit' && selected && (
           <CourseEditForm
             course={selected}
+            topics={topics}
+            topicsLoading={topicsLoading}
             onSave={handleSave}
             onDelete={() => handleDelete(selected.id)}
             onCancel={closeDrawer}
@@ -181,6 +203,8 @@ export default function CursosPage() {
         )}
         {drawerMode === 'add' && !isConsultant && (
           <CourseAddForm
+            topics={topics}
+            topicsLoading={topicsLoading}
             onSave={handleAdd}
             onCancel={closeDrawer}
           />

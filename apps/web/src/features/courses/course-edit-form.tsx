@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
 import type { Course } from './course-table'
 import { ContentItemsEditor, type ContentItem } from './content-items-editor'
+import { CourseTopicsPicker, type CourseTopicOption } from './course-topics-picker'
 import styles from './course-edit-form.module.css'
 
 export interface CourseFormData {
@@ -14,6 +15,13 @@ export interface CourseFormData {
   theoreticalHours: string
   description: string
   contentItems: ContentItem[]
+  /** Tópicos de avaliação prática que valem para o curso */
+  categoryIds: string[]
+}
+
+/** Curso com horas práticas precisa de ao menos 1 tópico (mesma regra do backend) */
+export function isMissingTopics(form: Pick<CourseFormData, 'practicalHours' | 'categoryIds'>) {
+  return Number(form.practicalHours) > 0 && form.categoryIds.length === 0
 }
 
 const vehicleTypeOptions = [
@@ -24,6 +32,8 @@ const vehicleTypeOptions = [
 
 interface CourseEditFormProps {
   course: Course
+  topics: CourseTopicOption[]
+  topicsLoading?: boolean
   onSave: (data: CourseFormData) => void
   onDelete: () => void
   onCancel: () => void
@@ -41,7 +51,15 @@ function normalizeContentItems(raw: unknown): ContentItem[] {
   }))
 }
 
-export function CourseEditForm({ course, onSave, onDelete, onCancel, readOnly = false }: CourseEditFormProps) {
+export function CourseEditForm({
+  course,
+  topics,
+  topicsLoading = false,
+  onSave,
+  onDelete,
+  onCancel,
+  readOnly = false,
+}: CourseEditFormProps) {
   const [form, setForm] = useState<CourseFormData>({
     name: course.name,
     vehicleType: (course as any).vehicleType ?? 'LEVE',
@@ -49,9 +67,10 @@ export function CourseEditForm({ course, onSave, onDelete, onCancel, readOnly = 
     theoreticalHours: String(course.theoreticalHours),
     description: course.description,
     contentItems: normalizeContentItems((course as any).contentItems),
+    categoryIds: course.categoryIds ?? [],
   })
 
-  function handleChange(field: keyof Omit<CourseFormData, 'contentItems'>, value: string) {
+  function handleChange(field: keyof Omit<CourseFormData, 'contentItems' | 'categoryIds'>, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -109,6 +128,14 @@ export function CourseEditForm({ course, onSave, onDelete, onCancel, readOnly = 
           />
         </div>
 
+        <CourseTopicsPicker
+          topics={topics}
+          loading={topicsLoading}
+          selectedIds={form.categoryIds}
+          onChange={(ids) => setForm((prev) => ({ ...prev, categoryIds: ids }))}
+          required={Number(form.practicalHours) > 0}
+        />
+
         <ContentItemsEditor
           items={form.contentItems}
           onChange={(items) => setForm((prev) => ({ ...prev, contentItems: items }))}
@@ -126,7 +153,14 @@ export function CourseEditForm({ course, onSave, onDelete, onCancel, readOnly = 
             <Button variant="danger" size="sm" onClick={onDelete}>Deletar</Button>
             <div className={styles.actionsRight}>
               <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-              <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onSave(form)}
+                disabled={topicsLoading || isMissingTopics(form)}
+              >
+                Salvar
+              </Button>
             </div>
           </>
         )}
