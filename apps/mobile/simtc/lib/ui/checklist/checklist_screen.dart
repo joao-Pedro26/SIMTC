@@ -17,6 +17,8 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_footer_bar.dart';
+import '../core/widgets/app_spinner.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
@@ -334,13 +336,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             key: Key('checklist-desatribuindo'),
             dimension: AppSpacing.touchTarget,
             child: Center(
-              child: SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.text3),
-                ),
-              ),
+              child: AppSpinner(color: AppColors.text3),
             ),
           ),
         ),
@@ -1123,11 +1119,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (_viewModel.isStarted && _wideLayout) return null;
     final tabletStart = tablet && !_viewModel.isStarted;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: tabletStart ? AppColors.background : AppColors.surface,
-        border: const Border(top: BorderSide(color: AppColors.border)),
-      ),
+    return AppFooterBar(
+      color: tabletStart ? AppColors.background : AppColors.surface,
       padding: tabletStart
           ? const EdgeInsets.symmetric(
               horizontal: AppSpacing.xxxl,

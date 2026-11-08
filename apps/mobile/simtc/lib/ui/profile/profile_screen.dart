@@ -19,6 +19,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
+import '../core/widgets/app_spinner.dart';
 import 'profile_labels.dart';
 import 'profile_viewmodel.dart';
 
@@ -477,11 +478,7 @@ class _ProfileRow extends StatelessWidget {
               // 14 no celular ("2i") e 16 no tablet ("4k"/"4v") (Fase 8C).
               SizedBox(width: tablet ? AppSpacing.lg : AppSpacing.md + 2),
               if (isLoading)
-                const SizedBox(
-                  width: _spinnerSize,
-                  height: _spinnerSize,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+                const AppSpinner(size: _spinnerSize, strokeWidth: 2)
               else
                 Text(
                   value,

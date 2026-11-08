@@ -16,6 +16,8 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_footer_bar.dart';
+import '../core/widgets/app_spinner.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/connectivity_banner.dart';
@@ -308,12 +310,10 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
 
   Widget? _buildCpfTrailing() {
     return switch (_viewModel.cpfCheck) {
-      CpfCheck.checking => const SizedBox.square(
-          dimension: AppSpacing.lg + 2,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
+      CpfCheck.checking => const AppSpinner(
+          size: AppSpacing.lg + 2,
+          strokeWidth: 2,
+          color: AppColors.primary,
         ),
       CpfCheck.available =>
         const Icon(AppIcons.approved, size: 20, color: AppColors.savedInk),
@@ -463,19 +463,8 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     final canSubmit = _viewModel.canSubmit && !isOffline;
     final error = _viewModel.errorMessage;
 
-    // Recuos e vão do canvas "3a" (12 em cima, 16 nos lados e embaixo, vão de
-    // 8), os mesmos dos rodapés irmãos.
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
+    // Recuos do canvas "3a" e vão de 8: os padrões do AppFooterBar.
+    return AppFooterBar(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

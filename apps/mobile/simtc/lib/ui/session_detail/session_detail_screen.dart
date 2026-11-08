@@ -24,6 +24,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_search_field.dart';
+import '../core/widgets/app_spinner.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
@@ -976,13 +977,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         key: ValueKey('desatribuindo-${participant.id}'),
         dimension: AppSpacing.touchTarget,
         child: const Center(
-          child: SizedBox.square(
-            dimension: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.text3),
-            ),
-          ),
+          child: AppSpinner(color: AppColors.text3),
         ),
       );
     }

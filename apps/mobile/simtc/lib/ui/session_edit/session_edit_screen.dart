@@ -16,6 +16,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_footer_bar.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/connectivity_banner.dart';
@@ -410,19 +411,8 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   Widget _buildFooter(bool isOffline, bool keyboardOpen) {
     final error = _viewModel.errorMessage;
 
-    // Recuos e vão do canvas "3b" (12 em cima, 16 nos lados e embaixo, vão de
-    // 8), os mesmos dos rodapés irmãos.
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
+    // Recuos do canvas "3b" e vão de 8: os padrões do AppFooterBar.
+    return AppFooterBar(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

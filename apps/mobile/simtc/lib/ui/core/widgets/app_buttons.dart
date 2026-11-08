@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'app_spinner.dart';
 
 /// Botão principal do app: altura de 56, cantos de 12 e cor de marca.
 ///
@@ -47,14 +48,7 @@ class AppPrimaryButton extends StatelessWidget {
   }
 
   Widget _buildSpinner() {
-    return const SizedBox(
-      width: 22,
-      height: 22,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.5,
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.surface),
-      ),
-    );
+    return const AppSpinner(size: 22, color: AppColors.surface);
   }
 
   Widget _buildContent() {
@@ -270,14 +264,7 @@ class AppCtaButton extends StatelessWidget {
   }
 
   Widget _buildSpinner() {
-    return const SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.5,
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.ctaInk),
-      ),
-    );
+    return const AppSpinner(color: AppColors.ctaInk);
   }
 
   Widget _buildContent() {
@@ -379,14 +366,7 @@ class AppDangerOutlineButton extends StatelessWidget {
   }
 
   Widget _buildSpinner() {
-    return const SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.5,
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.dangerInk),
-      ),
-    );
+    return const AppSpinner(color: AppColors.dangerInk);
   }
 
   Widget _buildContent() {
@@ -469,14 +449,7 @@ class AppCompactOutlineButton extends StatelessWidget {
   }
 
   Widget _buildSpinner() {
-    return const SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.5,
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryDark),
-      ),
-    );
+    return const AppSpinner(color: AppColors.primaryDark);
   }
 
   Widget _buildContent() {

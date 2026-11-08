@@ -12,6 +12,7 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
+import '../core/widgets/app_footer_bar.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/final_score_block.dart';
 import '../core/widgets/inline_notice.dart';
@@ -306,11 +307,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
   Widget _buildFooter() {
     final tablet = context.isTablet;
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
+    return AppFooterBar(
       padding: tablet
           ? const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl, vertical: AppSpacing.lg)
           : const EdgeInsets.fromLTRB(
