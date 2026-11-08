@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../../utils/app_log.dart';
 import '../../utils/result.dart';
 import '../repositories/assessment_repository.dart';
 import '../repositories/participant_repository.dart';
@@ -210,7 +211,7 @@ class AssessmentSyncService extends ChangeNotifier {
       // pode deixar a fila sem ser seguida: a aba diria "Tudo o que você
       // confirmou já chegou ao servidor" com a fila cheia. As sem dono ficam
       // para a próxima entrada.
-      debugPrint('Não foi possível dar dono às avaliações antigas: $error');
+      appLog('Não foi possível dar dono às avaliações antigas: $error');
     }
     if (_disposed || _userId != userId) return;
 
@@ -219,7 +220,7 @@ class AssessmentSyncService extends ChangeNotifier {
     // próxima mudança na fila chega normalmente.
     _queueSubscription = _assessments.watchQueue(userId).listen(
           _onQueue,
-          onError: (Object error) => debugPrint('Leitura da fila falhou: $error'),
+          onError: (Object error) => appLog('Leitura da fila falhou: $error'),
         );
     _lastSyncedSubscription = _assessments.watchLastSyncedAt(userId).listen(
       (at) {
@@ -231,7 +232,7 @@ class AssessmentSyncService extends ChangeNotifier {
         notifyListeners();
       },
       onError: (Object error) =>
-          debugPrint('Leitura da última sincronização falhou: $error'),
+          appLog('Leitura da última sincronização falhou: $error'),
     );
     _catalogSubscription = _assessments.watchHasCatalog().listen(
       (hasCatalog) {
@@ -242,7 +243,7 @@ class AssessmentSyncService extends ChangeNotifier {
         unawaited(syncNow());
       },
       onError: (Object error) =>
-          debugPrint('Leitura do catálogo falhou: $error'),
+          appLog('Leitura do catálogo falhou: $error'),
     );
   }
 
@@ -309,7 +310,7 @@ class AssessmentSyncService extends ChangeNotifier {
         } catch (error) {
           // Rede de segurança: os erros esperados já viram motivo na fila. Um
           // erro inesperado (do banco, por exemplo) não pode travar o envio.
-          debugPrint('Envio da fila falhou: $error');
+          appLog('Envio da fila falhou: $error');
           _scheduleRetry();
         } finally {
           _sendingIds = const {};
@@ -449,7 +450,7 @@ class AssessmentSyncService extends ChangeNotifier {
       if (item['status'] == 'fulfilled') {
         outcome[id] = null;
       } else {
-        debugPrint('Avaliação de $id recusada: ${item['error']}');
+        appLog('Avaliação de $id recusada: ${item['error']}');
         outcome[id] = item['code'] == SendFailure.notAssignedCode
             ? SendFailure.notAssigned
             : SendFailure.refused;

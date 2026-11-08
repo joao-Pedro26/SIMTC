@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../utils/app_log.dart';
 import '../../utils/result.dart';
 import '../models/assessment_catalog.dart';
 import '../services/api/api_client.dart';
@@ -33,7 +34,7 @@ class AssessmentCatalogRepository {
   static const String _failed = 'Não foi possível atualizar o catálogo.';
 
   static void _debugLog(String message) {
-    if (kDebugMode) debugPrint(message);
+    if (kDebugMode) appLog(message);
   }
 
   /// Baixa o catálogo inteiro e troca o do aparelho numa transação só.
