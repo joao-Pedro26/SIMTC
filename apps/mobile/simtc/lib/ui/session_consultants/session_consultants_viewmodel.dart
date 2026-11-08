@@ -181,9 +181,7 @@ class SessionConsultantsViewModel extends ChangeNotifier with ListSearch {
     String? responsibleId,
   ) {
     final inProgress = _participants
-        .where((p) =>
-            p.status == ParticipantStatus.emAvaliacao &&
-            p.assignedConsultantId == consultant.id)
+        .where((p) => p.isWith(consultant.id))
         .toList(growable: false);
     final concluded = _participants
         .where((p) => p.isAssessed && p.assessedByConsultantId == consultant.id)

@@ -517,7 +517,7 @@ class _DiscardButton extends StatelessWidget {
           backgroundColor: AppColors.surface,
           side: const BorderSide(color: AppColors.dangerBorder, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+            borderRadius: BorderRadius.circular(AppRadius.sm2),
           ),
           textStyle: AppTypography.buttonCompact,
         ),
@@ -547,7 +547,7 @@ class _RetryButton extends StatelessWidget {
           backgroundColor: AppColors.surface,
           side: const BorderSide(color: AppColors.borderStrong, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+            borderRadius: BorderRadius.circular(AppRadius.sm2),
           ),
           textStyle: AppTypography.buttonCompact,
         ),

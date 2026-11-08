@@ -238,7 +238,7 @@ class AppCtaButton extends StatelessWidget {
           // outros botões de linha de lista (Fase 8C).
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(
-              size == AppCtaSize.compact ? AppRadius.sm + 2 : AppRadius.md,
+              size == AppCtaSize.compact ? AppRadius.sm2 : AppRadius.md,
             ),
           ),
           // A cor do `textStyle` não vale num botão — quem pinta o rótulo é o
@@ -348,7 +348,7 @@ class AppDangerOutlineButton extends StatelessWidget {
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(
-              compact ? AppRadius.sm + 2 : AppRadius.md,
+              compact ? AppRadius.sm2 : AppRadius.md,
             ),
           ),
           // A cor vem do `foregroundColor`; daqui só o tamanho e o peso.
@@ -444,7 +444,7 @@ class AppCompactOutlineButton extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+            borderRadius: BorderRadius.circular(AppRadius.sm2),
           ),
           // A cor vem do `foregroundColor`; daqui só o tamanho e o peso.
           textStyle: AppTypography.buttonCompact,

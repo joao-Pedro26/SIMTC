@@ -12,6 +12,7 @@ import '../core/form_factor.dart';
 import '../core/open_once.dart';
 import '../core/score_labels.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/note_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
@@ -1252,21 +1253,9 @@ class _NoteButton extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
 
-  ({Color bg, Color border, Color ink}) get _colors => switch (note.noteType) {
-        'B' => selected
-            ? (bg: AppColors.noteBFill, border: AppColors.noteBFill, ink: AppColors.noteBSelectedInk)
-            : (bg: AppColors.noteBBg, border: AppColors.noteBBorder, ink: AppColors.noteBInk),
-        'PM' => selected
-            ? (bg: AppColors.notePmFill, border: AppColors.notePmFill, ink: AppColors.notePmSelectedInk)
-            : (bg: AppColors.notePmBg, border: AppColors.notePmBorder, ink: AppColors.notePmInk),
-        _ => selected
-            ? (bg: AppColors.noteMFill, border: AppColors.noteMFill, ink: AppColors.noteMSelectedInk)
-            : (bg: AppColors.noteMBg, border: AppColors.noteMBorder, ink: AppColors.noteMInk),
-      };
-
   @override
   Widget build(BuildContext context) {
-    final colors = _colors;
+    final colors = noteButtonColors(note.noteType, selected: selected);
     // O fundo é do `Material`, embaixo do `InkWell`, para a ondulação do
     // toque aparecer. O leitor de tela diz qual está marcado (Fase 8C).
     return Semantics(

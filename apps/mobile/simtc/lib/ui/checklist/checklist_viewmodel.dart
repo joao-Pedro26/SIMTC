@@ -163,10 +163,8 @@ class ChecklistViewModel extends ChangeNotifier {
   bool get canUnassign {
     final participant = _participant;
     return !isConfirmed &&
-        consultantId != null &&
         participant != null &&
-        participant.status == ParticipantStatus.emAvaliacao &&
-        participant.assignedConsultantId == consultantId;
+        participant.isWith(consultantId);
   }
 
   /// O "Desatribuir participante" está esperando o backend.

@@ -33,8 +33,7 @@ ParticipantSituation situationOf(
   }
   return switch (participant.status) {
     ParticipantStatus.pendente => ParticipantSituation.pending,
-    ParticipantStatus.emAvaliacao => myConsultantId != null &&
-            participant.assignedConsultantId == myConsultantId
+    ParticipantStatus.emAvaliacao => participant.isWith(myConsultantId)
         ? ParticipantSituation.mine
         : ParticipantSituation.other,
     ParticipantStatus.aprovado => ParticipantSituation.approved,

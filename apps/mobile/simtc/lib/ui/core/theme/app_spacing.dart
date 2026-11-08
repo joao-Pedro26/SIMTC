@@ -20,6 +20,9 @@ abstract final class AppSpacing {
 /// Raios de borda do app.
 abstract final class AppRadius {
   static const double sm = 8;
+
+  /// O canto de 10 dos botões compactos e do logo de contexto.
+  static const double sm2 = 10;
   static const double md = 12;
   static const double lg = 14;
 

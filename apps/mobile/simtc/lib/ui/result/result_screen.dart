@@ -15,6 +15,7 @@ import '../checklist/checklist_sections.dart';
 import '../core/form_factor.dart';
 import '../core/open_once.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/note_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
@@ -619,12 +620,6 @@ class _NoteBadge extends StatelessWidget {
   /// O selo do tablet (quadros "4i" e "4t"): 34×26, canto 6, nota de 12.
   final bool large;
 
-  Color get _fill => switch (noteType) {
-        'B' => AppColors.noteBFill,
-        'PM' => AppColors.notePmFill,
-        _ => AppColors.noteMFill,
-      };
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -637,7 +632,7 @@ class _NoteBadge extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: _fill,
+        color: noteFillColor(noteType),
         borderRadius: BorderRadius.circular(AppRadius.sm - 2),
       ),
       child: Text(

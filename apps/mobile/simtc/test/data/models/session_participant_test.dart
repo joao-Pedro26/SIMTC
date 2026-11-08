@@ -160,4 +160,52 @@ void main() {
     expect(p.assessedAt, DateTime(2026, 9, 23, 8, 12));
     expect(p.hasPreviousAssessment, isTrue);
   });
+
+  group('isWith', () {
+    SessionParticipant participant({
+      required ParticipantStatus status,
+      String? assignedConsultantId,
+    }) {
+      return SessionParticipant(
+        id: 'tp-1',
+        sessionId: 'sess-1',
+        name: 'Ana Paula Ribeiro',
+        maskedCpf: '042.118.***-**',
+        participationType: ParticipationType.somenteTeorica,
+        status: status,
+        assignedConsultantId: assignedConsultantId,
+      );
+    }
+
+    test('é verdadeiro em avaliação com o mesmo consultor', () {
+      final p = participant(
+        status: ParticipantStatus.emAvaliacao,
+        assignedConsultantId: 'c-1',
+      );
+      expect(p.isWith('c-1'), isTrue);
+    });
+
+    test('é falso para outro consultor', () {
+      final p = participant(
+        status: ParticipantStatus.emAvaliacao,
+        assignedConsultantId: 'c-1',
+      );
+      expect(p.isWith('c-2'), isFalse);
+    });
+
+    test('é falso para consultor nulo', () {
+      final p = participant(
+        status: ParticipantStatus.emAvaliacao,
+        assignedConsultantId: 'c-1',
+      );
+      expect(p.isWith(null), isFalse);
+    });
+
+    test('é falso fora de avaliação, mesmo com o mesmo consultor', () {
+      for (final status in [ParticipantStatus.pendente, ParticipantStatus.aprovado]) {
+        final p = participant(status: status, assignedConsultantId: 'c-1');
+        expect(p.isWith('c-1'), isFalse, reason: status.name);
+      }
+    });
+  });
 }

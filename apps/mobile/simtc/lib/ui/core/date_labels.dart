@@ -1,7 +1,7 @@
 /// Rótulos de data e hora do app, sem depender dos dados de locale do `intl`
 /// (que exigiriam inicialização assíncrona) — os meses abreviados são os
 /// mesmos que a Home já usa nos cabeçalhos de dia.
-const List<String> _meses = [
+const List<String> shortMonths = [
   'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
   'jul', 'ago', 'set', 'out', 'nov', 'dez',
 ];
@@ -10,7 +10,7 @@ String _dois(int value) => value.toString().padLeft(2, '0');
 
 /// "12 set" — a data de uma sessão onde o ano não precisa aparecer (a faixa
 /// de contexto de "Adicionar participante").
-String dayMonthLabel(DateTime date) => '${date.day} ${_meses[date.month - 1]}';
+String dayMonthLabel(DateTime date) => '${date.day} ${shortMonths[date.month - 1]}';
 
 /// "12 set 2026" — a data de uma sessão, no cabeçalho do detalhe.
 String dayMonthYearLabel(DateTime date) =>
@@ -27,7 +27,7 @@ String momentLabel(DateTime moment, DateTime now) {
       local.day == now.day;
   if (mesmoDia) return 'hoje $hora';
 
-  final dia = '${local.day} ${_meses[local.month - 1]}';
+  final dia = '${local.day} ${shortMonths[local.month - 1]}';
   return local.year == now.year ? '$dia $hora' : '$dia ${local.year} $hora';
 }
 

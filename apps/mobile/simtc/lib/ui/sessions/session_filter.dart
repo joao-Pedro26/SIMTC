@@ -1,4 +1,5 @@
 import '../../data/models/training_session.dart';
+import '../core/date_labels.dart';
 
 /// Os três chips da tela 1.3. Também identificam qual seção cada chip alveja.
 enum SessionFilter {
@@ -82,16 +83,11 @@ class SessionSection {
   bool get isEmpty => blocks.every((block) => block.totalCount == 0);
 }
 
-const List<String> _meses = [
-  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-  'jul', 'ago', 'set', 'out', 'nov', 'dez',
-];
-
 const List<String> _diasDaSemana = [
   'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom',
 ];
 
-String _diaEMes(DateTime date) => '${date.day} ${_meses[date.month - 1]}';
+String _diaEMes(DateTime date) => '${date.day} ${shortMonths[date.month - 1]}';
 
 String _diaDaSemana(DateTime date) => _diasDaSemana[date.weekday - 1];
 

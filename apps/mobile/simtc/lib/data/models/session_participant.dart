@@ -101,6 +101,13 @@ class SessionParticipant {
       status == ParticipantStatus.aprovado ||
       status == ParticipantStatus.necessitaReavaliacao;
 
+  /// Está em avaliação com este consultor — quem está com o participante agora.
+  /// Sem consultor (nulo), nunca é.
+  bool isWith(String? consultantId) =>
+      status == ParticipantStatus.emAvaliacao &&
+      consultantId != null &&
+      assignedConsultantId == consultantId;
+
   /// Existe uma avaliação anterior. Com o participante de novo em
   /// `EM_AVALIACAO`, é uma reavaliação em andamento — mesmo critério do web
   /// (`getDisplayStatus`, `participants-tab.tsx`).
