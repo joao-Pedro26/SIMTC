@@ -15,11 +15,20 @@ void main() {
     expect(lastSyncValue(null, now), 'Nenhum envio');
   });
 
+  test('sizeLabel troca de unidade nos limites', () {
+    expect(sizeLabel(1047552), '1023 KB');
+    expect(sizeLabel(1047553), '1,0 MB');
+    expect(sizeLabel(1048576), '1,0 MB');
+    expect(sizeLabel(1073741823), '1,0 GB');
+    expect(sizeLabel(1073741824), '1,0 GB');
+    expect(sizeLabel(0), '0 KB');
+  });
+
   test('tamanho em KB abaixo de 1 MB, com uma casa e vírgula acima', () {
     expect(sizeLabel(0), '0 KB');
     expect(sizeLabel(1), '1 KB');
     expect(sizeLabel(36 * 1024), '36 KB');
-    expect(sizeLabel(1024 * 1024 - 1), '1024 KB');
+    expect(sizeLabel(1024 * 1024 - 1), '1,0 MB');
     expect(sizeLabel(1024 * 1024), '1,0 MB');
     expect(sizeLabel((18.4 * 1024 * 1024).round()), '18,4 MB');
     expect(sizeLabel((1.25 * 1024 * 1024 * 1024).round()), '1,3 GB');

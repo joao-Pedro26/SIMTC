@@ -64,4 +64,25 @@ void main() {
     expect(dayAndClockLabel(DateTime(2026, 10, 8, 8, 12)), '08/10 às 08:12');
     expect(dayAndClockLabel(DateTime(2026, 1, 25, 17, 5)), '25/01 às 17:05');
   });
+
+  test('à meia-noite, o dia anterior não é "hoje"', () {
+    final momento = DateTime(2026, 9, 29, 23, 59);
+    final agoraMeiaNoite = DateTime(2026, 9, 30, 0, 1);
+    expect(momentLabel(momento, agoraMeiaNoite), '29 set 23:59');
+    expect(clockLabel(momento, agoraMeiaNoite), '29 set 23:59');
+    expect(atLabel(momento, agoraMeiaNoite), 'em 29 set 23:59');
+    expect(startedLabel(momento, agoraMeiaNoite), 'Iniciada em 29 set 23:59');
+
+    expect(
+      momentLabel(DateTime(2026, 9, 30, 0, 0), DateTime(2026, 9, 30, 0, 0)),
+      'hoje 00:00',
+    );
+  });
+
+  test('na virada do ano, o ano aparece', () {
+    expect(
+      momentLabel(DateTime(2025, 12, 31, 23, 59), DateTime(2026, 1, 1, 0, 1)),
+      '31 dez 2025 23:59',
+    );
+  });
 }

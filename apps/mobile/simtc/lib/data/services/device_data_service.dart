@@ -10,10 +10,14 @@ import 'local/token_storage.dart';
 /// pelo `CompanyLogo` e pelo `cached_network_image`. Os arquivos ficam na
 /// pasta temporária do app, numa subpasta com a chave do gerenciador.
 class LogoCache {
-  const LogoCache();
+  const LogoCache({
+    Future<Directory> Function() temporaryDirectory = getTemporaryDirectory,
+  }) : _temporaryDirectory = temporaryDirectory;
+
+  final Future<Directory> Function() _temporaryDirectory;
 
   Future<int> sizeInBytes() async {
-    final temp = await getTemporaryDirectory();
+    final temp = await _temporaryDirectory();
     final folder = Directory(
       '${temp.path}${Platform.pathSeparator}${DefaultCacheManager.key}',
     );

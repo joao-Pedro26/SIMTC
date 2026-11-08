@@ -23,9 +23,17 @@ String sizeLabel(int bytes) {
   String oneDecimal(double value) =>
       value.toStringAsFixed(1).replaceAll('.', ',');
 
-  if (bytes >= gb) return '${oneDecimal(bytes / gb)} GB';
-  if (bytes >= mb) return '${oneDecimal(bytes / mb)} MB';
-  return '${(bytes / kb).ceil()} KB';
+  // A unidade é escolhida depois de arredondar: 1047553 bytes arredondados
+  // para KB dariam "1024 KB", então já são "1,0 MB"; e 1073741823 com uma
+  // casa daria "1024,0 MB", então já são "1,0 GB".
+  if (bytes < mb) {
+    final kbInteiros = (bytes / kb).ceil();
+    if (kbInteiros < 1024) return '$kbInteiros KB';
+  }
+  if (bytes < gb && (bytes / mb).toStringAsFixed(1) != '1024.0') {
+    return '${oneDecimal(bytes / mb)} MB';
+  }
+  return '${oneDecimal(bytes / gb)} GB';
 }
 
 /// O corpo da confirmação do "Sair da conta" (decisão de 24/10/2026: avisa e
