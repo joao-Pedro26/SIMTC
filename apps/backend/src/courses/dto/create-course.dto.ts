@@ -31,4 +31,10 @@ export class CreateCourseDto {
     @IsOptional()
     @IsArray()
     contentItems?: any[];
+
+    /** Tópicos (AssessmentCategory) que valem para este curso. */
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    categoryIds?: string[];
 }

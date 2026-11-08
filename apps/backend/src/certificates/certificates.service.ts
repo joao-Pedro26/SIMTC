@@ -5,6 +5,7 @@ import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../email/email.service';
 import { SIGNATURE_BUCKET } from '../participants/signature.constants';
 import { withPublicParticipant } from '../participants/participant-view.util';
+import { findCourseCategories } from '../assessment-categories/course-categories.util';
 import {
   JwtPayload,
   calculateCategoryScore,
@@ -271,23 +272,13 @@ export class CertificatesService {
     const participant = trainingParticipant.participant;
     const consultant = session.responsibleConsultant;
 
-    // Busca TODAS as categorias (mesmo as não avaliadas nesta sessão, que contam 100%) —
-    // necessário para o bloco "Resultado da Avaliação" (sempre mostra os 4 tópicos) e
+    // Busca os tópicos do curso (mesmo os não avaliados nesta sessão, que contam 100%) —
+    // necessário para o bloco "Resultado da Avaliação" (mostra todos os tópicos do curso) e
     // para manter a ordem canônica (CV, RR, CS, TP) nas seções da página 1.
-    const allCategories = await this.prisma.assessmentCategory.findMany({
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        description: true,
-        order: true,
-        _count: { select: { infractions: true } },
-      },
-      orderBy: { order: 'asc' },
-    });
+    const courseCategories = await findCourseCategories(this.prisma, session.courseId);
 
     const { topicSections, categoryScores, overallScorePercent, resultLabel, resultBadgeClass } =
-      this.buildScoreData(assessment.items, allCategories);
+      this.buildScoreData(assessment.items, courseCategories);
 
     const conclusionParagraphs = await this.getConclusionParagraphs(overallScorePercent);
 
@@ -353,7 +344,7 @@ export class CertificatesService {
    *    ordem canônica das categorias, com o texto fixo do tópico (`category.description`,
    *    quando cadastrado — CV e TP ainda não têm) e as infrações ordenadas por `infraction.order`.
    *  - `categoryScores` / `overallScorePercent` / `resultLabel` / `resultBadgeClass`: o bloco
-   *    "Resultado da Avaliação" da página 2, sempre com as 4 categorias — mesma fórmula usada
+   *    "Resultado da Avaliação" da página 2, com todos os tópicos do curso — mesma fórmula usada
    *    em PracticalAssessmentsService.applyScore() e no preview do app web (score bruto para
    *    a média geral e para o limiar de cor da barra; arredondado só para exibição).
    */

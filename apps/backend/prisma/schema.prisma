@@ -72,8 +72,22 @@ model Course {
   contentItems  Json?       // Array de { left: string, right?: string, leftBold?: boolean, rightBold?: boolean }
   createdAt     DateTime    @default(now())
 
-  trainings TrainingSession[]
-  demands   DemandPipeline[]
+  trainings  TrainingSession[]
+  demands    DemandPipeline[]
+  categories CourseAssessmentCategory[]
+}
+
+// Tópicos (categorias de avaliação) que valem para cada curso. Só os tópicos
+// vinculados aparecem no checklist e entram no cálculo da nota do curso.
+model CourseAssessmentCategory {
+  courseId   String
+  categoryId String
+
+  course   Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  category AssessmentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, categoryId])
+  @@index([categoryId])
 }
 
 enum VehicleType {
@@ -92,6 +106,7 @@ model AssessmentCategory {
   order       Int          @default(0)
 
   infractions Infraction[]
+  courses     CourseAssessmentCategory[]
 }
 
 model Infraction {

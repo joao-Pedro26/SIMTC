@@ -57,16 +57,26 @@ export class AssessmentCategoriesService {
     })
   }
 
-  findAll() {
-    return this.prisma.assessmentCategory.findMany({
+  /**
+   * Catálogo completo. Cada tópico traz `courseIds` (cursos em que vale), para
+   * o web e o app mobile (offline) montarem o checklist só com os tópicos do
+   * curso do treinamento — ver `findCourseCategories` para a regra.
+   */
+  async findAll() {
+    const categories = await this.prisma.assessmentCategory.findMany({
       orderBy: { order: 'asc' },
       include: {
         infractions: {
           orderBy: { order: 'asc' },
           include: { notes: true },
         },
+        courses: { select: { courseId: true } },
       },
     });
+    return categories.map(({ courses, ...category }) => ({
+      ...category,
+      courseIds: courses.map((c) => c.courseId),
+    }));
   }
 
   findAssementCaretegoryById(id: string) {

@@ -6,6 +6,7 @@ import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 import { statusAfterRelease } from '../participants/participant-release.util';
 import { SYNC_REFUSAL_NOT_ASSIGNED, SyncRefusedException } from './sync-refused.exception';
+import { findCourseCategories } from '../assessment-categories/course-categories.util';
 
 /**
  * Os itens de um lote do app são enviados em paralelo e cada transação segura
@@ -187,12 +188,16 @@ export class PracticalAssessmentsService {
       byCategory.get(categoryId)!.push(item.infractionNote.deduction);
     }
 
-    // Busca TODAS as categorias (mesmo as não avaliadas nesta sessão, que contam 100%)
-    const allCategories = await tx.assessmentCategory.findMany({
-      select: { id: true, _count: { select: { infractions: true } } },
+    // Só os tópicos do curso do treinamento entram na nota — inclusive os não
+    // avaliados nesta sessão, que contam 100%. Itens marcados em tópicos fora
+    // do curso (catálogo antigo no aparelho) não pesam.
+    const { training } = await tx.trainingParticipant.findUniqueOrThrow({
+      where: { id: trainingParticipantId },
+      select: { training: { select: { courseId: true } } },
     });
+    const courseCategories = await findCourseCategories(tx, training.courseId);
 
-    const categoryScores = allCategories.map((cat) =>
+    const categoryScores = courseCategories.map((cat) =>
       calculateCategoryScore(byCategory.get(cat.id) ?? [], cat._count.infractions),
     );
     const overallScore = calculateOverallScore(categoryScores);

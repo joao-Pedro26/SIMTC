@@ -18,7 +18,13 @@ import {
 
 const mockPrisma = {
   practicalAssessment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), findUniqueOrThrow: jest.fn() },
-  trainingParticipant: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+  trainingParticipant: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+  },
   assessmentItem: { deleteMany: jest.fn() },
   assessmentCategory: { findMany: jest.fn() },
   $transaction: jest.fn(),
@@ -393,6 +399,9 @@ describe('PracticalAssessmentsService', () => {
 
     beforeEach(() => {
       mockPrisma.assessmentCategory.findMany.mockResolvedValue([]);
+      mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue({
+        training: { courseId: 'course-1' },
+      });
       // A transação interativa roda com o próprio mock no papel do `tx`.
       mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockPrisma));
       // Quem envia está com o participante: é o caso de todo envio normal.
@@ -430,7 +439,7 @@ describe('PracticalAssessmentsService', () => {
         practicalAssessment: { create: jest.fn(), update: jest.fn() },
         assessmentItem: { deleteMany: jest.fn() },
         assessmentCategory: { findMany: jest.fn() },
-        trainingParticipant: { update: jest.fn() },
+        trainingParticipant: { update: jest.fn(), findUniqueOrThrow: jest.fn() },
       };
 
       beforeEach(() => {
@@ -438,7 +447,44 @@ describe('PracticalAssessmentsService', () => {
           Object.values(model).forEach((fn) => fn.mockReset()),
         );
         tx.assessmentCategory.findMany.mockResolvedValue([]);
+        tx.trainingParticipant.findUniqueOrThrow.mockResolvedValue({
+          training: { courseId: 'course-1' },
+        });
         mockPrisma.$transaction.mockImplementation((fn: (t: unknown) => unknown) => fn(tx));
+      });
+
+      it('a nota usa só os tópicos vinculados ao curso do treinamento', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        // Item marcado com M (5) em CV, que tem 2 infrações no curso; RR conta 100%.
+        tx.practicalAssessment.create.mockResolvedValue({
+          id: 'assess-1',
+          items: [{ infractionNote: { deduction: 5, infraction: { category: { id: 'cv' } } } }],
+        });
+        tx.assessmentCategory.findMany.mockResolvedValueOnce([
+          { id: 'cv', _count: { infractions: 2 } },
+          { id: 'rr', _count: { infractions: 4 } },
+        ]);
+
+        await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(tx.assessmentCategory.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { courses: { some: { courseId: 'course-1' } } } }),
+        );
+        // CV = 100 - (5/5)*(100/2) = 50; RR = 100 → média 75
+        expect(tx.practicalAssessment.update).toHaveBeenCalledWith({
+          where: { id: 'assess-1' },
+          data: { score: 75 },
+        });
+      });
+
+      it('curso sem tópico vinculado cai em todos os tópicos', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        tx.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        await service.syncFromMobile([dto], 'consultant-1');
+
+        expect(tx.assessmentCategory.findMany).toHaveBeenCalledTimes(2);
+        expect(tx.assessmentCategory.findMany.mock.calls[1][0]).not.toHaveProperty('where');
       });
 
       it('a reavaliação apaga os itens, regrava a avaliação e calcula a nota dentro dela', async () => {
