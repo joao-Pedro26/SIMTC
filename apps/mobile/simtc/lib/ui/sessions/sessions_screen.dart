@@ -15,6 +15,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/transient_message.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/app_search_field.dart';
@@ -125,19 +126,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   /// A falha de atualização é um aviso passageiro, não um estado da tela: a
-  /// lista cacheada continua válida e visível. Por isso SnackBar, e por isso a
-  /// mensagem é limpa assim que é agendada — limpar antes de agendar também
-  /// evita reentrância, já que `clearError()` notifica de novo.
+  /// lista cacheada continua válida e visível (ver `showTransientMessage`).
   void _showErrorWhenItArrives() {
     final message = _viewModel.errorMessage;
     if (message == null) return;
     _viewModel.clearError();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    });
+    showTransientMessage(this, message);
   }
 
   @override

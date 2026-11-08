@@ -22,10 +22,12 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/transient_message.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_search_field.dart';
 import '../core/widgets/app_spinner.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/company_logo.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/filter_chip_bar.dart';
@@ -122,19 +124,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     super.dispose();
   }
 
-  /// Mesmo padrão da Home: o aviso é passageiro, a lista continua válida. A
-  /// mensagem é limpa assim que é agendada — limpar antes de agendar também
-  /// evita reentrância, já que `clearMessage()` notifica de novo.
+  /// Mesmo padrão da Home: o aviso é passageiro, a lista continua válida (ver
+  /// `showTransientMessage`).
   void _showMessageWhenItArrives() {
     final message = _viewModel.message;
     if (message == null) return;
     _viewModel.clearMessage();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    });
+    showTransientMessage(this, message);
   }
 
   @override
@@ -616,27 +612,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   }
 
   Future<void> _confirmStart() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Iniciar a sessão?'),
-        content: const Text(
-          'Com a sessão em andamento, os consultores podem atribuir e avaliar '
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Iniciar a sessão?',
+      message: 'Com a sessão em andamento, os consultores podem atribuir e avaliar '
           'participantes. O painel web passa a mostrá-la como "Em andamento".',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Iniciar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Iniciar',
+      destructive: false,
     );
-    if (confirmed == true && mounted) await _viewModel.startSession();
+    if (confirmed && mounted) await _viewModel.startSession();
   }
 
   /// A barra dos filtros, com a lupa na ponta direita (quadros "1e" e "1f").
@@ -1011,28 +995,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final withWhom = consultant.isEmpty ? 'outro consultor' : consultant;
     final status =
         participant.hasPreviousAssessment ? 'Não recomendado' : 'Pendente';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Desatribuir ${participant.name}?'),
-        content: Text(
-          'Está em avaliação com $withWhom. Ao desatribuir, volta para '
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Desatribuir ${participant.name}?',
+      message: 'Está em avaliação com $withWhom. Ao desatribuir, volta para '
           '$status e pode ser avaliado por outro consultor.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Voltar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Desatribuir'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Desatribuir',
+      cancelLabel: 'Voltar',
     );
-    if (confirmed == true && mounted) {
+    if (confirmed && mounted) {
       await _viewModel.unassignAsAdmin(participant.id);
     }
   }

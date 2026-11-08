@@ -12,10 +12,12 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/transient_message.dart';
 import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_search_field.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/session_context_header.dart';
@@ -66,19 +68,13 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
     super.dispose();
   }
 
-  /// Mesmo padrão do detalhe: o aviso de quem entrou ou saiu é passageiro. A
-  /// mensagem é limpa assim que é agendada — limpar antes de agendar também
-  /// evita reentrância, já que `clearMessage()` notifica de novo.
+  /// Mesmo padrão do detalhe: o aviso de quem entrou ou saiu é passageiro (ver
+  /// `showTransientMessage`).
   void _showMessageWhenItArrives() {
     final message = _viewModel.message;
     if (message == null) return;
     _viewModel.clearMessage();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    });
+    showTransientMessage(this, message);
   }
 
   @override
@@ -443,26 +439,14 @@ class _SessionConsultantsScreenState extends State<SessionConsultantsScreen> {
   Future<void> _remove(SessionConsultantItem item) async {
     final consequence = item.note;
     if (consequence != null) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text('Remover ${item.name} da sessão?'),
-          content: Text(consequence),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Voltar'),
-            ),
-            FilledButton(
-              style:
-                  FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Remover'),
-            ),
-          ],
-        ),
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Remover ${item.name} da sessão?',
+        message: consequence,
+        confirmLabel: 'Remover',
+        cancelLabel: 'Voltar',
       );
-      if (confirmed != true || !mounted) return;
+      if (!confirmed || !mounted) return;
     }
 
     await _viewModel.remove(item.id);

@@ -16,6 +16,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/status_chip.dart';
 import 'sync_queue_labels.dart';
@@ -399,28 +400,14 @@ class SyncScreen extends StatelessWidget {
     AssessmentSyncService sync,
     LocalAssessment item,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Descartar a avaliação?'),
-        content: Text(
-          'A avaliação de ${queueItemTitle(item)} não foi aceita pelo servidor '
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Descartar a avaliação?',
+      message: 'A avaliação de ${queueItemTitle(item)} não foi aceita pelo servidor '
           'e será apagada deste aparelho.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Descartar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Descartar',
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     var discarded = false;
     try {

@@ -20,6 +20,7 @@ import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/app_spinner.dart';
+import '../core/widgets/confirm_dialog.dart';
 import 'profile_labels.dart';
 import 'profile_viewmodel.dart';
 
@@ -323,24 +324,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _confirmClear() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Limpar cache local?'),
-        content: const Text(_clearMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Limpar'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Limpar cache local?',
+      message: _clearMessage,
+      confirmLabel: 'Limpar',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final cleared = await _viewModel.clearCache();
     if (!mounted) return;
@@ -365,27 +355,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // (Fase 8C).
     if (!mounted || !context.claimOpen()) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Sair da conta?'),
-        content: Text(
-          logoutMessage(queued: queued, drafts: drafts, offline: isOffline),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sair'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Sair da conta?',
+      message: logoutMessage(queued: queued, drafts: drafts, offline: isOffline),
+      confirmLabel: 'Sair',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     // Saindo, o roteador leva ao login sozinho; aqui só a falha importa.
     final left = await _viewModel.logout();

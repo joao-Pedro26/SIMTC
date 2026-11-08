@@ -19,6 +19,7 @@ import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_footer_bar.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/session_context_header.dart';
@@ -474,58 +475,31 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   /// Um toque errado no ano tiraria a sessão — mesmo em andamento — da lista
   /// de todos os aparelhos, sem aviso (decisão de 09/10/2026 — não está no
   /// canvas). Só pergunta quando a data foi mudada para antes da janela.
-  Future<bool> _confirmOldDate() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text(
-          'Esta data é de mais de ${SessionRepository.historyWindowDays} dias '
+  Future<bool> _confirmOldDate() {
+    return showConfirmDialog(
+      context,
+      title: 'Esta data é de mais de ${SessionRepository.historyWindowDays} dias '
           'atrás.',
-        ),
-        content: const Text(
-          'A sessão vai sair da lista do app em todos os aparelhos; depois '
+      message: 'A sessão vai sair da lista do app em todos os aparelhos; depois '
           'disso, só o painel web consegue alterá-la. Salvar assim mesmo?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Voltar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Salvar',
+      cancelLabel: 'Voltar',
+      destructive: false,
     );
-    return confirmed == true;
   }
 
   /// "Descartar" é um pedido explícito: sai sem perguntar.
   void _discard() => Navigator.of(context).pop();
 
   Future<void> _confirmLeave() async {
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Descartar as alterações?'),
-        content: const Text(
-          'O que você mudou nos dados do treinamento ainda não foi salvo.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Continuar editando'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Descartar'),
-          ),
-        ],
-      ),
+    final discard = await showConfirmDialog(
+      context,
+      title: 'Descartar as alterações?',
+      message: 'O que você mudou nos dados do treinamento ainda não foi salvo.',
+      confirmLabel: 'Descartar',
+      cancelLabel: 'Continuar editando',
     );
-    if (discard == true && mounted) Navigator.of(context).pop();
+    if (discard && mounted) Navigator.of(context).pop();
   }
 
   Future<void> _confirmCancel() async {
@@ -536,29 +510,16 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       1 => ' Há 1 participante em avaliação agora.',
       _ => ' Há $count participantes em avaliação agora.',
     };
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancelar a sessão?'),
-        content: Text(
-          'Ninguém mais poderá ser avaliado nesta sessão, e ela sai da lista '
+    // "Voltar", e não "Cancelar": aqui "cancelar" é a própria ação.
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Cancelar a sessão?',
+      message: 'Ninguém mais poderá ser avaliado nesta sessão, e ela sai da lista '
           'de sessões do app. Não dá para desfazer.$inEvaluation',
-        ),
-        actions: [
-          // "Voltar", e não "Cancelar": aqui "cancelar" é a própria ação.
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Voltar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Cancelar sessão'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Cancelar sessão',
+      cancelLabel: 'Voltar',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final cancelled = await _viewModel.cancelSession();
     if (!cancelled || !mounted) return;

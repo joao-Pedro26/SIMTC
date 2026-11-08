@@ -16,9 +16,11 @@ import '../core/theme/note_colors.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/transient_message.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_footer_bar.dart';
 import '../core/widgets/app_spinner.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
@@ -127,17 +129,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     super.dispose();
   }
 
-  /// Mesmo padrão do detalhe da sessão: o aviso é passageiro, e a mensagem é
-  /// limpa assim que é agendada.
+  /// Mesmo padrão do detalhe da sessão: o aviso é passageiro (ver
+  /// `showTransientMessage`).
   void _showMessageWhenItArrives() {
     final message = _viewModel.message;
     if (message == null) return;
     _viewModel.clearMessage();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    });
+    showTransientMessage(this, message);
   }
 
   @override
@@ -394,28 +392,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     final discardNote = _viewModel.isStarted || _viewModel.isResumable
         ? ' A avaliação iniciada será descartada.'
         : '';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(name == null ? 'Desatribuir o participante?' : 'Desatribuir $name?'),
-        content: Text(
-          '${name ?? 'O participante'} volta para "$status" e fica disponível '
+    final confirmed = await showConfirmDialog(
+      context,
+      title: name == null ? 'Desatribuir o participante?' : 'Desatribuir $name?',
+      message: '${name ?? 'O participante'} volta para "$status" e fica disponível '
           'para outro consultor.$discardNote',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Desatribuir'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Desatribuir',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final unassigned = await _viewModel.unassign();
     if (!unassigned || !mounted) return;
@@ -432,27 +416,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     // A avaliação parada pode ser de quem já não está com o consultor.
     final stays =
         _viewModel.isWithMe ? ' O participante continua com você.' : '';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Descartar a avaliação?'),
-        content: Text(
-          'As marcações e a hora de início $whose serão apagadas.$stays',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.dangerInk),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Descartar'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Descartar a avaliação?',
+      message: 'As marcações e a hora de início $whose serão apagadas.$stays',
+      confirmLabel: 'Descartar',
     );
-    if (confirmed == true && mounted) await _viewModel.discard();
+    if (confirmed && mounted) await _viewModel.discard();
   }
 
   Widget _buildTimerRow() {
