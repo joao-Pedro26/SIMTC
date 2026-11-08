@@ -88,23 +88,49 @@ class SessionRepository {
   ///
   /// Com sucesso, o status local muda na hora para os botões de atribuir
   /// aparecerem sem esperar o re-sync do detalhe.
-  Future<Result<void>> start(String sessionId) async {
+  Future<Result<void>> start(String sessionId) {
+    return _run(
+      request: () async {
+        await _api.post<Map<String, dynamic>>('$_path/$sessionId/start');
+      },
+      failureMessage: _startFailed,
+      keepsServerMessage: (e) => e.statusCode == 403 || e.isNetworkError,
+      localChange: SessionsCompanion(
+        id: Value(sessionId),
+        status: Value(SessionStatus.emAndamento.wireValue),
+      ),
+    );
+  }
+
+  /// O esqueleto das três ações que mandam uma mudança ao backend e depois a
+  /// espelham no cache: chama [request]; se o backend recusar, devolve a
+  /// mensagem dele quando [keepsServerMessage] aceita o erro, senão o texto
+  /// genérico de [failureMessage]. Com sucesso, grava [localChange] na linha
+  /// da sessão — e ignora a falha dessa gravação: o backend já aceitou, e o
+  /// re-sync do detalhe corrige a linha.
+  Future<Result<void>> _run({
+    required Future<void> Function() request,
+    required String failureMessage,
+    required bool Function(ApiException error) keepsServerMessage,
+    required SessionsCompanion localChange,
+  }) async {
     try {
-      await _api.post<Map<String, dynamic>>('$_path/$sessionId/start');
+      await request();
     } on ApiException catch (error) {
-      final ownMessage = error.statusCode == 403 || error.isNetworkError;
-      return Failure(error, ownMessage ? error.message : _startFailed);
+      return Failure(
+        error,
+        keepsServerMessage(error) ? error.message : failureMessage,
+      );
     } catch (error) {
-      return Failure(Exception('$error'), _startFailed);
+      return Failure(Exception('$error'), failureMessage);
     }
 
     try {
-      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        SessionsCompanion(status: Value(SessionStatus.emAndamento.wireValue)),
-      );
+      await (_db.update(_db.sessions)
+            ..where((t) => t.id.equals(localChange.id.value)))
+          .write(localChange);
     } catch (_) {
-      // O backend já iniciou; o re-sync do detalhe corrige a linha local.
+      // O backend já gravou; o re-sync do detalhe corrige a linha local.
     }
     return const Success<void>(null);
   }
@@ -133,52 +159,38 @@ class SessionRepository {
     };
     if (body.isEmpty) return const Success<void>(null);
 
-    try {
-      await _api.patch<Map<String, dynamic>>('$_path/$sessionId', data: body);
-    } on ApiException catch (error) {
-      return Failure(error, _ownMessage(error) ? error.message : _updateFailed);
-    } catch (error) {
-      return Failure(Exception('$error'), _updateFailed);
-    }
-
-    try {
-      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        SessionsCompanion(
-          date: date == null ? const Value.absent() : Value(date),
-          city: city == null ? const Value.absent() : Value(city),
-          state: state == null ? const Value.absent() : Value(state),
-          notes: notes == null ? const Value.absent() : Value(notes),
-        ),
-      );
-    } catch (_) {
-      // O backend já gravou; o re-sync do detalhe corrige a linha local.
-    }
-    return const Success<void>(null);
+    return _run(
+      request: () async {
+        await _api.patch<Map<String, dynamic>>('$_path/$sessionId', data: body);
+      },
+      failureMessage: _updateFailed,
+      keepsServerMessage: _ownMessage,
+      localChange: SessionsCompanion(
+        id: Value(sessionId),
+        date: date == null ? const Value.absent() : Value(date),
+        city: city == null ? const Value.absent() : Value(city),
+        state: state == null ? const Value.absent() : Value(state),
+        notes: notes == null ? const Value.absent() : Value(notes),
+      ),
+    );
   }
 
   /// "Cancelar sessão" (`PATCH /training-sessions/:id/cancel`, só ADMIN). O
   /// backend recusa (403) sessão já concluída ou já cancelada, e não há como
   /// desfazer. Com sucesso, o status local muda na hora — e a Home deixa de
   /// mostrar a sessão (decisão de 20/09/2026).
-  Future<Result<void>> cancel(String sessionId) async {
-    try {
-      await _api.patch<Map<String, dynamic>>('$_path/$sessionId/cancel');
-    } on ApiException catch (error) {
-      return Failure(error, _ownMessage(error) ? error.message : _cancelFailed);
-    } catch (error) {
-      return Failure(Exception('$error'), _cancelFailed);
-    }
-
-    try {
-      await (_db.update(_db.sessions)..where((t) => t.id.equals(sessionId)))
-          .write(
-        SessionsCompanion(status: Value(SessionStatus.cancelado.wireValue)),
-      );
-    } catch (_) {
-      // O backend já cancelou; o próximo sync corrige a linha local.
-    }
-    return const Success<void>(null);
+  Future<Result<void>> cancel(String sessionId) {
+    return _run(
+      request: () async {
+        await _api.patch<Map<String, dynamic>>('$_path/$sessionId/cancel');
+      },
+      failureMessage: _cancelFailed,
+      keepsServerMessage: _ownMessage,
+      localChange: SessionsCompanion(
+        id: Value(sessionId),
+        status: Value(SessionStatus.cancelado.wireValue),
+      ),
+    );
   }
 
   /// Recusas do backend que explicam o que houve — 403 (sessão concluída ou

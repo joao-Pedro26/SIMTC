@@ -443,6 +443,89 @@ void main() {
       final row = await db.select(db.sessions).getSingle();
       expect(row.status, 'PLANEJADO');
     });
+
+    test('sem rede, a mensagem de falta de conexão e o status local não muda',
+        () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenThrow(const ApiException(
+        message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+        isNetworkError: true,
+      ));
+
+      final result = await repository.start('s1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.message,
+          'message',
+          'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+        ),
+      );
+      final row = await db.select(db.sessions).getSingle();
+      expect(row.status, 'PLANEJADO');
+    });
+
+    test('start: 404 vira a mensagem genérica', () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenThrow(const ApiException(
+        message: 'Treinamento não encontrado',
+        statusCode: 404,
+      ));
+
+      final result = await repository.start('s1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.message,
+          'message',
+          'Não foi possível iniciar a sessão. Tente de novo.',
+        ),
+      );
+    });
+
+    test('erro do servidor (500) vira a mensagem genérica de iniciar', () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenThrow(const ApiException(
+        message: 'Internal server error',
+        statusCode: 500,
+      ));
+
+      final result = await repository.start('s1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.message,
+          'message',
+          'Não foi possível iniciar a sessão. Tente de novo.',
+        ),
+      );
+    });
+
+    test('exceção que não é da API vira a mensagem genérica e não mexe no status',
+        () async {
+      await seedPlanned();
+      when(() => api.post<Map<String, dynamic>>('/training-sessions/s1/start'))
+          .thenThrow(StateError('bug inesperado'));
+
+      final result = await repository.start('s1');
+
+      expect(
+        result,
+        isA<Failure<void>>().having(
+          (f) => f.message,
+          'message',
+          'Não foi possível iniciar a sessão. Tente de novo.',
+        ),
+      );
+      final row = await db.select(db.sessions).getSingle();
+      expect(row.status, 'PLANEJADO');
+    });
   });
 
   group('edição pelo ADMIN', () {
@@ -562,6 +645,29 @@ void main() {
         expect(row.city, 'Itabira');
       });
 
+      test(
+          '404 (sessão apagada) devolve a mensagem do servidor, e o Failure traz '
+          'a ApiException com statusCode 404, sem mexer no cache', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
+            .thenThrow(const ApiException(
+          message: 'Treinamento não encontrado',
+          statusCode: 404,
+        ));
+
+        final result = await repository.update('s1', city: 'Betim');
+
+        expect(
+          result,
+          isA<Failure<void>>()
+              .having((f) => f.message, 'message', 'Treinamento não encontrado')
+              .having((f) => f.exception, 'exception', isA<ApiException>()
+                  .having((e) => e.statusCode, 'statusCode', 404)),
+        );
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.city, 'Itabira');
+      });
+
       test('sem rede, a mensagem de falta de conexão', () async {
         await seedSession();
         when(() => api.patch<Map<String, dynamic>>(path, data: any(named: 'data')))
@@ -656,6 +762,45 @@ void main() {
             (f) => f.message,
             'message',
             'Não foi possível cancelar a sessão. Tente de novo.',
+          ),
+        );
+        final row = await db.select(db.sessions).getSingle();
+        expect(row.status, 'EM_ANDAMENTO');
+      });
+
+      test('cancel: 404 devolve a mensagem do servidor', () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(cancelPath)).thenThrow(
+          const ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+        );
+
+        final result = await repository.cancel('s1');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+              (f) => f.message, 'message', 'Treinamento não encontrado'),
+        );
+      });
+
+      test('sem rede, a mensagem de falta de conexão e o status local não muda',
+          () async {
+        await seedSession();
+        when(() => api.patch<Map<String, dynamic>>(cancelPath)).thenThrow(
+          const ApiException(
+            message: 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
+            isNetworkError: true,
+          ),
+        );
+
+        final result = await repository.cancel('s1');
+
+        expect(
+          result,
+          isA<Failure<void>>().having(
+            (f) => f.message,
+            'message',
+            'Sem conexão com o servidor. Verifique a internet e tente de novo.',
           ),
         );
         final row = await db.select(db.sessions).getSingle();

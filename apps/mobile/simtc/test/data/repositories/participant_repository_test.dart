@@ -323,6 +323,30 @@ void main() {
       expect(await db.select(db.participants).get(), hasLength(1));
     });
 
+    test('404 devolve a mensagem do servidor e preserva o cache', () async {
+      await seedSession();
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson([participantJson('tp-1')])),
+      );
+      await repository.syncSession('sess-1');
+
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenThrow(
+        const ApiException(
+          message: 'Treinamento não encontrado',
+          statusCode: 404,
+        ),
+      );
+
+      final result = await repository.syncSession('sess-1');
+
+      expect(
+        result,
+        isA<Failure<int>>()
+            .having((f) => f.message, 'message', 'Treinamento não encontrado'),
+      );
+      expect(await db.select(db.participants).get(), hasLength(1));
+    });
+
     test('sem rede, a mensagem diz que o cache continua na tela', () async {
       when(() => api.get<Map<String, dynamic>>(detailPath)).thenThrow(
         const ApiException(message: 'sem rede', isNetworkError: true),
@@ -631,6 +655,49 @@ void main() {
       );
       final row = await db.select(db.participants).getSingle();
       expect(row.status, 'PENDENTE');
+    });
+
+    test('sem rede, a mensagem de falta de conexão e a linha local não muda',
+        () async {
+      await seedPending();
+      when(() => api.post<Map<String, dynamic>>(assignPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+
+      final result = await repository.assign(
+        'tp-1',
+        consultantId: 'c-1',
+        consultantName: 'Carla Souza',
+      );
+
+      expect(
+        result,
+        isA<Failure<void>>().having((f) => f.message, 'message', 'Sem conexão'),
+      );
+      final row = await db.select(db.participants).getSingle();
+      expect(row.status, 'PENDENTE');
+      expect(row.assignedConsultantId, isNull);
+    });
+
+    test('404 vira a mensagem genérica de atribuir', () async {
+      await seedPending();
+      when(() => api.post<Map<String, dynamic>>(assignPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Treinamento não encontrado', statusCode: 404),
+      );
+
+      final result = await repository.assign(
+        'tp-1',
+        consultantId: 'c-1',
+        consultantName: 'Carla Souza',
+      );
+
+      expect(
+        result,
+        isA<Failure<void>>().having((f) => f.message, 'message',
+            'Não foi possível atribuir o participante. Tente de novo.'),
+      );
     });
 
     test('erro inesperado do servidor vira uma mensagem genérica', () async {
@@ -1123,6 +1190,52 @@ void main() {
         result,
         isA<Failure<SessionParticipant>>().having((f) => f.message, 'message',
             'Não foi possível adicionar o participante. Tente de novo.'),
+      );
+    });
+
+    test('sem rede, a mensagem de falta de conexão', () async {
+      await seedSession();
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(message: 'Sem conexão', isNetworkError: true),
+      );
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(
+        result,
+        isA<Failure<SessionParticipant>>()
+            .having((f) => f.message, 'message', 'Sem conexão'),
+      );
+      expect(await db.select(db.participants).get(), isEmpty);
+    });
+
+    test('404 (sessão apagada) devolve a mensagem do servidor', () async {
+      await seedSession();
+      when(() => api.post<Map<String, dynamic>>(addPath,
+          data: any(named: 'data'))).thenThrow(
+        const ApiException(
+          message: 'Treinamento não encontrado',
+          statusCode: 404,
+        ),
+      );
+
+      final result = await repository.add(
+        'sess-1',
+        cpf: '52998224725',
+        name: 'Fernanda Lopes Meireles',
+        participationType: ParticipationType.teoricaEPratica,
+      );
+
+      expect(
+        result,
+        isA<Failure<SessionParticipant>>().having(
+            (f) => f.message, 'message', 'Treinamento não encontrado'),
       );
     });
 
