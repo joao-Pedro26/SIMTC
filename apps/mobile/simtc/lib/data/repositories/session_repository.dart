@@ -139,8 +139,8 @@ class SessionRepository {
   /// (`PATCH /training-sessions/:id`, só ADMIN). Nulo quer dizer "não mudou"
   /// e não é enviado — assim uma edição feita no painel web em outro campo
   /// não é desfeita por um valor velho do cache. Observações vazias limpam o
-  /// campo no servidor; a data não tem como ser apagada (o backend ignora
-  /// data vazia).
+  /// campo no servidor; a data o servidor ignora quando vem vazia, e por isso
+  /// não há como apagá-la por aqui.
   ///
   /// O backend recusa (403) sessão concluída ou cancelada. Com sucesso, o
   /// cache muda na hora, sem esperar o re-sync do detalhe.

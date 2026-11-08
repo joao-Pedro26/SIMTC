@@ -171,6 +171,10 @@ class AddParticipantViewModel extends ChangeNotifier {
       _cpf.isNotEmpty || _name.trim().isNotEmpty || _email.trim().isNotEmpty;
 
   /// Por que o formulário está travado; nulo quando dá para adicionar.
+  ///
+  /// Antes da primeira leitura do cache, `_session` é nulo e isto devolve
+  /// "Esta sessão não está mais disponível neste aparelho.". Não aparece para
+  /// ninguém: a tela olha o carregamento antes do motivo (Decisões, 4).
   String? get lockedReason {
     if (_currentUser?.isAdmin != true) {
       return 'Só administradores podem adicionar participantes.';

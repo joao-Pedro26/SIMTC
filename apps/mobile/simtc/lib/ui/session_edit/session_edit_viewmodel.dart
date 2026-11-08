@@ -100,6 +100,10 @@ class SessionEditViewModel extends ChangeNotifier {
 
   /// Por que os campos estão travados; nulo quando dá para editar. O motivo
   /// fica escrito na tela — os campos nunca somem (canvas "3b").
+  ///
+  /// Antes da primeira leitura do cache, `_session` é nulo e isto devolve
+  /// "Esta sessão não está mais disponível neste aparelho.". Não aparece para
+  /// ninguém: a tela olha o carregamento antes do motivo (Decisões, 4).
   String? get lockedReason {
     if (_currentUser?.isAdmin != true) {
       return 'Só administradores podem alterar os dados do treinamento.';

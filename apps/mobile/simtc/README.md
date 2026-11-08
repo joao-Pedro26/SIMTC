@@ -75,7 +75,7 @@ Só os aparelhos pareados por este caminho B aparecem em `flutter devices --devi
 
 ## Acessar o backend local a partir do aparelho
 
-Em desenvolvimento, o app fala com o backend que roda no PC (`npm run start:dev` em `apps/backend`, porta 3001). Em vez de usar o IP do PC, que exige liberar o firewall do Windows, redirecione a porta pelo `adb`:
+O app usa a API de produção por padrão. Só quem roda com `--dart-define=API_BASE_URL=http://localhost:3001/api` (ver "Ambientes") fala com o backend que roda no PC (`npm run start:dev` em `apps/backend`, porta 3001). Para esse caso, em vez de usar o IP do PC, que exige liberar o firewall do Windows, redirecione a porta pelo `adb`:
 
 ```bash
 adb -s <ID_DO_APARELHO> reverse tcp:3001 tcp:3001

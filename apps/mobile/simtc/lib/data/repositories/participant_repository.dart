@@ -434,9 +434,10 @@ class ParticipantRepository {
       return Failure(Exception('$error'), _addFailed);
     }
 
-    // O backend já inscreveu. Um corpo fora do formato não vira falha — o
-    // admin tentaria de novo e receberia "CPF já inscrito": só não há linha
-    // para o cache, e o re-sync do detalhe a traz.
+    // O backend já inscreveu. Um corpo fora do formato não vira falha: o `add`
+    // devolve um participante com `id` vazio e sem linha no cache (o admin
+    // tentaria de novo e receberia "CPF já inscrito"); o re-sync do detalhe o
+    // traz depois.
     if (added.id.isEmpty) {
       return Success(
         SessionParticipant(

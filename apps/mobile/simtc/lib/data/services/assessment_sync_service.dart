@@ -216,8 +216,8 @@ class AssessmentSyncService extends ChangeNotifier {
     if (_disposed || _userId != userId) return;
 
     _firstQueueEmission = true;
-    // Com `onError`, um erro numa leitura não derruba a assinatura: a
-    // próxima mudança na fila chega normalmente.
+    // Um erro na leitura da fila só é registrado e a assinatura segue: a
+    // fila volta a aparecer no próximo evento do banco.
     _queueSubscription = _assessments.watchQueue(userId).listen(
           _onQueue,
           onError: (Object error) => appLog('Leitura da fila falhou: $error'),

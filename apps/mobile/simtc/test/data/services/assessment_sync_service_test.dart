@@ -388,8 +388,8 @@ void main() {
   });
 
   test(
-      '401 no envio (sessão encerrada) não marca erro: a fila espera o dono '
-      'entrar de novo', () async {
+      '401 no envio não marca erro: a sessão foi encerrada (ou o servidor '
+      'recusou de novo) e a fila fica pendente', () async {
     failWith(const ApiException(message: 'Unauthorized', statusCode: 401));
     startService();
 

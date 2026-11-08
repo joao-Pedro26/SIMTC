@@ -372,6 +372,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+/// Medidas de uma linha do Perfil, por tamanho de tela.
+class _RowMetrics {
+  const _RowMetrics({
+    required this.minHeight,
+    required this.padding,
+    required this.iconSize,
+    required this.iconGap,
+    required this.valueGap,
+    required this.labelStyle,
+    required this.valueStyle,
+  });
+
+  final double minHeight;
+  final EdgeInsets padding;
+  final double iconSize;
+
+  /// Entre o ícone e o rótulo.
+  final double iconGap;
+
+  /// Entre o rótulo e o valor, à direita.
+  final double valueGap;
+  final TextStyle labelStyle;
+  final TextStyle valueStyle;
+}
+
+/// Celular (quadro "2i"): ícone de 22, 15 em cima e embaixo, 20 dos lados, 14
+/// entre o ícone e o rótulo, 56 de altura.
+final _phoneMetrics = _RowMetrics(
+  minHeight: AppSpacing.controlHeight,
+  padding: const EdgeInsets.symmetric(
+    horizontal: AppSpacing.xl,
+    vertical: AppSpacing.md + 3,
+  ),
+  iconSize: 22,
+  iconGap: AppSpacing.md + 2,
+  // 14 no celular ("2i") e 16 no tablet ("4k"/"4v") (Fase 8C).
+  valueGap: AppSpacing.md + 2,
+  labelStyle: AppTypography.profileRowLabel,
+  valueStyle: AppTypography.profileRowValue,
+);
+
+/// Tablet (quadros "4k" e "4v"): ícone de 23, 18 em cima e embaixo, sem recuo
+/// dos lados (a coluna já tem), 16 entre o ícone e o rótulo e pelo menos 64.
+final _tabletMetrics = _RowMetrics(
+  minHeight: AppSpacing.controlHeight + AppSpacing.sm,
+  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg + 2),
+  iconSize: 23,
+  iconGap: AppSpacing.lg,
+  valueGap: AppSpacing.lg,
+  labelStyle: AppTypography.profileRowLabelTablet,
+  valueStyle: AppTypography.profileRowValueTablet,
+);
+
 /// Uma linha do Perfil (quadro "2i"): ícone de 22, rótulo e valor; 15 em
 /// cima e embaixo, 20 dos lados, 14 entre o ícone e o rótulo, e pelo menos
 /// 56 de altura. No [tablet] (quadros "4k" e "4v"): ícone de 23, 18 em cima e
@@ -400,29 +453,19 @@ class _ProfileRow extends StatelessWidget {
   final bool isLoading;
   final VoidCallback? onTap;
 
-  static const double _iconSize = 22;
-  static const double _iconGap = AppSpacing.md + 2;
-  static const double _tabletIconSize = 23;
-  static const double _tabletMinHeight = AppSpacing.controlHeight + AppSpacing.sm;
   static const double _spinnerSize = 16;
 
   @override
   Widget build(BuildContext context) {
     final note = this.note;
+    final metrics = tablet ? _tabletMetrics : _phoneMetrics;
     return Material(
       color: AppColors.surface,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints: BoxConstraints(
-            minHeight: tablet ? _tabletMinHeight : AppSpacing.controlHeight,
-          ),
-          padding: tablet
-              ? const EdgeInsets.symmetric(vertical: AppSpacing.lg + 2)
-              : const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.md + 3,
-                ),
+          constraints: BoxConstraints(minHeight: metrics.minHeight),
+          padding: metrics.padding,
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
           ),
@@ -430,20 +473,15 @@ class _ProfileRow extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: tablet ? _tabletIconSize : _iconSize,
+                size: metrics.iconSize,
                 color: AppColors.text3,
               ),
-              SizedBox(width: tablet ? AppSpacing.lg : _iconGap),
+              SizedBox(width: metrics.iconGap),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      label,
-                      style: tablet
-                          ? AppTypography.profileRowLabelTablet
-                          : AppTypography.profileRowLabel,
-                    ),
+                    Text(label, style: metrics.labelStyle),
                     if (note != null) ...[
                       const SizedBox(height: AppSpacing.xxs),
                       Text(note, style: AppTypography.meta),
@@ -451,17 +489,13 @@ class _ProfileRow extends StatelessWidget {
                   ],
                 ),
               ),
-              // 14 no celular ("2i") e 16 no tablet ("4k"/"4v") (Fase 8C).
-              SizedBox(width: tablet ? AppSpacing.lg : AppSpacing.md + 2),
+              SizedBox(width: metrics.valueGap),
               if (isLoading)
                 const AppSpinner(size: _spinnerSize, strokeWidth: 2)
               else
                 Text(
                   value,
-                  style: (tablet
-                          ? AppTypography.profileRowValueTablet
-                          : AppTypography.profileRowValue)
-                      .copyWith(color: valueColor),
+                  style: metrics.valueStyle.copyWith(color: valueColor),
                 ),
             ],
           ),

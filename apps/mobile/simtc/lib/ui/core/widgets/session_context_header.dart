@@ -5,6 +5,35 @@ import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'company_logo.dart';
 
+/// Medidas de uma faixa: o recuo vertical, o estilo da primeira linha e o vão
+/// até a segunda.
+class _HeaderMetrics {
+  const _HeaderMetrics({
+    required this.verticalPadding,
+    required this.titleStyle,
+    required this.subtitleGap,
+  });
+
+  final double verticalPadding;
+  final TextStyle Function() titleStyle;
+  final double subtitleGap;
+}
+
+/// Quadro "3b" (Dados do treinamento): recuo de 14, empresa em 15 e 3 até a
+/// linha de apoio.
+final _spaciousMetrics = _HeaderMetrics(
+  verticalPadding: AppSpacing.md + 2,
+  titleStyle: () => AppTypography.contextTitle,
+  subtitleGap: AppSpacing.xxs + 1,
+);
+
+/// Quadros "3a" e "3c": recuo de 12, empresa em 14 e 2 até a linha de apoio.
+final _compactMetrics = _HeaderMetrics(
+  verticalPadding: AppSpacing.md,
+  titleStyle: () => AppTypography.contextTitleCompact,
+  subtitleGap: AppSpacing.xxs,
+);
+
 /// Faixa de contexto no topo das telas de ADMIN (canvas "3a", "3b" e "3c"):
 /// o logo da empresa e duas linhas dizendo em que sessão o admin está
 /// mexendo — ele cadastra em sequência e precisa saber onde está.
@@ -40,6 +69,7 @@ class SessionContextHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final metrics = spacious ? _spaciousMetrics : _compactMetrics;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -48,7 +78,7 @@ class SessionContextHeader extends StatelessWidget {
       ),
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
-        vertical: spacious ? AppSpacing.md + 2 : AppSpacing.md,
+        vertical: metrics.verticalPadding,
       ),
       child: Row(
         children: [
@@ -63,15 +93,11 @@ class SessionContextHeader extends StatelessWidget {
               children: [
                 Text(
                   title ?? companyName,
-                  style: spacious
-                      ? AppTypography.contextTitle
-                      : AppTypography.contextTitleCompact,
+                  style: metrics.titleStyle(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(
-                  height: spacious ? AppSpacing.xxs + 1 : AppSpacing.xxs,
-                ),
+                SizedBox(height: metrics.subtitleGap),
                 Text(
                   subtitle,
                   style: AppTypography.meta,
