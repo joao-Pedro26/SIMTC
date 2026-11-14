@@ -38,6 +38,10 @@ type FieldKey = 'name' | 'cpf' | 'email' | 'cnhCategory' | 'cnhExpiration' | 'pa
 type Grid = unknown[][];
 
 const HEADER_SCAN_ROWS = 10;
+/** Colunas além desta são ignoradas na leitura do .xlsx. */
+const XLSX_MAX_COLUMNS = 50;
+/** Seriais do Excel abaixo disto (antes de ~1954) são tratados como número solto, não data. */
+const MIN_PLAUSIBLE_EXCEL_SERIAL = 20000;
 const XLSX_SIGNATURE = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 /** Minúsculas, sem acento, sem pontuação, espaços colapsados. */
@@ -89,7 +93,7 @@ function parseDate(value: unknown): string | undefined {
   }
   if (typeof value === 'number') {
     // Número serial do Excel (dias desde 30/12/1899).
-    if (!isFinite(value) || value < 1 || value > 2958465) return undefined;
+    if (!isFinite(value) || value < MIN_PLAUSIBLE_EXCEL_SERIAL || value > 2958465) return undefined;
     return new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000)
       .toISOString()
       .slice(0, 10);
@@ -155,7 +159,10 @@ export function validateImportRow(raw: RawImportRow): ParsedRow {
 
   let participationType: ParticipationType | undefined;
   if (!isBlank(raw.participationType)) {
-    participationType = PARTICIPATION_ALIASES[normalizeText(raw.participationType)];
+    const key = normalizeText(raw.participationType);
+    participationType = Object.prototype.hasOwnProperty.call(PARTICIPATION_ALIASES, key)
+      ? PARTICIPATION_ALIASES[key]
+      : undefined;
     if (!participationType) warnings.push('Tipo de participação não reconhecido');
   }
 
@@ -213,12 +220,12 @@ function buildSheet(
     .filter(({ text, index }) => text !== '' && !used.has(index))
     .map(({ text }) => text);
 
+  // `forEach` pula os buracos do grid esparso do .xlsx; o custo não depende da linha mais distante.
   const dataRows: { rowNumber: number; cells: unknown[] }[] = [];
-  for (let i = headerRow; i < grid.length; i++) {
-    const cells = grid[i] ?? [];
-    if (cells.every(isBlank)) continue;
+  grid.forEach((cells, i) => {
+    if (i < headerRow || !cells || cells.every(isBlank)) return;
     dataRows.push({ rowNumber: i + 1, cells });
-  }
+  });
   if (dataRows.length > PARTICIPANT_IMPORT_MAX_ROWS) {
     throw new BadRequestException(
       `A planilha tem ${dataRows.length} linhas; o limite é ${PARTICIPANT_IMPORT_MAX_ROWS} por arquivo`,
@@ -270,24 +277,43 @@ async function parseXlsx(buffer: Buffer): Promise<ParsedSheet> {
   }
 
   for (const sheet of workbook.worksheets) {
+    // Grid esparso: só linhas/células que existem, sem varrer rowCount × columnCount.
     const grid: Grid = [];
-    for (let r = 1; r <= sheet.rowCount; r++) {
-      const row = sheet.getRow(r);
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const cells: unknown[] = [];
-      for (let c = 1; c <= sheet.columnCount; c++) cells.push(readCell(row.getCell(c)));
-      grid.push(cells);
-    }
+      row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        if (colNumber <= XLSX_MAX_COLUMNS) cells[colNumber - 1] = readCell(cell);
+      });
+      grid[rowNumber - 1] = cells;
+    });
     const header = findHeader(grid);
     if (header) return buildSheet(grid, sheet.name, header);
   }
   throw new BadRequestException(HEADER_NOT_FOUND);
 }
 
+/** Pontos de código de 0x80-0x9F no Windows-1252 (latin1 puro os deixaria como controles C1). */
+const WINDOWS_1252_C1 = [
+  0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030, 0x160, 0x2039, 0x152,
+  0x8d, 0x17d, 0x8f, 0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x2dc, 0x2122,
+  0x161, 0x203a, 0x153, 0x9d, 0x17e, 0x178,
+];
+
+/**
+ * `TextDecoder('windows-1252')` no Node 24 decodifica como latin1 (0x93 vira controle C1),
+ * então a tabela fica explícita aqui.
+ */
+function decodeWindows1252(buffer: Buffer): string {
+  return buffer
+    .toString('latin1')
+    .replace(/[-]/g, (ch) => String.fromCharCode(WINDOWS_1252_C1[ch.charCodeAt(0) - 0x80]));
+}
+
 function decodeCsv(buffer: Buffer): string {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer).replace(/^﻿/, '');
   } catch {
-    return buffer.toString('latin1');
+    return decodeWindows1252(buffer);
   }
 }
 

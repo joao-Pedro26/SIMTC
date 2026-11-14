@@ -157,6 +157,57 @@ describe('parseParticipantSheet', () => {
     expect(sheet.rows.map((r) => r.rowNumber)).toEqual([2, 4]);
   });
 
+  it('célula perdida na linha 50000 não custa tempo nem vira linha de dados', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Aba1');
+    ws.addRow(HEADER);
+    ws.addRow(['Maria', VALID_CPF, '', 'B']);
+    ws.getCell('A50000').value = ' ';
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+    const started = Date.now();
+    const sheet = await parseParticipantSheet(buf, 'a.xlsx');
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(sheet.rows).toHaveLength(1);
+    expect(sheet.rows[0].rowNumber).toBe(2);
+  });
+
+  it('número puro pequeno na Validade é ilegível; serial válido funciona', async () => {
+    const buf = await oneSheet([
+      HEADER,
+      ['Ana', VALID_CPF, '', 'B', 2027],
+      ['Bia', VALID_CPF, '', 'B', 46752],
+    ]);
+    const sheet = await parseParticipantSheet(buf, 'a.xlsx');
+    expect(sheet.rows[0].cnhExpiration).toBeUndefined();
+    expect(sheet.rows[0].warnings).toEqual(['Validade da CNH ilegível']);
+    expect(sheet.rows[1].cnhExpiration).toBe('2027-12-31');
+  });
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    'tipo "%s" não é reconhecido',
+    (participationType) => {
+      const row = validateImportRow({
+        rowNumber: 2,
+        name: 'Maria',
+        cpf: VALID_CPF,
+        cnhCategory: 'B',
+        participationType,
+      });
+      expect(row.participationType).toBeUndefined();
+      expect(row.warnings).toEqual(['Tipo de participação não reconhecido']);
+    },
+  );
+
+  it('CSV em Windows-1252 decodifica aspas curvas e travessão', async () => {
+    const csv = Buffer.concat([
+      Buffer.from('Nome;CPF;Categoria CNH\n', 'latin1'),
+      Buffer.from([0x93, 0x4a, 0x6f, 0xe3, 0x6f, 0x94, 0x20, 0x96, 0x20, 0x41]),
+      Buffer.from(';01234567890;B\n', 'latin1'),
+    ]);
+    const sheet = await parseParticipantSheet(csv, 'a.csv');
+    expect(sheet.rows[0].name).toBe('“João” – A');
+  });
+
   it('recusa .xls', async () => {
     await expectFileError(
       parseParticipantSheet(Buffer.from('x'), 'a.xls'),
