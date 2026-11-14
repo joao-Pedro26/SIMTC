@@ -7,6 +7,7 @@ import { CompaniesModule } from './companies/companies.module';
 import { ConsultantsModule } from './consultants/consultants.module';
 import { CoursesModule } from './courses/courses.module';
 import { AssessmentCategoriesModule } from './assessment-categories/assessment-categories.module';
+import { VehicleTypesModule } from './vehicle-types/vehicle-types.module';
 import { DemandPipelineModule } from './demand-pipeline/demand-pipeline.module';
 import { TrainingSessionsModule } from './training-sessions/training-sessions.module';
 import { ParticipantsModule } from './participants/participants.module';
@@ -39,6 +40,7 @@ import { JobsModule } from './jobs/jobs.module';
     CompaniesModule,
     ConsultantsModule,
     CoursesModule,
+    VehicleTypesModule,
     AssessmentCategoriesModule,
     DemandPipelineModule,
     TrainingSessionsModule,

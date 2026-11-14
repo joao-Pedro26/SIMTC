@@ -65,7 +65,8 @@ model Consultant {
 model Course {
   id            String      @id @default(cuid())
   name          String
-  vehicleType   VehicleType
+  vehicleTypeId String
+  vehicleType   VehicleType @relation(fields: [vehicleTypeId], references: [id])
   theoryHours   Float
   practiceHours Float       @default(0)
   description   String
@@ -90,10 +91,14 @@ model CourseAssessmentCategory {
   @@index([categoryId])
 }
 
-enum VehicleType {
-  LEVE
-  PESADO
-  MOTO
+// Tipos de veículo gerenciáveis pelo admin (antes era um enum fixo).
+// Não dá pra excluir um tipo que ainda está em uso por algum curso.
+model VehicleType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  courses Course[]
 }
 
 // ─── CATEGORIAS E INFRAÇÕES ──────────────────────────────────────────────────

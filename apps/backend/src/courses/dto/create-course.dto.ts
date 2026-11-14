@@ -1,18 +1,14 @@
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 
-enum VehicleType {
-  LEVE = 'LEVE',
-  PESADO = 'PESADO',
-  MOTO = 'MOTO'
-}
-
-export class CreateCourseDto { 
+export class CreateCourseDto {
 
     @IsString()
     name!: string;
 
-    @IsEnum(VehicleType)
-    vehicleType!: VehicleType;
+    /** Id de um VehicleType cadastrado (GET /vehicle-types). */
+    @IsString()
+    @IsNotEmpty()
+    vehicleTypeId!: string;
 
     @IsNumber()
     @Min(0) 

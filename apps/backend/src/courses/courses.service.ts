@@ -6,6 +6,7 @@ import { UpdateCourseDto } from './dto/update-couse.dto';
 
 const COURSE_INCLUDE = {
   categories: { select: { categoryId: true } },
+  vehicleType: true,
 } satisfies Prisma.CourseInclude;
 
 type CourseWithCategories = Prisma.CourseGetPayload<{ include: typeof COURSE_INCLUDE }>;
@@ -23,6 +24,7 @@ export class CoursesService {
   async createCourse(dto: CreateCourseDto) {
     const { categoryIds, ...data } = dto;
     const ids = await this.validateCategoryIds(categoryIds ?? [], data.practiceHours ?? 0);
+    await this.validateVehicleTypeId(data.vehicleTypeId);
 
     const course = await this.prisma.course.create({
       data: {
@@ -58,6 +60,7 @@ export class CoursesService {
     // práticas e os tópicos que vão ficar depois deste PATCH.
     const practiceHours = data.practiceHours ?? current.practiceHours;
     const ids = await this.validateCategoryIds(categoryIds ?? current.categoryIds, practiceHours);
+    if (data.vehicleTypeId !== undefined) await this.validateVehicleTypeId(data.vehicleTypeId);
 
     const course = await this.prisma.$transaction(async (tx) => {
       if (categoryIds !== undefined) {
@@ -74,6 +77,13 @@ export class CoursesService {
   async deleteCourse(id: string) {
     await this.findCourseById(id);
     return this.prisma.course.delete({ where: { id } });
+  }
+
+  private async validateVehicleTypeId(vehicleTypeId: string) {
+    const exists = await this.prisma.vehicleType.findUnique({ where: { id: vehicleTypeId } });
+    if (!exists) {
+      throw new BadRequestException('Tipo de veículo não encontrado.');
+    }
   }
 
   /**
