@@ -67,12 +67,10 @@ function toRowDto(row: ParticipantImportPreviewRow): ParticipantImportRowDto {
   if (row.email !== undefined) dto.email = row.email
   if (row.cnhCategory !== undefined) dto.cnhCategory = row.cnhCategory
   if (row.cnhExpiration !== undefined) dto.cnhExpiration = row.cnhExpiration
-  if (row.participationType !== undefined) dto.participationType = row.participationType
   return dto
 }
 
 export function ImportParticipantsModal({ sessionId, onClose, onImported }: ImportParticipantsModalProps) {
-  const [defaultType, setDefaultType] = useState<ParticipationType>(ParticipationType.TEORICA_E_PRATICA)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -147,7 +145,6 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
           <PreviewStep
             sessionId={sessionId}
             preview={preview}
-            defaultType={defaultType}
             onChangeFile={() => { setPreview(null); setError('') }}
             onDone={setResult}
             onAttempt={() => setImportAttempted(true)}
@@ -156,20 +153,6 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
         ) : (
           <>
             <div className={styles.body}>
-              <div className={styles.field}>
-                <label htmlFor="import-default-type" className={styles.label}>Tipo de participação padrão</label>
-                <select
-                  id="import-default-type"
-                  className={styles.select}
-                  value={defaultType}
-                  onChange={(e) => setDefaultType(e.target.value as ParticipationType)}
-                  disabled={loadingPreview}
-                >
-                  <option value={ParticipationType.TEORICA_E_PRATICA}>Teoria + Prática</option>
-                  <option value={ParticipationType.SOMENTE_TEORICA}>Teoria</option>
-                </select>
-              </div>
-
               <div
                 className={`${styles.dropzone} ${dragging ? styles.dropzoneActive : ''}`}
                 onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
@@ -220,14 +203,13 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
 interface PreviewStepProps {
   sessionId: string
   preview: ParticipantImportPreviewResponse
-  defaultType: ParticipationType
   onChangeFile: () => void
   onDone: (r: ParticipantImportResult) => void
   onAttempt: () => void
   onClose: () => void
 }
 
-function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, onAttempt, onClose }: PreviewStepProps) {
+function PreviewStep({ sessionId, preview, onChangeFile, onDone, onAttempt, onClose }: PreviewStepProps) {
   const [filter, setFilter] = useState<'' | ParticipantImportRowStatus>('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -258,7 +240,6 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
     try {
       const chosen = new Set(selection.selectedIds)
       const body: ImportParticipantsDto = {
-        defaultParticipationType: defaultType,
         rows: preview.rows.filter((r) => chosen.has(String(r.rowNumber))).map(toRowDto),
       }
       const res = await clientApi.post<ParticipantImportResult>(
@@ -289,6 +270,9 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
             <span key={c.label} className={styles.chip}>{c.label}: <strong>{c.value}</strong></span>
           ))}
         </div>
+        <p className={styles.note}>
+          Todos entram como {TYPE_LABELS[preview.participationType]}, conforme o curso do treinamento.
+        </p>
 
         <div className={styles.filterRow}>
           <label htmlFor="import-status-filter" className={styles.label}>Filtrar por status</label>
@@ -328,7 +312,6 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
                 <th className={styles.th}>CPF</th>
                 <th className={styles.th}>E-mail</th>
                 <th className={styles.th}>CNH</th>
-                <th className={styles.th}>Tipo</th>
                 <th className={styles.th}>Status</th>
               </tr>
             </thead>
@@ -354,7 +337,6 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
                     <td className={styles.td}>
                       {[r.cnhCategory, r.cnhExpiration].filter(Boolean).join(' · ')}
                     </td>
-                    <td className={styles.td}>{TYPE_LABELS[r.participationType ?? defaultType]}</td>
                     <td className={styles.td}>
                       <span className={`${styles.badge} ${STATUS_CLASS[r.status]}`}>{STATUS_LABELS[r.status]}</span>
                       {r.errors.map((m, i) => <p key={`e${i}`} className={styles.msgError}>{m}</p>)}
