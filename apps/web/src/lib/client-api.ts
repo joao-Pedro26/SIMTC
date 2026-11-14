@@ -120,5 +120,6 @@ export const clientApi = {
   patch:  <T>(path: string, body: unknown) => clientFetch<T>(path, { method: 'PATCH',  body: JSON.stringify(body) }),
   delete: <T>(path: string)                => clientFetch<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, fd: FormData)  => clientFetch<T>(path, { method: 'PATCH',  body: fd }),
+  uploadPost: <T>(path: string, fd: FormData) => clientFetch<T>(path, { method: 'POST',   body: fd }),
   downloadFile,
 }

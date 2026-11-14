@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provid
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
 import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
+import { ImportParticipantsModal } from './import-participants-modal'
 import type { TrainingSession, TrainingParticipant, ParticipantStatus } from './types'
 import styles from './participants-tab.module.css'
 
@@ -62,6 +63,7 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState<AddParticipantForm>(emptyForm)
   const [busy, setBusy] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [actionError, setActionError] = useState('')
   const [nameFilter,   setNameFilter]   = useState('')
   const [tipoFilter,   setTipoFilter]   = useState('')
@@ -230,7 +232,7 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
               <Trash2 size={14} /> Excluir selecionados ({bulkSelection.selectedCount})
             </Button>
           )}
-          <Button variant="ghost" size="sm" disabled>
+          <Button variant="ghost" size="sm" onClick={() => setShowImport(true)} disabled={!canEdit || busy}>
             <Upload size={14} /> Importar planilha
           </Button>
           <Button
@@ -457,6 +459,14 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
             onRefresh()
           }}
           onClose={() => setBulkJobId(null)}
+        />
+      )}
+
+      {showImport && (
+        <ImportParticipantsModal
+          sessionId={sessionId}
+          onImported={() => onRefresh()}
+          onClose={() => setShowImport(false)}
         />
       )}
 
