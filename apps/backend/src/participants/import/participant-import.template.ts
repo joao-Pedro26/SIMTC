@@ -19,7 +19,7 @@ const COLUMNS: { header: string; width: number; numFmt?: string }[] = [
   { header: 'CPF*', width: 18, numFmt: '@' },
   { header: 'E-mail', width: 30 },
   { header: 'Categoria CNH*', width: 18 },
-  { header: 'Validade CNH', width: 16, numFmt: 'dd/mm/yyyy' },
+  { header: 'Validade CNH*', width: 16, numFmt: 'dd/mm/yyyy' },
   { header: 'Tipo de participação', width: 24 },
 ];
 
@@ -30,10 +30,10 @@ const INSTRUCTIONS: string[] = [
   '',
   'Preencha a aba "Participantes", uma pessoa por linha, a partir da linha 2.',
   '',
-  'Campos obrigatórios: Nome, CPF e Categoria CNH.',
+  'Campos obrigatórios: Nome, CPF, Categoria CNH e Validade CNH.',
   `Categorias de CNH aceitas: ${CNH_CATEGORIES.join(', ')}.`,
   'E-mail: opcional, mas, se preenchido, precisa ser um e-mail válido.',
-  'Validade CNH: opcional, no formato dd/mm/aaaa (por exemplo, 31/12/2030).',
+  'Validade CNH: obrigatória, no formato dd/mm/aaaa (por exemplo, 31/12/2030).',
   `Tipo de participação: opcional; use ${PARTICIPATION_TYPE_OPTIONS.map((o) => `"${o}"`).join(' ou ')}. Em branco, vale o tipo padrão escolhido na importação.`,
   'CPF: a coluna já está formatada como Texto para o Excel não apagar o zero à esquerda.',
   '',

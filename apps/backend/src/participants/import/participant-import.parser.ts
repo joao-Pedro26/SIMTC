@@ -152,9 +152,11 @@ export function validateImportRow(raw: RawImportRow): ParsedRow {
   }
 
   let cnhExpiration: string | undefined;
-  if (!isBlank(raw.cnhExpiration)) {
+  if (isBlank(raw.cnhExpiration)) {
+    errors.push('Validade da CNH obrigatória');
+  } else {
     cnhExpiration = parseDate(raw.cnhExpiration);
-    if (!cnhExpiration) warnings.push('Validade da CNH ilegível');
+    if (!cnhExpiration) errors.push('Validade da CNH ilegível (use dd/mm/aaaa)');
   }
 
   let participationType: ParticipationType | undefined;
@@ -212,6 +214,9 @@ function buildSheet(
   const { headerRow, columns } = header;
   if (!columns.has('cnhCategory')) {
     throw new BadRequestException('Coluna Categoria CNH não encontrada');
+  }
+  if (!columns.has('cnhExpiration')) {
+    throw new BadRequestException('Coluna Validade CNH não encontrada');
   }
 
   const used = new Set(columns.values());

@@ -7,6 +7,7 @@ import {
 
 const HEADER = ['Nome', 'CPF', 'E-mail', 'Categoria CNH', 'Validade CNH', 'Tipo'];
 const VALID_CPF = '01234567890';
+const EXP = '31/12/2030';
 
 type Cell = ExcelJS.CellValue;
 
@@ -32,7 +33,7 @@ describe('parseParticipantSheet', () => {
       ['Lista da turma'],
       [],
       HEADER,
-      ['Maria', VALID_CPF, '', 'B'],
+      ['Maria', VALID_CPF, '', 'B', EXP],
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.headerRow).toBe(3);
@@ -58,8 +59,8 @@ describe('parseParticipantSheet', () => {
 
   it('aceita "Nome Completo" e cabeçalho com asterisco do modelo', async () => {
     const buf = await oneSheet([
-      ['Nome Completo*', 'CPF*', 'Categoria CNH*'],
-      ['Ana', VALID_CPF, 'B'],
+      ['Nome Completo*', 'CPF*', 'Categoria CNH*', 'Validade CNH*'],
+      ['Ana', VALID_CPF, 'B', EXP],
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.rows[0].name).toBe('Ana');
@@ -69,7 +70,7 @@ describe('parseParticipantSheet', () => {
   it('usa a segunda aba quando só ela tem o cabeçalho', async () => {
     const buf = await xlsx([
       { name: 'Instruções', rows: [['Leia isto']] },
-      { name: 'Participantes', rows: [HEADER, ['Maria', VALID_CPF, '', 'B']] },
+      { name: 'Participantes', rows: [HEADER, ['Maria', VALID_CPF, '', 'B', EXP]] },
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.sheetName).toBe('Participantes');
@@ -77,14 +78,14 @@ describe('parseParticipantSheet', () => {
   });
 
   it('CPF numérico sem o zero à esquerda volta a ter 11 dígitos', async () => {
-    const buf = await oneSheet([HEADER, ['Maria', 1234567890, '', 'B']]);
+    const buf = await oneSheet([HEADER, ['Maria', 1234567890, '', 'B', EXP]]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.rows[0].cpf).toBe(VALID_CPF);
     expect(sheet.rows[0].errors).toEqual([]);
   });
 
   it('CPF com máscara fica só com dígitos', async () => {
-    const buf = await oneSheet([HEADER, ['Maria', '012.345.678-90', '', 'B']]);
+    const buf = await oneSheet([HEADER, ['Maria', '012.345.678-90', '', 'B', EXP]]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.rows[0].cpf).toBe(VALID_CPF);
   });
@@ -97,6 +98,7 @@ describe('parseParticipantSheet', () => {
         VALID_CPF,
         { text: 'Maria@Empresa.COM', hyperlink: 'mailto:Maria@Empresa.COM' },
         'B',
+        EXP,
       ],
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
@@ -123,23 +125,32 @@ describe('parseParticipantSheet', () => {
     expect(sheet.rows[0].cnhExpiration).toBe('2027-04-05');
   });
 
-  it('validade ilegível gera aviso e fica sem data', async () => {
+  it('validade ilegível é erro da linha, sem aviso e sem data', async () => {
     const buf = await oneSheet([HEADER, ['Maria', VALID_CPF, '', 'B', 'amanha']]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.rows[0].cnhExpiration).toBeUndefined();
-    expect(sheet.rows[0].warnings).toEqual(['Validade da CNH ilegível']);
-    expect(sheet.rows[0].errors).toEqual([]);
+    expect(sheet.rows[0].errors).toEqual(['Validade da CNH ilegível (use dd/mm/aaaa)']);
+    expect(sheet.rows[0].warnings).toEqual([]);
+  });
+
+  it('validade vazia é erro da linha', async () => {
+    const buf = await oneSheet([HEADER, ['Maria', VALID_CPF, '', 'B', '']]);
+    const sheet = await parseParticipantSheet(buf, 'a.xlsx');
+    expect(sheet.rows[0].cnhExpiration).toBeUndefined();
+    expect(sheet.rows[0].errors).toEqual(['Validade da CNH obrigatória']);
+    expect(sheet.rows[0].warnings).toEqual([]);
   });
 
   it('CSV com ; em latin1 mantém João e Conceição', async () => {
-    const csv = 'Nome;CPF;Categoria CNH\nJoão;012.345.678-90;B\nConceição;01234567890;A\n';
+    const csv =
+      'Nome;CPF;Categoria CNH;Validade CNH\nJoão;012.345.678-90;B;31/12/2030\nConceição;01234567890;A;31/12/2030\n';
     const sheet = await parseParticipantSheet(Buffer.from(csv, 'latin1'), 'a.csv');
     expect(sheet.sheetName).toBeNull();
     expect(sheet.rows.map((r) => r.name)).toEqual(['João', 'Conceição']);
   });
 
   it('CSV com , em UTF-8 com BOM reconhece a primeira coluna', async () => {
-    const csv = '﻿Nome,CPF,Categoria CNH\nMaria,01234567890,B\n';
+    const csv = '﻿Nome,CPF,Categoria CNH,Validade CNH\nMaria,01234567890,B,31/12/2030\n';
     const sheet = await parseParticipantSheet(Buffer.from(csv, 'utf8'), 'a.csv');
     expect(sheet.rows[0]).toMatchObject({ name: 'Maria', cpf: VALID_CPF, rowNumber: 2 });
   });
@@ -147,9 +158,9 @@ describe('parseParticipantSheet', () => {
   it('ignora linhas vazias no meio e no fim e preserva o rowNumber', async () => {
     const buf = await oneSheet([
       HEADER,
-      ['Ana', VALID_CPF, '', 'B'],
+      ['Ana', VALID_CPF, '', 'B', EXP],
       [],
-      ['Bia', VALID_CPF, '', 'B'],
+      ['Bia', VALID_CPF, '', 'B', EXP],
       [],
       [],
     ]);
@@ -161,7 +172,7 @@ describe('parseParticipantSheet', () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Aba1');
     ws.addRow(HEADER);
-    ws.addRow(['Maria', VALID_CPF, '', 'B']);
+    ws.addRow(['Maria', VALID_CPF, '', 'B', EXP]);
     ws.getCell('A50000').value = ' ';
     const buf = Buffer.from(await wb.xlsx.writeBuffer());
     const started = Date.now();
@@ -171,7 +182,7 @@ describe('parseParticipantSheet', () => {
     expect(sheet.rows[0].rowNumber).toBe(2);
   });
 
-  it('número puro pequeno na Validade é ilegível; serial válido funciona', async () => {
+  it('número puro pequeno na Validade é erro de leitura; serial válido funciona', async () => {
     const buf = await oneSheet([
       HEADER,
       ['Ana', VALID_CPF, '', 'B', 2027],
@@ -179,7 +190,8 @@ describe('parseParticipantSheet', () => {
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.rows[0].cnhExpiration).toBeUndefined();
-    expect(sheet.rows[0].warnings).toEqual(['Validade da CNH ilegível']);
+    expect(sheet.rows[0].errors).toEqual(['Validade da CNH ilegível (use dd/mm/aaaa)']);
+    expect(sheet.rows[0].warnings).toEqual([]);
     expect(sheet.rows[1].cnhExpiration).toBe('2027-12-31');
   });
 
@@ -191,6 +203,7 @@ describe('parseParticipantSheet', () => {
         name: 'Maria',
         cpf: VALID_CPF,
         cnhCategory: 'B',
+        cnhExpiration: '2030-12-31',
         participationType,
       });
       expect(row.participationType).toBeUndefined();
@@ -200,9 +213,9 @@ describe('parseParticipantSheet', () => {
 
   it('CSV em Windows-1252 decodifica aspas curvas e travessão', async () => {
     const csv = Buffer.concat([
-      Buffer.from('Nome;CPF;Categoria CNH\n', 'latin1'),
+      Buffer.from('Nome;CPF;Categoria CNH;Validade CNH\n', 'latin1'),
       Buffer.from([0x93, 0x4a, 0x6f, 0xe3, 0x6f, 0x94, 0x20, 0x96, 0x20, 0x41]),
-      Buffer.from(';01234567890;B\n', 'latin1'),
+      Buffer.from(';01234567890;B;31/12/2030\n', 'latin1'),
     ]);
     const sheet = await parseParticipantSheet(csv, 'a.csv');
     expect(sheet.rows[0].name).toBe('“João” – A');
@@ -250,6 +263,11 @@ describe('parseParticipantSheet', () => {
     await expectFileError(parseParticipantSheet(buf, 'a.xlsx'), 'Coluna Categoria CNH não encontrada');
   });
 
+  it('sem coluna Validade CNH é erro do arquivo', async () => {
+    const buf = await oneSheet([['Nome', 'CPF', 'Categoria CNH'], ['Maria', VALID_CPF, 'B']]);
+    await expectFileError(parseParticipantSheet(buf, 'a.xlsx'), 'Coluna Validade CNH não encontrada');
+  });
+
   it('cabeçalho depois da linha 10 não é encontrado', async () => {
     const rows: Cell[][] = Array.from({ length: 10 }, () => ['x']);
     rows.push(HEADER);
@@ -259,7 +277,7 @@ describe('parseParticipantSheet', () => {
 
   it('501 linhas de dados é erro do arquivo; 500 passa', async () => {
     const people = (n: number): Cell[][] =>
-      Array.from({ length: n }, (_, i) => [`Pessoa ${i}`, VALID_CPF, '', 'B']);
+      Array.from({ length: n }, (_, i) => [`Pessoa ${i}`, VALID_CPF, '', 'B', EXP]);
     const over = await oneSheet([HEADER, ...people(501)]);
     await expectFileError(
       parseParticipantSheet(over, 'a.xlsx'),
@@ -271,7 +289,13 @@ describe('parseParticipantSheet', () => {
 });
 
 describe('validateImportRow', () => {
-  const base = { rowNumber: 2, name: 'Maria', cpf: VALID_CPF, cnhCategory: 'B' };
+  const base = {
+    rowNumber: 2,
+    name: 'Maria',
+    cpf: VALID_CPF,
+    cnhCategory: 'B',
+    cnhExpiration: '2030-12-31',
+  };
 
   it.each([
     ['vazia', ''],
@@ -308,9 +332,14 @@ describe('validateImportRow', () => {
     expect(validateImportRow({ ...base, email: 'fulano@' }).errors).toEqual(['E-mail inválido']);
   });
 
-  it('acumula nome vazio, CPF inválido e CNH vazia', () => {
+  it('acumula nome vazio, CPF inválido, CNH vazia e validade vazia', () => {
     const row = validateImportRow({ rowNumber: 7, name: '', cpf: '123', cnhCategory: '' });
-    expect(row.errors).toEqual(['Nome obrigatório', 'CPF inválido', 'Categoria CNH obrigatória']);
+    expect(row.errors).toEqual([
+      'Nome obrigatório',
+      'CPF inválido',
+      'Categoria CNH obrigatória',
+      'Validade da CNH obrigatória',
+    ]);
     expect(row.rowNumber).toBe(7);
     expect(row.cpf).toBe('123');
   });

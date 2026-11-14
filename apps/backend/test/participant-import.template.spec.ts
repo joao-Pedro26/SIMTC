@@ -34,7 +34,7 @@ describe('buildParticipantImportTemplate', () => {
       'CPF*',
       'E-mail',
       'Categoria CNH*',
-      'Validade CNH',
+      'Validade CNH*',
       'Tipo de participação',
     ]);
     for (let c = 1; c <= 6; c++) expect(header.getCell(c).font?.bold).toBe(true);
@@ -71,6 +71,8 @@ describe('buildParticipantImportTemplate', () => {
       'Nome',
       'CPF',
       'Categoria CNH',
+      'Campos obrigatórios: Nome, CPF, Categoria CNH e Validade CNH.',
+      'Validade CNH: obrigatória',
       CNH_CATEGORIES.join(', '),
       'dd/mm/aaaa',
       'Somente teórica',
@@ -97,8 +99,8 @@ describe('buildParticipantImportTemplate', () => {
     const wb = await open(template);
     const ws = wb.getWorksheet('Participantes')!;
     ws.getRow(2).values = ['Ana Souza', '01234567890', 'ana@x.com', 'B', '31/12/2030', 'Somente teórica'];
-    ws.getRow(3).values = ['Bruno Lima', '52998224725', '', 'AB', '', 'Teórica e prática'];
-    ws.getRow(4).values = ['Carla Dias', '11144477735', 'carla@x.com', 'E'];
+    ws.getRow(3).values = ['Bruno Lima', '52998224725', '', 'AB', '31/12/2030', 'Teórica e prática'];
+    ws.getRow(4).values = ['Carla Dias', '11144477735', 'carla@x.com', 'E', '31/12/2030'];
     const filled = Buffer.from(await wb.xlsx.writeBuffer());
 
     const sheet = await parseParticipantSheet(filled, 'modelo.xlsx');
@@ -113,5 +115,16 @@ describe('buildParticipantImportTemplate', () => {
       cnhExpiration: '2030-12-31',
     });
     expect(sheet.rows[1].participationType).toBe('TEORICA_E_PRATICA');
+  });
+
+  it('linha do modelo sem validade gera o erro de validade obrigatória', async () => {
+    const wb = await open(template);
+    const ws = wb.getWorksheet('Participantes')!;
+    ws.getRow(2).values = ['Ana Souza', '01234567890', '', 'B'];
+    const filled = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const sheet = await parseParticipantSheet(filled, 'modelo.xlsx');
+    expect(sheet.rows).toHaveLength(1);
+    expect(sheet.rows[0].errors).toEqual(['Validade da CNH obrigatória']);
   });
 });

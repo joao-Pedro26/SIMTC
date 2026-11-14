@@ -36,7 +36,7 @@ function stored(overrides: Record<string, unknown>) {
 }
 
 function row(rowNumber: number, overrides: Partial<ParticipantImportRowDto> = {}): ParticipantImportRowDto {
-  return { rowNumber, name: 'Ana Nova', cpf: CPF_ANA, cnhCategory: 'B', ...overrides };
+  return { rowNumber, name: 'Ana Nova', cpf: CPF_ANA, cnhCategory: 'B', cnhExpiration: '2027-12-31', ...overrides };
 }
 
 function body(...rows: ParticipantImportRowDto[]): ImportParticipantsDto {
@@ -109,11 +109,11 @@ describe('ParticipantImportService', () => {
 
       const file = csv(
         'Ana Nova,529.982.247-25,ana@empresa.com,B,31/12/2027,teorica',
-        `Bruno Cadastrado,${CPF_BRUNO},,AB,,`,
-        `Carla Inscrita,${CPF_CARLA},,B,,`,
-        `Ana Repetida,${CPF_ANA},,B,,`,
-        `Elisa Sem Cnh,${CPF_ELISA},,,,`,
-        `Diego Novo,${CPF_DIEGO},,C,,`,
+        `Bruno Cadastrado,${CPF_BRUNO},,AB,31/12/2027,`,
+        `Carla Inscrita,${CPF_CARLA},,B,31/12/2027,`,
+        `Ana Repetida,${CPF_ANA},,B,31/12/2027,`,
+        `Elisa Sem Cnh,${CPF_ELISA},,,31/12/2027,`,
+        `Diego Novo,${CPF_DIEGO},,C,31/12/2027,`,
       );
 
       const result = await service.preview(SESSION_ID, file, 'lista.csv');
@@ -169,7 +169,7 @@ describe('ParticipantImportService', () => {
     it('duplicado: vale a primeira ocorrência, mesmo com máscara diferente', async () => {
       const result = await service.preview(
         SESSION_ID,
-        csv(`Ana Nova,${CPF_ANA},,B,,`, 'Ana De Novo,529.982.247-25,,B,,'),
+        csv(`Ana Nova,${CPF_ANA},,B,31/12/2027,`, 'Ana De Novo,529.982.247-25,,B,31/12/2027,'),
         'lista.csv',
       );
 
@@ -179,7 +179,11 @@ describe('ParticipantImportService', () => {
     it('linha com ERRO não reserva o CPF para as seguintes', async () => {
       const result = await service.preview(
         SESSION_ID,
-        csv(`Ana Sem Cnh,${CPF_ANA},,,,`, `Ana Nova,${CPF_ANA},,B,,`, `Ana De Novo,${CPF_ANA},,B,,`),
+        csv(
+          `Ana Sem Cnh,${CPF_ANA},,,31/12/2027,`,
+          `Ana Nova,${CPF_ANA},,B,31/12/2027,`,
+          `Ana De Novo,${CPF_ANA},,B,31/12/2027,`,
+        ),
         'lista.csv',
       );
 
@@ -192,7 +196,7 @@ describe('ParticipantImportService', () => {
 
       const result = await service.preview(
         SESSION_ID,
-        csv(`Carla,${CPF_CARLA},x@,B,,`, `Carla,${CPF_CARLA},,B,,`),
+        csv(`Carla,${CPF_CARLA},x@,B,31/12/2027,`, `Carla,${CPF_CARLA},,B,31/12/2027,`),
         'lista.csv',
       );
 
@@ -200,8 +204,15 @@ describe('ParticipantImportService', () => {
       expect(result.rows[0].errors).toEqual(['E-mail inválido']);
     });
 
+    it('linha sem validade da CNH é ERRO', async () => {
+      const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,,`), 'lista.csv');
+
+      expect(result.rows[0].status).toBe('ERRO');
+      expect(result.rows[0].errors).toEqual(['Validade da CNH obrigatória']);
+    });
+
     it('arquivo só com linhas inválidas não consulta cadastros', async () => {
-      const result = await service.preview(SESSION_ID, csv('Sem Cpf,,,B,,'), 'lista.csv');
+      const result = await service.preview(SESSION_ID, csv('Sem Cpf,,,B,31/12/2027,'), 'lista.csv');
 
       expect(result.rows.map((r) => r.status)).toEqual(['ERRO']);
       expect(mockPrisma.participant.findMany).not.toHaveBeenCalled();
@@ -225,7 +236,7 @@ describe('ParticipantImportService', () => {
       it('nome e CNH diferentes viram change; e-mail vazio na planilha não', async () => {
         const result = await service.preview(
           SESSION_ID,
-          csv(`Bruno Novo,${CPF_BRUNO},,AB,,`),
+          csv(`Bruno Novo,${CPF_BRUNO},,AB,31/01/2026,`),
           'lista.csv',
         );
 
@@ -256,13 +267,14 @@ describe('ParticipantImportService', () => {
 
         const result = await service.preview(
           SESSION_ID,
-          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,,`),
+          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,31/12/2027,`),
           'lista.csv',
         );
 
         expect(result.rows[0].changes).toEqual([
           { field: 'email', from: null, to: 'bruno@novo.com' },
           { field: 'cnhCategory', from: null, to: 'B' },
+          { field: 'cnhExpiration', from: null, to: '2027-12-31' },
         ]);
       });
 
@@ -277,8 +289,26 @@ describe('ParticipantImportService', () => {
         expect(result.rows[0].changes).toEqual([]);
       });
 
+      it('validade igual à do cadastro não gera change; diferente gera', async () => {
+        const same = await service.preview(
+          SESSION_ID,
+          csv(`Bruno Antigo,${CPF_BRUNO},,B,31/01/2026,`),
+          'lista.csv',
+        );
+        expect(same.rows[0].changes).toEqual([]);
+
+        const other = await service.preview(
+          SESSION_ID,
+          csv(`Bruno Antigo,${CPF_BRUNO},,B,28/02/2026,`),
+          'lista.csv',
+        );
+        expect(other.rows[0].changes).toEqual([
+          { field: 'cnhExpiration', from: '2026-01-31', to: '2026-02-28' },
+        ]);
+      });
+
       it('só ATUALIZA_E_INSCREVE tem changes', async () => {
-        const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,,`), 'lista.csv');
+        const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,31/12/2027,`), 'lista.csv');
 
         expect(result.rows[0].status).toBe('NOVO');
         expect(result.rows[0]).not.toHaveProperty('changes');
@@ -308,6 +338,8 @@ describe('ParticipantImportService', () => {
       ['CNH fora da lista', { cnhCategory: 'F' }, 'Categoria CNH inválida (use: A, B, C, D, E, AB, AC, AD, AE)'],
       ['CNH ausente', { cnhCategory: undefined }, 'Categoria CNH obrigatória'],
       ['e-mail inválido', { email: 'x@' }, 'E-mail inválido'],
+      ['validade ausente', { cnhExpiration: undefined }, 'Validade da CNH obrigatória'],
+      ['validade ilegível', { cnhExpiration: 'amanha' }, 'Validade da CNH ilegível (use dd/mm/aaaa)'],
     ])('revalida a linha do JSON: %s vai para skipped, sem gravar', async (_label, overrides, reason) => {
       const result = await service.commit(SESSION_ID, body(row(2, overrides)));
 
@@ -321,10 +353,13 @@ describe('ParticipantImportService', () => {
     });
 
     it('linha com vários erros lista todos no motivo', async () => {
-      const result = await service.commit(SESSION_ID, body(row(2, { name: ' ', cnhCategory: 'F' })));
+      const result = await service.commit(
+        SESSION_ID,
+        body(row(2, { name: ' ', cnhCategory: 'F', cnhExpiration: undefined })),
+      );
 
       expect(result.skipped[0].reason).toBe(
-        'Nome obrigatório · Categoria CNH inválida (use: A, B, C, D, E, AB, AC, AD, AE)',
+        'Nome obrigatório · Categoria CNH inválida (use: A, B, C, D, E, AB, AC, AD, AE) · Validade da CNH obrigatória',
       );
     });
 
@@ -415,7 +450,11 @@ describe('ParticipantImportService', () => {
 
       expect(result).toEqual({ created: 0, updatedAndEnrolled: 1, skipped: [], failed: [] });
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      const expectedData = buildParticipantUpdateData({ name: 'Bruno Novo', cnhCategory: 'AB' });
+      const expectedData = buildParticipantUpdateData({
+        name: 'Bruno Novo',
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-12-31',
+      });
       expect(expectedData.email).toBeUndefined();
       expect(tx.participant.update).toHaveBeenCalledWith({ where: { id: 'p-bruno' }, data: expectedData });
       expect(tx.participant.create).not.toHaveBeenCalled();
@@ -492,7 +531,11 @@ describe('ParticipantImportService', () => {
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
       expect(tx.participant.update).toHaveBeenCalledWith({
         where: { id: 'p-ana' },
-        data: buildParticipantUpdateData({ name: 'Ana Atual', cnhCategory: 'B' }),
+        data: buildParticipantUpdateData({
+          name: 'Ana Atual',
+          cnhCategory: 'B',
+          cnhExpiration: '2027-12-31',
+        }),
       });
       expect(tx.trainingParticipant.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ participantId: 'p-ana' }),
