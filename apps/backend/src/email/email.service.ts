@@ -184,13 +184,20 @@ export class EmailService {
       from: this.from,
       to,
       subject: `Treinamento agendado: ${courseName} — SIM Treinamentos`,
-      html: `<p>Olá, ${contactName}!</p>
-             <p>Um novo treinamento foi agendado para a empresa <strong>${companyName}</strong>:</p>
-             <p><strong>Curso:</strong> ${courseName}<br>
-             <strong>Data:</strong> ${dateFormatted}<br>
-             <strong>Local:</strong> ${location}</p>
-             <p>Em caso de dúvidas, entre em contato: <a href="mailto:contato@simtc.com.br">contato@simtc.com.br</a></p>`,
-    });
+      template: {
+        id: 'training-scheduled',
+        variables: {
+          simLogoUrl: this.simLogoUrl,
+          brandBarUrl: this.brandBarUrl,
+          contactName,
+          companyName,
+          courseName,
+          trainingDate: dateFormatted,
+          location,
+          anoAtual: String(new Date().getFullYear()),
+        },
+      },
+    } as any);
   }
 
   async sendConsultantCredentials(
