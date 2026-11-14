@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, UseGuards, Patch, Delete, HttpCode, HttpStatus, Inject, MaxFileSizeValidator, ParseFilePipe, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Patch, Delete, HttpCode, HttpStatus, Inject, MaxFileSizeValidator, ParseFilePipe, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -10,6 +10,7 @@ import { ImportParticipantsBodyDto } from './dto/import-participants.dto';
 import { LookupParticipantDto } from './dto/lookup-participant.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { ParticipantImportService } from './import/participant-import.service';
+import { buildParticipantImportTemplate } from './import/participant-import.template';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 
@@ -103,6 +104,20 @@ export class ParticipantsController {
     @Body() dto: ImportParticipantsBodyDto,
   ) {
     return this.importService.commit(trainingSessionId, dto);
+  }
+
+  /** Modelo .xlsx da importação, gerado na hora para a lista de CNH nunca ficar defasada. */
+  @Get('participants/import/template')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Baixa o modelo .xlsx para a importação de participantes' })
+  async downloadImportTemplate() {
+    const buffer = await buildParticipantImportTemplate();
+    return new StreamableFile(buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: 'attachment; filename="modelo-importacao-participantes.xlsx"',
+    });
   }
 
   @Patch('participants/:participantId/type')
