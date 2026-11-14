@@ -7,7 +7,9 @@ import { ParticipationType } from '../enums';
  *   `file`) → `ParticipantImportPreviewResponse`. Não grava nada.
  * - `POST /training-sessions/:id/participants/import` (JSON
  *   `ImportParticipantsDto`) → `ParticipantImportResult`. O servidor revalida e
- *   reclassifica cada linha; o que veio da prévia não é confiável.
+ *   reclassifica cada linha; o que veio da prévia não é confiável. O tipo de
+ *   participação não vem do cliente: o servidor o deriva do curso (com horas
+ *   práticas = `TEORICA_E_PRATICA`, sem = `SOMENTE_TEORICA`).
  * - `GET /participants/import/template` → `modelo-importacao-participantes.xlsx`.
  */
 
@@ -30,8 +32,6 @@ export interface ParticipantImportRowDto {
   email?: string;
   cnhCategory?: string;
   cnhExpiration?: string;
-  /** Ausente = usa o tipo padrão escolhido no modal. */
-  participationType?: ParticipationType;
 }
 
 export interface ParticipantImportChange {
@@ -58,6 +58,8 @@ export interface ParticipantImportTotals {
 }
 
 export interface ParticipantImportPreviewResponse {
+  /** Tipo com que todas as linhas serão inscritas, derivado do curso do treinamento. */
+  participationType: ParticipationType;
   /** Aba lida; `null` em CSV. */
   sheetName: string | null;
   headerRow: number;
@@ -67,7 +69,6 @@ export interface ParticipantImportPreviewResponse {
 }
 
 export interface ImportParticipantsDto {
-  defaultParticipationType: ParticipationType;
   rows: ParticipantImportRowDto[];
 }
 
