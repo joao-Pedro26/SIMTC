@@ -1,8 +1,3 @@
-export declare enum VehicleType {
-    LEVE = "LEVE",
-    PESADO = "PESADO",
-    MOTO = "MOTO"
-}
 export declare enum NoteType {
     B = "B",// Bom — sem dedução
     PM = "PM",// Pode Melhorar — deduz 3 pontos

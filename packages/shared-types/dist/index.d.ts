@@ -7,4 +7,5 @@ export * from './dtos/course.dto';
 export * from './dtos/assessment.dto';
 export * from './dtos/training.dto';
 export * from './dtos/demand.dto';
+export * from './dtos/participant-import.dto';
 //# sourceMappingURL=index.d.ts.map

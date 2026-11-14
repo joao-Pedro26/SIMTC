@@ -1,8 +1,7 @@
-import { VehicleType } from '../enums';
-
 export interface CreateCourseDto {
   name: string;
-  vehicleType: VehicleType;
+  /** Id de um tipo de veículo cadastrado (/vehicle-types) */
+  vehicleTypeId: string;
   theoryHours: number;
   practiceHours?: number;
   description: string;

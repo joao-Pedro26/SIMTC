@@ -2,13 +2,7 @@
 // ─── ENUMS COMPARTILHADOS ─────────────────────────────────────────────────────
 // Definidos aqui uma vez — importados pelo backend (NestJS) e pelo web (Next.js)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserRole = exports.ParticipantStatus = exports.ParticipationType = exports.TrainingStatus = exports.DemandStatus = exports.NoteType = exports.VehicleType = void 0;
-var VehicleType;
-(function (VehicleType) {
-    VehicleType["LEVE"] = "LEVE";
-    VehicleType["PESADO"] = "PESADO";
-    VehicleType["MOTO"] = "MOTO";
-})(VehicleType || (exports.VehicleType = VehicleType = {}));
+exports.UserRole = exports.ParticipantStatus = exports.ParticipationType = exports.TrainingStatus = exports.DemandStatus = exports.NoteType = void 0;
 var NoteType;
 (function (NoteType) {
     NoteType["B"] = "B";

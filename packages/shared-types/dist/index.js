@@ -26,4 +26,5 @@ __exportStar(require("./dtos/course.dto"), exports);
 __exportStar(require("./dtos/assessment.dto"), exports);
 __exportStar(require("./dtos/training.dto"), exports);
 __exportStar(require("./dtos/demand.dto"), exports);
+__exportStar(require("./dtos/participant-import.dto"), exports);
 //# sourceMappingURL=index.js.map

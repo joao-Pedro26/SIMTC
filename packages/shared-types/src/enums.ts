@@ -1,12 +1,6 @@
 // ─── ENUMS COMPARTILHADOS ─────────────────────────────────────────────────────
 // Definidos aqui uma vez — importados pelo backend (NestJS) e pelo web (Next.js)
 
-export enum VehicleType {
-  LEVE   = 'LEVE',
-  PESADO = 'PESADO',
-  MOTO   = 'MOTO',
-}
-
 export enum NoteType {
   B  = 'B',   // Bom — sem dedução
   PM = 'PM',  // Pode Melhorar — deduz 3 pontos
