@@ -15,6 +15,7 @@ import 'data/services/assessment_sync_service.dart';
 import 'data/services/auth_session.dart';
 import 'data/services/connectivity_service.dart';
 import 'data/services/device_data_service.dart';
+import 'data/services/ibge_city_service.dart';
 import 'data/services/local/app_database.dart';
 import 'data/services/local/token_storage.dart';
 
@@ -38,6 +39,7 @@ class AppDependencies {
     required this.connectivityService,
     required this.assessmentSyncService,
     required this.deviceDataService,
+    required this.ibgeCityService,
   });
 
   factory AppDependencies.create({required AppDatabase database}) {
@@ -112,6 +114,7 @@ class AppDependencies {
         database: database,
         storage: tokenStorage,
       ),
+      ibgeCityService: IbgeCityService(),
     );
   }
 
@@ -128,6 +131,7 @@ class AppDependencies {
   final ConnectivityService connectivityService;
   final AssessmentSyncService assessmentSyncService;
   final DeviceDataService deviceDataService;
+  final IbgeCityService ibgeCityService;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
   ///
@@ -153,6 +157,7 @@ class AppDependencies {
           value: assessmentSyncService,
         ),
         Provider<DeviceDataService>.value(value: deviceDataService),
+        Provider<IbgeCityService>.value(value: ibgeCityService),
       ];
 
   void dispose() {

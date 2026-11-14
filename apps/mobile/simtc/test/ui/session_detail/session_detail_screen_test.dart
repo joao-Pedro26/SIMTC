@@ -18,6 +18,7 @@ import 'package:simtc/data/repositories/session_consultant_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/ibge_city_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/add_participant/add_participant_screen.dart';
@@ -42,6 +43,7 @@ import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/utils/result.dart';
 
+import '../../support/fake_ibge_city_service.dart';
 import '../../support/a11y.dart';
 import '../../support/ripple.dart';
 
@@ -197,6 +199,7 @@ void main() {
       providers: [
         Provider<SessionRepository>.value(value: sessions),
         Provider<ParticipantRepository>.value(value: participants),
+        Provider<IbgeCityService>.value(value: FakeIbgeCityService()),
         Provider<SessionConsultantRepository>.value(value: consultants),
         Provider<AssessmentRepository>.value(value: assessments),
         Provider<AssessmentCatalogRepository>.value(value: catalog),

@@ -16,16 +16,19 @@ import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/ibge_city_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/app_localization.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/app_footer_bar.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
 import 'package:simtc/ui/core/widgets/session_context_header.dart';
 import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 
 import '../../support/a11y.dart';
+import '../../support/fake_ibge_city_service.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
@@ -40,6 +43,7 @@ void main() {
   late SessionRepository sessionRepository;
   late ParticipantRepository participantRepository;
   late ConnectivityService connectivity;
+  late FakeIbgeCityService ibge;
   late GoRouter router;
 
   /// O que a tela devolve à de baixo quando fecha: `true` se salvou (é o que
@@ -75,6 +79,9 @@ void main() {
     sessionRepository = SessionRepository(apiClient: api, database: db);
     participantRepository = ParticipantRepository(apiClient: api, database: db);
     connectivity = ConnectivityService();
+    // Sem municípios por padrão: as sugestões repetiriam o texto digitado nos
+    // outros testes. O grupo da busca de cidades põe a lista de verdade.
+    ibge = FakeIbgeCityService(const []);
   });
 
   tearDown(() async {
@@ -186,6 +193,7 @@ void main() {
         providers: [
           Provider<SessionRepository>.value(value: sessionRepository),
           Provider<ParticipantRepository>.value(value: participantRepository),
+          Provider<IbgeCityService>.value(value: ibge),
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
         ],
@@ -488,28 +496,14 @@ void main() {
     expect(saveButton(tester).onPressed, isNull);
   });
 
-  testWidgets(
-      'UF: fica em maiúsculas, com duas letras, e a sigla que não existe '
-      'impede o salvar', (tester) async {
+  testWidgets('a UF não se digita: o campo fica apagado e vem da cidade escolhida',
+      (tester) async {
     await seedSession();
-    patchAnswers();
     await pumpEdit(tester);
 
-    await tester.enterText(field('campo-uf'), 'xx9');
-    await tester.pump();
-
-    expect(find.text('XX'), findsOneWidget);
-    expect(find.text('UF inválida.'), findsOneWidget);
-    expect(saveButton(tester).onPressed, isNull);
-
-    await tester.enterText(field('campo-uf'), 'sp');
-    await tester.pump();
-
-    expect(find.text('UF inválida.'), findsNothing);
-    await tester.tap(find.text('Salvar alterações'));
-    await tester.pumpAndSettle();
-
-    expect(sentBody(), {'state': 'SP'});
+    final uf = tester.widget<TextField>(field('campo-uf'));
+    expect(uf.enabled, isFalse);
+    expect(uf.controller!.text, 'MG');
   });
 
   testWidgets('cidade apagada mostra o motivo e impede o salvar', (tester) async {
@@ -521,6 +515,152 @@ void main() {
 
     expect(find.text('Informe a cidade.'), findsOneWidget);
     expect(saveButton(tester).onPressed, isNull);
+  });
+
+  group('busca de cidades (IBGE)', () {
+    setUp(() => ibge = FakeIbgeCityService());
+
+    Finder suggestion(String name, String uf) =>
+        find.byKey(Key('sugestao-$name-$uf'));
+
+    testWidgets(
+        'digitar sugere municípios, os que começam com o texto primeiro, e '
+        'ignora acentos e maiúsculas', (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'bel');
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('sugestoes-cidade')), findsOneWidget);
+      expect(suggestion('Belo Horizonte', 'MG'), findsOneWidget);
+      expect(suggestion('Bela Vista', 'SP'), findsOneWidget);
+      expect(suggestion('Betim', 'MG'), findsNothing);
+
+      await tester.enterText(field('campo-cidade'), 'sao');
+      await tester.pump();
+      expect(suggestion('São Paulo', 'SP'), findsOneWidget);
+    });
+
+    testWidgets('tocar numa sugestão preenche a cidade e a UF e fecha a lista',
+        (tester) async {
+      await seedSession();
+      patchAnswers();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'sao pa');
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(suggestion('São Paulo', 'SP'));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(field('campo-cidade')).controller!.text,
+          'São Paulo');
+      expect(
+          tester.widget<TextField>(field('campo-uf')).controller!.text, 'SP');
+      expect(find.byKey(const Key('sugestoes-cidade')), findsNothing);
+      expect(saveButton(tester).onPressed, isNotNull);
+
+      await tester.tap(find.byType(AppCtaButton));
+      await tester.pumpAndSettle();
+      expect(sentBody(), {'city': 'São Paulo', 'state': 'SP'});
+    });
+
+    testWidgets(
+        'com o teclado aberto, o começo da lista rola para ficar à vista, '
+        'acima do rodapé', (tester) async {
+      await seedSession();
+      await pumpEdit(tester, screen: const Size(412, 760));
+      await setKeyboard(tester, 320);
+
+      await tester.enterText(field('campo-cidade'), 'be');
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final list = tester.getRect(find.byKey(const Key('sugestoes-cidade')));
+      final footerTop = tester.getTopLeft(find.byType(AppFooterBar)).dy;
+      expect(list.top, greaterThanOrEqualTo(0));
+      expect(list.top, lessThan(footerTop));
+      // As duas primeiras linhas estão à vista.
+      final second = tester.getRect(find.byType(InkWell).at(1));
+      expect(second.bottom, lessThanOrEqualTo(footerTop));
+    });
+
+    testWidgets('a lista tem a largura do campo de cidade, não a da tela',
+        (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'be');
+      await tester.pump();
+      await tester.pump();
+
+      final list = tester.getRect(find.byKey(const Key('sugestoes-cidade')));
+      final city = tester.getRect(find.byKey(const Key('campo-cidade')));
+      expect(list.left, city.left);
+      expect(list.width, city.width);
+    });
+
+    testWidgets(
+        'rolar a lista não a fecha; só o toque fora dela e do campo fecha',
+        (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'be');
+      await tester.pump();
+      await tester.pump();
+
+      await tester.drag(
+          find.byKey(const Key('sugestoes-cidade')), const Offset(0, -40));
+      await tester.pump();
+      expect(find.byKey(const Key('sugestoes-cidade')), findsOneWidget);
+
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pump();
+      expect(find.byKey(const Key('sugestoes-cidade')), findsNothing);
+    });
+
+    testWidgets('sem sugestão para o texto, nada aparece', (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'Zzz');
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('sugestoes-cidade')), findsNothing);
+    });
+
+    testWidgets(
+        'com o IBGE fora do ar, a cidade segue como texto livre e dá para '
+        'salvar', (tester) async {
+      ibge = FakeIbgeCityService(const [], true);
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'Itabirito');
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('sugestoes-cidade')), findsNothing);
+      expect(saveButton(tester).onPressed, isNotNull);
+    });
+
+    testWidgets('a lista é carregada uma vez só', (tester) async {
+      await seedSession();
+      await pumpEdit(tester);
+
+      await tester.enterText(field('campo-cidade'), 'b');
+      await tester.pump();
+      await tester.enterText(field('campo-cidade'), 'be');
+      await tester.pump();
+      await tester.pump();
+
+      expect(ibge.loads, 1);
+    });
   });
 
   testWidgets('apagar as observações limpa o campo no servidor', (tester) async {
@@ -961,16 +1101,14 @@ void main() {
 
   testWidgets(
       'celular estreito com a fonte do sistema ampliada: a tela não estoura, '
-      'nem com os dois erros à vista', (tester) async {
+      'nem com o erro à vista', (tester) async {
     await seedSession();
     await pumpEdit(tester, screen: const Size(360, 1600), textScale: 1.6);
 
     await tester.enterText(field('campo-cidade'), '');
-    await tester.enterText(field('campo-uf'), 'XX');
     await tester.pump();
 
     expect(find.text('Informe a cidade.'), findsOneWidget);
-    expect(find.text('UF inválida.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

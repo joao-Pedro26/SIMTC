@@ -17,6 +17,7 @@ import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/api/api_client.dart';
 import 'package:simtc/data/services/api/api_exception.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/ibge_city_service.dart';
 import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/add_participant/add_participant_screen.dart';
@@ -35,6 +36,8 @@ import 'package:simtc/ui/session_edit/session_edit_screen.dart';
 import 'package:simtc/ui/session_detail/session_detail_screen.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/ui/sessions/sessions_split_view.dart';
+
+import '../../support/fake_ibge_city_service.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
 
@@ -206,6 +209,7 @@ void main() {
           Provider<ParticipantRepository>.value(
             value: ParticipantRepository(apiClient: api, database: db),
           ),
+          Provider<IbgeCityService>.value(value: FakeIbgeCityService()),
           Provider<SessionConsultantRepository>.value(
             value: SessionConsultantRepository(apiClient: api, database: db),
           ),

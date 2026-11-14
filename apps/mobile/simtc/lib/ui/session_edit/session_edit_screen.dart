@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +6,7 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../data/services/ibge_city_service.dart';
 import '../../router.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
@@ -58,6 +58,18 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _stateController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  final FocusNode _cityFocus = FocusNode();
+
+  /// A linha da lista que precisa ficar à vista (a segunda, ou a única).
+  final GlobalKey _revealKey = GlobalKey();
+
+  /// Municípios do IBGE: carregados na primeira vez que se digita na cidade.
+  /// Se o IBGE estiver fora do ar, o campo segue como texto livre.
+  List<IbgeCity>? _cities;
+  bool _loadingCities = false;
+
+  /// Sugestões para o que foi digitado na cidade; vazio fora da digitação.
+  List<IbgeCity> _suggestions = const [];
 
   /// Os campos já receberam os valores da sessão — acontece uma vez só, para
   /// uma atualização do cache não apagar o que o admin digitou.
@@ -72,6 +84,7 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
   @override
   void dispose() {
     _viewModel.removeListener(_fillWhenLoaded);
+    _cityFocus.dispose();
     _viewModel.dispose();
     _dateController.dispose();
     _cityController.dispose();
@@ -90,6 +103,72 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
     _stateController.text = _viewModel.state;
     _notesController.text = _viewModel.notes;
   }
+
+  /// A lista só fecha ao escolher uma cidade ou ao tocar fora dela e do campo
+  /// — não ao rolar o formulário (que tira o foco do campo) nem ao rolar a
+  /// própria lista.
+  void _closeSuggestions() {
+    if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+  }
+
+  /// O que se digita na cidade: grava no view model e sugere municípios.
+  void _onCityTyped(String value) {
+    _viewModel.setCity(value);
+    _ensureCitiesLoaded();
+    _updateSuggestions();
+  }
+
+  Future<void> _ensureCitiesLoaded() async {
+    if (_cities != null || _loadingCities) return;
+    _loadingCities = true;
+    try {
+      final cities = await context.read<IbgeCityService>().load();
+      if (!mounted) return;
+      _cities = cities;
+      if (_cityFocus.hasFocus) _updateSuggestions();
+    } catch (_) {
+      // Sem o IBGE, a cidade segue como texto livre.
+    } finally {
+      _loadingCities = false;
+    }
+  }
+
+  void _updateSuggestions() {
+    final cities = _cities;
+    final next = cities == null
+        ? const <IbgeCity>[]
+        : IbgeCityService.searchCities(cities, _cityController.text);
+    setState(() => _suggestions = next);
+    if (next.isNotEmpty) _revealSuggestions();
+  }
+
+  /// A lista nasce abaixo do campo, onde o teclado costuma estar: rola o
+  /// formulário o bastante para as primeiras linhas ficarem à vista, acima do
+  /// teclado. O resto se alcança rolando a própria lista.
+  void _revealSuggestions() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rowContext = _revealKey.currentContext;
+      if (!mounted || rowContext == null || !rowContext.mounted) return;
+      Scrollable.ensureVisible(
+        rowContext,
+        duration: const Duration(milliseconds: 150),
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
+  }
+
+  /// Escolher uma sugestão preenche a cidade e a UF.
+  void _pickCity(IbgeCity city) {
+    _cityController.text = city.name;
+    _stateController.text = city.uf;
+    _viewModel.setCity(city.name);
+    _viewModel.setState(city.uf);
+    setState(() => _suggestions = const []);
+    _dropFocus();
+  }
+
+  /// Quantas linhas a lista mostra de uma vez, antes de rolar por dentro.
+  static const int _visibleSuggestionRows = 4;
 
   bool get _fieldsEnabled => _viewModel.canEdit && !_viewModel.isBusy;
 
@@ -334,16 +413,29 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: AppTextField(
-            key: const Key('campo-cidade'),
-            label: 'Cidade',
-            controller: _cityController,
-            icon: AppIcons.place,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            enabled: _fieldsEnabled,
-            errorText: _viewModel.cityError,
-            onChanged: _viewModel.setCity,
+          // O campo e a lista são uma região só: o toque em qualquer um dos dois
+          // não fecha a lista, e o toque fora deles fecha.
+          child: TapRegion(
+            onTapOutside: (_) => _closeSuggestions(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppTextField(
+                  key: const Key('campo-cidade'),
+                  label: 'Cidade',
+                  controller: _cityController,
+                  focusNode: _cityFocus,
+                  icon: AppIcons.place,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  enabled: _fieldsEnabled,
+                  errorText: _viewModel.cityError,
+                  onChanged: _onCityTyped,
+                ),
+                if (_suggestions.isNotEmpty && _fieldsEnabled)
+                  _buildSuggestions(),
+              ],
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.md - 2),
@@ -353,19 +445,68 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
             key: const Key('campo-uf'),
             label: 'UF',
             controller: _stateController,
-            textCapitalization: TextCapitalization.characters,
-            textInputAction: TextInputAction.next,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
-              LengthLimitingTextInputFormatter(2),
-              const _UpperCaseFormatter(),
-            ],
-            enabled: _fieldsEnabled,
+            // Não se digita: a UF vem da cidade escolhida na lista.
+            enabled: false,
             errorText: _viewModel.stateError,
-            onChanged: _viewModel.setState,
           ),
         ),
       ],
+    );
+  }
+
+  /// Municípios que combinam com o que foi digitado, logo abaixo do campo de
+  /// cidade e na largura dele (a mesma busca do painel web). Passando de
+  /// [_visibleSuggestionRows] linhas, a lista rola por dentro. O toque numa
+  /// linha preenche a cidade e a UF.
+  Widget _buildSuggestions() {
+    final revealAt = _suggestions.length > 1 ? 1 : 0;
+    return Container(
+      key: const Key('sugestoes-cidade'),
+      margin: const EdgeInsets.only(top: AppSpacing.sm),
+      constraints: const BoxConstraints(
+        maxHeight: AppSpacing.touchTarget * _visibleSuggestionRows,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: AppColors.borderStrong),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        physics: const ClampingScrollPhysics(),
+        children: [
+          for (final (index, city) in _suggestions.indexed)
+            KeyedSubtree(
+              key: index == revealAt ? _revealKey : null,
+              child: InkWell(
+                key: Key('sugestao-${city.name}-${city.uf}'),
+                onTap: () => _pickCity(city),
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(minHeight: AppSpacing.touchTarget),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md + 2,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child:
+                              Text(city.name, style: AppTypography.fieldValue),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(city.uf, style: AppTypography.meta),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -537,19 +678,5 @@ class _SessionEditScreenState extends State<SessionEditScreen> {
       shrinkWrap: context.isTablet,
       children: const [SkeletonListItem(), SkeletonListItem(), SkeletonListItem()],
     );
-  }
-}
-
-/// Mostra em maiúsculas o que for digitado na UF, mesmo num teclado que não
-/// respeita o `TextCapitalization.characters`.
-class _UpperCaseFormatter extends TextInputFormatter {
-  const _UpperCaseFormatter();
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }
