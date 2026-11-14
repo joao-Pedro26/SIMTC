@@ -79,7 +79,7 @@ export class ParticipantsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Prévia da importação de participantes por planilha (não grava)' })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: PARTICIPANT_IMPORT_MAX_BYTES } }))
   previewImport(
     @Param('id') trainingSessionId: string,
     @UploadedFile(new ParseFilePipe({

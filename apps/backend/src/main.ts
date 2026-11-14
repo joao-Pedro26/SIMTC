@@ -11,6 +11,9 @@ async function bootstrap() {
   // e o throttle vira um limite global em vez de por cliente.
   app.set('trust proxy', 1);
 
+  // O padrão do Express é 100 KB; a importação de 500 participantes envia ~100 KB+ de JSON.
+  app.useBodyParser('json', { limit: '1mb' });
+
   // Prefixo global da API
   app.setGlobalPrefix('api');
 
