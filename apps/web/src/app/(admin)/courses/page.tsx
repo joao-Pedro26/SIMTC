@@ -9,6 +9,7 @@ import { Drawer } from '@/components/ui/drawer/drawer'
 import { CourseEditForm, type CourseFormData } from '@/features/courses/course-edit-form'
 import { CourseAddForm } from '@/features/courses/course-add-form'
 import type { CourseTopicOption } from '@/features/courses/course-topics-picker'
+import type { VehicleTypeActions, VehicleTypeOption } from '@/features/courses/vehicle-type-field'
 import { clientApi } from '@/lib/client-api'
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
@@ -20,7 +21,8 @@ import styles from './page.module.css'
 interface BackendCourse {
   id: string
   name: string
-  vehicleType: 'LEVE' | 'PESADO' | 'MOTO'
+  vehicleTypeId: string
+  vehicleType: { id: string; name: string }
   theoryHours: number
   practiceHours: number
   description: string
@@ -28,11 +30,12 @@ interface BackendCourse {
   categoryIds?: string[]
 }
 
-function mapCourse(c: BackendCourse): Course & { vehicleType: string } {
+function mapCourse(c: BackendCourse): Course {
   return {
     id: c.id,
     name: c.name,
-    vehicleType: c.vehicleType,
+    vehicleTypeId: c.vehicleTypeId,
+    vehicleTypeName: c.vehicleType?.name,
     theoreticalHours: c.theoryHours,
     practicalHours: c.practiceHours,
     description: c.description,
@@ -44,7 +47,7 @@ function mapCourse(c: BackendCourse): Course & { vehicleType: string } {
 function toPayload(data: CourseFormData) {
   return {
     name: data.name,
-    vehicleType: data.vehicleType,
+    vehicleTypeId: data.vehicleTypeId,
     theoryHours: Number(data.theoreticalHours),
     practiceHours: Number(data.practicalHours),
     description: data.description,
@@ -59,11 +62,11 @@ export default function CursosPage() {
   const toast = useToast()
   const confirm = useConfirm()
   const { isConsultant } = useCurrentUser()
-  const [courses, setCourses] = useState<ReturnType<typeof mapCourse>[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<ReturnType<typeof mapCourse> | null>(null)
+  const [selected, setSelected] = useState<Course | null>(null)
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null)
 
   async function fetchCourses() {
@@ -96,7 +99,46 @@ export default function CursosPage() {
 
   const topicCodes = new Map(topics.map((t) => [t.id, t.code]))
 
-  useEffect(() => { fetchCourses(); fetchTopics() }, [])
+  // Tipos de veículo (editáveis pelo admin dentro do form do curso)
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([])
+
+  async function fetchVehicleTypes() {
+    try {
+      setVehicleTypes(await clientApi.get<VehicleTypeOption[]>('/vehicle-types'))
+    } catch {
+      toast.error('Erro ao carregar os tipos de veículo.')
+    }
+  }
+
+  const vehicleTypeActions: VehicleTypeActions = {
+    async onCreate(name) {
+      try {
+        await clientApi.post('/vehicle-types', { name })
+        await fetchVehicleTypes()
+        toast.success('Tipo de veículo adicionado.')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Erro ao adicionar tipo de veículo.')
+      }
+    },
+    async onDelete(type) {
+      const ok = await confirm({
+        title: 'Excluir tipo de veículo',
+        message: `Excluir "${type.name}"? Só é possível se nenhum curso usar este tipo.`,
+        confirmLabel: 'Excluir',
+        variant: 'danger',
+      })
+      if (!ok) return
+      try {
+        await clientApi.delete(`/vehicle-types/${type.id}`)
+        await fetchVehicleTypes()
+        toast.success('Tipo de veículo excluído.')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Erro ao excluir tipo de veículo.')
+      }
+    },
+  }
+
+  useEffect(() => { fetchCourses(); fetchTopics(); fetchVehicleTypes() }, [])
 
   function openEdit(c: Course) { setSelected(courses.find(x => x.id === c.id) ?? null); setDrawerMode('edit') }
   function openAdd() { setSelected(null); setDrawerMode('add') }
@@ -172,6 +214,7 @@ export default function CursosPage() {
               courses={courses.filter((c) =>
                 c.name.toLowerCase().includes(query.toLowerCase())
               )}
+              vehicleTypes={vehicleTypes}
               onEdit={openEdit}
               onDelete={(c) => handleDelete(c.id)}
               topicCodes={topicCodes}
@@ -193,6 +236,8 @@ export default function CursosPage() {
         {drawerMode === 'edit' && selected && (
           <CourseEditForm
             course={selected}
+            vehicleTypes={vehicleTypes}
+            vehicleTypeActions={isConsultant ? undefined : vehicleTypeActions}
             topics={topics}
             topicsLoading={topicsLoading}
             onSave={handleSave}
@@ -203,6 +248,8 @@ export default function CursosPage() {
         )}
         {drawerMode === 'add' && !isConsultant && (
           <CourseAddForm
+            vehicleTypes={vehicleTypes}
+            vehicleTypeActions={vehicleTypeActions}
             topics={topics}
             topicsLoading={topicsLoading}
             onSave={handleAdd}

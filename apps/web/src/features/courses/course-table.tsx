@@ -11,7 +11,8 @@ export interface Course {
   practicalHours: number
   theoreticalHours: number
   description: string
-  vehicleType?: string
+  vehicleTypeId?: string
+  vehicleTypeName?: string
   contentItems?: any[]
   /** Tópicos de avaliação prática vinculados ao curso */
   categoryIds?: string[]
@@ -19,6 +20,8 @@ export interface Course {
 
 interface CourseTableProps {
   courses: Course[]
+  /** Tipos de veículo cadastrados — alimentam o filtro da coluna */
+  vehicleTypes: { id: string; name: string }[]
   onEdit: (course: Course) => void
   onDelete: (course: Course) => void
   /** Código (CV, RR, ...) de cada tópico, por id — para a coluna "Tópicos" */
@@ -27,25 +30,14 @@ interface CourseTableProps {
   readOnly?: boolean
 }
 
-const vehicleOptions = [
-  { label: 'Leve',   value: 'LEVE'   },
-  { label: 'Pesado', value: 'PESADO' },
-  { label: 'Moto',   value: 'MOTO'   },
-]
-
-const vehicleLabels: Record<string, string> = {
-  LEVE:   'Leve',
-  PESADO: 'Pesado',
-  MOTO:   'Moto',
-}
-
-export function CourseTable({ courses, onEdit, onDelete, topicCodes, readOnly = false }: CourseTableProps) {
+export function CourseTable({ courses, vehicleTypes, onEdit, onDelete, topicCodes, readOnly = false }: CourseTableProps) {
+  const vehicleOptions = vehicleTypes.map((t) => ({ label: t.name, value: t.id }))
   const [nameFilter,    setNameFilter]    = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
 
   const filtered = courses.filter((c) => {
     const matchName    = c.name.toLowerCase().includes(nameFilter.toLowerCase())
-    const matchVehicle = vehicleFilter === '' || c.vehicleType === vehicleFilter
+    const matchVehicle = vehicleFilter === '' || c.vehicleTypeId === vehicleFilter
     return matchName && matchVehicle
   })
 
@@ -92,7 +84,7 @@ export function CourseTable({ courses, onEdit, onDelete, topicCodes, readOnly = 
               <tr key={c.id} className={styles.row}>
                 <td className={`${styles.td} ${styles.nameCell}`}>{c.name}</td>
                 <td className={`${styles.td} ${styles.center}`}>
-                  {c.vehicleType ? vehicleLabels[c.vehicleType] ?? c.vehicleType : '—'}
+                  {c.vehicleTypeName ?? '—'}
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>{c.practicalHours}h</td>
                 <td className={`${styles.td} ${styles.center}`}>{c.theoreticalHours}h</td>

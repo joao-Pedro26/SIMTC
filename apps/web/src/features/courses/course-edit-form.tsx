@@ -2,15 +2,15 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button/button'
-import { Select } from '@/components/ui/select/select'
 import type { Course } from './course-table'
+import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
 import { ContentItemsEditor, type ContentItem } from './content-items-editor'
 import { CourseTopicsPicker, type CourseTopicOption } from './course-topics-picker'
 import styles from './course-edit-form.module.css'
 
 export interface CourseFormData {
   name: string
-  vehicleType: 'LEVE' | 'PESADO' | 'MOTO'
+  vehicleTypeId: string
   practicalHours: string
   theoreticalHours: string
   description: string
@@ -24,14 +24,11 @@ export function isMissingTopics(form: Pick<CourseFormData, 'practicalHours' | 'c
   return Number(form.practicalHours) > 0 && form.categoryIds.length === 0
 }
 
-const vehicleTypeOptions = [
-  { value: 'LEVE',   label: 'Veículo Leve' },
-  { value: 'PESADO', label: 'Veículo Pesado' },
-  { value: 'MOTO',   label: 'Motocicleta' },
-]
-
 interface CourseEditFormProps {
   course: Course
+  vehicleTypes: VehicleTypeOption[]
+  /** Gerenciar (criar/excluir) tipos — ausente para CONSULTANT */
+  vehicleTypeActions?: VehicleTypeActions
   topics: CourseTopicOption[]
   topicsLoading?: boolean
   onSave: (data: CourseFormData) => void
@@ -53,6 +50,8 @@ function normalizeContentItems(raw: unknown): ContentItem[] {
 
 export function CourseEditForm({
   course,
+  vehicleTypes,
+  vehicleTypeActions,
   topics,
   topicsLoading = false,
   onSave,
@@ -62,7 +61,7 @@ export function CourseEditForm({
 }: CourseEditFormProps) {
   const [form, setForm] = useState<CourseFormData>({
     name: course.name,
-    vehicleType: (course as any).vehicleType ?? 'LEVE',
+    vehicleTypeId: course.vehicleTypeId ?? '',
     practicalHours: String(course.practicalHours),
     theoreticalHours: String(course.theoreticalHours),
     description: course.description,
@@ -87,14 +86,12 @@ export function CourseEditForm({
           />
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Tipo de Veículo:</label>
-          <Select
-            value={form.vehicleType}
-            onChange={(v) => handleChange('vehicleType', v)}
-            options={vehicleTypeOptions}
-          />
-        </div>
+        <VehicleTypeField
+          value={form.vehicleTypeId}
+          onChange={(id) => handleChange('vehicleTypeId', id)}
+          vehicleTypes={vehicleTypes}
+          actions={readOnly ? undefined : vehicleTypeActions}
+        />
 
         <div className={styles.row2}>
           <div className={styles.field}>
@@ -157,7 +154,7 @@ export function CourseEditForm({
                 variant="primary"
                 size="sm"
                 onClick={() => onSave(form)}
-                disabled={topicsLoading || isMissingTopics(form)}
+                disabled={topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
               >
                 Salvar
               </Button>

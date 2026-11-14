@@ -1,0 +1,104 @@
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.manageBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+  color: var(--teal);
+  cursor: pointer;
+}
+
+.manageBtn:hover {
+  text-decoration: underline;
+}
+
+.panel {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.empty {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  padding: 0.2rem;
+  cursor: pointer;
+  color: var(--error, #c0392b);
+  opacity: 0.7;
+  display: inline-flex;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.deleteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.addRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

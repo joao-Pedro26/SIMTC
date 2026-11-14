@@ -2,28 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button/button'
-import { Select } from '@/components/ui/select/select'
+import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
 import { isMissingTopics, type CourseFormData } from './course-edit-form'
 import { ContentItemsEditor } from './content-items-editor'
 import { CourseTopicsPicker, type CourseTopicOption } from './course-topics-picker'
 import styles from './course-edit-form.module.css'
 
 interface CourseAddFormProps {
+  vehicleTypes: VehicleTypeOption[]
+  vehicleTypeActions: VehicleTypeActions
   topics: CourseTopicOption[]
   topicsLoading?: boolean
   onSave: (data: CourseFormData) => void
   onCancel: () => void
 }
 
-const vehicleTypeOptions = [
-  { value: 'LEVE',   label: 'Veículo Leve' },
-  { value: 'PESADO', label: 'Veículo Pesado' },
-  { value: 'MOTO',   label: 'Motocicleta' },
-]
-
 const empty: CourseFormData = {
   name: '',
-  vehicleType: 'LEVE',
+  vehicleTypeId: '',
   practicalHours: '0',
   theoreticalHours: '0',
   description: '',
@@ -31,11 +27,28 @@ const empty: CourseFormData = {
   categoryIds: [],
 }
 
-export function CourseAddForm({ topics, topicsLoading = false, onSave, onCancel }: CourseAddFormProps) {
+export function CourseAddForm({
+  vehicleTypes,
+  vehicleTypeActions,
+  topics,
+  topicsLoading = false,
+  onSave,
+  onCancel,
+}: CourseAddFormProps) {
   const [form, setForm] = useState<CourseFormData>(() => ({
     ...empty,
+    vehicleTypeId: vehicleTypes[0]?.id ?? '',
     categoryIds: topics.map((t) => t.id),
   }))
+
+  // Se o tipo escolhido foi excluído (ou a lista chegou depois), cai no primeiro disponível
+  useEffect(() => {
+    setForm((prev) =>
+      vehicleTypes.some((t) => t.id === prev.vehicleTypeId)
+        ? prev
+        : { ...prev, vehicleTypeId: vehicleTypes[0]?.id ?? '' },
+    )
+  }, [vehicleTypes])
 
   // Curso novo começa com todos os tópicos marcados — o admin desmarca o que
   // não se encaixa. Se a lista chegar depois de abrir o form, marca uma vez.
@@ -63,14 +76,12 @@ export function CourseAddForm({ topics, topicsLoading = false, onSave, onCancel 
           />
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Tipo de Veículo:</label>
-          <Select
-            value={form.vehicleType}
-            onChange={(v) => handleChange('vehicleType', v)}
-            options={vehicleTypeOptions}
-          />
-        </div>
+        <VehicleTypeField
+          value={form.vehicleTypeId}
+          onChange={(id) => handleChange('vehicleTypeId', id)}
+          vehicleTypes={vehicleTypes}
+          actions={vehicleTypeActions}
+        />
 
         <div className={styles.row2}>
           <div className={styles.field}>
@@ -127,7 +138,7 @@ export function CourseAddForm({ topics, topicsLoading = false, onSave, onCancel 
             variant="primary"
             size="sm"
             onClick={() => onSave(form)}
-            disabled={topicsLoading || isMissingTopics(form)}
+            disabled={topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
           >
             Salvar
           </Button>
