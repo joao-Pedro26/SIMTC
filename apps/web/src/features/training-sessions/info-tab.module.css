@@ -22,6 +22,15 @@
   border: 1px solid var(--border);
 }
 
+.logo {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 4px;
+  object-fit: contain;
+  background-color: #fff;
+  flex-shrink: 0;
+}
+
 .logoFallback {
   width: 3rem;
   height: 3rem;

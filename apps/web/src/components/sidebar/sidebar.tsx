@@ -174,7 +174,6 @@ export function Sidebar() {
       {/* Usuário + logout */}
       <div className={styles.userArea}>
         <div className={styles.userRow}>
-          <div className={styles.avatar}>{me ? getInitials(me.name) : '...'}</div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{me?.name ?? 'Carregando...'}</p>
             <p className={styles.userRole}>{me ? (roleLabels[me.role] ?? me.role) : ''}</p>

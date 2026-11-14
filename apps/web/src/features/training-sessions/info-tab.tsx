@@ -39,9 +39,17 @@ export function InfoTab({ session, onArchive, onCancel, onManage, readOnly }: In
       <div className={styles.content}>
 
         <div className={styles.companyHeader}>
-          <div className={styles.logoFallback}>
-            {session.company.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-          </div>
+          {session.company.logoUrl ? (
+            <img
+              src={session.company.logoUrl}
+              alt={session.company.name}
+              className={styles.logo}
+            />
+          ) : (
+            <div className={styles.logoFallback}>
+              {session.company.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+            </div>
+          )}
           <div>
             <p className={styles.companyName}>{session.company.name}</p>
             <p className={styles.courseName}>{session.course.name}</p>

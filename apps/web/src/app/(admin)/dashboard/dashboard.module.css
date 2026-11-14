@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 72rem;
+  width: 100%;
   padding: 1.5rem 1.75rem 1.75rem;
 }
 
@@ -27,7 +27,7 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
