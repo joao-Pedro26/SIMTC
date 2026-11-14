@@ -1,12 +1,15 @@
-import { Controller, Get, Post, Param, Body, UseGuards, Patch, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Patch, Delete, HttpCode, HttpStatus, Inject, MaxFileSizeValidator, ParseFilePipe, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ParticipantsService } from './participants.service';
-import { UserRole } from '@simtc/shared-types';
+import { PARTICIPANT_IMPORT_MAX_BYTES, UserRole } from '@simtc/shared-types';
 import { ValidateCpfPipe } from '../common/pipes/validate-cpf.pipe';
 import { AddParticipantDto } from './dto/add-participant.dto';
+import { ImportParticipantsBodyDto } from './dto/import-participants.dto';
 import { LookupParticipantDto } from './dto/lookup-participant.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
+import { ParticipantImportService } from './import/participant-import.service';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 
@@ -14,6 +17,11 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 @Controller()
 export class ParticipantsController {
   constructor(private readonly service: ParticipantsService) {}
+
+  // Injeção por propriedade: o construtor continua com um argumento só, que é
+  // como os specs existentes instanciam o controller.
+  @Inject(ParticipantImportService)
+  private readonly importService!: ParticipantImportService;
 
   @Get('training-sessions/:id/participants')
   @ApiBearerAuth()
@@ -58,6 +66,43 @@ export class ParticipantsController {
   ) {
     const cpf = new ValidateCpfPipe().transform(dto.cpf);
     return this.service.lookupByCpf(trainingSessionId, cpf);
+  }
+
+  /**
+   * Prévia da importação por planilha (.xlsx/.csv, campo `file`): lê, valida e
+   * classifica cada linha contra o banco. Não grava nada.
+   */
+  @Post('training-sessions/:id/participants/import/preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Prévia da importação de participantes por planilha (não grava)' })
+  @UseInterceptors(FileInterceptor('file'))
+  previewImport(
+    @Param('id') trainingSessionId: string,
+    @UploadedFile(new ParseFilePipe({
+      validators: [new MaxFileSizeValidator({ maxSize: PARTICIPANT_IMPORT_MAX_BYTES })],
+    }))
+    file: Express.Multer.File,
+  ) {
+    return this.importService.preview(trainingSessionId, file.buffer, file.originalname);
+  }
+
+  /**
+   * Grava a importação. O corpo traz as linhas da prévia, mas o servidor
+   * revalida e reclassifica cada uma: linha ruim volta em `skipped`.
+   */
+  @Post('training-sessions/:id/participants/import')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Importa participantes por planilha: cria/atualiza cadastros e inscreve' })
+  importParticipants(
+    @Param('id') trainingSessionId: string,
+    @Body() dto: ImportParticipantsBodyDto,
+  ) {
+    return this.importService.commit(trainingSessionId, dto);
   }
 
   @Patch('participants/:participantId/type')

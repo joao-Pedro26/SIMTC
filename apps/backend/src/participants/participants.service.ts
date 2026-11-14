@@ -8,6 +8,7 @@ import { AddParticipantDto, ParticipationType } from './dto/add-participant.dto'
 import { SignatureLookupDto } from './dto/signature-lookup.dto';
 import { UpdateParticipantTypeDto } from './dto/update-participant-type.dto';
 import { deleteOrphanedParticipants } from './participant-cleanup.util';
+import { buildParticipantUpdateData } from './participant-data.util';
 import { assertValidSignaturePng } from './png-signature.util';
 import { SIGNATURE_BUCKET } from './signature.constants';
 import { withPublicParticipant } from './participant-view.util';
@@ -119,12 +120,7 @@ export class ParticipantsService {
 
     return this.prisma.participant.update({
       where: { id: existing.id },
-      data: {
-        name: dto.name,
-        email: dto.email ? dto.email : undefined,
-        cnhCategory: dto.cnhCategory ? dto.cnhCategory : undefined,
-        cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
-      },
+      data: buildParticipantUpdateData(dto),
     });
   }
 
@@ -216,12 +212,7 @@ export class ParticipantsService {
         const participant = existing
           ? await tx.participant.update({
               where: { id: existing.id },
-              data: {
-                name: dto.name,
-                email: dto.email ? dto.email : undefined,
-                cnhCategory: dto.cnhCategory ? dto.cnhCategory : undefined,
-                cnhExpiration: dto.cnhExpiration ? new Date(dto.cnhExpiration) : undefined,
-              },
+              data: buildParticipantUpdateData(dto),
             })
           : await tx.participant.create({
               data: {
