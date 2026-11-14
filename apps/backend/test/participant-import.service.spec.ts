@@ -25,7 +25,7 @@ const CPF_DIEGO = '98765432100';
 const CPF_ELISA = '39053344705';
 
 const SESSION_ID = 'sess-1';
-const HEADER = 'Nome,CPF,E-mail,Categoria CNH,Validade CNH,Tipo';
+const HEADER = 'Nome,CPF,E-mail,Categoria CNH,Validade CNH';
 
 function csv(...lines: string[]): Buffer {
   return Buffer.from([HEADER, ...lines].join('\n'), 'utf-8');
@@ -40,7 +40,11 @@ function row(rowNumber: number, overrides: Partial<ParticipantImportRowDto> = {}
 }
 
 function body(...rows: ParticipantImportRowDto[]): ImportParticipantsDto {
-  return { defaultParticipationType: ParticipationType.TEORICA_E_PRATICA, rows };
+  return { rows };
+}
+
+function session(practiceHours = 2, status = 'PLANEJADO') {
+  return { status, course: { practiceHours } };
 }
 
 function uniqueViolation(target: string[]): Prisma.PrismaClientKnownRequestError {
@@ -68,7 +72,7 @@ describe('ParticipantImportService', () => {
     jest.resetAllMocks();
     service = new ParticipantImportService(mockPrisma as unknown as PrismaService);
 
-    mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: SESSION_ID, status: 'PLANEJADO' });
+    mockPrisma.trainingSession.findUnique.mockResolvedValue(session());
     mockPrisma.participant.findMany.mockResolvedValue([]);
     mockPrisma.trainingParticipant.findMany.mockResolvedValue([]);
     mockPrisma.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
@@ -92,7 +96,7 @@ describe('ParticipantImportService', () => {
     });
 
     it.each(['CANCELADO', 'CONCLUIDO'])('sessão %s → 400 de inscrições encerradas', async (status) => {
-      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: SESSION_ID, status });
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(session(2, status));
 
       await expect(service.preview(SESSION_ID, csv(), 'lista.csv')).rejects.toThrow(
         new BadRequestException('Inscrições encerradas para este treinamento'),
@@ -108,16 +112,17 @@ describe('ParticipantImportService', () => {
       mockPrisma.trainingParticipant.findMany.mockResolvedValue([{ participantId: 'p-carla' }]);
 
       const file = csv(
-        'Ana Nova,529.982.247-25,ana@empresa.com,B,31/12/2027,teorica',
-        `Bruno Cadastrado,${CPF_BRUNO},,AB,31/12/2027,`,
-        `Carla Inscrita,${CPF_CARLA},,B,31/12/2027,`,
-        `Ana Repetida,${CPF_ANA},,B,31/12/2027,`,
-        `Elisa Sem Cnh,${CPF_ELISA},,,31/12/2027,`,
-        `Diego Novo,${CPF_DIEGO},,C,31/12/2027,`,
+        'Ana Nova,529.982.247-25,ana@empresa.com,B,31/12/2027',
+        `Bruno Cadastrado,${CPF_BRUNO},,AB,31/12/2027`,
+        `Carla Inscrita,${CPF_CARLA},,B,31/12/2027`,
+        `Ana Repetida,${CPF_ANA},,B,31/12/2027`,
+        `Elisa Sem Cnh,${CPF_ELISA},,,31/12/2027`,
+        `Diego Novo,${CPF_DIEGO},,C,31/12/2027`,
       );
 
       const result = await service.preview(SESSION_ID, file, 'lista.csv');
 
+      expect(result.participationType).toBe(ParticipationType.TEORICA_E_PRATICA);
       expect(result.sheetName).toBeNull();
       expect(result.headerRow).toBe(1);
       expect(result.rows.map((r) => [r.rowNumber, r.status])).toEqual([
@@ -135,7 +140,6 @@ describe('ParticipantImportService', () => {
         email: 'ana@empresa.com',
         cnhCategory: 'B',
         cnhExpiration: '2027-12-31',
-        participationType: ParticipationType.SOMENTE_TEORICA,
         status: 'NOVO',
         errors: [],
         warnings: [],
@@ -166,10 +170,23 @@ describe('ParticipantImportService', () => {
       expectNoWrites();
     });
 
+    it('curso sem horas práticas → prévia devolve SOMENTE_TEORICA; a sessão é lida numa query só', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(session(0));
+
+      const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,31/12/2027`), 'lista.csv');
+
+      expect(result.participationType).toBe(ParticipationType.SOMENTE_TEORICA);
+      expect(mockPrisma.trainingSession.findUnique).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.trainingSession.findUnique).toHaveBeenCalledWith({
+        where: { id: SESSION_ID },
+        select: { status: true, course: { select: { practiceHours: true } } },
+      });
+    });
+
     it('duplicado: vale a primeira ocorrência, mesmo com máscara diferente', async () => {
       const result = await service.preview(
         SESSION_ID,
-        csv(`Ana Nova,${CPF_ANA},,B,31/12/2027,`, 'Ana De Novo,529.982.247-25,,B,31/12/2027,'),
+        csv(`Ana Nova,${CPF_ANA},,B,31/12/2027`, 'Ana De Novo,529.982.247-25,,B,31/12/2027,'),
         'lista.csv',
       );
 
@@ -180,9 +197,9 @@ describe('ParticipantImportService', () => {
       const result = await service.preview(
         SESSION_ID,
         csv(
-          `Ana Sem Cnh,${CPF_ANA},,,31/12/2027,`,
-          `Ana Nova,${CPF_ANA},,B,31/12/2027,`,
-          `Ana De Novo,${CPF_ANA},,B,31/12/2027,`,
+          `Ana Sem Cnh,${CPF_ANA},,,31/12/2027`,
+          `Ana Nova,${CPF_ANA},,B,31/12/2027`,
+          `Ana De Novo,${CPF_ANA},,B,31/12/2027`,
         ),
         'lista.csv',
       );
@@ -196,7 +213,7 @@ describe('ParticipantImportService', () => {
 
       const result = await service.preview(
         SESSION_ID,
-        csv(`Carla,${CPF_CARLA},x@,B,31/12/2027,`, `Carla,${CPF_CARLA},,B,31/12/2027,`),
+        csv(`Carla,${CPF_CARLA},x@,B,31/12/2027`, `Carla,${CPF_CARLA},,B,31/12/2027`),
         'lista.csv',
       );
 
@@ -250,7 +267,7 @@ describe('ParticipantImportService', () => {
       it('e-mail e validade preenchidos e diferentes viram change', async () => {
         const result = await service.preview(
           SESSION_ID,
-          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,31/12/2027,`),
+          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,31/12/2027`),
           'lista.csv',
         );
 
@@ -267,7 +284,7 @@ describe('ParticipantImportService', () => {
 
         const result = await service.preview(
           SESSION_ID,
-          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,31/12/2027,`),
+          csv(`Bruno Antigo,${CPF_BRUNO},bruno@novo.com,B,31/12/2027`),
           'lista.csv',
         );
 
@@ -308,7 +325,7 @@ describe('ParticipantImportService', () => {
       });
 
       it('só ATUALIZA_E_INSCREVE tem changes', async () => {
-        const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,31/12/2027,`), 'lista.csv');
+        const result = await service.preview(SESSION_ID, csv(`Ana Nova,${CPF_ANA},,B,31/12/2027`), 'lista.csv');
 
         expect(result.rows[0].status).toBe('NOVO');
         expect(result.rows[0]).not.toHaveProperty('changes');
@@ -325,7 +342,7 @@ describe('ParticipantImportService', () => {
     });
 
     it.each(['CANCELADO', 'CONCLUIDO'])('sessão %s → 400 de inscrições encerradas', async (status) => {
-      mockPrisma.trainingSession.findUnique.mockResolvedValue({ id: SESSION_ID, status });
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(session(2, status));
 
       await expect(service.commit(SESSION_ID, body(row(2)))).rejects.toThrow(
         new BadRequestException('Inscrições encerradas para este treinamento'),
@@ -407,11 +424,7 @@ describe('ParticipantImportService', () => {
       const result = await service.commit(
         SESSION_ID,
         body(
-          row(2, {
-            email: 'ana@empresa.com',
-            cnhExpiration: '2027-12-31',
-            participationType: ParticipationType.SOMENTE_TEORICA,
-          }),
+          row(2, { email: 'ana@empresa.com', cnhExpiration: '2027-12-31' }),
         ),
       );
 
@@ -430,7 +443,7 @@ describe('ParticipantImportService', () => {
         data: {
           trainingSessionId: SESSION_ID,
           participantId: 'new-1',
-          participationType: ParticipationType.SOMENTE_TEORICA,
+          participationType: ParticipationType.TEORICA_E_PRATICA,
         },
       });
       // As gravações passam pelo `tx`, nunca pelo cliente fora da transação.
@@ -467,15 +480,26 @@ describe('ParticipantImportService', () => {
       });
     });
 
-    it('participationType ausente na linha → usa o tipo padrão do lote', async () => {
-      await service.commit(SESSION_ID, {
-        defaultParticipationType: ParticipationType.SOMENTE_TEORICA,
-        rows: [row(2)],
-      });
+    it('curso com horas práticas → inscreve todos como TEORICA_E_PRATICA, ignorando o que vier do cliente', async () => {
+      const dirty = { ...row(2), participationType: 'SOMENTE_TEORICA' } as ParticipantImportRowDto;
 
+      await service.commit(SESSION_ID, { ...body(dirty), defaultParticipationType: 'SOMENTE_TEORICA' } as ImportParticipantsDto);
+
+      expect(mockPrisma.trainingSession.findUnique).toHaveBeenCalledTimes(1);
       expect(tx.trainingParticipant.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ participationType: ParticipationType.SOMENTE_TEORICA }),
+        data: expect.objectContaining({ participationType: ParticipationType.TEORICA_E_PRATICA }),
       });
+    });
+
+    it('curso sem horas práticas → inscreve todos como SOMENTE_TEORICA', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(session(0));
+
+      await service.commit(SESSION_ID, body(row(2), row(3, { cpf: CPF_DIEGO })));
+
+      expect(tx.trainingParticipant.create).toHaveBeenCalledTimes(2);
+      for (const [arg] of tx.trainingParticipant.create.mock.calls) {
+        expect(arg.data.participationType).toBe(ParticipationType.SOMENTE_TEORICA);
+      }
     });
 
     it('cada linha tem a própria transação: erro na 2ª não derruba a 1ª nem a 3ª', async () => {

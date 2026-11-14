@@ -2,11 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { isEmail } from 'class-validator';
 import * as ExcelJS from 'exceljs';
 import * as Papa from 'papaparse';
-import {
-  ParticipantImportRowDto,
-  ParticipationType,
-  PARTICIPANT_IMPORT_MAX_ROWS,
-} from '@simtc/shared-types';
+import { ParticipantImportRowDto, PARTICIPANT_IMPORT_MAX_ROWS } from '@simtc/shared-types';
 import { ValidateCpfPipe } from '../../common/pipes/validate-cpf.pipe';
 import { CNH_CATEGORIES, isValidCnhCategory } from '../cnh.constants';
 
@@ -17,7 +13,6 @@ export interface RawImportRow {
   email?: unknown;
   cnhCategory?: unknown;
   cnhExpiration?: unknown;
-  participationType?: unknown;
 }
 
 export interface ParsedRow extends ParticipantImportRowDto {
@@ -32,7 +27,7 @@ export interface ParsedSheet {
   rows: ParsedRow[];
 }
 
-type FieldKey = 'name' | 'cpf' | 'email' | 'cnhCategory' | 'cnhExpiration' | 'participationType';
+type FieldKey = 'name' | 'cpf' | 'email' | 'cnhCategory' | 'cnhExpiration';
 
 /** Cada célula já lida: `Date`/número ficam crus (datas e CPF numérico), o resto vira texto. */
 type Grid = unknown[][];
@@ -60,17 +55,6 @@ const HEADER_ALIASES: Record<FieldKey, string[]> = {
   email: ['email', 'e-mail', 'email corporativo', 'correio eletronico'].map(normalizeText),
   cnhCategory: ['categoria cnh', 'cnh categoria', 'categoria', 'cat cnh', 'cnh'],
   cnhExpiration: ['validade cnh', 'vencimento cnh', 'validade', 'vencimento', 'data de validade'],
-  participationType: ['tipo', 'tipo de participacao', 'participacao', 'modalidade'],
-};
-
-const PARTICIPATION_ALIASES: Record<string, ParticipationType> = {
-  teorica: ParticipationType.SOMENTE_TEORICA,
-  'somente teorica': ParticipationType.SOMENTE_TEORICA,
-  teoria: ParticipationType.SOMENTE_TEORICA,
-  'teorica e pratica': ParticipationType.TEORICA_E_PRATICA,
-  pratica: ParticipationType.TEORICA_E_PRATICA,
-  completa: ParticipationType.TEORICA_E_PRATICA,
-  ambas: ParticipationType.TEORICA_E_PRATICA,
 };
 
 const cpfPipe = new ValidateCpfPipe();
@@ -159,15 +143,6 @@ export function validateImportRow(raw: RawImportRow): ParsedRow {
     if (!cnhExpiration) errors.push('Validade da CNH ilegível (use dd/mm/aaaa)');
   }
 
-  let participationType: ParticipationType | undefined;
-  if (!isBlank(raw.participationType)) {
-    const key = normalizeText(raw.participationType);
-    participationType = Object.prototype.hasOwnProperty.call(PARTICIPATION_ALIASES, key)
-      ? PARTICIPATION_ALIASES[key]
-      : undefined;
-    if (!participationType) warnings.push('Tipo de participação não reconhecido');
-  }
-
   return {
     rowNumber: raw.rowNumber,
     name,
@@ -175,7 +150,6 @@ export function validateImportRow(raw: RawImportRow): ParsedRow {
     email,
     cnhCategory,
     cnhExpiration,
-    participationType,
     errors,
     warnings,
   };
@@ -249,7 +223,6 @@ function buildSheet(
       email: at(cells, 'email'),
       cnhCategory: at(cells, 'cnhCategory'),
       cnhExpiration: at(cells, 'cnhExpiration'),
-      participationType: at(cells, 'participationType'),
     }),
   );
 

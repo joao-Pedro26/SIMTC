@@ -35,9 +35,8 @@ describe('buildParticipantImportTemplate', () => {
       'E-mail',
       'Categoria CNH*',
       'Validade CNH*',
-      'Tipo de participação',
     ]);
-    for (let c = 1; c <= 6; c++) expect(header.getCell(c).font?.bold).toBe(true);
+    for (let c = 1; c <= 5; c++) expect(header.getCell(c).font?.bold).toBe(true);
     expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
     expect(ws.getRow(2).hasValues).toBe(false);
   });
@@ -48,18 +47,15 @@ describe('buildParticipantImportTemplate', () => {
     expect(ws.getColumn(5).numFmt).toBe('dd/mm/yyyy');
   });
 
-  it('listas suspensas nas linhas 2 a 501 (CNH e Tipo)', async () => {
+  it('listas suspensas nas linhas 2 a 501 (só Categoria CNH)', async () => {
     const ws = (await open(template)).getWorksheet('Participantes')!;
     for (const row of [2, 250, 501]) {
       const cnh = ws.getCell(`D${row}`).dataValidation;
       expect(cnh.type).toBe('list');
       expect(cnh.formulae).toEqual([`"${CNH_CATEGORIES.join(',')}"`]);
-      const tipo = ws.getCell(`F${row}`).dataValidation;
-      expect(tipo.type).toBe('list');
-      expect(tipo.formulae).toEqual(['"Somente teórica,Teórica e prática"']);
+      expect(ws.getCell(`F${row}`).dataValidation).toBeFalsy();
     }
     expect(ws.getCell('D502').dataValidation).toBeFalsy();
-    expect(ws.getCell('F502').dataValidation).toBeFalsy();
   });
 
   it('a aba Instruções traz as regras e o exemplo', async () => {
@@ -75,8 +71,7 @@ describe('buildParticipantImportTemplate', () => {
       'Validade CNH: obrigatória',
       CNH_CATEGORIES.join(', '),
       'dd/mm/aaaa',
-      'Somente teórica',
-      'Teórica e prática',
+      'O tipo de participação é definido pelo curso do treinamento e pode ser ajustado depois, na lista de participantes.',
       '500',
       '2 MB',
       'Participantes',
@@ -95,11 +90,11 @@ describe('buildParticipantImportTemplate', () => {
     });
   });
 
-  it('modelo preenchido (tipos da lista, CPF com zero à esquerda como texto) → 3 linhas limpas', async () => {
+  it('modelo preenchido (CPF com zero à esquerda como texto) → 3 linhas limpas', async () => {
     const wb = await open(template);
     const ws = wb.getWorksheet('Participantes')!;
-    ws.getRow(2).values = ['Ana Souza', '01234567890', 'ana@x.com', 'B', '31/12/2030', 'Somente teórica'];
-    ws.getRow(3).values = ['Bruno Lima', '52998224725', '', 'AB', '31/12/2030', 'Teórica e prática'];
+    ws.getRow(2).values = ['Ana Souza', '01234567890', 'ana@x.com', 'B', '31/12/2030'];
+    ws.getRow(3).values = ['Bruno Lima', '52998224725', '', 'AB', '31/12/2030'];
     ws.getRow(4).values = ['Carla Dias', '11144477735', 'carla@x.com', 'E', '31/12/2030'];
     const filled = Buffer.from(await wb.xlsx.writeBuffer());
 
@@ -111,10 +106,8 @@ describe('buildParticipantImportTemplate', () => {
     }
     expect(sheet.rows[0]).toMatchObject({
       cpf: '01234567890',
-      participationType: 'SOMENTE_TEORICA',
       cnhExpiration: '2030-12-31',
     });
-    expect(sheet.rows[1].participationType).toBe('TEORICA_E_PRATICA');
   });
 
   it('linha do modelo sem validade gera o erro de validade obrigatória', async () => {

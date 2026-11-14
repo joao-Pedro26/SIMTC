@@ -43,8 +43,8 @@ describe('parseParticipantSheet', () => {
 
   it('reconhece aliases com acento e lista colunas ignoradas', async () => {
     const buf = await oneSheet([
-      ['Colaborador', 'CPF', 'Setor', 'E-mail', 'Cat CNH', 'Vencimento CNH', 'Participação'],
-      ['Ana', VALID_CPF, 'Frota', 'ana@x.com', 'B', '31/12/2027', 'teorica'],
+      ['Colaborador', 'CPF', 'Setor', 'E-mail', 'Cat CNH', 'Vencimento CNH'],
+      ['Ana', VALID_CPF, 'Frota', 'ana@x.com', 'B', '31/12/2027'],
     ]);
     const sheet = await parseParticipantSheet(buf, 'a.xlsx');
     expect(sheet.ignoredColumns).toEqual(['Setor']);
@@ -53,8 +53,19 @@ describe('parseParticipantSheet', () => {
       email: 'ana@x.com',
       cnhCategory: 'B',
       cnhExpiration: '2027-12-31',
-      participationType: 'SOMENTE_TEORICA',
     });
+  });
+
+  it('coluna "Tipo" de planilha antiga é ignorada: sem erro, sem aviso e sem participationType', async () => {
+    const buf = await oneSheet([
+      HEADER,
+      ['Ana', VALID_CPF, '', 'B', EXP, 'teorica'],
+    ]);
+    const sheet = await parseParticipantSheet(buf, 'a.xlsx');
+    expect(sheet.ignoredColumns).toEqual(['Tipo']);
+    expect(sheet.rows[0].errors).toEqual([]);
+    expect(sheet.rows[0].warnings).toEqual([]);
+    expect(sheet.rows[0]).not.toHaveProperty('participationType');
   });
 
   it('aceita "Nome Completo" e cabeçalho com asterisco do modelo', async () => {
@@ -195,22 +206,6 @@ describe('parseParticipantSheet', () => {
     expect(sheet.rows[1].cnhExpiration).toBe('2027-12-31');
   });
 
-  it.each(['constructor', 'toString', '__proto__'])(
-    'tipo "%s" não é reconhecido',
-    (participationType) => {
-      const row = validateImportRow({
-        rowNumber: 2,
-        name: 'Maria',
-        cpf: VALID_CPF,
-        cnhCategory: 'B',
-        cnhExpiration: '2030-12-31',
-        participationType,
-      });
-      expect(row.participationType).toBeUndefined();
-      expect(row.warnings).toEqual(['Tipo de participação não reconhecido']);
-    },
-  );
-
   it('CSV em Windows-1252 decodifica aspas curvas e travessão', async () => {
     const csv = Buffer.concat([
       Buffer.from('Nome;CPF;Categoria CNH;Validade CNH\n', 'latin1'),
@@ -348,41 +343,13 @@ describe('validateImportRow', () => {
     expect(validateImportRow({ ...base, cpf: undefined }).errors).toEqual(['CPF obrigatório']);
   });
 
-  it.each([
-    ['teorica', 'SOMENTE_TEORICA'],
-    ['Somente Teórica', 'SOMENTE_TEORICA'],
-    ['completa', 'TEORICA_E_PRATICA'],
-    ['Teórica e Prática', 'TEORICA_E_PRATICA'],
-  ])('tipo "%s" vira %s', (participationType, expected) => {
-    const row = validateImportRow({ ...base, participationType });
-    expect(row.participationType).toBe(expected);
-    expect(row.warnings).toEqual([]);
-  });
-
-  it('tipo vazio fica undefined sem aviso', () => {
-    const row = validateImportRow({ ...base, participationType: '' });
-    expect(row.participationType).toBeUndefined();
-    expect(row.warnings).toEqual([]);
-  });
-
-  it('tipo "xyz" fica undefined com aviso', () => {
-    const row = validateImportRow({ ...base, participationType: 'xyz' });
-    expect(row.participationType).toBeUndefined();
-    expect(row.warnings).toEqual(['Tipo de participação não reconhecido']);
-  });
-
   it('normaliza o nome', () => {
     expect(validateImportRow({ ...base, name: '  Maria   da  SILVA ' }).name).toBe('Maria da SILVA');
   });
 
   it('aceita entrada já normalizada sem aviso', () => {
-    const row = validateImportRow({
-      ...base,
-      cnhExpiration: '2027-12-31',
-      participationType: 'SOMENTE_TEORICA',
-    });
+    const row = validateImportRow({ ...base, cnhExpiration: '2027-12-31' });
     expect(row.cnhExpiration).toBe('2027-12-31');
-    expect(row.participationType).toBe('SOMENTE_TEORICA');
     expect(row.warnings).toEqual([]);
     expect(row.errors).toEqual([]);
   });

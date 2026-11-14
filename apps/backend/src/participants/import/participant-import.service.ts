@@ -39,6 +39,11 @@ interface ClassifiedRow {
 
 type WriteOutcome = 'created' | 'updated' | 'alreadyEnrolled' | 'failed';
 
+/** Curso com horas práticas → teoria + prática; só teórico → somente teórica. */
+function participationTypeForCourse(practiceHours: number): ParticipationType {
+  return practiceHours > 0 ? ParticipationType.TEORICA_E_PRATICA : ParticipationType.SOMENTE_TEORICA;
+}
+
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
@@ -57,7 +62,7 @@ export class ParticipantImportService {
     buffer: Buffer,
     filename: string,
   ): Promise<ParticipantImportPreviewResponse> {
-    await this.assertSessionOpen(sessionId);
+    const participationType = await this.assertSessionOpen(sessionId);
 
     const sheet = await parseParticipantSheet(buffer, filename);
     const classified = await this.classifyRows(sessionId, sheet.rows);
@@ -76,6 +81,7 @@ export class ParticipantImportService {
     };
 
     return {
+      participationType,
       sheetName: sheet.sheetName,
       headerRow: sheet.headerRow,
       ignoredColumns: sheet.ignoredColumns,
@@ -85,7 +91,7 @@ export class ParticipantImportService {
   }
 
   async commit(sessionId: string, dto: ImportParticipantsDto): Promise<ParticipantImportResult> {
-    await this.assertSessionOpen(sessionId);
+    const participationType = await this.assertSessionOpen(sessionId);
 
     const classified = await this.classifyRows(sessionId, dto.rows.map(validateImportRow));
 
@@ -100,12 +106,7 @@ export class ParticipantImportService {
       } else if (status === 'JA_INSCRITO') {
         result.skipped.push(entry(ALREADY_ENROLLED));
       } else {
-        const outcome = await this.writeRow(
-          sessionId,
-          row,
-          existing?.id ?? null,
-          row.participationType ?? dto.defaultParticipationType,
-        );
+        const outcome = await this.writeRow(sessionId, row, existing?.id ?? null, participationType);
         if (outcome === 'created') result.created++;
         else if (outcome === 'updated') result.updatedAndEnrolled++;
         else if (outcome === 'alreadyEnrolled') result.skipped.push(entry(ALREADY_ENROLLED));
@@ -115,16 +116,20 @@ export class ParticipantImportService {
     return result;
   }
 
-  /** Mesma recusa do `addParticipant`: sessão inexistente, cancelada ou concluída. */
-  private async assertSessionOpen(sessionId: string): Promise<void> {
+  /**
+   * Mesma recusa do `addParticipant`: sessão inexistente, cancelada ou concluída.
+   * Devolve o tipo de participação de todas as linhas, derivado do curso (mesma query).
+   */
+  private async assertSessionOpen(sessionId: string): Promise<ParticipationType> {
     const session = await this.prisma.trainingSession.findUnique({
       where: { id: sessionId },
-      select: { status: true },
+      select: { status: true, course: { select: { practiceHours: true } } },
     });
     if (!session) throw new NotFoundException('Sessão de treinamento não encontrada');
     if (session.status === 'CANCELADO' || session.status === 'CONCLUIDO') {
       throw new BadRequestException('Inscrições encerradas para este treinamento');
     }
+    return participationTypeForCourse(session.course.practiceHours);
   }
 
   /**
