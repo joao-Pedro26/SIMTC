@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<ParticipantImportRowStatus, string> = {
   ATUALIZA_E_INSCREVE: 'Atualiza cadastro',
   JA_INSCRITO: 'Já inscrito',
   DUPLICADO_NA_PLANILHA: 'Duplicado na planilha',
-  ERRO: 'Com erro',
+  ERRO: 'Erro',
 }
 
 const STATUS_CLASS: Record<ParticipantImportRowStatus, string> = {
