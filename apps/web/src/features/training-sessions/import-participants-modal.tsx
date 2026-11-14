@@ -12,6 +12,7 @@ import {
   type ParticipantImportResult,
   type ParticipantImportRowDto,
   type ParticipantImportRowStatus,
+  PARTICIPANT_IMPORT_MAX_BYTES,
 } from '@simtc/shared-types'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
@@ -78,10 +79,16 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
   const [preview, setPreview] = useState<ParticipantImportPreviewResponse | null>(null)
   const [result, setResult] = useState<ParticipantImportResult | null>(null)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+  // A gravação pode ter alcançado o servidor mesmo que a resposta tenha falhado.
+  const [importAttempted, setImportAttempted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function sendFile(file: File) {
     setError('')
+    if (file.size > PARTICIPANT_IMPORT_MAX_BYTES) {
+      setError('O arquivo tem mais de 2 MB. Reduza a planilha ou divida em arquivos menores.')
+      return
+    }
     setLoadingPreview(true)
     try {
       const fd = new FormData()
@@ -125,7 +132,7 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
   }
 
   function handleClose() {
-    if (result) onImported()
+    if (result || importAttempted) onImported()
     onClose()
   }
 
@@ -143,7 +150,8 @@ export function ImportParticipantsModal({ sessionId, onClose, onImported }: Impo
             defaultType={defaultType}
             onChangeFile={() => { setPreview(null); setError('') }}
             onDone={setResult}
-            onClose={onClose}
+            onAttempt={() => setImportAttempted(true)}
+            onClose={handleClose}
           />
         ) : (
           <>
@@ -215,10 +223,11 @@ interface PreviewStepProps {
   defaultType: ParticipationType
   onChangeFile: () => void
   onDone: (r: ParticipantImportResult) => void
+  onAttempt: () => void
   onClose: () => void
 }
 
-function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, onClose }: PreviewStepProps) {
+function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, onAttempt, onClose }: PreviewStepProps) {
   const [filter, setFilter] = useState<'' | ParticipantImportRowStatus>('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -243,6 +252,7 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
   const { totals } = preview
 
   async function handleImport() {
+    onAttempt()
     setSending(true)
     setError('')
     try {
@@ -377,7 +387,7 @@ function PreviewStep({ sessionId, preview, defaultType, onChangeFile, onDone, on
           disabled={selection.selectedCount === 0 || sending}
         >
           {sending && <Loader2 size={14} className={styles.spinner} />}
-          Importar {selection.selectedCount} participantes
+          Importar {selection.selectedCount} {selection.selectedCount === 1 ? 'participante' : 'participantes'}
         </Button>
       </div>
     </>
