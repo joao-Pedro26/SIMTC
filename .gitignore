@@ -83,3 +83,10 @@ reuniao-simtc-2026-08-22.md
 # a barra inicial aqui, senão a regra também esconde pastas de assets legítimas
 # dentro dos apps (ex.: apps/mobile/assets/, usada de verdade pelo Flutter)
 /assets/
+
+# Brainstorm e prompts de importação de participantes (rascunhos locais)
+brainstorm-importacao-participantes.md
+prompt-importacao-participantes-claude-code.md
+
+# Planilhas e CSVs de teste manual da importação (dados de teste, não do app)
+testes-importacao-planilha/
