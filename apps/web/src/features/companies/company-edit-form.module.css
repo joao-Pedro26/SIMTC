@@ -294,3 +294,10 @@
   display: flex;
   gap: 8px;
 }
+
+/* Cidade (autocompletar IBGE) + UF preenchida automaticamente */
+.cityRow {
+  display: grid;
+  grid-template-columns: 1fr 5.5rem;
+  gap: 1rem;
+}

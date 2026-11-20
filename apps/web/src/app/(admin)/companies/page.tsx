@@ -39,7 +39,10 @@ interface BackendCompany {
 interface Company {
   id: string
   name: string
-  address: string
+  address: string        // endereço completo para exibição (rua, cidade, UF)
+  street: string
+  city: string
+  state: string
   cnpj: string
   lastTraining: string   // derivado do treinamento concluído mais recente
   contactId: string
@@ -48,14 +51,28 @@ interface Company {
   logoUrl?: string
 }
 
+// Empresas criadas antes do seletor de cidade ficaram com "A definir" gravado
+// em endereço/cidade; trata como vazio para não aparecer na tela.
+function clean(v?: string | null): string {
+  const t = (v ?? '').trim()
+  return t.toLowerCase() === 'a definir' ? '' : t
+}
+
 function mapCompany(c: BackendCompany): Company {
   const primary = c.contacts[0]
   const lastSessionDate = c.trainings?.[0]?.date
+  const street = clean(c.address)
+  const city = clean(c.city)
+  // A UF só faz sentido com a cidade (o "SP" fixo antigo acompanhava o "A definir")
+  const state = city ? (c.state ?? '') : ''
   return {
     id: c.id,
     name: c.name,
     cnpj: c.cnpj,
-    address: [c.address, c.city, c.state].filter(Boolean).join(', '),
+    street,
+    city,
+    state,
+    address: [street, city, state].filter(Boolean).join(', '),
     lastTraining: lastSessionDate ? lastSessionDate.split('T')[0] : '',
     contactId: primary?.id ?? '',
     contactName: primary?.name ?? '',
@@ -105,12 +122,18 @@ export default function EmpresasPage() {
 
   async function handleSave(data: CompanyFormData) {
     if (!selected) return
+    // Cidade digitada sem escolher da lista fica sem UF
+    if (data.city && !data.state) {
+      toast.error('Escolha a cidade na lista para definir a UF.')
+      return
+    }
     try {
-      // Atualiza dados da empresa
+      // Atualiza dados da empresa. Sem cidade (empresa antiga), mantém a que já está gravada.
       await clientApi.patch(`/companies/${selected.id}`, {
         name: data.name,
         cnpj: data.cnpj.replace(/\D/g, ''),
         address: data.address || undefined,
+        ...(data.city && { city: data.city, state: data.state }),
       })
 
       // Atualiza contato principal se existir e nome ou email tiver mudado
@@ -129,7 +152,14 @@ export default function EmpresasPage() {
         ...selected,
         name: data.name,
         cnpj: data.cnpj,
-        address: data.address,
+        street: data.address,
+        city: data.city || selected.city,
+        state: data.city ? data.state : selected.state,
+        address: [
+          data.address,
+          data.city || selected.city,
+          data.city ? data.state : selected.state,
+        ].filter(Boolean).join(', '),
         contactName: data.contactName,
         contactEmail: data.contactEmail,
       }
@@ -154,12 +184,17 @@ export default function EmpresasPage() {
         return
       }
 
+      if (!data.city || !data.state) {
+        toast.error('Escolha a cidade na lista para definir a UF.')
+        return
+      }
+
       const newCompany = await clientApi.post<{ id: string }>('/companies', {
         name: data.name,
         cnpj,
         address: data.address || 'A definir',
-        city: 'A definir',
-        state: 'SP',
+        city: data.city,
+        state: data.state,
         contacts: [
           { name: data.contactName, email: data.contactEmail },
         ],
@@ -263,7 +298,9 @@ export default function EmpresasPage() {
             companyId={selected.id}
             name={selected.name}
             cnpj={selected.cnpj}
-            address={selected.address}
+            address={selected.street}
+            city={selected.city}
+            state={selected.state}
             lastTraining={selected.lastTraining}
             contactName={selected.contactName}
             contactEmail={selected.contactEmail}

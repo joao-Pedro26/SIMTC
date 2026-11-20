@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
 import { Loader2, Pencil, Trash2, Plus, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
+import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
 import { clientApi } from '@/lib/client-api'
 import styles from './company-edit-form.module.css'
 
@@ -51,6 +53,8 @@ interface CompanyEditFormProps {
   name: string
   cnpj: string
   address: string
+  city: string
+  state: string
   lastTraining: string  // derivado — read-only
   contactName: string
   contactEmail: string
@@ -68,6 +72,8 @@ export interface CompanyFormData {
   name: string
   cnpj: string
   address: string
+  city: string
+  state: string
   contactName: string
   contactEmail: string
 }
@@ -77,6 +83,8 @@ export function CompanyEditForm({
   name,
   cnpj,
   address,
+  city,
+  state,
   lastTraining,
   contactName,
   contactEmail,
@@ -182,9 +190,13 @@ export function CompanyEditForm({
     name,
     cnpj: applyCnpjMask(cnpj),
     address,
+    city,
+    state,
     contactName,
     contactEmail,
   })
+
+  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
 
   const [currentLogoUrl, setCurrentLogoUrl] = useState(logoUrl)
   const [uploadTs, setUploadTs] = useState<number | null>(null)
@@ -319,6 +331,35 @@ export function CompanyEditForm({
               onChange={(e) => handleChange('address', e.target.value)}
               readOnly={readOnly}
             />
+          </div>
+
+          {/* Cidade (IBGE) + UF */}
+          <div className={styles.cityRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>Cidade</label>
+              {readOnly ? (
+                <input className={styles.input} value={form.city} readOnly />
+              ) : (
+                <CityAutocomplete
+                  inputClassName={styles.input}
+                  value={form.city}
+                  // Digitar limpa a UF; ela só volta ao escolher uma sugestão
+                  onChange={(c, uf) => setForm((prev) => ({ ...prev, city: c, state: uf ?? '' }))}
+                  placeholder="Digite e escolha a cidade"
+                />
+              )}
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>UF</label>
+              <input
+                className={styles.input}
+                value={form.state}
+                readOnly
+                tabIndex={-1}
+                title="Preenchido automaticamente ao escolher a cidade"
+                style={{ cursor: 'not-allowed', opacity: 0.8 }}
+              />
+            </div>
           </div>
 
           {/* Último Treinamento — calculado automaticamente */}

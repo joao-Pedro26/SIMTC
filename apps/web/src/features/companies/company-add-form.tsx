@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button/button'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
+import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
 import type { CompanyFormData } from './company-edit-form'
 import styles from './company-edit-form.module.css'
 
@@ -24,6 +26,8 @@ const empty: CompanyFormData = {
   name: '',
   cnpj: '',
   address: '',
+  city: '',
+  state: '',
   contactName: '',
   contactEmail: '',
 }
@@ -33,6 +37,8 @@ export function CompanyAddForm({ onSave, onCancel }: CompanyAddFormProps) {
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useDrawerGuard({ form, hasLogo: !!logoFile }, () => onSave(form, logoFile ?? undefined))
 
   function handleChange(field: keyof CompanyFormData, value: string) {
     const formatted = field === 'cnpj' ? applyCnpjMask(value) : value
@@ -93,6 +99,30 @@ export function CompanyAddForm({ onSave, onCancel }: CompanyAddFormProps) {
         <div className={styles.field}>
           <label className={styles.label}>Endereço</label>
           <input className={styles.input} value={form.address} onChange={(e) => handleChange('address', e.target.value)} />
+        </div>
+
+        <div className={styles.cityRow}>
+          <div className={styles.field}>
+            <label className={styles.label}>Cidade</label>
+            <CityAutocomplete
+              inputClassName={styles.input}
+              value={form.city}
+              // Digitar limpa a UF; ela só volta ao escolher uma sugestão
+              onChange={(city, uf) => setForm((prev) => ({ ...prev, city, state: uf ?? '' }))}
+              placeholder="Digite e escolha a cidade"
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>UF</label>
+            <input
+              className={styles.input}
+              value={form.state}
+              readOnly
+              tabIndex={-1}
+              title="Preenchido automaticamente ao escolher a cidade"
+              style={{ cursor: 'not-allowed', opacity: 0.8 }}
+            />
+          </div>
         </div>
 
         <fieldset className={styles.fieldset}>
