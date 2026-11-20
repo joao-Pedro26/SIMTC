@@ -66,7 +66,7 @@
     }
 
     .subtitle {
-      font-size: 17px;
+      font-size: 24px;
       font-weight: bold;
       color: #111;
       text-align: center;
@@ -74,11 +74,14 @@
       margin-top: 4px;
     }
 
+    /* Texto com recuo lateral, logo abaixo do título do treinamento. */
     .body {
-      font-size: 17px;
-      line-height: 1.7;
+      font-size: 20px;
+      line-height: 1.8;
       color: #111;
       flex: 1;
+      padding: 14px 40px 0;
+      text-align: justify;
     }
 
     .body p { margin: 0; }
@@ -97,16 +100,17 @@
       justify-content: flex-start;
       gap: 80px;
       padding: 0 10px;
-      margin-bottom: 158px;
+      margin-bottom: 128px;
       align-items: flex-start;
     }
 
-    .sig { text-align: center; }
+    .sig { text-align: center; --sig-h: 90px; }
 
-    /* Área da assinatura sempre reservada (58px + 2px), com ou sem imagem:
-       as linhas e os nomes das duas colunas ficam na mesma altura. */
+    /* Área da assinatura sempre reservada (--sig-h + 2px), com ou sem imagem:
+       as linhas e os nomes das duas colunas ficam na mesma altura. Para mudar
+       o tamanho da assinatura, altere só o --sig-h acima. */
     .sig-img {
-      height: 58px;
+      height: var(--sig-h);
       display: block;
       margin: 0 auto 2px;
     }
@@ -114,7 +118,7 @@
     .sig-line {
       border-top: 1px solid #333;
       width: 280px;
-      margin: 60px auto 6px;
+      margin: calc(var(--sig-h) + 2px) auto 6px;
     }
 
     .sig-img + .sig-line { margin-top: 0; }
@@ -303,7 +307,7 @@
         {{/if}}
         <div class="sig-line"></div>
         <p class="sig-name">{{consultant.name}}</p>
-        {{#if consultant.credentialDetran}}<p class="sig-info">{{consultant.credentialDetran}}</p>{{/if}}
+        {{#if consultant.credentialDetran}}<p class="sig-info">Detran-SP {{consultant.credentialDetran}}</p>{{/if}}
         {{#if consultant.regMte}}<p class="sig-info">{{consultant.regMte}}</p>{{/if}}
       </div>
       <div class="sig">
