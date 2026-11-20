@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import type { Course } from './course-table'
 import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
@@ -68,6 +69,8 @@ export function CourseEditForm({
     contentItems: normalizeContentItems((course as any).contentItems),
     categoryIds: course.categoryIds ?? [],
   })
+
+  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
 
   function handleChange(field: keyof Omit<CourseFormData, 'contentItems' | 'categoryIds'>, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))

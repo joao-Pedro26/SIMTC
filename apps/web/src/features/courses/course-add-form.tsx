@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
 import { isMissingTopics, type CourseFormData } from './course-edit-form'
@@ -40,6 +41,15 @@ export function CourseAddForm({
     vehicleTypeId: vehicleTypes[0]?.id ?? '',
     categoryIds: topics.map((t) => t.id),
   }))
+
+  // O estado inicial se completa depois de abrir (tipos e tópicos carregam): compara com o padrão atual.
+  useDrawerGuard(form, () => onSave(form), {
+    baseline: {
+      ...empty,
+      vehicleTypeId: vehicleTypes[0]?.id ?? '',
+      categoryIds: topics.map((t) => t.id),
+    },
+  })
 
   // Se o tipo escolhido foi excluído (ou a lista chegou depois), cai no primeiro disponível
   useEffect(() => {

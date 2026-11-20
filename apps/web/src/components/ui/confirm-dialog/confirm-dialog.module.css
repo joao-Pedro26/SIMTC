@@ -159,3 +159,29 @@
   .overlay { animation: none; }
   .dialog  { animation: none; }
 }
+
+/* ── Diálogo de alterações não salvas: X no canto para continuar editando ── */
+
+.dialogWithClose {
+  position: relative;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2, #4a5568);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

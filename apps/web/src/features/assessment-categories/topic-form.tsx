@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import type { Topic } from './topic-table'
 import styles from './topic-form.module.css'
@@ -31,6 +32,8 @@ export function TopicEditForm({ topic, onSave, onDelete, onCancel, readOnly = fa
     name: topic.name,
     disciplinaryText: topic.disciplinaryText,
   })
+
+  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
 
   function handleChange(field: keyof TopicFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -79,6 +82,8 @@ const emptyTopic: TopicFormData = { sigla: '', name: '', disciplinaryText: '' }
 
 export function TopicAddForm({ onSave, onCancel }: TopicAddFormProps) {
   const [form, setForm] = useState<TopicFormData>(emptyTopic)
+
+  useDrawerGuard(form, () => onSave(form))
 
   function handleChange(field: keyof TopicFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))

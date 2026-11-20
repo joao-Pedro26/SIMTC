@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Select } from '@/components/ui/select/select'
 import { Button } from '@/components/ui/button/button'
 import styles from './demand-form.module.css'
@@ -60,6 +61,9 @@ export function DemandForm({
   }
 
   const isValid = form.companyId !== '' && form.consultantId !== '' && form.courseId !== ''
+
+  // Salvar pelo aviso só vale com os campos obrigatórios preenchidos (como o botão Salvar).
+  useDrawerGuard(form, () => { if (isValid) onSave(form) })
 
   return (
     <div className={styles.wrapper}>

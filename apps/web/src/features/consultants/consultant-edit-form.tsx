@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Loader2, PenLine, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
@@ -43,6 +44,8 @@ export function ConsultantEditForm({ consultantId, consultant, onSave, onDelete,
     detranCredential: consultant.detranCredential ?? '',
     status: consultant.status,
   })
+  // A assinatura é enviada na hora em que é escolhida; só os campos do formulário ficam pendentes.
+  useDrawerGuard(form, () => onSave(form))
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   // signatureExists: se há path salvo no banco (para label do botão)
   const [signatureExists, setSignatureExists] = useState(!!consultant.signatureUrl)

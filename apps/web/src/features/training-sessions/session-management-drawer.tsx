@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, X, Loader2, UserPlus, Check } from 'lucide-react'
+import { DrawerGuardBridge } from '@/components/ui/drawer/drawer-guard-bridge'
 import { Drawer } from '@/components/ui/drawer/drawer'
 import { AssessmentDrawer } from './assessment-drawer'
 import { clientApi } from '@/lib/client-api'
@@ -195,8 +196,8 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
 
   // ── Salvar campos ─────────────────────────────────────────────────────────────
 
-  async function handleSave() {
-    if (!dirty) return
+  async function handleSave(): Promise<boolean> {
+    if (!dirty) return false
     setBusy(true)
     setSaveError('')
     try {
@@ -208,8 +209,10 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
       })
       await fetchData()
       onSaved?.()
+      return true
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Erro ao salvar')
+      return false
     } finally {
       setBusy(false)
     }
@@ -468,6 +471,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   return (
     <>
       <Drawer open={open} title={drawerTitle} onClose={onClose} footer={footer} maxWidth="76rem">
+        <DrawerGuardBridge dirty={canEdit && dirty} save={handleSave} />
         {loading ? (
           <div className={styles.loadingState}>
             <Loader2 size={24} className={styles.spin} />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
 import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
@@ -73,6 +74,9 @@ export function TrainingSessionAddForm({
     form.city.trim() !== '' &&
     form.state !== '' &&
     form.date !== ''
+
+  // Salvar pelo aviso só vale com os campos obrigatórios preenchidos (como o botão Salvar).
+  useDrawerGuard(form, () => { if (isValid) onSave(form) })
 
   return (
     <div className={styles.wrapper}>

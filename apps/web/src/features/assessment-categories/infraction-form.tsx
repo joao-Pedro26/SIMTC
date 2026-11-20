@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
 import type { Topic } from './topic-table'
@@ -141,6 +142,8 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
     noteM:  infraction.noteM,
   })
 
+  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
+
   function handleChange(updates: Partial<InfractionFormData>) {
     setForm((prev) => ({ ...prev, ...updates }))
   }
@@ -169,6 +172,8 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
 
 export function InfractionAddForm({ topics, onSave, onCancel }: InfractionAddFormProps) {
   const [form, setForm] = useState<InfractionFormData>(emptyForm())
+
+  useDrawerGuard(form, () => onSave(form))
 
   function handleChange(updates: Partial<InfractionFormData>) {
     setForm((prev) => ({ ...prev, ...updates }))

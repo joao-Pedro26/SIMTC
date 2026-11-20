@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { PenLine } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
@@ -34,6 +35,8 @@ export function ConsultantAddForm({ onSave, onCancel }: ConsultantAddFormProps) 
   const [form, setForm] = useState<ConsultantFormData>(empty)
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined)
+
+  useDrawerGuard({ form, hasSignature: !!signatureFile }, () => onSave(form, signatureFile ?? undefined))
 
   // Cria/revoga URL de preview local ao selecionar arquivo
   useEffect(() => {
