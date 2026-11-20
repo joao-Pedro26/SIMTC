@@ -26,9 +26,8 @@ interface BackendSession {
   city: string
   state: string
   date?: string | null
-  participantCount?: number | null
+  participantStats?: { total: number }
   status: string
-  _count?: { participants: number }
   createdAt: string
 }
 
@@ -96,7 +95,7 @@ export default async function DashboardPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   })
 
-  const totalParticipants = sessions.reduce((acc, s) => acc + (s.participantCount ?? 0), 0)
+  const totalParticipants = sessions.reduce((acc, s) => acc + (s.participantStats?.total ?? 0), 0)
   const completedSessions = sessions.filter((s) => s.status === 'CONCLUIDO')
   const approvalRate = completedSessions.length > 0
     ? `${((completedSessions.length / sessions.length) * 100).toFixed(1)}%`
@@ -112,7 +111,7 @@ export default async function DashboardPage() {
       color: 'teal',
     },
     {
-      label: 'Participantes (estimado)',
+      label: 'Participantes',
       value: String(totalParticipants),
       delta: `${completedSessions.length} concluídos`,
       up: completedSessions.length > 0,
@@ -208,7 +207,7 @@ export default async function DashboardPage() {
                     <td>{formatDate(s.date)}</td>
                     <td>{s.city}, {s.state}</td>
                     <td>{s.responsibleConsultant?.name ?? 'Consultor removido'}</td>
-                    <td className={styles.tdCenter}>{s.participantCount ?? '—'}</td>
+                    <td className={styles.tdCenter}>{s.participantStats?.total ?? '—'}</td>
                     <td><StatusBadge status={s.status} /></td>
                   </tr>
                 ))}

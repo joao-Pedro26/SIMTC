@@ -64,7 +64,7 @@ export function InfoTab({ session, onArchive, onCancel, onManage, readOnly }: In
             {session.course.theoryHours}h teórica
             {session.course.practiceHours > 0 && ` + ${session.course.practiceHours}h prática`}
           </Row>
-          <Row label="Nº estimado">{session.participantCount} participantes</Row>
+          <Row label="Nº de participantes">{session.participantCount} participantes</Row>
           <Row label="Consultor responsável">{session.responsibleConsultant?.name ?? 'Consultor removido'}</Row>
           {session.additionalConsultants.length > 0 && (
             <Row label="Consultores adicionais">

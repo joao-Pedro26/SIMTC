@@ -70,7 +70,7 @@ function mapDetailSession(s: BackendDetailSession): TrainingSession {
     city: s.city,
     state: s.state,
     date: s.date ? s.date.split('T')[0] : '',
-    participantCount: s.participantCount ?? 0,
+    participantCount: s.participants?.length ?? 0,
     notes: s.notes ?? null,
     status: s.status,
     qrCodeToken: s.qrCodeToken,

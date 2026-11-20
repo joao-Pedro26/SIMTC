@@ -15,7 +15,6 @@ export interface TrainingSessionFormData {
   city: string
   state: string
   date: string
-  participantCount: string
   notes: string
 }
 
@@ -35,7 +34,6 @@ const empty: TrainingSessionFormData = {
   city: '',
   state: '',
   date: '',
-  participantCount: '',
   notes: '',
 }
 
@@ -145,17 +143,6 @@ export function TrainingSessionAddForm({
               type="date"
               value={form.date}
               onChange={(e) => set('date', e.target.value)}
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Nº estimado de participantes</label>
-            <input
-              className={styles.input}
-              type="number"
-              min="0"
-              value={form.participantCount}
-              onChange={(e) => set('participantCount', e.target.value)}
-              placeholder="0"
             />
           </div>
         </div>

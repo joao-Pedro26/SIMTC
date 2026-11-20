@@ -36,7 +36,7 @@ interface BackendSession {
   city: string
   state: string
   date?: string | null
-  participantCount?: number | null
+  participantStats?: { total: number }
   notes?: string | null
   status: TrainingSession['status']
   qrCodeToken: string
@@ -59,7 +59,7 @@ function mapSession(s: BackendSession): TrainingSession {
     city: s.city,
     state: s.state,
     date: s.date ? s.date.split('T')[0] : '',
-    participantCount: s.participantCount ?? 0,
+    participantCount: s.participantStats?.total ?? 0,
     notes: s.notes ?? null,
     status: s.status,
     qrCodeToken: s.qrCodeToken,
@@ -144,7 +144,6 @@ export default function TreinamentosPage() {
         city: data.city,
         state: data.state,
         date: data.date || undefined,
-        participantCount: data.participantCount ? Number(data.participantCount) : undefined,
         notes: data.notes || undefined,
       })
       await fetchAll()
