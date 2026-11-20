@@ -160,7 +160,11 @@ export class CertificatesService {
       : null;
 
     const pdf = await this.pdfGenerator.renderCertificate({
-      participant: { ...participantData, signatureUrl: participantSignatureUrl },
+      participant: {
+        ...participantData,
+        cpf: this.formatCpf(participantData.cpf),
+        signatureUrl: participantSignatureUrl,
+      },
       session: { ...session, date: sessionDate },
       company: session.company,
       course: { ...session.course, contentItems },
@@ -208,6 +212,14 @@ export class CertificatesService {
     if (percent > 75) return '#48bb78';
     if (percent > 50) return '#ecc94b';
     return '#fc8181';
+  }
+
+  /** 12345678900 → 123.456.789-00 (valor fora do padrão de 11 dígitos segue como veio). */
+  private formatCpf(cpf: string | null | undefined): string | null {
+    if (!cpf) return null;
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return cpf;
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   }
 
   private formatCargaHoraria(theoryHours: number, practiceHours: number): string {
