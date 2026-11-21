@@ -62,5 +62,12 @@ void main() {
       expect(contrast(AppColors.text3, AppColors.background),
           greaterThanOrEqualTo(4.5));
     });
+
+    test('a caixa da observação do instrutor passa de 4,5:1', () {
+      expect(contrast(AppColors.primaryDark, AppColors.primarySoft),
+          greaterThanOrEqualTo(4.5));
+      expect(contrast(AppColors.text2, AppColors.primarySoft),
+          greaterThanOrEqualTo(4.5));
+    });
   });
 }

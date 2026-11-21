@@ -442,6 +442,7 @@ void main() {
       expect(confirmed.isConfirmed, isTrue);
 
       await confirmed.setObservation('inf-1', 'tarde demais');
+      expect(confirmed.message, isNotNull);
 
       final item = await db.select(db.localAssessmentItems).getSingle();
       expect(item.observation, isNull);
@@ -455,6 +456,7 @@ void main() {
       expect(vm.isReleased, isTrue);
 
       await vm.setObservation('inf-1', 'liberado');
+      expect(vm.message, isNotNull);
 
       final item = await db.select(db.localAssessmentItems).getSingle();
       expect(item.observation, isNull);

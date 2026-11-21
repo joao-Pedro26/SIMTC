@@ -75,6 +75,8 @@ class ChecklistViewModel extends ChangeNotifier {
       'Não foi possível salvar a nota. Tente de novo.';
   static const String _observationNotSaved =
       'Não foi possível salvar a observação. Tente de novo.';
+  static const String _observationLocked =
+      'A observação não foi salva: a avaliação já não pode ser editada.';
   static const String _startFailed =
       'Não foi possível iniciar a avaliação. Tente de novo.';
 
@@ -596,7 +598,12 @@ class ChecklistViewModel extends ChangeNotifier {
   /// lista que o repositório devolve em vez de esperar o stream.
   Future<void> setObservation(String infractionId, String text) async {
     final assessmentId = _assessmentId;
-    if (assessmentId == null || isConfirmed || isReleased || _busy) return;
+    if (assessmentId == null || _busy) return;
+    if (isConfirmed || isReleased) {
+      _message = _observationLocked;
+      notifyListeners();
+      return;
+    }
 
     try {
       _items = await _assessmentRepository.setObservation(
