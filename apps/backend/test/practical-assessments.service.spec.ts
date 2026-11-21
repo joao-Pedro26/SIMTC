@@ -6,13 +6,17 @@ import { ROLES_KEY } from 'src/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { PracticalAssessmentsController } from 'src/practical-assessments/practical-assessments.controller';
-import { PracticalAssessmentsService } from 'src/practical-assessments/practical-assessments.service';
+import {
+  PracticalAssessmentsService,
+  normalizeObservation,
+} from 'src/practical-assessments/practical-assessments.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   calculateCategoryScore,
   calculateOverallScore,
   getApprovalStatus,
   JwtPayload,
+  ASSESSMENT_OBSERVATION_MAX_LENGTH,
   UserRole,
 } from '@simtc/shared-types';
 
@@ -43,6 +47,19 @@ describe('PracticalAssessmentsService', () => {
 
     service = module.get<PracticalAssessmentsService>(PracticalAssessmentsService);
     jest.clearAllMocks();
+  });
+
+  describe('normalizeObservation', () => {
+    it.each([[null], [undefined], [42], [{}], ['   ']])('%p vira null', (raw) => {
+      expect(normalizeObservation(raw)).toBeNull();
+    });
+    it('faz trim', () => expect(normalizeObservation('  texto  ')).toBe('texto'));
+    it('normaliza CRLF', () =>
+      expect(normalizeObservation('a' + String.fromCharCode(13, 10) + 'b')).toBe('a' + String.fromCharCode(10) + 'b'));
+    it('trunca em vez de lancar', () => {
+      const out = normalizeObservation('x'.repeat(600));
+      expect(out).toHaveLength(ASSESSMENT_OBSERVATION_MAX_LENGTH);
+    });
   });
 
   // ─── Funções de scoring (lógica pura) ────────────────────────────────────
@@ -430,6 +447,56 @@ describe('PracticalAssessmentsService', () => {
       const result = await service.syncFromMobile([dto], 'consultant-1');
 
       expect(result[0]).toMatchObject({ status: 'fulfilled' });
+    });
+
+    describe('observacao do instrutor', () => {
+      it('primeira avaliacao: o create dos itens recebe a observacao', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        await service.syncFromMobile(
+          [{ ...dto, items: [{ infractionNoteId: 'n1', observation: 'texto' }] }],
+          'consultant-1',
+        );
+
+        expect(mockPrisma.practicalAssessment.create.mock.calls[0][0].data.items.create).toEqual([
+          { infractionNoteId: 'n1', observation: 'texto' },
+        ]);
+      });
+
+      it('reavaliacao sem o campo: o create apos o deleteMany recebe observation null', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue({ id: 'assess-1' });
+        mockPrisma.assessmentItem.deleteMany.mockResolvedValue({ count: 1 });
+        mockPrisma.practicalAssessment.update.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        await service.syncFromMobile(
+          [{ ...dto, items: [{ infractionNoteId: 'n1' }] }],
+          'consultant-1',
+        );
+
+        expect(mockPrisma.practicalAssessment.update.mock.calls[0][0].data.items.create).toEqual([
+          { infractionNoteId: 'n1', observation: null },
+        ]);
+      });
+
+      it('lote com observation nao-string e outro valido: ambos sincronizam', async () => {
+        mockPrisma.practicalAssessment.findUnique.mockResolvedValue(null);
+        mockPrisma.practicalAssessment.create.mockResolvedValue({ id: 'assess-1', items: [] });
+
+        const result = await service.syncFromMobile(
+          [
+            { ...dto, trainingParticipantId: 'tp-1', items: [{ infractionNoteId: 'n1', observation: 42 as any }] },
+            { ...dto, trainingParticipantId: 'tp-2', items: [{ infractionNoteId: 'n2', observation: 'ok' }] },
+          ],
+          'consultant-1',
+        );
+
+        expect(result.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
+        const created = mockPrisma.practicalAssessment.create.mock.calls.map(
+          (c) => c[0].data.items.create[0].observation,
+        );
+        expect(created).toEqual([null, 'ok']);
+      });
     });
 
     describe('numa transação só (Fase 8D-1)', () => {

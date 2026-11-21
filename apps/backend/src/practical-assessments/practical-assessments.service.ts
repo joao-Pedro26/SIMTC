@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { SyncPracticalAssessmentDto } from '@simtc/shared-types';
+import { ASSESSMENT_OBSERVATION_MAX_LENGTH, SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 import { statusAfterRelease } from '../participants/participant-release.util';
@@ -15,6 +15,18 @@ import { findCourseCategories } from '../assessment-categories/course-categories
  * recusados só por esperar conexão, e o app os trataria como recusa do servidor.
  */
 const SYNC_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 10_000 };
+
+/**
+ * Observacao livre do instrutor sobre uma falta. Nunca recusa: a avaliacao pode
+ * ter sido feita offline e enviada horas depois, entao texto invalido ou longo
+ * demais e saneado (nao-string/vazio -> null; acima do limite -> truncado).
+ */
+export function normalizeObservation(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const text = raw.replace(/\r\n/g, '\n').trim();
+  if (text === '') return null;
+  return text.slice(0, ASSESSMENT_OBSERVATION_MAX_LENGTH);
+}
 
 @Injectable()
 export class PracticalAssessmentsService {
@@ -121,7 +133,10 @@ export class PracticalAssessmentsService {
             synced: true,
             score: null, // resetar até calcular abaixo
             items: {
-              create: dto.items.map((item) => ({ infractionNoteId: item.infractionNoteId })),
+              create: dto.items.map((item) => ({
+                infractionNoteId: item.infractionNoteId,
+                observation: normalizeObservation(item.observation),
+              })),
             },
           },
           include: {
@@ -149,7 +164,10 @@ export class PracticalAssessmentsService {
           endTime: dto.endTime ? new Date(dto.endTime) : undefined,
           synced: true,
           items: {
-            create: dto.items.map((item) => ({ infractionNoteId: item.infractionNoteId })),
+            create: dto.items.map((item) => ({
+                infractionNoteId: item.infractionNoteId,
+                observation: normalizeObservation(item.observation),
+              })),
           },
         },
         include: {

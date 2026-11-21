@@ -362,7 +362,7 @@ export class CertificatesService {
    */
   private buildScoreData(items: any[], allCategories: any[]) {
     const byCategoryDeductions = new Map<string, number[]>();
-    const byCategoryInfractions = new Map<string, Array<{ order: number; title: string; body: string | null }>>();
+    const byCategoryInfractions = new Map<string, Array<{ order: number; title: string; body: string | null; observation: string | null }>>();
 
     for (const item of items) {
       const note = item.infractionNote;
@@ -378,6 +378,7 @@ export class CertificatesService {
         order: infraction.order,
         title: infraction.description,
         body: note.comment ?? null,
+        observation: item.observation ?? null,
       });
     }
 
@@ -406,7 +407,7 @@ export class CertificatesService {
         infractions: byCategoryInfractions
           .get(cat.id)!
           .sort((a, b) => a.order - b.order)
-          .map(({ title, body }) => ({ title, body })),
+          .map(({ title, body, observation }) => ({ title, body, observation })),
       }));
 
     return { topicSections, categoryScores, overallScorePercent, resultLabel, resultBadgeClass };

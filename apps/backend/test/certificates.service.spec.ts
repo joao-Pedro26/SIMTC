@@ -4,6 +4,9 @@ import { PdfGeneratorService } from 'src/certificates/pdf-generator.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
 import { EmailService } from 'src/email/email.service';
+import * as fs from 'fs';
+import * as path from 'path';
+import Handlebars from 'handlebars';
 
 const mockStorage = { upload: jest.fn(), delete: jest.fn(), getSignedUrl: jest.fn(), download: jest.fn() };
 const mockPdfGenerator = { renderCertificate: jest.fn(), renderAssessmentReport: jest.fn() };
@@ -163,6 +166,61 @@ describe('CertificatesService', () => {
       expect(p).not.toHaveProperty('signaturePath');
       expect(p).not.toHaveProperty('signatureUpdatedAt');
       expect(result.trainingParticipant.training).toEqual({ id: 's1' });
+    });
+  });
+
+  describe('buildScoreData: observacao do instrutor', () => {
+    const cat = { id: 'cat1', code: 'CV', name: 'Cat', description: null, _count: { infractions: 5 } };
+    const item = (order: number, desc: string, observation?: string | null) => ({
+      ...(observation !== undefined ? { observation } : {}),
+      infractionNote: {
+        deduction: 1,
+        comment: 'c',
+        infraction: { order, description: desc, category: { id: 'cat1' } },
+      },
+    });
+    const build = (items: any[]) => (service as any).buildScoreData(items, [cat]);
+
+    it('repassa a observacao da infracao', () => {
+      const data = build([item(1, 'A', 'texto')]);
+      expect(data.topicSections[0].infractions[0].observation).toBe('texto');
+    });
+
+    it('sem observacao fica null', () => {
+      const data = build([item(1, 'A'), item(2, 'B', null)]);
+      expect(data.topicSections[0].infractions.map((i: any) => i.observation)).toEqual([null, null]);
+    });
+
+    it('continua ordenando por order', () => {
+      const data = build([item(2, 'B', 'y'), item(1, 'A', 'x')]);
+      expect(data.topicSections[0].infractions.map((i: any) => i.title)).toEqual(['A', 'B']);
+    });
+  });
+
+  describe('template assessment-report: observacao do instrutor', () => {
+    const tpl = Handlebars.compile(
+      fs.readFileSync(path.join(__dirname, '..', 'src', 'certificates', 'templates', 'assessment-report.html'), 'utf-8'),
+    );
+    const render = (observation: string | null) =>
+      tpl({
+        topicSections: [
+          { code: 'CV', name: 'Cat', description: null, infractions: [{ title: 'A', body: 'b', observation }] },
+        ],
+        categoryScores: [],
+        conclusionParagraphs: [],
+      });
+
+    it('escapa HTML da observacao', () => {
+      const html = render('a <b>x</b> & "q"' + String.fromCharCode(10) + 'linha2');
+      expect(html).toContain('instructor-note');
+      expect(html).toContain('&lt;b&gt;');
+      expect(html).toContain('&amp;');
+      expect(html).toContain('&quot;');
+      expect(html).not.toContain('<b>x</b>');
+    });
+
+    it('nao renderiza o bloco sem observacao', () => {
+      expect(render(null)).not.toContain('<div class="instructor-note">');
     });
   });
 });

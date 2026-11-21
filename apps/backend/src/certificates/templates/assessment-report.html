@@ -128,6 +128,19 @@
     color: #000;
     margin: 16pt 0 4pt 10pt;
   }
+  .instructor-note {
+    font-family: Verdana, Geneva, sans-serif;
+    font-size: 10pt;
+    font-style: italic;
+    color: #000;
+    text-align: justify;
+    line-height: 14pt;
+    white-space: pre-line;
+    border-left: 1.5pt solid #1f3a5f;
+    padding-left: 8pt;
+    margin: 0 0 14pt 0;
+  }
+  .instructor-note-label { font-weight: 700; font-style: normal; }
   .infraction-title::before { content: "\2013\00a0"; }
 
   .empty-state {
@@ -260,6 +273,12 @@
         {{#each this.infractions}}
         <div class="infraction-title">{{this.title}}</div>
         {{#if this.body}}<div class="body-text">{{this.body}}</div>{{/if}}
+        {{#if this.observation}}
+        <div class="instructor-note">
+          <span class="instructor-note-label">Observação do instrutor:</span>
+          {{this.observation}}
+        </div>
+        {{/if}}
         {{/each}}
         {{/each}}
       {{else}}
