@@ -4,7 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { AssessmentConfirmDialog } from './assessment-confirm-dialog'
 import { clientApi } from '@/lib/client-api'
-import { calculateCategoryScore, calculateOverallScore, getApprovalLabel } from '@simtc/shared-types'
+import {
+  ASSESSMENT_OBSERVATION_MAX_LENGTH,
+  calculateCategoryScore,
+  calculateOverallScore,
+  getApprovalLabel,
+} from '@simtc/shared-types'
 import styles from './assessment-drawer.module.css'
 
 // ── Tipos da API ──────────────────────────────────────────────────────────────
@@ -49,6 +54,7 @@ interface SelectedNote {
   noteType: 'B' | 'PM' | 'M'
   deduction: number
   categoryId: string
+  observation?: string
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -80,6 +86,10 @@ export function AssessmentDrawer({
   const startTimeRef = useRef<Date | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  // Infração cuja falta será removida, aguardando confirmação (tem observação)
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
+  // Infrações com o campo de observação aberto (mesmo sem texto ainda)
+  const [openObservations, setOpenObservations] = useState<Set<string>>(new Set())
   const [endTime, setEndTime] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -117,6 +127,8 @@ export function AssessmentDrawer({
       startTimeRef.current = null
       setShowConfirm(false)
       setShowCancelConfirm(false)
+      setRemoveConfirmId(null)
+      setOpenObservations(new Set())
       setEndTime(null)
       setSaveError('')
     }
@@ -128,30 +140,70 @@ export function AssessmentDrawer({
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         if (showConfirm) { setShowConfirm(false); return }
+        if (removeConfirmId) { setRemoveConfirmId(null); return }
         if (showCancelConfirm) { setShowCancelConfirm(false); return }
         setShowCancelConfirm(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, showConfirm, showCancelConfirm])
+  }, [open, showConfirm, showCancelConfirm, removeConfirmId])
 
-  function toggleNote(infraction: AssessmentInfraction, note: InfractionNote, categoryId: string) {
+  function removeSelection(infractionId: string) {
     setSelections((prev) => {
       const next = new Map(prev)
-      const current = next.get(infraction.id)
-      if (current?.infractionNoteId === note.id) {
-        next.delete(infraction.id)
-      } else {
-        next.set(infraction.id, {
-          infractionNoteId: note.id,
-          noteType: note.noteType,
-          deduction: note.deduction,
-          categoryId,
-        })
-      }
+      next.delete(infractionId)
       return next
     })
+    setOpenObservations((prev) => {
+      const next = new Set(prev)
+      next.delete(infractionId)
+      return next
+    })
+  }
+
+  function toggleNote(infraction: AssessmentInfraction, note: InfractionNote, categoryId: string) {
+    const current = selections.get(infraction.id)
+    if (current?.infractionNoteId === note.id) {
+      // Desmarcar com observação preenchida pede confirmação antes de perdê-la
+      if (current.observation?.trim()) {
+        setRemoveConfirmId(infraction.id)
+        return
+      }
+      removeSelection(infraction.id)
+      return
+    }
+    setSelections((prev) => {
+      const next = new Map(prev)
+      // Trocar de nota (B/PM/M) preserva a observação já escrita
+      next.set(infraction.id, {
+        infractionNoteId: note.id,
+        noteType: note.noteType,
+        deduction: note.deduction,
+        categoryId,
+        observation: prev.get(infraction.id)?.observation,
+      })
+      return next
+    })
+  }
+
+  function setObservation(infractionId: string, text: string) {
+    setSelections((prev) => {
+      const current = prev.get(infractionId)
+      if (!current) return prev
+      const next = new Map(prev)
+      next.set(infractionId, { ...current, observation: text })
+      return next
+    })
+  }
+
+  function openObservation(infractionId: string) {
+    setOpenObservations((prev) => new Set(prev).add(infractionId))
+  }
+
+  function handleRemoveConfirmed() {
+    if (removeConfirmId) removeSelection(removeConfirmId)
+    setRemoveConfirmId(null)
   }
 
   function calculateScores() {
@@ -193,6 +245,7 @@ export function AssessmentDrawer({
       const today = new Date()
       const items = Array.from(selections.values()).map((sel) => ({
         infractionNoteId: sel.infractionNoteId,
+        observation: sel.observation?.trim() || undefined,
       }))
 
       // O sync responde 2xx mesmo quando recusa a avaliação: o resultado vem
@@ -226,6 +279,9 @@ export function AssessmentDrawer({
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
   const { catScores, overall } = calculateScores()
   const catScoreMap = new Map(catScores.map((cs) => [cs.categoryId, cs.score]))
+
+  const observationCount = Array.from(selections.values()).filter((sel) => sel.observation?.trim()).length
+  const faultCount = selections.size
 
   const confirmCategoryScores = categories
     .map((c) => ({ code: c.code, name: c.name, score: catScoreMap.get(c.id) ?? 100 }))
@@ -327,6 +383,37 @@ export function AssessmentDrawer({
                                   )
                                 })}
                               </div>
+                              {currentSel && (currentSel.observation || openObservations.has(infraction.id)) ? (
+                                <div className={styles.observationBox}>
+                                  <label className={styles.observationLabel} htmlFor={`obs-${infraction.id}`}>
+                                    Observação do instrutor
+                                  </label>
+                                  <textarea
+                                    id={`obs-${infraction.id}`}
+                                    className={styles.observationInput}
+                                    rows={3}
+                                    maxLength={ASSESSMENT_OBSERVATION_MAX_LENGTH}
+                                    value={currentSel.observation ?? ''}
+                                    onChange={(e) => setObservation(infraction.id, e.target.value)}
+                                  />
+                                  <div className={styles.observationMeta}>
+                                    <span className={styles.observationHint}>
+                                      Esta observação aparece no relatório enviado ao cliente.
+                                    </span>
+                                    <span className={styles.observationCounter}>
+                                      {(currentSel.observation ?? '').length}/{ASSESSMENT_OBSERVATION_MAX_LENGTH}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : currentSel ? (
+                                <button
+                                  type="button"
+                                  className={styles.addObservationBtn}
+                                  onClick={() => openObservation(infraction.id)}
+                                >
+                                  + Adicionar observação
+                                </button>
+                              ) : null}
                             </li>
                           )
                         })}
@@ -369,6 +456,24 @@ export function AssessmentDrawer({
             </div>
           </div>
 
+          {/* Confirm dialog de remoção de falta com observação */}
+          {removeConfirmId && (
+            <div className={styles.cancelOverlay}>
+              <div className={styles.cancelDialog}>
+                <p className={styles.cancelDialogTitle}>Remover a falta e a observação?</p>
+                <p className={styles.cancelDialogBody}>O texto da observação será perdido.</p>
+                <div className={styles.cancelDialogActions}>
+                  <button className={styles.cancelDialogKeep} onClick={() => setRemoveConfirmId(null)}>
+                    Manter
+                  </button>
+                  <button className={styles.cancelDialogConfirm} onClick={handleRemoveConfirmed}>
+                    Remover
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Confirm dialog de cancelamento */}
           {showCancelConfirm && (
             <div className={styles.cancelOverlay}>
@@ -396,6 +501,8 @@ export function AssessmentDrawer({
           endTime={endTime}
           categoryScores={confirmCategoryScores}
           overallScore={overall}
+          faultCount={faultCount}
+          observationCount={observationCount}
           approvalLabel={getApprovalLabel(overall)}
           saving={saving}
           onConfirm={handleConfirm}

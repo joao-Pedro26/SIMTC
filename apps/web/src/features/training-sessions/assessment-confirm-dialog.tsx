@@ -14,6 +14,8 @@ interface AssessmentConfirmDialogProps {
   endTime: Date
   categoryScores: CategoryScore[]
   overallScore: number
+  faultCount: number
+  observationCount: number
   approvalLabel: string
   saving: boolean
   onConfirm: () => void
@@ -38,6 +40,8 @@ export function AssessmentConfirmDialog({
   endTime,
   categoryScores,
   overallScore,
+  faultCount,
+  observationCount,
   approvalLabel,
   saving,
   onConfirm,
@@ -93,6 +97,13 @@ export function AssessmentConfirmDialog({
             Nenhuma infração marcada — pontuação máxima em todas as categorias.
           </p>
         )}
+
+        {/* Total de faltas e observações */}
+        <p className={styles.noItems}>
+          {faultCount} {faultCount === 1 ? 'falta' : 'faltas'}
+          {observationCount > 0 &&
+            ` · ${observationCount} ${observationCount === 1 ? 'observação' : 'observações'}`}
+        </p>
 
         {/* Resultado geral */}
         <div className={styles.overallRow}>

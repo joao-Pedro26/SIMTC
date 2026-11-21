@@ -334,6 +334,73 @@
   padding: 2rem;
 }
 
+/* ── Observação do instrutor ─────────────────────────────────────────────────── */
+
+.addObservationBtn {
+  align-self: flex-start;
+  margin-left: 1.625rem;
+  padding: 0.1rem 0;
+  border: none;
+  background: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1d9aa4;
+  cursor: pointer;
+}
+
+.addObservationBtn:hover {
+  color: #0a6e80;
+  text-decoration: underline;
+}
+
+.observationBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-left: 1.625rem;
+}
+
+.observationLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text, #1a202c);
+}
+
+.observationInput {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text, #1a202c);
+  background-color: var(--surface, #fff);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 7px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.observationInput:focus {
+  outline: none;
+  border-color: #1d9aa4;
+}
+
+.observationMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.observationHint,
+.observationCounter {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #718096);
+}
+
+.observationCounter {
+  flex-shrink: 0;
+}
+
 /* ── Footer ──────────────────────────────────────────────────────────────────── */
 
 .footer {
