@@ -5,6 +5,10 @@ import '../models/session_participant.dart';
 import '../models/training_session.dart';
 import '../services/local/app_database.dart';
 
+/// Tamanho máximo da observação do instrutor numa falta. Espelha
+/// `ASSESSMENT_OBSERVATION_MAX_LENGTH` do `@simtc/shared-types`.
+const kAssessmentObservationMaxLength = 500;
+
 /// O consultor já tem outra avaliação em andamento (rascunho iniciado e ainda
 /// não confirmado): só uma por vez (decisão de 01/10/2026).
 /// [trainingParticipantId] é o participante dessa avaliação em andamento.
@@ -294,6 +298,32 @@ class AssessmentRepository {
     return loadItems(localAssessmentId);
   }
 
+  /// Grava a observação do instrutor numa infração já marcada. O texto é
+  /// aparado e cortado em [kAssessmentObservationMaxLength]; vazio vira nulo.
+  /// Se a infração não está marcada, não faz nada (não cria item sem nota).
+  /// Devolve as marcações atualizadas, como `mark` e `unmark`.
+  Future<List<LocalAssessmentItem>> setObservation({
+    required String localAssessmentId,
+    required String infractionId,
+    String? observation,
+  }) async {
+    var text = observation?.trim() ?? '';
+    if (text.length > kAssessmentObservationMaxLength) {
+      text = text.substring(0, kAssessmentObservationMaxLength);
+    }
+    await (_db.update(_db.localAssessmentItems)
+          ..where((t) =>
+              t.localAssessmentId.equals(localAssessmentId) &
+              t.infractionId.equals(infractionId)))
+        .write(
+      LocalAssessmentItemsCompanion(
+        observation: Value(text.isEmpty ? null : text),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    return loadItems(localAssessmentId);
+  }
+
   /// "Confirmar" da tela 1.6: grava `endTime` (o fim que a tela mostrou, ou a
   /// hora do toque se nenhum for dado), o nome do participante e o % que a
   /// tela mostrou, e põe a avaliação na fila de envio. Quem sobe é o
@@ -456,7 +486,10 @@ class AssessmentRepository {
         'items': [
           for (final item in items)
             if (infractionOfNote[item.infractionNoteId] == item.infractionId)
-              {'infractionNoteId': item.infractionNoteId},
+              {
+                'infractionNoteId': item.infractionNoteId,
+                if (item.observation != null) 'observation': item.observation,
+              },
         ],
       });
     }

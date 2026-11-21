@@ -3533,6 +3533,12 @@ class $LocalAssessmentItemsTable extends LocalAssessmentItems
   late final GeneratedColumn<String> infractionNoteId = GeneratedColumn<String>(
       'infraction_note_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _observationMeta =
+      const VerificationMeta('observation');
+  @override
+  late final GeneratedColumn<String> observation = GeneratedColumn<String>(
+      'observation', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -3540,8 +3546,14 @@ class $LocalAssessmentItemsTable extends LocalAssessmentItems
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, localAssessmentId, infractionId, infractionNoteId, updatedAt];
+  List<GeneratedColumn> get $columns => [
+        id,
+        localAssessmentId,
+        infractionId,
+        infractionNoteId,
+        observation,
+        updatedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3582,6 +3594,12 @@ class $LocalAssessmentItemsTable extends LocalAssessmentItems
     } else if (isInserting) {
       context.missing(_infractionNoteIdMeta);
     }
+    if (data.containsKey('observation')) {
+      context.handle(
+          _observationMeta,
+          observation.isAcceptableOrUnknown(
+              data['observation']!, _observationMeta));
+    }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
@@ -3609,6 +3627,8 @@ class $LocalAssessmentItemsTable extends LocalAssessmentItems
           .read(DriftSqlType.string, data['${effectivePrefix}infraction_id'])!,
       infractionNoteId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}infraction_note_id'])!,
+      observation: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}observation']),
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -3628,12 +3648,17 @@ class LocalAssessmentItem extends DataClass
 
   /// `InfractionNote.id` escolhido — é o que o sync envia.
   final String infractionNoteId;
+
+  /// Observação do instrutor sobre a falta (máx. [kAssessmentObservationMaxLength]
+  /// caracteres, já normalizada). Nula quando não há.
+  final String? observation;
   final DateTime updatedAt;
   const LocalAssessmentItem(
       {required this.id,
       required this.localAssessmentId,
       required this.infractionId,
       required this.infractionNoteId,
+      this.observation,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3642,6 +3667,9 @@ class LocalAssessmentItem extends DataClass
     map['local_assessment_id'] = Variable<String>(localAssessmentId);
     map['infraction_id'] = Variable<String>(infractionId);
     map['infraction_note_id'] = Variable<String>(infractionNoteId);
+    if (!nullToAbsent || observation != null) {
+      map['observation'] = Variable<String>(observation);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -3652,6 +3680,9 @@ class LocalAssessmentItem extends DataClass
       localAssessmentId: Value(localAssessmentId),
       infractionId: Value(infractionId),
       infractionNoteId: Value(infractionNoteId),
+      observation: observation == null && nullToAbsent
+          ? const Value.absent()
+          : Value(observation),
       updatedAt: Value(updatedAt),
     );
   }
@@ -3664,6 +3695,7 @@ class LocalAssessmentItem extends DataClass
       localAssessmentId: serializer.fromJson<String>(json['localAssessmentId']),
       infractionId: serializer.fromJson<String>(json['infractionId']),
       infractionNoteId: serializer.fromJson<String>(json['infractionNoteId']),
+      observation: serializer.fromJson<String?>(json['observation']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3675,6 +3707,7 @@ class LocalAssessmentItem extends DataClass
       'localAssessmentId': serializer.toJson<String>(localAssessmentId),
       'infractionId': serializer.toJson<String>(infractionId),
       'infractionNoteId': serializer.toJson<String>(infractionNoteId),
+      'observation': serializer.toJson<String?>(observation),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3684,12 +3717,14 @@ class LocalAssessmentItem extends DataClass
           String? localAssessmentId,
           String? infractionId,
           String? infractionNoteId,
+          Value<String?> observation = const Value.absent(),
           DateTime? updatedAt}) =>
       LocalAssessmentItem(
         id: id ?? this.id,
         localAssessmentId: localAssessmentId ?? this.localAssessmentId,
         infractionId: infractionId ?? this.infractionId,
         infractionNoteId: infractionNoteId ?? this.infractionNoteId,
+        observation: observation.present ? observation.value : this.observation,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   LocalAssessmentItem copyWithCompanion(LocalAssessmentItemsCompanion data) {
@@ -3704,6 +3739,8 @@ class LocalAssessmentItem extends DataClass
       infractionNoteId: data.infractionNoteId.present
           ? data.infractionNoteId.value
           : this.infractionNoteId,
+      observation:
+          data.observation.present ? data.observation.value : this.observation,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3715,14 +3752,15 @@ class LocalAssessmentItem extends DataClass
           ..write('localAssessmentId: $localAssessmentId, ')
           ..write('infractionId: $infractionId, ')
           ..write('infractionNoteId: $infractionNoteId, ')
+          ..write('observation: $observation, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, localAssessmentId, infractionId, infractionNoteId, updatedAt);
+  int get hashCode => Object.hash(id, localAssessmentId, infractionId,
+      infractionNoteId, observation, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3731,6 +3769,7 @@ class LocalAssessmentItem extends DataClass
           other.localAssessmentId == this.localAssessmentId &&
           other.infractionId == this.infractionId &&
           other.infractionNoteId == this.infractionNoteId &&
+          other.observation == this.observation &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3740,6 +3779,7 @@ class LocalAssessmentItemsCompanion
   final Value<String> localAssessmentId;
   final Value<String> infractionId;
   final Value<String> infractionNoteId;
+  final Value<String?> observation;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LocalAssessmentItemsCompanion({
@@ -3747,6 +3787,7 @@ class LocalAssessmentItemsCompanion
     this.localAssessmentId = const Value.absent(),
     this.infractionId = const Value.absent(),
     this.infractionNoteId = const Value.absent(),
+    this.observation = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3755,6 +3796,7 @@ class LocalAssessmentItemsCompanion
     required String localAssessmentId,
     required String infractionId,
     required String infractionNoteId,
+    this.observation = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -3767,6 +3809,7 @@ class LocalAssessmentItemsCompanion
     Expression<String>? localAssessmentId,
     Expression<String>? infractionId,
     Expression<String>? infractionNoteId,
+    Expression<String>? observation,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3775,6 +3818,7 @@ class LocalAssessmentItemsCompanion
       if (localAssessmentId != null) 'local_assessment_id': localAssessmentId,
       if (infractionId != null) 'infraction_id': infractionId,
       if (infractionNoteId != null) 'infraction_note_id': infractionNoteId,
+      if (observation != null) 'observation': observation,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3785,6 +3829,7 @@ class LocalAssessmentItemsCompanion
       Value<String>? localAssessmentId,
       Value<String>? infractionId,
       Value<String>? infractionNoteId,
+      Value<String?>? observation,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return LocalAssessmentItemsCompanion(
@@ -3792,6 +3837,7 @@ class LocalAssessmentItemsCompanion
       localAssessmentId: localAssessmentId ?? this.localAssessmentId,
       infractionId: infractionId ?? this.infractionId,
       infractionNoteId: infractionNoteId ?? this.infractionNoteId,
+      observation: observation ?? this.observation,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3812,6 +3858,9 @@ class LocalAssessmentItemsCompanion
     if (infractionNoteId.present) {
       map['infraction_note_id'] = Variable<String>(infractionNoteId.value);
     }
+    if (observation.present) {
+      map['observation'] = Variable<String>(observation.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -3828,6 +3877,7 @@ class LocalAssessmentItemsCompanion
           ..write('localAssessmentId: $localAssessmentId, ')
           ..write('infractionId: $infractionId, ')
           ..write('infractionNoteId: $infractionNoteId, ')
+          ..write('observation: $observation, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6379,6 +6429,7 @@ typedef $$LocalAssessmentItemsTableCreateCompanionBuilder
   required String localAssessmentId,
   required String infractionId,
   required String infractionNoteId,
+  Value<String?> observation,
   required DateTime updatedAt,
   Value<int> rowid,
 });
@@ -6388,6 +6439,7 @@ typedef $$LocalAssessmentItemsTableUpdateCompanionBuilder
   Value<String> localAssessmentId,
   Value<String> infractionId,
   Value<String> infractionNoteId,
+  Value<String?> observation,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -6433,6 +6485,9 @@ class $$LocalAssessmentItemsTableFilterComposer
       column: $table.infractionNoteId,
       builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get observation => $composableBuilder(
+      column: $table.observation, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
@@ -6477,6 +6532,9 @@ class $$LocalAssessmentItemsTableOrderingComposer
       column: $table.infractionNoteId,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get observation => $composableBuilder(
+      column: $table.observation, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 
@@ -6518,6 +6576,9 @@ class $$LocalAssessmentItemsTableAnnotationComposer
 
   GeneratedColumn<String> get infractionNoteId => $composableBuilder(
       column: $table.infractionNoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get observation => $composableBuilder(
+      column: $table.observation, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -6573,6 +6634,7 @@ class $$LocalAssessmentItemsTableTableManager extends RootTableManager<
             Value<String> localAssessmentId = const Value.absent(),
             Value<String> infractionId = const Value.absent(),
             Value<String> infractionNoteId = const Value.absent(),
+            Value<String?> observation = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -6581,6 +6643,7 @@ class $$LocalAssessmentItemsTableTableManager extends RootTableManager<
             localAssessmentId: localAssessmentId,
             infractionId: infractionId,
             infractionNoteId: infractionNoteId,
+            observation: observation,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -6589,6 +6652,7 @@ class $$LocalAssessmentItemsTableTableManager extends RootTableManager<
             required String localAssessmentId,
             required String infractionId,
             required String infractionNoteId,
+            Value<String?> observation = const Value.absent(),
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -6597,6 +6661,7 @@ class $$LocalAssessmentItemsTableTableManager extends RootTableManager<
             localAssessmentId: localAssessmentId,
             infractionId: infractionId,
             infractionNoteId: infractionNoteId,
+            observation: observation,
             updatedAt: updatedAt,
             rowid: rowid,
           ),

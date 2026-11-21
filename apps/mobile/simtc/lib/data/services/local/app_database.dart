@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -90,6 +90,14 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(
                 assessmentCategories,
                 assessmentCategories.courseIds,
+              );
+            }
+            if (from < 7) {
+              // Observação do instrutor por falta (20/11/2026): anulável — as
+              // marcações já feitas no aparelho ficam sem observação.
+              await m.addColumn(
+                localAssessmentItems,
+                localAssessmentItems.observation,
               );
             }
           });

@@ -199,6 +199,20 @@ const String _localAssessmentsV3 = '''
   )
 ''';
 
+/// A tabela `local_assessment_items` como as Fases 1 a 8 a deixaram (esquema
+/// 6): sem a observação do instrutor, que entrou no esquema 7.
+const String _localAssessmentItemsV6 = '''
+  CREATE TABLE IF NOT EXISTS local_assessment_items (
+    id TEXT NOT NULL,
+    local_assessment_id TEXT NOT NULL,
+    infraction_id TEXT NOT NULL,
+    infraction_note_id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (local_assessment_id, infraction_id)
+  )
+''';
+
 void main() {
   late AppDatabase db;
 
@@ -421,6 +435,7 @@ void main() {
           raw.execute(_participantsV1);
           raw.execute(_localAssessmentsV3);
           raw.execute(_assessmentCategoriesV1);
+          raw.execute(_localAssessmentItemsV6);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status, cached_at)
             VALUES ('sess-antiga', 'Bracell Celulose', 'Direção Preventiva',
@@ -461,6 +476,7 @@ void main() {
           raw.execute(_participantsV1);
           raw.execute(_localAssessmentsV3);
           raw.execute(_assessmentCategoriesV1);
+          raw.execute(_localAssessmentItemsV6);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state, status,
                                   total_participants, assessable_participants,
@@ -607,6 +623,7 @@ void main() {
         setup: (raw) {
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
+          raw.execute(_localAssessmentItemsV6);
           raw.execute(_localAssessmentsV3);
           raw.execute('''
             INSERT INTO local_assessments (id, training_participant_id, session_id,
@@ -687,6 +704,7 @@ void main() {
         setup: (raw) {
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
+          raw.execute(_localAssessmentItemsV6);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state,
                                   status, responsible_consultant_id, cached_at)
@@ -734,6 +752,7 @@ void main() {
         setup: (raw) {
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
+          raw.execute(_localAssessmentItemsV6);
           raw.execute('''
             INSERT INTO sessions (id, company_name, course_name, city, state,
                                   status, cached_at)
@@ -762,5 +781,37 @@ void main() {
         await migrated.select(migrated.assessmentCategories).getSingle();
     expect(category.code, 'CV');
     expect(category.courseIds, isNull);
+  });
+
+  test(
+      'migra do esquema 6 para o 7 mantendo a marcação já feita, sem '
+      'observação do instrutor', () async {
+    final directory = Directory.systemTemp.createTempSync('simtc_migracao_v7');
+    final file = File('${directory.path}/simtc.sqlite');
+
+    final migrated = AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (raw) {
+          raw.execute(_localAssessmentItemsV6);
+          raw.execute('''
+            INSERT INTO local_assessment_items (id, local_assessment_id,
+                                                infraction_id, infraction_note_id,
+                                                updated_at)
+            VALUES ('it-1', 'la-1', 'inf-1', 'note-b', 1758600000)
+          ''');
+          raw.execute('PRAGMA user_version = 6');
+        },
+      ),
+    );
+
+    addTearDown(() async {
+      await migrated.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    final item = await migrated.select(migrated.localAssessmentItems).getSingle();
+    expect(item.infractionNoteId, 'note-b');
+    expect(item.observation, isNull);
   });
 }

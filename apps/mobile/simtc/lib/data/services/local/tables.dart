@@ -200,6 +200,10 @@ class LocalAssessmentItems extends Table {
 
   /// `InfractionNote.id` escolhido — é o que o sync envia.
   TextColumn get infractionNoteId => text()();
+
+  /// Observação do instrutor sobre a falta (máx. [kAssessmentObservationMaxLength]
+  /// caracteres, já normalizada). Nula quando não há.
+  TextColumn get observation => text().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override

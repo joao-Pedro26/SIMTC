@@ -614,6 +614,109 @@ void main() {
     });
   });
 
+  group('setObservation', () {
+    Future<String> markedAssessment() async {
+      final id = (await open('tp-1')).id;
+      await repository.mark(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-b',
+      );
+      return id;
+    }
+
+    test('grava a observação com trim', () async {
+      final id = await markedAssessment();
+
+      final items = await repository.setObservation(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        observation: '  passou no vermelho  ',
+      );
+
+      expect(items.single.observation, 'passou no vermelho');
+      expect((await repository.loadItems(id)).single.observation,
+          'passou no vermelho');
+    });
+
+    test('vazio, só espaços ou nulo viram nulo', () async {
+      final id = await markedAssessment();
+      for (final value in ['', '   \n ', null]) {
+        await repository.setObservation(
+          localAssessmentId: id,
+          infractionId: 'inf-1',
+          observation: 'algo',
+        );
+        final items = await repository.setObservation(
+          localAssessmentId: id,
+          infractionId: 'inf-1',
+          observation: value,
+        );
+        expect(items.single.observation, isNull, reason: 'valor: "$value"');
+      }
+    });
+
+    test('corta em $kAssessmentObservationMaxLength caracteres', () async {
+      final id = await markedAssessment();
+
+      final items = await repository.setObservation(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        observation: 'a' * 600,
+      );
+
+      expect(items.single.observation, hasLength(kAssessmentObservationMaxLength));
+      expect(kAssessmentObservationMaxLength, 500);
+    });
+
+    test('sem item (infração desmarcada) não faz nada e não lança', () async {
+      final id = (await open('tp-1')).id;
+
+      final items = await repository.setObservation(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        observation: 'texto',
+      );
+
+      expect(items, isEmpty);
+      expect(await repository.loadItems(id), isEmpty);
+    });
+
+    test('mark trocando a nota preserva a observação', () async {
+      final id = await markedAssessment();
+      await repository.setObservation(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        observation: 'texto',
+      );
+
+      final items = await repository.mark(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-m',
+      );
+
+      expect(items.single.infractionNoteId, 'note-m');
+      expect(items.single.observation, 'texto');
+    });
+
+    test('unmark remove a linha e a observação', () async {
+      final id = await markedAssessment();
+      await repository.setObservation(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+        observation: 'texto',
+      );
+
+      final items = await repository.unmark(
+        localAssessmentId: id,
+        infractionId: 'inf-1',
+      );
+
+      expect(items, isEmpty);
+    });
+  });
+
   group('descartar', () {
     test(
         'descartar o rascunho apaga a avaliação e as marcações — o participante '
@@ -923,6 +1026,39 @@ void main() {
           ],
         },
       ]);
+    });
+
+    test('observation só vai no item quando não é nula', () async {
+      await seedCatalog();
+      final assessment = await open('tp-1');
+      await repository.mark(
+        localAssessmentId: assessment.id,
+        infractionId: 'inf-1',
+        infractionNoteId: 'note-b',
+      );
+      await repository.mark(
+        localAssessmentId: assessment.id,
+        infractionId: 'inf-2',
+        infractionNoteId: 'note-x',
+      );
+      await repository.setObservation(
+        localAssessmentId: assessment.id,
+        infractionId: 'inf-1',
+        observation: 'texto',
+      );
+
+      final payload = await repository.syncPayload([await row(assessment.id)]);
+
+      final items = (payload.single['items'] as List).cast<Map>();
+      expect(items, hasLength(2));
+      expect(
+        items.singleWhere((i) => i['infractionNoteId'] == 'note-b'),
+        {'infractionNoteId': 'note-b', 'observation': 'texto'},
+      );
+      expect(
+        items.singleWhere((i) => i['infractionNoteId'] == 'note-x'),
+        {'infractionNoteId': 'note-x'},
+      );
     });
 
     test('cada avaliação leva só as próprias marcações', () async {
