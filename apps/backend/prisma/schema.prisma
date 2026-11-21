@@ -279,6 +279,7 @@ model AssessmentItem {
   id               String @id @default(cuid())
   assessmentId     String
   infractionNoteId String
+  observation      String? // texto livre do instrutor — sai no PDF
 
   assessment     PracticalAssessment @relation(fields: [assessmentId], references: [id])
   infractionNote InfractionNote      @relation(fields: [infractionNoteId], references: [id])
