@@ -18,6 +18,8 @@ export interface CreateInfractionDto {
   }[];
 }
 
+export const ASSESSMENT_OBSERVATION_MAX_LENGTH = 500;
+
 export interface SyncPracticalAssessmentDto {
   trainingParticipantId: string;
   consultantId?: string;   // opcional — no web vem do JWT; no mobile pode ser enviado
@@ -26,5 +28,7 @@ export interface SyncPracticalAssessmentDto {
   endTime?: string;
   items: {
     infractionNoteId: string;
+    /** Observação do instrutor sobre esta falta. Sai no PDF do relatório. */
+    observation?: string | null;
   }[];
 }
