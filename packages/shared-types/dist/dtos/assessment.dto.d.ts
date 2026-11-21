@@ -15,6 +15,7 @@ export interface CreateInfractionDto {
         deduction: number;
     }[];
 }
+export declare const ASSESSMENT_OBSERVATION_MAX_LENGTH = 500;
 export interface SyncPracticalAssessmentDto {
     trainingParticipantId: string;
     consultantId?: string;
@@ -23,6 +24,8 @@ export interface SyncPracticalAssessmentDto {
     endTime?: string;
     items: {
         infractionNoteId: string;
+        /** Observação do instrutor sobre esta falta. Sai no PDF do relatório. */
+        observation?: string | null;
     }[];
 }
 //# sourceMappingURL=assessment.dto.d.ts.map
