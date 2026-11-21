@@ -211,6 +211,35 @@ void main() {
     expect(find.text('Confirmar'), findsOneWidget);
   });
 
+  testWidgets(
+      'a linha do tópico acrescenta "· N obs." só quando há observações',
+      (tester) async {
+    await draftWith({'inf-1': 'inf-1-PM'});
+    await assessmentRepository.setObservation(
+      localAssessmentId: (await db.select(db.localAssessments).getSingle()).id,
+      infractionId: 'inf-1',
+      observation: 'Não sinalizou',
+    );
+
+    await pumpSummary(tester);
+
+    expect(find.text('1 infração · 1 obs.'), findsOneWidget);
+    expect(find.text('sem infração'), findsOneWidget, reason: 'RR sem obs.');
+  });
+
+  testWidgets('o "· N obs." também aparece no tablet', (tester) async {
+    await draftWith({'inf-1': 'inf-1-PM'});
+    await assessmentRepository.setObservation(
+      localAssessmentId: (await db.select(db.localAssessments).getSingle()).id,
+      infractionId: 'inf-1',
+      observation: 'Não sinalizou',
+    );
+
+    await pumpSummary(tester, tablet: const Size(1280, 800));
+
+    expect(find.text('1 infração · 1 obs.'), findsOneWidget);
+  });
+
   testWidgets('tudo o que se toca tem 48 e rótulo (Fase 8C)', (tester) async {
     await draftWith({'inf-1': 'inf-1-PM'});
     await pumpSummary(tester);

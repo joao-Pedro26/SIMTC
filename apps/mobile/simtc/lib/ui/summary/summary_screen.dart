@@ -207,6 +207,13 @@ class _SummaryScreenState extends State<SummaryScreen> {
     ].join(' · ');
   }
 
+  /// "2 infrações" ou, com observações do instrutor, "2 infrações · 1 obs.".
+  String _countLabel(ChecklistCategory category) {
+    final label = infractionCountLabel(category.markedCount);
+    final observations = category.observationCount;
+    return observations == 0 ? label : '$label · $observations obs.';
+  }
+
   Widget _buildCategory(ChecklistCategory category) {
     if (context.isTablet) return _buildTabletCategory(category);
 
@@ -234,7 +241,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xxs + 1),
                   Text(
-                    infractionCountLabel(category.markedCount),
+                    _countLabel(category),
                     style: AppTypography.meta,
                   ),
                 ],
@@ -261,7 +268,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
       overflow: TextOverflow.ellipsis,
     );
     final count = Text(
-      infractionCountLabel(category.markedCount),
+      _countLabel(category),
       style: AppTypography.summaryCountTablet,
     );
 

@@ -59,13 +59,19 @@ class RemoteAssessmentItem {
     required this.categoryName,
     required this.categoryOrder,
     this.comment,
+    this.observation,
   });
 
   final String infractionNoteId;
 
   /// `B`, `PM` ou `M`.
   final String noteType;
+  /// Comentário fixo do catálogo para a nota (`infractionNote.comment`).
   final String? comment;
+
+  /// Observação do instrutor sobre a falta, lida do **item** (`item.observation`),
+  /// nunca de dentro de `infractionNote`; nula quando não há.
+  final String? observation;
   final int deduction;
   final String infractionId;
   final String infractionDescription;
@@ -89,6 +95,7 @@ class RemoteAssessmentItem {
       infractionNoteId: note['id'] as String? ?? '',
       noteType: note['noteType'] as String? ?? '',
       comment: note['comment'] as String?,
+      observation: json['observation'] as String?,
       deduction: (note['deduction'] as num?)?.toInt() ?? 0,
       infractionId: infraction['id'] as String? ?? '',
       infractionDescription: infraction['description'] as String? ?? '',

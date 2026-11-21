@@ -81,6 +81,10 @@ class ChecklistCategory {
 
   /// Quantas infrações da categoria têm nota marcada.
   int get markedCount => infractions.where((i) => i.isMarked).length;
+
+  /// Quantas infrações marcadas têm observação do instrutor.
+  int get observationCount =>
+      infractions.where((i) => i.isMarked && (i.observation?.isNotEmpty ?? false)).length;
 }
 
 /// Monta as seções do acordeão a partir do catálogo e das marcações

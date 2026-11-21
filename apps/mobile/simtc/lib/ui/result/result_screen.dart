@@ -22,6 +22,7 @@ import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_footer_bar.dart';
 import '../core/widgets/app_top_bar.dart';
+import '../core/widgets/instructor_observation.dart';
 import '../core/widgets/final_score_block.dart';
 import '../core/widgets/inline_notice.dart';
 import '../core/widgets/skeleton.dart';
@@ -517,6 +518,10 @@ class _ResultScreenState extends State<ResultScreen> {
                 if (comment != null) ...[
                   SizedBox(height: tablet ? AppSpacing.xs : AppSpacing.xs + 1),
                   Text(comment, style: AppTypography.summaryDetail),
+                ],
+                if (infraction.observation case final observation?) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  InstructorObservation(text: observation),
                 ],
               ],
             ),

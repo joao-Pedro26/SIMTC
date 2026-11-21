@@ -354,6 +354,14 @@ abstract final class AppTypography {
   static TextStyle get noteComment =>
       _inter(size: 13.5, weight: FontWeight.w400, height: 1.45, color: AppColors.noteCommentInk);
 
+  /// Rótulo "Observação do instrutor" da caixa abaixo do comentário do catálogo
+  static TextStyle get instructorObservationLabel =>
+      _inter(size: 12, weight: FontWeight.w700, height: 1.3, color: AppColors.primaryDark);
+
+  /// Texto da observação do instrutor
+  static TextStyle get instructorObservation =>
+      _inter(size: 13.5, weight: FontWeight.w400, height: 1.45, color: AppColors.text2);
+
   // ─── Conferir e finalizar (quadro "2e" do canvas) ─────────────────────────
 
   /// "Pontuação final", acima do número

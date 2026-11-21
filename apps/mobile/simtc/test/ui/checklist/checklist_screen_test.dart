@@ -1585,4 +1585,232 @@ void main() {
       expect(find.text('Descartar a avaliação?'), findsOneWidget);
     });
   });
+
+  for (final tablet in [false, true]) {
+    group('observação do instrutor ${tablet ? 'no tablet' : 'no celular'}', () {
+      const hint = 'Esta observação aparece no relatório enviado ao cliente.';
+
+      Future<String> pumpObs(
+        WidgetTester tester, {
+        String? marked,
+        String? observation,
+        bool confirmed = false,
+      }) async {
+        if (tablet) {
+          tester.view.physicalSize = _landscape;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+        }
+        final draft = await assessmentRepository.openDraft(
+          trainingParticipantId: 'tp-1',
+          sessionId: 'sess-1',
+          ownerUserId: 'user-1',
+          consultantId: 'c-eu',
+        );
+        if (marked != null) {
+          await assessmentRepository.mark(
+            localAssessmentId: draft.id,
+            infractionId: 'inf-1',
+            infractionNoteId: marked,
+          );
+        }
+        if (observation != null) {
+          await assessmentRepository.setObservation(
+            localAssessmentId: draft.id,
+            infractionId: 'inf-1',
+            observation: observation,
+          );
+        }
+        if (confirmed) {
+          await assessmentRepository.confirm(draft.id,
+              participantName: 'Ana', score: 88);
+        }
+        const screen = MaterialApp(
+          home: ChecklistScreen(sessionId: 'sess-1', participantId: 'tp-1'),
+        );
+        await tester.pumpWidget(withProviders(
+          tablet
+              ? const FormFactorScope(formFactor: FormFactor.tablet, child: screen)
+              : screen,
+        ));
+        await tester.pumpAndSettle();
+        return draft.id;
+      }
+
+      Future<String?> savedObservation() async =>
+          (await db.select(db.localAssessmentItems).getSingleOrNull())?.observation;
+
+      Future<void> typeObservation(WidgetTester tester, String text) async {
+        await tester.enterText(find.byKey(const Key('observation-field')), text);
+        await tester.pump();
+      }
+
+      testWidgets('"Adicionar observação" só aparece com a falta marcada',
+          (tester) async {
+        await pumpObs(tester);
+        expect(find.text('Adicionar observação'), findsNothing);
+
+        await tester.tap(find.text('PM'));
+        await tester.pumpAndSettle();
+        expect(find.text('Adicionar observação'), findsOneWidget);
+        // Não é a caixa amarela do catálogo.
+        expect(find.text(pmComment), findsOneWidget);
+        expect(find.text('Observação do instrutor'), findsNothing);
+      });
+
+      testWidgets('o bottom sheet salva a observação e ela aparece na linha',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm');
+
+        await tester.tap(find.text('Adicionar observação'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Observação — item 1'), findsOneWidget);
+        expect(find.text(hint), findsOneWidget);
+        expect(find.text('Remover'), findsNothing, reason: 'ainda não há texto');
+        expect(find.text('0/500'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byKey(const Key('observation-field'))).autofocus,
+          isTrue,
+        );
+
+        await typeObservation(tester, '  Não sinalizou a conversão  ');
+        expect(find.text('29/500'), findsOneWidget,
+            reason: 'o contador conta o que foi digitado');
+        await tester.tap(find.text('Salvar'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Observação — item 1'), findsNothing);
+        expect(await savedObservation(), 'Não sinalizou a conversão');
+        expect(find.text('Observação do instrutor'), findsOneWidget);
+        expect(find.text('Não sinalizou a conversão'), findsOneWidget);
+        expect(find.text('Adicionar observação'), findsNothing);
+      });
+
+      testWidgets('tocar na observação abre a edição com o texto; "Remover" apaga',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm', observation: 'Texto antigo');
+
+        await tester.tap(find.text('Texto antigo'));
+        await tester.pumpAndSettle();
+        expect(find.text('Observação — item 1'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byKey(const Key('observation-field'))).controller!.text,
+          'Texto antigo',
+        );
+
+        await tester.tap(find.text('Remover'));
+        await tester.pumpAndSettle();
+
+        expect(await savedObservation(), isNull);
+        expect(find.text('Observação do instrutor'), findsNothing);
+        expect(find.text('Adicionar observação'), findsOneWidget);
+      });
+
+      testWidgets('o fechar do bottom sheet não grava', (tester) async {
+        await pumpObs(tester, marked: 'note-pm', observation: 'Texto antigo');
+
+        await tester.tap(find.text('Texto antigo'));
+        await tester.pumpAndSettle();
+        await typeObservation(tester, 'Outro texto');
+        await tester.tap(find.byTooltip('Fechar'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Observação — item 1'), findsNothing);
+        expect(await savedObservation(), 'Texto antigo');
+      });
+
+      testWidgets(
+          'trocar a nota mantém a observação e a linha continua mostrando-a',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm', observation: 'Texto antigo');
+
+        await tester.tap(find.text('M'));
+        await tester.pumpAndSettle();
+
+        expect(await savedObservation(), 'Texto antigo');
+        expect(find.text('Texto antigo'), findsOneWidget);
+      });
+
+      testWidgets('avaliação confirmada: a observação aparece, sem ação de toque',
+          (tester) async {
+        await pumpObs(tester,
+            marked: 'note-pm', observation: 'Texto antigo', confirmed: true);
+
+        expect(find.text('Observação do instrutor'), findsOneWidget);
+        expect(find.text('Texto antigo'), findsOneWidget);
+        expect(find.text('Adicionar observação'), findsNothing);
+
+        await tester.tap(find.text('Texto antigo'));
+        await tester.pumpAndSettle();
+        expect(find.text('Observação — item 1'), findsNothing);
+      });
+
+      testWidgets('avaliação confirmada sem observação: nem o botão', (tester) async {
+        await pumpObs(tester, marked: 'note-pm', confirmed: true);
+        expect(find.text('Adicionar observação'), findsNothing);
+      });
+
+      testWidgets(
+          'desmarcar uma falta com observação pede confirmação; "Cancelar" mantém',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm', observation: 'Texto antigo');
+
+        await tester.tap(find.text('PM'));
+        await tester.pumpAndSettle();
+        expect(find.text('Remover a falta e a observação?'), findsOneWidget);
+
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+
+        final item = await db.select(db.localAssessmentItems).getSingle();
+        expect(item.infractionNoteId, 'note-pm');
+        expect(item.observation, 'Texto antigo');
+      });
+
+      testWidgets('confirmado o diálogo, a falta e a observação saem',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm', observation: 'Texto antigo');
+
+        await tester.tap(find.text('PM'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Remover'));
+        await tester.pumpAndSettle();
+
+        expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+        expect(find.text('Adicionar observação'), findsNothing);
+      });
+
+      testWidgets('desmarcar sem observação não pede confirmação', (tester) async {
+        await pumpObs(tester, marked: 'note-pm');
+
+        await tester.tap(find.text('PM'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Remover a falta e a observação?'), findsNothing);
+        expect(await db.select(db.localAssessmentItems).get(), isEmpty);
+      });
+
+      testWidgets(
+          'o limite conta unidades UTF-16 como o repositório: o emoji que '
+          'estoura os 500 não entra e o contador mostra o mesmo número',
+          (tester) async {
+        await pumpObs(tester, marked: 'note-pm');
+        await tester.tap(find.text('Adicionar observação'));
+        await tester.pumpAndSettle();
+
+        // 499 unidades + um emoji de 2 unidades: passaria de 500.
+        await typeObservation(tester, '${'a' * 499}😀');
+        expect(find.text('499/500'), findsOneWidget);
+
+        // 498 unidades + o emoji: exatamente 500, e grava inteiro.
+        await typeObservation(tester, '${'a' * 498}😀');
+        expect(find.text('500/500'), findsOneWidget);
+        await tester.tap(find.text('Salvar'));
+        await tester.pumpAndSettle();
+
+        expect(await savedObservation(), '${'a' * 498}😀');
+      });
+    });
+  }
 }

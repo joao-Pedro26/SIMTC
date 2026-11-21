@@ -23,11 +23,13 @@ import '../core/widgets/app_spinner.dart';
 import '../core/widgets/confirm_dialog.dart';
 import '../core/widgets/connectivity_banner.dart';
 import '../core/widgets/inline_notice.dart';
+import '../core/widgets/instructor_observation.dart';
 import '../core/widgets/skeleton.dart';
 import '../summary/summary_screen.dart';
 import 'checklist_badges.dart';
 import 'checklist_sections.dart';
 import 'checklist_viewmodel.dart';
+import 'observation_length_formatter.dart';
 
 /// Tela 1.5 — checklist da avaliação prática (Fase 4), quadro "1b" do canvas.
 ///
@@ -995,6 +997,10 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             const SizedBox(height: AppSpacing.sm + 2),
             _NoteComment(comment),
           ],
+          if (_buildObservation(infraction) case final observation?) ...[
+            const SizedBox(height: AppSpacing.sm + 2),
+            observation,
+          ],
         ],
       ),
     );
@@ -1042,6 +1048,15 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     child: _NoteComment(comment),
                   ),
                 ],
+                if (_buildObservation(infraction) case final observation?) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: expanded ? commentMaxWidthExpanded : double.infinity,
+                    ),
+                    child: observation,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1055,6 +1070,65 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  /// A observação do instrutor abaixo do comentário do catálogo: o texto (que
+  /// abre a edição, a não ser que a avaliação esteja confirmada ou liberada)
+  /// ou, na falta marcada sem texto, o botão "Adicionar observação". Nulo
+  /// quando não há o que mostrar.
+  Widget? _buildObservation(ChecklistInfraction infraction) {
+    if (!infraction.isMarked) return null;
+    final readOnly = _viewModel.isConfirmed || _viewModel.isReleased;
+    final text = infraction.observation;
+    if (text != null && text.isNotEmpty) {
+      return InstructorObservation(
+        key: ValueKey('observation-${infraction.id}'),
+        text: text,
+        onTap: readOnly ? null : () => _editObservation(infraction),
+      );
+    }
+    if (readOnly) return null;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: ValueKey('add-observation-${infraction.id}'),
+        onPressed: () => _editObservation(infraction),
+        icon: const Icon(AppIcons.edit, size: 18),
+        label: const Text('Adicionar observação'),
+      ),
+    );
+  }
+
+  /// Marca ou troca a nota; ao desmarcar uma falta que tem observação, pede
+  /// confirmação antes, porque a observação some junto com a falta.
+  Future<void> _onNoteTap(ChecklistInfraction infraction, String noteId) async {
+    if (_viewModel.needsUnmarkConfirmation(infraction.id, noteId)) {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Remover a falta e a observação?',
+        message: 'A observação escrita para este item será apagada junto com '
+            'a falta.',
+        confirmLabel: 'Remover',
+      );
+      if (!confirmed || !mounted) return;
+    }
+    await _viewModel.toggleNote(infraction.id, noteId);
+  }
+
+  Future<void> _editObservation(ChecklistInfraction infraction) async {
+    final text = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      constraints: const BoxConstraints(maxWidth: 640),
+      builder: (_) => _ObservationSheet(
+        order: infraction.order,
+        initialText: infraction.observation ?? '',
+      ),
+    );
+    if (text == null || !mounted) return;
+    await _viewModel.setObservation(infraction.id, text);
+  }
+
   Widget _buildNoteButtons(ChecklistInfraction infraction) {
     return Row(
       children: [
@@ -1066,7 +1140,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               selected: infraction.selectedNoteId == infraction.notes[i].id,
               onTap: _viewModel.isConfirmed || _viewModel.isReleased
                   ? null
-                  : () => _viewModel.toggleNote(infraction.id, infraction.notes[i].id),
+                  : () => _onNoteTap(infraction, infraction.notes[i].id),
             ),
           ),
         ],
@@ -1270,6 +1344,114 @@ class _NoteComment extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(comment, style: AppTypography.noteComment)),
         ],
+      ),
+    );
+  }
+}
+
+/// O bottom sheet de edição da observação (melhor que um campo na lista:
+/// teclado e rolagem). Devolve o texto para gravar (vazio, no "Remover") ou
+/// nada, se foi fechado.
+class _ObservationSheet extends StatefulWidget {
+  const _ObservationSheet({required this.order, required this.initialText});
+
+  final int order;
+  final String initialText;
+
+  @override
+  State<_ObservationSheet> createState() => _ObservationSheetState();
+}
+
+class _ObservationSheetState extends State<_ObservationSheet> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialText);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.md,
+          AppSpacing.xl,
+          AppSpacing.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Observação — item ${widget.order}',
+                    style: AppTypography.categoryName,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Fechar',
+                  icon: const Icon(AppIcons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            // O limite é em unidades UTF-16, como o corte do repositório, e o
+            // contador mostra essa mesma conta (o `maxLength` do TextField
+            // conta grafemas e deixaria passar texto que o repositório corta).
+            TextField(
+              key: const Key('observation-field'),
+              controller: _controller,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 6,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              inputFormatters: const [
+                ObservationLengthFormatter(kAssessmentObservationMaxLength),
+              ],
+              decoration: InputDecoration(
+                hintText: 'Descreva o que foi observado',
+                helperText: 'Esta observação aparece no relatório enviado ao cliente.',
+                helperMaxLines: 2,
+                counter: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _controller,
+                  builder: (_, value, __) => Text(
+                    '${value.text.length}/$kAssessmentObservationMaxLength',
+                    style: AppTypography.meta,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                if (widget.initialText.isNotEmpty) ...[
+                  Expanded(
+                    child: AppSecondaryButton(
+                      label: 'Remover',
+                      onPressed: () => Navigator.of(context).pop(''),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                ],
+                Expanded(
+                  child: AppPrimaryButton(
+                    label: 'Salvar',
+                    onPressed: () => Navigator.of(context).pop(_controller.text),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

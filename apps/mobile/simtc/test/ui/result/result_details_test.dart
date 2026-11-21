@@ -63,11 +63,13 @@ void main() {
     String categoryName = 'Controle do Veículo',
     int categoryOrder = 1,
     String? comment,
+    String? observation,
   }) {
     return RemoteAssessmentItem(
       infractionNoteId: '$infractionId-$noteType',
       noteType: noteType,
       comment: comment,
+      observation: observation,
       deduction: deduction,
       infractionId: infractionId,
       infractionDescription: 'Do servidor, item $order',
@@ -162,6 +164,81 @@ void main() {
       expect(categories.single.code, 'CV');
       expect(categories.single.score, isNull);
       expect(categories.single.infractions.map((i) => i.number), [1, 4]);
+    });
+  });
+
+  group('RemoteAssessmentItem.tryParse', () {
+    Map<String, dynamic> json({Map<String, dynamic>? itemExtra, String? noteComment}) => {
+          'infractionNoteId': 'n-1',
+          'infractionNote': {
+            'id': 'n-1',
+            'noteType': 'PM',
+            'comment': noteComment,
+            'deduction': 3,
+            'infraction': {
+              'id': 'inf-1',
+              'description': 'Item 1',
+              'order': 1,
+              'category': {'id': 'cat-cv', 'code': 'CV', 'name': 'CV', 'order': 1},
+            },
+          },
+          ...?itemExtra,
+        };
+
+    test('lê a observação do item, separada do comentário do catálogo', () {
+      final item = RemoteAssessmentItem.tryParse(
+        json(itemExtra: {'observation': 'Do instrutor'}, noteComment: 'Do catálogo'),
+      )!;
+      expect(item.observation, 'Do instrutor');
+      expect(item.comment, 'Do catálogo');
+    });
+
+    test('sem o campo, a observação é nula e o comentário não a substitui', () {
+      final item = RemoteAssessmentItem.tryParse(json(noteComment: 'Do catálogo'))!;
+      expect(item.observation, isNull);
+      expect(item.comment, 'Do catálogo');
+    });
+
+    test('ignora uma "observation" dentro de infractionNote', () {
+      final map = json();
+      (map['infractionNote'] as Map<String, dynamic>)['observation'] = 'no lugar errado';
+      expect(RemoteAssessmentItem.tryParse(map)!.observation, isNull);
+    });
+  });
+
+  group('observação nas infrações do resultado', () {
+    test('resultFromRemote leva a observação do item', () {
+      final remote = RemoteAssessment(
+        startTime: DateTime.utc(2026, 9, 30, 11),
+        items: [
+          remoteItem(
+            infractionId: 'inf-1',
+            order: 1,
+            noteType: 'PM',
+            deduction: 3,
+            observation: 'Do instrutor',
+          ),
+        ],
+      );
+      final infraction = resultFromRemote(catalog, remote).first.infractions.single;
+      expect(infraction.observation, 'Do instrutor');
+    });
+
+    test('resultFromLocal leva a observação gravada no aparelho', () {
+      final categories = resultFromLocal(catalog, [
+        LocalAssessmentItem(
+          id: 'item-inf-1',
+          localAssessmentId: 'assess-1',
+          infractionId: 'inf-1',
+          infractionNoteId: 'inf-1-PM',
+          observation: 'Do instrutor',
+          updatedAt: DateTime(2026, 9, 30),
+        ),
+        item('inf-4', 'inf-4-B'),
+      ]);
+      final infractions = categories.first.infractions;
+      expect(infractions.first.observation, 'Do instrutor');
+      expect(infractions.last.observation, isNull);
     });
   });
 }

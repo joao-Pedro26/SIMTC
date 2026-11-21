@@ -12,6 +12,7 @@ class ResultInfraction {
     required this.description,
     required this.noteType,
     this.comment,
+    this.observation,
   });
 
   final int number;
@@ -20,6 +21,9 @@ class ResultInfraction {
   /// `B`, `PM` ou `M`.
   final String noteType;
   final String? comment;
+
+  /// Observação do instrutor sobre a falta.
+  final String? observation;
 }
 
 /// Uma categoria do Resultado: o % dela e as infrações marcadas, na ordem do
@@ -63,6 +67,7 @@ List<ResultCategory> resultFromLocal(
                 description: infraction.description,
                 noteType: note.noteType,
                 comment: note.comment,
+                observation: infraction.observation,
               ),
         ]),
       ),
@@ -124,6 +129,7 @@ List<ResultInfraction> _remoteInfractions(List<RemoteAssessmentItem> items) {
         description: item.infractionDescription,
         noteType: item.noteType,
         comment: item.comment,
+        observation: item.observation,
       ),
   ]);
 }

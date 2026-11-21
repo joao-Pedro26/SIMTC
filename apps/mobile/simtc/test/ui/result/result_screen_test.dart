@@ -385,6 +385,41 @@ void main() {
   });
 
   testWidgets(
+      'avaliação do servidor: a observação do instrutor aparece abaixo do '
+      'comentário do catálogo', (tester) async {
+    await seedParticipant(status: 'NAO_RECOMENDADO', score: 62.5);
+    final json = serverJson();
+    (json['items'] as List).first['observation'] = 'Não olhou o retrovisor';
+    serverAnswers(json);
+
+    await pumpResult(tester);
+
+    expect(find.text('Observação do instrutor'), findsOneWidget);
+    expect(find.text('Não olhou o retrovisor'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Não olhou o retrovisor')).dy,
+      greaterThan(tester.getBottomLeft(find.text('Não realizou nenhum ajuste')).dy),
+    );
+  });
+
+  testWidgets(
+      'avaliação deste aparelho: a observação gravada aparece no resultado',
+      (tester) async {
+    await seedParticipant(status: 'EM_AVALIACAO');
+    await confirmedHere({'inf-1': 'inf-1-PM'});
+    await assessmentRepository.setObservation(
+      localAssessmentId: (await db.select(db.localAssessments).getSingle()).id,
+      infractionId: 'inf-1',
+      observation: 'Texto do instrutor',
+    );
+
+    await pumpResult(tester, justConfirmed: true);
+
+    expect(find.text('Observação do instrutor'), findsOneWidget);
+    expect(find.text('Texto do instrutor'), findsOneWidget);
+  });
+
+  testWidgets(
       'sem rede e sem avaliação no aparelho: só a nota e o status, com o aviso',
       (tester) async {
     await seedParticipant(status: 'APROVADO', score: 90);
