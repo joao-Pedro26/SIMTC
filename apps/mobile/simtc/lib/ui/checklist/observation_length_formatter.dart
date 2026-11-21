@@ -20,12 +20,21 @@ class ObservationLengthFormatter extends TextInputFormatter {
     final text = newValue.text;
     if (text.length <= maxLength) return newValue;
 
+    // Já no limite e a edição passaria dele: ignora a edição (mesma guarda do
+    // LengthLimitingTextInputFormatter), em vez de apagar o fim em silêncio.
+    if (oldValue.text.length >= maxLength) return oldValue;
+
     var end = maxLength;
     final last = text.codeUnitAt(end - 1);
     if (last >= 0xD800 && last <= 0xDBFF) end--;
     return TextEditingValue(
       text: text.substring(0, end),
-      selection: TextSelection.collapsed(offset: end),
+      selection: newValue.selection.isValid
+          ? TextSelection(
+              baseOffset: newValue.selection.baseOffset.clamp(0, end),
+              extentOffset: newValue.selection.extentOffset.clamp(0, end),
+            )
+          : TextSelection.collapsed(offset: end),
     );
   }
 }
