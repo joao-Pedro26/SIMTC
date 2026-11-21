@@ -32,6 +32,26 @@ class _LateStreamParticipantRepository extends ParticipantRepository {
       late.stream;
 }
 
+class _FailingObservationRepository extends AssessmentRepository {
+  _FailingObservationRepository(AppDatabase db) : super(database: db);
+
+  bool fail = true;
+
+  @override
+  Future<List<LocalAssessmentItem>> setObservation({
+    required String localAssessmentId,
+    required String infractionId,
+    String? observation,
+  }) {
+    if (fail) throw StateError('falhou');
+    return super.setObservation(
+      localAssessmentId: localAssessmentId,
+      infractionId: infractionId,
+      observation: observation,
+    );
+  }
+}
+
 void main() {
   late _MockApiClient api;
   late AppDatabase db;
@@ -387,6 +407,111 @@ void main() {
       expect(vm.sections.single.score, 100);
       expect(vm.overallScore, 100);
       expect(vm.isApproved, isTrue);
+    });
+  });
+
+  group('observação do instrutor', () {
+    Future<ChecklistViewModel> startedMarked() async {
+      await seedParticipant(assignedConsultantId: 'c-eu');
+      await seedCatalog();
+      final vm = buildViewModel();
+      addTearDown(vm.dispose);
+      await vm.init();
+      await vm.start();
+      await vm.toggleNote('inf-1', 'note-pm');
+      return vm;
+    }
+
+    test('grava a observação e a seção passa a trazê-la', () async {
+      final vm = await startedMarked();
+
+      await vm.setObservation('inf-1', '  Passou do limite na curva.  ');
+
+      expect(vm.sections.single.infractions.single.observation,
+          'Passou do limite na curva.');
+      expect(vm.saveFailed, isFalse);
+    });
+
+    test('não grava com a avaliação já confirmada', () async {
+      await startedMarked();
+      final id = (await db.select(db.localAssessments).getSingle()).id;
+      await assessmentRepository.confirm(id, participantName: 'Carlos', score: 96);
+      final confirmed = buildViewModel();
+      addTearDown(confirmed.dispose);
+      await confirmed.init();
+      expect(confirmed.isConfirmed, isTrue);
+
+      await confirmed.setObservation('inf-1', 'tarde demais');
+
+      final item = await db.select(db.localAssessmentItems).getSingle();
+      expect(item.observation, isNull);
+    });
+
+    test('não grava com o participante liberado', () async {
+      final vm = await startedMarked();
+      await (db.update(db.participants)..where((t) => t.id.equals('tp-1')))
+          .write(const ParticipantsCompanion(status: Value('PENDENTE')));
+      await pumpEventQueue();
+      expect(vm.isReleased, isTrue);
+
+      await vm.setObservation('inf-1', 'liberado');
+
+      final item = await db.select(db.localAssessmentItems).getSingle();
+      expect(item.observation, isNull);
+    });
+
+    test('não grava enquanto desatribui (ocupado)', () async {
+      const unassignPath = '/practical-assessments/unassign';
+      final gate = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.post<Map<String, dynamic>>(unassignPath, data: any(named: 'data')))
+          .thenAnswer((_) => gate.future);
+      final vm = await startedMarked();
+
+      final pending = vm.unassign();
+      await vm.setObservation('inf-1', 'ocupado');
+
+      final item = await db.select(db.localAssessmentItems).getSingle();
+      expect(item.observation, isNull);
+      gate.complete(Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: unassignPath),
+        statusCode: 201,
+        data: {'unassigned': 1},
+      ));
+      await pending;
+    });
+
+    test('erro do repositório liga "Não salvo" e um sucesso o limpa', () async {
+      final failing = _FailingObservationRepository(db);
+      assessmentRepository = failing;
+      final vm = await startedMarked();
+
+      await vm.setObservation('inf-1', 'texto');
+
+      expect(vm.saveFailed, isTrue);
+      expect(vm.message, isNotNull);
+      expect(vm.sections.single.infractions.single.observation, isNull);
+
+      failing.fail = false;
+      await vm.setObservation('inf-1', 'texto');
+
+      expect(vm.saveFailed, isFalse);
+      expect(vm.sections.single.infractions.single.observation, 'texto');
+    });
+
+    test('needsUnmarkConfirmation: só ao tocar a nota já marcada que tem '
+        'observação', () async {
+      final vm = await startedMarked();
+
+      expect(vm.needsUnmarkConfirmation('inf-1', 'note-pm'), isFalse,
+          reason: 'sem observação');
+
+      await vm.setObservation('inf-1', 'tem texto');
+
+      expect(vm.needsUnmarkConfirmation('inf-1', 'note-pm'), isTrue);
+      expect(vm.needsUnmarkConfirmation('inf-1', 'note-m'), isFalse,
+          reason: 'trocar de nota não desmarca');
+      expect(vm.needsUnmarkConfirmation('inf-2', 'note-pm'), isFalse,
+          reason: 'infração sem marcação');
     });
   });
 

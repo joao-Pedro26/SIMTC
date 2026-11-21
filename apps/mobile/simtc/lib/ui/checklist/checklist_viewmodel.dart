@@ -73,6 +73,8 @@ class ChecklistViewModel extends ChangeNotifier {
       'Participante desatribuído, mas a avaliação iniciada não foi apagada do aparelho.';
   static const String _noteNotSaved =
       'Não foi possível salvar a nota. Tente de novo.';
+  static const String _observationNotSaved =
+      'Não foi possível salvar a observação. Tente de novo.';
   static const String _startFailed =
       'Não foi possível iniciar a avaliação. Tente de novo.';
 
@@ -587,6 +589,38 @@ class ChecklistViewModel extends ChangeNotifier {
       _message = _noteNotSaved;
     }
     notifyListeners();
+  }
+
+  /// Grava a observação do instrutor sobre a falta. Mesmas travas e mesmo
+  /// tratamento de erro do [toggleNote] (inclusive o "Não salvo"), e usa a
+  /// lista que o repositório devolve em vez de esperar o stream.
+  Future<void> setObservation(String infractionId, String text) async {
+    final assessmentId = _assessmentId;
+    if (assessmentId == null || isConfirmed || isReleased || _busy) return;
+
+    try {
+      _items = await _assessmentRepository.setObservation(
+        localAssessmentId: assessmentId,
+        infractionId: infractionId,
+        observation: text,
+      );
+      _saveFailed = false;
+    } catch (_) {
+      _saveFailed = true;
+      _message = _observationNotSaved;
+    }
+    notifyListeners();
+  }
+
+  /// `true` quando tocar em [noteId] desmarcaria a nota atual da infração
+  /// (é a mesma já marcada) e há observação que se perderia — a tela pede
+  /// confirmação antes de chamar [toggleNote].
+  bool needsUnmarkConfirmation(String infractionId, String noteId) {
+    final item =
+        _items.where((i) => i.infractionId == infractionId).firstOrNull;
+    return item != null &&
+        item.infractionNoteId == noteId &&
+        (item.observation?.isNotEmpty ?? false);
   }
 
   @override

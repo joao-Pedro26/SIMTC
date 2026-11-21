@@ -33,6 +33,7 @@ class ChecklistInfraction {
     required this.order,
     required this.notes,
     required this.selectedNoteId,
+    this.observation,
   });
 
   final String id;
@@ -44,6 +45,11 @@ class ChecklistInfraction {
 
   /// Nulo quando nenhum botão está pressionado.
   final String? selectedNoteId;
+
+  /// Observação do instrutor sobre a falta (texto livre, já normalizada pelo
+  /// repositório); nula quando não há — e quando a nota marcada sumiu do
+  /// catálogo, porque a infração aparece então como "sem infração".
+  final String? observation;
 
   bool get isMarked => selectedNoteId != null;
 
@@ -139,6 +145,7 @@ ChecklistInfraction _buildInfraction(
           .compareTo(noteTypeOrder.indexOf(b.noteType)),
     );
   final selectedNoteId = item?.infractionNoteId;
+  final hasSelectedNote = notes.any((n) => n.id == selectedNoteId);
 
   return ChecklistInfraction(
     id: infraction.id,
@@ -153,8 +160,8 @@ ChecklistInfraction _buildInfraction(
           deduction: note.deduction,
         ),
     ],
-    selectedNoteId:
-        notes.any((n) => n.id == selectedNoteId) ? selectedNoteId : null,
+    selectedNoteId: hasSelectedNote ? selectedNoteId : null,
+    observation: hasSelectedNote ? item?.observation : null,
   );
 }
 

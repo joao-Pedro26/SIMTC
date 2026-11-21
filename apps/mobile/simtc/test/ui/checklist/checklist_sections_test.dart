@@ -30,12 +30,13 @@ void main() {
     );
   }
 
-  LocalAssessmentItem item(String infractionId, String noteId) {
+  LocalAssessmentItem item(String infractionId, String noteId, {String? observation}) {
     return LocalAssessmentItem(
       id: 'item-$infractionId',
       localAssessmentId: 'assess-1',
       infractionId: infractionId,
       infractionNoteId: noteId,
+      observation: observation,
       updatedAt: DateTime(2026, 9, 25),
     );
   }
@@ -112,6 +113,31 @@ void main() {
       final sections = buildChecklistSections(catalog, [item('inf-1', 'note-m-1')]);
 
       expect(sections.single.infractions.single.selectedComment, 'Risco grave.');
+    });
+
+    test('a observação do instrutor vem do item local; sem item ou sem texto fica nula', () {
+      final catalog = [
+        CatalogCategory(
+          id: 'cat-1',
+          code: 'CV',
+          name: 'Controle do Veículo',
+          order: 1,
+          infractions: [
+            for (final id in ['inf-1', 'inf-2', 'inf-3'])
+              infraction(id, order: 1, notes: [note('note-$id', 'B', 1)]),
+          ],
+        ),
+      ];
+
+      final sections = buildChecklistSections(catalog, [
+        item('inf-1', 'note-inf-1', observation: 'Parou fora da faixa.'),
+        item('inf-2', 'note-inf-2'),
+      ]);
+
+      final infractions = sections.single.infractions;
+      expect(infractions[0].observation, 'Parou fora da faixa.');
+      expect(infractions[1].observation, isNull);
+      expect(infractions[2].observation, isNull);
     });
 
     test('os 3 botões vêm sempre na ordem B, PM, M, mesmo se o catálogo vier fora de ordem', () {
