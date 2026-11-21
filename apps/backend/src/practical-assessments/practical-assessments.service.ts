@@ -165,9 +165,9 @@ export class PracticalAssessmentsService {
           synced: true,
           items: {
             create: dto.items.map((item) => ({
-                infractionNoteId: item.infractionNoteId,
-                observation: normalizeObservation(item.observation),
-              })),
+              infractionNoteId: item.infractionNoteId,
+              observation: normalizeObservation(item.observation),
+            })),
           },
         },
         include: {

@@ -212,11 +212,17 @@ describe('CertificatesService', () => {
 
     it('escapa HTML da observacao', () => {
       const html = render('a <b>x</b> & "q"' + String.fromCharCode(10) + 'linha2');
-      expect(html).toContain('instructor-note');
+      expect(html).toContain('<div class="instructor-note"><span class="instructor-note-label">Observação do instrutor:</span>');
       expect(html).toContain('&lt;b&gt;');
       expect(html).toContain('&amp;');
       expect(html).toContain('&quot;');
       expect(html).not.toContain('<b>x</b>');
+    });
+
+    it('preserva a quebra do texto e nao deixa whitespace entre a div e o rotulo', () => {
+      const html = render('linha1' + String.fromCharCode(10) + 'linha2');
+      expect(html).toContain('linha1' + String.fromCharCode(10) + 'linha2');
+      expect(html).not.toMatch(/<div class="instructor-note">\s/);
     });
 
     it('nao renderiza o bloco sem observacao', () => {
