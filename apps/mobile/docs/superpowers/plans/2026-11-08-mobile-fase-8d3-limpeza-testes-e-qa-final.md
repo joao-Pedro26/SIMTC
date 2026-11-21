@@ -469,6 +469,8 @@ git commit -m "docs(mobile): registra a validacao da fase 8d-3 e o fim da fase 8
 
 Se algo falhar, **não corrigir no improviso**: usar `superpowers:systematic-debugging`, e se a falha for de regra de negócio, parar e perguntar.
 
+**Validado em 21/11/2026: celular no aparelho físico e tablet no emulador; roteiro inteiro passou. Fase 8 concluída.** (Aval dado pelo usuário.)
+
 Depois do aval, e só com o OK do usuário, um passo de cada vez: enviar a `feat/mobile-app` ao GitHub e, se o usuário quiser, avançar a `feat/frontend-backend-integration` (que publica na produção). As mudanças do app não pedem deploy do servidor.
 
 ---
