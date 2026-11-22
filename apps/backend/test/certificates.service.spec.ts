@@ -12,9 +12,12 @@ const mockStorage = { upload: jest.fn(), delete: jest.fn(), getSignedUrl: jest.f
 const mockPdfGenerator = { renderCertificate: jest.fn(), renderAssessmentReport: jest.fn() };
 
 const mockPrisma = {
-  trainingParticipant: { findUniqueOrThrow: jest.fn() },
+  trainingParticipant: { findUniqueOrThrow: jest.fn(), findMany: jest.fn() },
   trainingSession: { findUniqueOrThrow: jest.fn() },
   certificate: { upsert: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+  practicalAssessment: { update: jest.fn() },
+  reportConclusionText: { findFirst: jest.fn() },
+  assessmentCategory: { findMany: jest.fn() },
 };
 
 const PARTICIPANT_SIGNATURE_PATH = 'participants/p1/1730000000000.png';
@@ -147,6 +150,102 @@ describe('CertificatesService', () => {
       const data = mockPdfGenerator.renderCertificate.mock.calls[0][0];
       expect(data.participant).not.toHaveProperty('signaturePath');
       expect(JSON.stringify(data)).not.toContain('"signaturePath"');
+    });
+  });
+
+  describe('troca do PDF ao gerar de novo', () => {
+    const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+
+    function setupReport(reportPdfUrl: string | null) {
+      mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue(
+        buildTrainingParticipant({ assessment: { id: 'a1', reportPdfUrl, items: [] } }),
+      );
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue({
+        ...buildSession(),
+        courseId: 'course1',
+        city: 'Campinas',
+        state: 'SP',
+        consultants: [],
+      });
+      mockPrisma.assessmentCategory.findMany.mockResolvedValue([]);
+      mockPrisma.reportConclusionText.findFirst.mockResolvedValue({ text: 'x' });
+      mockPdfGenerator.renderAssessmentReport.mockResolvedValue(Buffer.from('pdf'));
+      mockPrisma.practicalAssessment.update.mockResolvedValue({ id: 'a1' });
+    }
+
+    it('certificado: sobe o novo e grava no banco antes de apagar o antigo', async () => {
+      mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue(buildTrainingParticipant());
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue(buildSession());
+      mockPrisma.certificate.upsert.mockResolvedValue({ id: 'cert1', pdfUrl: 'https://storage/certificates/s1/old.pdf' });
+      mockStorage.delete.mockResolvedValue(undefined);
+
+      await service.generateCertificateForParticipant('tp1');
+
+      expect(mockStorage.delete).toHaveBeenCalledWith('certificates', 's1/old.pdf');
+      expect(order(mockStorage.upload)).toBeLessThan(order(mockPrisma.certificate.update));
+      expect(order(mockPrisma.certificate.update)).toBeLessThan(order(mockStorage.delete));
+    });
+
+    it('certificado: sem PDF anterior não apaga nada', async () => {
+      mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue(buildTrainingParticipant());
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue(buildSession());
+
+      await service.generateCertificateForParticipant('tp1');
+
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+    });
+
+    it('certificado: se o upload falhar, o antigo fica', async () => {
+      mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue(buildTrainingParticipant());
+      mockPrisma.trainingSession.findUniqueOrThrow.mockResolvedValue(buildSession());
+      mockPrisma.certificate.upsert.mockResolvedValue({ id: 'cert1', pdfUrl: 'https://storage/certificates/s1/old.pdf' });
+      mockStorage.upload.mockRejectedValue(new Error('storage offline'));
+
+      await expect(service.generateCertificateForParticipant('tp1')).rejects.toThrow('storage offline');
+
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.certificate.update).not.toHaveBeenCalled();
+    });
+
+    it('relatório: sobe o novo e grava no banco antes de apagar o antigo', async () => {
+      setupReport('https://storage/reports/s1/old.pdf');
+      mockStorage.upload.mockResolvedValue('https://storage/reports/s1/new.pdf');
+      mockStorage.delete.mockResolvedValue(undefined);
+
+      await service.generateReportForParticipant('tp1');
+
+      expect(mockStorage.delete).toHaveBeenCalledWith('reports', 's1/old.pdf');
+      expect(order(mockStorage.upload)).toBeLessThan(order(mockPrisma.practicalAssessment.update));
+      expect(order(mockPrisma.practicalAssessment.update)).toBeLessThan(order(mockStorage.delete));
+    });
+
+    it('relatório: se o upload falhar, o antigo fica', async () => {
+      setupReport('https://storage/reports/s1/old.pdf');
+      mockStorage.upload.mockRejectedValue(new Error('storage offline'));
+
+      await expect(service.generateReportForParticipant('tp1')).rejects.toThrow('storage offline');
+
+      expect(mockStorage.delete).not.toHaveBeenCalled();
+      expect(mockPrisma.practicalAssessment.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findByTrainingSession: certificado sem arquivo', () => {
+    it('certificado sem pdfUrl volta como null', async () => {
+      mockPrisma.trainingParticipant.findMany.mockResolvedValue([
+        { participantId: 'p1', participant: { id: 'p1', name: 'A' }, status: 'APROVADO', certificate: { id: 'c1', pdfUrl: '' } },
+        {
+          participantId: 'p2',
+          participant: { id: 'p2', name: 'B' },
+          status: 'APROVADO',
+          certificate: { id: 'c2', pdfUrl: 'https://x/certificates/a.pdf' },
+        },
+      ]);
+
+      const rows = await service.findByTrainingSession('s1', { sub: 'u1', role: 'ADMIN' } as any);
+
+      expect(rows[0].certificate).toBeNull();
+      expect(rows[1].certificate?.id).toBe('c2');
     });
   });
 

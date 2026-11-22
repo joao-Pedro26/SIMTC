@@ -174,20 +174,21 @@ export class CertificatesService {
       cargaHoraria,
     });
 
-    // Deleta o arquivo anterior para evitar arquivos órfãos no bucket
-    if (cert.pdfUrl) {
-      const oldPath = cert.pdfUrl.split('/certificates/')[1];
-      if (oldPath) await this.storage.delete('certificates', oldPath).catch(() => null);
-    }
-
     // Timestamp no path para bustar o cache do CDN do Supabase
     const fileName = `${session.id}/${trainingParticipant.participantId}-${Date.now()}.pdf`;
     const url = await this.storage.upload('certificates', fileName, pdf, 'application/pdf');
 
-    return this.prisma.certificate.update({
+    const updated = await this.prisma.certificate.update({
       where: { id: cert.id },
       data: { pdfUrl: url },
     });
+
+    // O anterior só é apagado depois que o banco aponta para o novo: uma
+    // interrupção no meio nunca deixa o registro apontando para arquivo apagado.
+    const oldPath = cert.pdfUrl ? cert.pdfUrl.split('/certificates/')[1] : null;
+    if (oldPath) await this.storage.delete('certificates', oldPath).catch(() => null);
+
+    return updated;
   }
 
   private formatDate(date: Date): string {
@@ -335,19 +336,19 @@ export class CertificatesService {
       credentialDetran: consultant?.credentialDetran ?? null,
     });
 
-    // Deleta arquivo anterior do bucket para evitar órfãos
-    if (assessment.reportPdfUrl) {
-      const oldPath = assessment.reportPdfUrl.split('/reports/')[1];
-      if (oldPath) await this.storage.delete('reports', oldPath).catch(() => null);
-    }
-
     const fileName = `${session.id}/${trainingParticipant.participantId}-relatorio-${Date.now()}.pdf`;
     const url = await this.storage.upload('reports', fileName, pdf, 'application/pdf');
 
-    return this.prisma.practicalAssessment.update({
+    const updated = await this.prisma.practicalAssessment.update({
       where: { id: assessment.id },
       data: { reportPdfUrl: url, reportGeneratedAt: new Date() },
     });
+
+    // Mesmo cuidado do certificado: apaga o anterior só depois de gravar o novo.
+    const oldPath = assessment.reportPdfUrl ? assessment.reportPdfUrl.split('/reports/')[1] : null;
+    if (oldPath) await this.storage.delete('reports', oldPath).catch(() => null);
+
+    return updated;
   }
 
   /**
@@ -531,7 +532,8 @@ export class CertificatesService {
       participantId: tp.participantId,
       participantName: tp.participant.name,
       status: tp.status,
-      certificate: tp.certificate
+      // Registro sem pdfUrl é um certificado cuja geração não terminou: pendente.
+      certificate: tp.certificate?.pdfUrl
         ? {
             id: tp.certificate.id,
             pdfUrl: tp.certificate.pdfUrl,
