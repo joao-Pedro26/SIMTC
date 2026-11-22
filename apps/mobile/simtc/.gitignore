@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# APK e latest.json gerados por tool/publicar-release.ps1 (vão para o Supabase,
+# não para o git)
+/dist/
+
 # Symbolication related
 app.*.symbols
 
