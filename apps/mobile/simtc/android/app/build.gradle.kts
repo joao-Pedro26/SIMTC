@@ -45,10 +45,14 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+                fun chave(nome: String): String =
+                    keystoreProperties.getProperty(nome)
+                        ?: error("key.properties sem a chave $nome")
+                keyAlias = chave("keyAlias")
+                keyPassword = chave("keyPassword")
+                // `storeFile` é relativo a android/app (o `file()` daqui).
+                storeFile = file(chave("storeFile"))
+                storePassword = chave("storePassword")
             }
         }
     }

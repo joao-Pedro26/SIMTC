@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Necessária no manifest principal: o APK release (sideload) não herda a
          permissão declarada nos manifests de debug/profile. -->
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -6,6 +7,12 @@
          instalador de um APK baixado. Na primeira vez, o próprio Android leva o
          usuário à tela "Instalar apps desconhecidos" para liberar. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- O open_filex traz permissões de leitura de mídia que o app não usa: o
+         instalador abre o APK pelo FileProvider. Removidas na mesclagem. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
     <application
         android:label="SIMTC"
         android:name="${applicationName}"
