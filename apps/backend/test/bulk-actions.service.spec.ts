@@ -406,6 +406,14 @@ describe('BulkActionsService', () => {
       expect(result.reason).toBe('certificado: a; relatório: b');
     });
 
+    it('erro inesperado ao ler o participante vira falha dele, sem derrubar o lote', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockRejectedValue(new Error('pooler caiu'));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(result).toEqual({ participantId: 'tp-1', name: 'tp-1', status: 'failed', reason: 'pooler caiu' });
+    });
+
     it.each([
       ['de outra sessão', { trainingSessionId: 's2' }],
       ['removido', null],

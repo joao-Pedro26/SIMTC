@@ -387,7 +387,24 @@ export class BulkActionsService {
     }
   }
 
+  /** Nunca lança: um erro de um participante (ex.: soluço do banco) vira falha só dele. */
   private async generateDocumentsForOne(trainingParticipantId: string, trainingSessionId: string): Promise<BulkItemResult> {
+    try {
+      return await this.generateDocumentsForOneUnsafe(trainingParticipantId, trainingSessionId);
+    } catch (err: any) {
+      return {
+        participantId: trainingParticipantId,
+        name: trainingParticipantId,
+        status: 'failed',
+        reason: err?.message ?? 'Erro desconhecido',
+      };
+    }
+  }
+
+  private async generateDocumentsForOneUnsafe(
+    trainingParticipantId: string,
+    trainingSessionId: string,
+  ): Promise<BulkItemResult> {
     const tp = await this.prisma.trainingParticipant.findUnique({
       where: { id: trainingParticipantId },
       include: { participant: true, assessment: { select: { id: true } } },
