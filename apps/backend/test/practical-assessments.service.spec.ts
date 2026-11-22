@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { UpdateAssessmentTimesDto } from 'src/practical-assessments/dto/update-assessment-times.dto';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from 'src/auth/decorators/roles.decorator';
@@ -802,6 +805,102 @@ describe('PracticalAssessmentsController: quem lê uma avaliação (Fase 8D-1)',
 
   it('a classe continua exigindo o login', () => {
     expect(reflector.get(GUARDS_METADATA, PracticalAssessmentsController)).toEqual([JwtAuthGuard]);
+  });
+});
+
+describe('PracticalAssessmentsService.updateTimes (correção de data e horários)', () => {
+  function build(existing: unknown = { id: 'pa-1' }) {
+    const prisma = {
+      practicalAssessment: {
+        findUnique: jest.fn().mockResolvedValue(existing),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'pa-1', ...data })),
+      },
+    };
+    const service = new PracticalAssessmentsService(prisma as unknown as PrismaService);
+    return { prisma, service };
+  }
+
+  it('grava a data à meia-noite UTC e os dois horários, sem mexer em nota nem itens', async () => {
+    const { prisma, service } = build();
+
+    await service.updateTimes('pa-1', {
+      date: '2026-11-20',
+      startTime: '2026-11-20T11:30:00.000Z',
+      endTime: '2026-11-20T12:10:00.000Z',
+    });
+
+    expect(prisma.practicalAssessment.update).toHaveBeenCalledWith({
+      where: { id: 'pa-1' },
+      data: {
+        date: new Date('2026-11-20T00:00:00.000Z'),
+        startTime: new Date('2026-11-20T11:30:00.000Z'),
+        endTime: new Date('2026-11-20T12:10:00.000Z'),
+      },
+      select: { id: true, date: true, startTime: true, endTime: true },
+    });
+  });
+
+  it('sem hora de término, limpa o término', async () => {
+    const { prisma, service } = build();
+    await service.updateTimes('pa-1', { date: '2026-11-20', startTime: '2026-11-20T11:30:00.000Z' });
+    expect(prisma.practicalAssessment.update.mock.calls[0][0].data.endTime).toBeNull();
+  });
+
+  it('término antes ou igual ao início é 400', async () => {
+    const { prisma, service } = build();
+    await expect(
+      service.updateTimes('pa-1', {
+        date: '2026-11-20',
+        startTime: '2026-11-20T11:30:00.000Z',
+        endTime: '2026-11-20T11:30:00.000Z',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.practicalAssessment.update).not.toHaveBeenCalled();
+  });
+
+  it('dia que não existe (31/02) é 400, e não vira 3 de março', async () => {
+    const { service } = build();
+    await expect(
+      service.updateTimes('pa-1', { date: '2026-02-31', startTime: '2026-03-03T11:30:00.000Z' }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('avaliação que não existe é 404', async () => {
+    const { prisma, service } = build(null);
+    await expect(
+      service.updateTimes('nao-existe', { date: '2026-11-20', startTime: '2026-11-20T11:30:00.000Z' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.practicalAssessment.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('UpdateAssessmentTimesDto', () => {
+  const check = (body: object) => validate(plainToInstance(UpdateAssessmentTimesDto, body));
+
+  it('aceita data AAAA-MM-DD e horários ISO', async () => {
+    expect(
+      await check({ date: '2026-11-20', startTime: '2026-11-20T11:30:00.000Z', endTime: '2026-11-20T12:00:00.000Z' }),
+    ).toHaveLength(0);
+  });
+
+  it.each([
+    [{ date: '20/11/2026', startTime: '2026-11-20T11:30:00.000Z' }, 'date'],
+    [{ date: '2026-11-20', startTime: '08:30' }, 'startTime'],
+    [{ date: '2026-11-20', startTime: '2026-11-20T11:30:00.000Z', endTime: 'amanhã' }, 'endTime'],
+    [{ startTime: '2026-11-20T11:30:00.000Z' }, 'date'],
+  ])('recusa %p (campo %s)', async (body, field) => {
+    const errors = await check(body);
+    expect(errors.map((e) => e.property)).toContain(field);
+  });
+});
+
+describe('PracticalAssessmentsController.updateTimes', () => {
+  const reflector = new Reflector();
+
+  it('só o ADMIN corrige data e horários, pelo RolesGuard', () => {
+    const handler = PracticalAssessmentsController.prototype.updateTimes;
+    expect(reflector.get<UserRole[]>(ROLES_KEY, handler)).toEqual([UserRole.ADMIN]);
+    expect(reflector.get(GUARDS_METADATA, handler)).toEqual([RolesGuard]);
   });
 });
 

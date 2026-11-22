@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,6 +7,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayload, SyncPracticalAssessmentDto, UserRole } from '@simtc/shared-types';
 import { PracticalAssessmentsService } from './practical-assessments.service';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
+import { UpdateAssessmentTimesDto } from './dto/update-assessment-times.dto';
 
 @ApiTags('practical-assessments')
 @ApiBearerAuth()
@@ -50,5 +51,13 @@ export class PracticalAssessmentsController {
   @Roles(UserRole.ADMIN, UserRole.CONSULTANT)
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
+  }
+
+  @Patch(':id/times')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Corrige data, hora de início e de término de uma avaliação salva (ADMIN)' })
+  updateTimes(@Param('id') id: string, @Body() dto: UpdateAssessmentTimesDto) {
+    return this.service.updateTimes(id, dto);
   }
 }

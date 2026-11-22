@@ -1,8 +1,9 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ASSESSMENT_OBSERVATION_MAX_LENGTH, SyncPracticalAssessmentDto } from '@simtc/shared-types';
 import { AssignParticipantsDto } from './dto/assign-participants.dto';
+import { UpdateAssessmentTimesDto } from './dto/update-assessment-times.dto';
 import { calculateCategoryScore, calculateOverallScore, getApprovalStatus } from '@simtc/shared-types';
 import { statusAfterRelease } from '../participants/participant-release.util';
 import { SYNC_REFUSAL_NOT_ASSIGNED, SyncRefusedException } from './sync-refused.exception';
@@ -247,6 +248,37 @@ export class PracticalAssessmentsService {
     });
     if (!assessment) throw new NotFoundException('Avaliação não encontrada');
     return assessment;
+  }
+
+  /**
+   * Corrige a data e os horários de uma avaliação já salva (só ADMIN). Serve
+   * para quando a nota é lançada depois da avaliação: o relatório deve mostrar
+   * quando ela aconteceu, não quando foi digitada. Nota, faltas e status do
+   * participante não mudam; o PDF já gerado só muda quando for gerado de novo.
+   */
+  async updateTimes(id: string, dto: UpdateAssessmentTimesDto) {
+    const date = new Date(dto.date);
+    // `new Date('2026-02-31')` vira 3 de março: confere que o dia existe.
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== dto.date) {
+      throw new BadRequestException('Data inválida');
+    }
+    const startTime = new Date(dto.startTime);
+    const endTime = dto.endTime ? new Date(dto.endTime) : null;
+    if (endTime && endTime.getTime() <= startTime.getTime()) {
+      throw new BadRequestException('A hora de término precisa ser depois da hora de início');
+    }
+
+    const existing = await this.prisma.practicalAssessment.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Avaliação não encontrada');
+
+    return this.prisma.practicalAssessment.update({
+      where: { id },
+      data: { date, startTime, endTime },
+      select: { id: true, date: true, startTime: true, endTime: true },
+    });
   }
 
   /** Retorna avaliação existente do participante, ou null se não houver */
