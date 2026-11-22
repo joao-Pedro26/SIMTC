@@ -59,15 +59,22 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     }
   }, [canGenerate, sessionId])
 
-  // Job acompanhado com o modal fechado terminou: avisa e atualiza a tabela.
+  // Job acompanhado com o modal fechado terminou. Tudo certo: só um aviso.
+  // Com falha, pulado ou interrupção: reabre o modal com o resumo e os motivos,
+  // senão o João só veria relógios na tabela sem saber por quê.
   useEffect(() => {
     if (!genJob || genModalOpen) return
     if (genJob.status !== 'COMPLETED' && genJob.status !== 'FAILED') return
-    setGenJobId(null)
     bulkSelection.clear()
     onRefresh()
-    if (genJob.status === 'COMPLETED') toast.success('Documentos gerados.')
-    else toast.error(genJob.errorMessage ?? 'A geração de documentos foi interrompida.')
+    const allOk = genJob.status === 'COMPLETED' && genJob.failedItems === 0 && genJob.skippedItems === 0
+    if (allOk) {
+      setGenJobId(null)
+      toast.success('Documentos gerados.')
+    } else {
+      genFinishedRef.current = true
+      setGenModalOpen(true)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genJob, genModalOpen])
 
