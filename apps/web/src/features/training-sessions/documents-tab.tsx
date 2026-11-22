@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { FileText, Send, Download, Loader2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { FileText, Send, Download, Loader2, CheckCircle2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
 import { useToast } from '@/components/ui/toast/toast-provider'
@@ -23,7 +24,8 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
   const [generateError, setGenerateError] = useState('')
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sentIds, setSentIds] = useState<Set<string>>(new Set())
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadingRow, setDownloadingRow] = useState<string | null>(null)
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
 
   const allParticipantIds = session.participants.map((p) => p.id)
   const bulkSelection = useBulkSelection(allParticipantIds)
@@ -60,15 +62,27 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     }
   }
 
-  async function handleDownload(certificateId: string) {
-    setDownloadingId(certificateId)
+  async function handleDownloadCertificate(rowId: string, certificateId: string) {
+    setDownloadingRow(rowId)
     try {
       const { url } = await clientApi.get<{ url: string }>(`/certificates/${certificateId}/download-url`)
       window.open(url, '_blank', 'noopener,noreferrer')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erro ao baixar certificado.')
     } finally {
-      setDownloadingId(null)
+      setDownloadingRow(null)
+    }
+  }
+
+  async function handleDownloadReport(rowId: string, reportId: string) {
+    setDownloadingRow(rowId)
+    try {
+      const { url } = await clientApi.get<{ url: string }>(`/assessment-reports/${reportId}/download-url`)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao baixar relatório.')
+    } finally {
+      setDownloadingRow(null)
     }
   }
 
@@ -171,12 +185,14 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
               <th className={styles.th}>Nome</th>
               <th className={`${styles.th} ${styles.center}`}>Tipo</th>
               <th className={`${styles.th} ${styles.center}`}>Score</th>
-              <th className={`${styles.th} ${styles.center}`}>Certificado</th>
+              <th className={`${styles.th} ${styles.center}`}>Documentos</th>
               <th className={styles.th} />
             </tr>
           </thead>
           <tbody>
-            {session.participants.map((p) => (
+            {session.participants.map((p) => {
+              const hasDocs = !!(p.certificateId || p.reportId)
+              return (
               <tr key={p.id} className={styles.row}>
                 <td className={styles.td}>
                   <input
@@ -201,26 +217,37 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
                   }
                 </td>
                 <td className={`${styles.td} ${styles.center}`}>
-                  {p.certificateGenerated
-                    ? <span className={styles.certGenerated}>Gerado</span>
-                    : <span className={styles.certPending}>Pendente</span>
+                  {hasDocs
+                    ? (
+                      <span className={styles.docsStatus} title="Documentos gerados" aria-label="Documentos gerados">
+                        <CheckCircle2 size={16} className={styles.docsReady} />
+                      </span>
+                    )
+                    : (
+                      <span className={styles.docsStatus} title="Documentos pendentes" aria-label="Documentos pendentes">
+                        <Clock size={16} className={styles.docsPending} />
+                      </span>
+                    )
                   }
                 </td>
                 <td className={styles.td}>
                   <div className={styles.rowActions}>
+                    {hasDocs && (
+                      <DownloadMenu
+                        hasCertificate={!!p.certificateId}
+                        hasReport={!!p.reportId}
+                        open={openMenuFor === p.id}
+                        busy={downloadingRow === p.id}
+                        onToggle={() => setOpenMenuFor((cur) => (cur === p.id ? null : p.id))}
+                        onClose={() => setOpenMenuFor(null)}
+                        onPick={(doc) => {
+                          if (doc === 'certificate' && p.certificateId) handleDownloadCertificate(p.id, p.certificateId)
+                          if (doc === 'report' && p.reportId) handleDownloadReport(p.id, p.reportId)
+                        }}
+                      />
+                    )}
                     {p.certificateGenerated && p.certificateId && (
                       <>
-                        <button
-                          className={styles.actionBtn}
-                          onClick={() => handleDownload(p.certificateId!)}
-                          disabled={downloadingId === p.certificateId}
-                          title="Baixar certificado PDF"
-                        >
-                          {downloadingId === p.certificateId
-                            ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                            : <Download size={14} />
-                          }
-                        </button>
                         {sentIds.has(p.certificateId) ? (
                           <span className={styles.sentLabel}>Enviado ✓</span>
                         ) : !readOnly ? (
@@ -241,7 +268,7 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
@@ -258,5 +285,114 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
         />
       )}
     </div>
+  )
+}
+
+type DocKind = 'certificate' | 'report'
+
+interface DownloadMenuProps {
+  hasCertificate: boolean
+  hasReport: boolean
+  open: boolean
+  busy: boolean
+  onToggle: () => void
+  onClose: () => void
+  onPick: (doc: DocKind) => void
+}
+
+const MENU_GAP = 4
+const VIEWPORT_MARGIN = 8
+
+/**
+ * Botão de baixar com menu "Certificado" / "Relatório".
+ * O menu vai para o <body> (portal) com position: fixed: a tabela tem rolagem
+ * própria e o detalhe pode estar dentro de um Drawer com transform, o que
+ * cortaria ou deslocaria um menu posicionado dentro da célula.
+ */
+function DownloadMenu({ hasCertificate, hasReport, open, busy, onToggle, onClose, onPick }: DownloadMenuProps) {
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    const btn = btnRef.current
+    const menu = menuRef.current
+    if (!btn || !menu) return
+    const r = btn.getBoundingClientRect()
+    const fitsBelow = r.bottom + MENU_GAP + menu.offsetHeight <= window.innerHeight - VIEWPORT_MARGIN
+    setPos({
+      top: fitsBelow ? r.bottom + MENU_GAP : r.top - MENU_GAP - menu.offsetHeight,
+      left: Math.max(VIEWPORT_MARGIN, r.right - menu.offsetWidth),
+    })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      onClose()
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('scroll', onClose, true)
+    window.addEventListener('resize', onClose)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('resize', onClose)
+    }
+  }, [open, onClose])
+
+  function pick(doc: DocKind) {
+    onClose()
+    onPick(doc)
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className={styles.actionBtn}
+        onClick={onToggle}
+        disabled={busy}
+        title="Baixar documentos"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        {busy
+          ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+          : <Download size={14} />
+        }
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          className={styles.menu}
+          style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+        >
+          {hasCertificate && (
+            <button role="menuitem" className={styles.menuItem} onClick={() => pick('certificate')}>
+              Certificado
+            </button>
+          )}
+          {hasReport && (
+            <button role="menuitem" className={styles.menuItem} onClick={() => pick('report')}>
+              Relatório
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
