@@ -86,8 +86,9 @@ function mapDetailSession(s: BackendDetailSession): TrainingSession {
       type: tp.participationType as TrainingSession['participants'][0]['type'],
       status: tp.status as TrainingSession['participants'][0]['status'],
       score: tp.assessment?.score ?? null,
-      certificateGenerated: !!tp.certificate,
-      certificateId: tp.certificate?.id ?? null,
+      // Registro sem pdfUrl = geração que não terminou: conta como pendente.
+      certificateGenerated: !!tp.certificate?.pdfUrl,
+      certificateId: tp.certificate?.pdfUrl ? tp.certificate.id : null,
       certificatePdfUrl: tp.certificate?.pdfUrl ?? null,
       reportId: tp.assessment?.reportPdfUrl ? tp.assessment.id : null,
       hasSignature: tp.participant.hasSignature ?? false,

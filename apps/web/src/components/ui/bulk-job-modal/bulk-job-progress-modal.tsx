@@ -4,30 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2, XCircle, MinusCircle, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
+import { useBulkJob, isBulkJobFinished } from '@/lib/use-bulk-job'
 import styles from './bulk-job-progress-modal.module.css'
 
-export type BulkJobKind = 'DELETE_PARTICIPANTS' | 'SEND_CERTIFICATES' | 'DOWNLOAD_ZIP'
-type BulkJobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
-
-interface BulkItemResult {
-  participantId: string
-  name: string
-  status: 'success' | 'skipped' | 'failed'
-  reason?: string
-}
-
-interface BulkJob {
-  id: string
-  type: BulkJobKind
-  status: BulkJobStatus
-  totalItems: number
-  processedItems: number
-  succeededItems: number
-  skippedItems: number
-  failedItems: number
-  resultDetails: BulkItemResult[] | null
-  errorMessage: string | null
-}
+export type { BulkJobKind } from '@/lib/use-bulk-job'
 
 interface BulkJobProgressModalProps {
   jobId: string
@@ -35,69 +15,53 @@ interface BulkJobProgressModalProps {
   /** Chamado uma única vez quando o job chega a COMPLETED ou FAILED. */
   onFinished?: () => void
   onClose: () => void
+  /** Deixa fechar com o job rodando (o processo segue no servidor). Padrão: false. */
+  closableWhileRunning?: boolean
+  /** Nota exibida enquanto o job roda. */
+  runningNote?: string
 }
-
-const POLL_INTERVAL_MS = 1500
 
 /**
  * Modal genérico de acompanhamento de um job em lote (excluir participantes,
- * enviar certificados por e-mail, gerar ZIP), com polling em
- * GET /jobs/:jobId a cada ~1.5s. Enquanto o job está PENDING/RUNNING, o botão
- * de fechar fica desabilitado para deixar claro que o processo ainda está em
- * andamento (pode levar alguns instantes em lotes grandes).
+ * enviar certificados por e-mail, gerar ZIP, gerar documentos), com polling
+ * via `useBulkJob`. Enquanto o job está PENDING/RUNNING, o botão de fechar
+ * fica desabilitado, a menos que `closableWhileRunning` (geração de
+ * documentos, que a aba continua acompanhando com o modal fechado).
  *
  * Ver brainstorm-acoes-lote-participantes.md.
  */
-export function BulkJobProgressModal({ jobId, title, onFinished, onClose }: BulkJobProgressModalProps) {
-  const [job, setJob] = useState<BulkJob | null>(null)
-  const [pollError, setPollError] = useState('')
+export function BulkJobProgressModal({
+  jobId,
+  title,
+  onFinished,
+  onClose,
+  closableWhileRunning = false,
+  runningNote = 'Isso pode levar alguns instantes — não feche esta janela.',
+}: BulkJobProgressModalProps) {
+  const { job, pollError: jobPollError } = useBulkJob(jobId)
+  const [downloadError, setDownloadError] = useState('')
   const [downloading, setDownloading] = useState(false)
   const finishedFiredRef = useRef(false)
 
   useEffect(() => {
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout>
-
-    async function poll() {
-      try {
-        const data = await clientApi.get<BulkJob>(`/jobs/${jobId}`)
-        if (cancelled) return
-        setJob(data)
-        setPollError('')
-
-        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-          if (!finishedFiredRef.current) {
-            finishedFiredRef.current = true
-            onFinished?.()
-          }
-          return
-        }
-        timer = setTimeout(poll, POLL_INTERVAL_MS)
-      } catch (e) {
-        if (cancelled) return
-        setPollError(e instanceof Error ? e.message : 'Erro ao consultar progresso do processo')
-        timer = setTimeout(poll, POLL_INTERVAL_MS)
-      }
-    }
-
-    poll()
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
+    if (isBulkJobFinished(job) && !finishedFiredRef.current) {
+      finishedFiredRef.current = true
+      onFinished?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId])
+  }, [job])
 
+  const pollError = downloadError || jobPollError
   const isRunning = !job || job.status === 'PENDING' || job.status === 'RUNNING'
   const percent = job && job.totalItems > 0 ? Math.round((job.processedItems / job.totalItems) * 100) : 0
 
   async function handleDownload() {
     setDownloading(true)
-    setPollError('')
+    setDownloadError('')
     try {
       await clientApi.downloadFile(`/jobs/${jobId}/download`, `documentos-${jobId}.zip`)
     } catch (e) {
-      setPollError(e instanceof Error ? e.message : 'Erro ao baixar arquivo ZIP')
+      setDownloadError(e instanceof Error ? e.message : 'Erro ao baixar arquivo ZIP')
     } finally {
       setDownloading(false)
     }
@@ -119,7 +83,7 @@ export function BulkJobProgressModal({ jobId, title, onFinished, onClose }: Bulk
             <div className={styles.progressBarTrack}>
               <div className={styles.progressBarFill} style={{ width: `${percent}%` }} />
             </div>
-            <p className={styles.note}>Isso pode levar alguns instantes — não feche esta janela.</p>
+            <p className={styles.note}>{runningNote}</p>
           </>
         ) : (
           <>
@@ -170,7 +134,7 @@ export function BulkJobProgressModal({ jobId, title, onFinished, onClose }: Bulk
               } Baixar ZIP
             </Button>
           )}
-          <Button variant={isRunning ? 'ghost' : 'primary'} size="sm" onClick={onClose} disabled={isRunning}>
+          <Button variant={isRunning ? 'ghost' : 'primary'} size="sm" onClick={onClose} disabled={isRunning && !closableWhileRunning}>
             Fechar
           </Button>
         </div>
