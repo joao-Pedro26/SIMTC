@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/app_release.dart';
@@ -36,6 +37,7 @@ void main() {
   late bool online;
   late bool wifi;
   late UpdateViewModel vm;
+  late ChangeNotifier conexao;
   var vmDescartado = false;
 
   UpdateViewModel criar({bool enabled = true}) => UpdateViewModel(
@@ -43,6 +45,7 @@ void main() {
         isOnline: () => online,
         isQueueIdle: () => !sync.isSending && sync.queue.isEmpty,
         queueChanges: sync,
+        connectivityChanges: conexao,
         isOnWifi: () async => wifi,
         enabled: enabled,
       );
@@ -67,11 +70,13 @@ void main() {
     online = true;
     wifi = true;
     vmDescartado = false;
+    conexao = ChangeNotifier();
     vm = criar();
   });
 
   tearDown(() {
     if (!vmDescartado) vm.dispose();
+    conexao.dispose();
   });
 
   group('checagem da abertura', () {
@@ -414,6 +419,151 @@ void main() {
 
       expect(vm.status, UpdateStatus.available);
       expect(vm.mandatory, isTrue);
+    });
+  });
+
+  group('fila diferida (correções da revisão)', () {
+    test('fila ociosa offline → a rede voltando roda a diferida, sem nova notificação da fila', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+
+      online = false;
+      sync.setQueue([]);
+      await pumpEventQueue();
+      verifyNever(() => service.fetchLatest());
+
+      online = true;
+      conexao.notifyListeners();
+      await pumpEventQueue();
+
+      verify(() => service.fetchLatest()).called(1);
+      expect(vm.promptPending, isTrue);
+    });
+
+    test('reabrir a Home roda a diferida com fila ociosa e rede; devolve true sem ligar promptPending', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+
+      online = false;
+      sync.setQueue([]);
+      await pumpEventQueue();
+
+      online = true;
+      final achou = await vm.checkOnOpen();
+
+      expect(achou, isTrue);
+      expect(vm.promptPending, isFalse);
+      expect(vm.status, UpdateStatus.available);
+      verify(() => service.fetchLatest()).called(1);
+    });
+
+    test('falha manual não perde a diferida: a reabertura da Home a roda', () async {
+      var chamadas = 0;
+      when(() => service.installedVersionCode()).thenAnswer((_) async => 1);
+      when(() => service.fetchLatest()).thenAnswer((_) async {
+        chamadas++;
+        return chamadas == 1
+            ? Failure(Exception('sem rede'))
+            : Success(_release());
+      });
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+      online = false;
+      sync.setQueue([]);
+      await pumpEventQueue();
+      online = true;
+
+      await vm.checkNow();
+      expect(vm.status, UpdateStatus.failed);
+
+      // Notificação da fila com a falha na tela: não substitui o erro.
+      sync.setQueue([]);
+      await pumpEventQueue();
+      expect(chamadas, 1);
+      expect(vm.status, UpdateStatus.failed);
+
+      final achou = await vm.checkOnOpen();
+
+      expect(achou, isTrue);
+      expect(chamadas, 2);
+      expect(vm.promptPending, isFalse);
+    });
+
+    test('checkNow com sucesso (em dia) cancela a diferida e não deixa checagem depois', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+      online = false;
+      sync.setQueue([]);
+      await pumpEventQueue();
+      online = true;
+
+      publicada(instalada: 2, code: 2);
+      await vm.checkNow();
+      expect(vm.status, UpdateStatus.upToDate);
+
+      sync.setQueue([queuedAssessment('p2')]);
+      sync.setQueue([]);
+      await pumpEventQueue();
+
+      verify(() => service.fetchLatest()).called(1);
+      expect(vm.promptPending, isFalse);
+      expect(vm.status, UpdateStatus.upToDate);
+      expect(await vm.checkOnOpen(), isFalse);
+    });
+
+    test('checkNow que acha versão cancela a diferida e não liga promptPending', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+      online = false;
+      sync.setQueue([]);
+      await pumpEventQueue();
+      online = true;
+
+      await vm.checkNow();
+      expect(vm.status, UpdateStatus.available);
+
+      sync.setQueue([queuedAssessment('p2')]);
+      sync.setQueue([]);
+      await pumpEventQueue();
+
+      verify(() => service.fetchLatest()).called(1);
+      expect(vm.promptPending, isFalse);
+      expect(vm.status, UpdateStatus.available);
+    });
+
+    test('duas notificações da fila depois da diferida → serviço chamado uma vez', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+
+      sync.setQueue([]);
+      await pumpEventQueue();
+      sync.setQueue([queuedAssessment('p2')]);
+      sync.setQueue([]);
+      await pumpEventQueue();
+
+      verify(() => service.fetchLatest()).called(1);
+      expect(vm.promptPending, isTrue);
+    });
+
+    test('dispose não notifica os ouvintes depois', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await vm.checkOnOpen();
+      var notificou = false;
+      vm.addListener(() => notificou = true);
+
+      vm.dispose();
+      vmDescartado = true;
+      sync.setQueue([]);
+      await pumpEventQueue();
+
+      expect(notificou, isFalse);
+      verifyNever(() => service.fetchLatest());
     });
   });
 }

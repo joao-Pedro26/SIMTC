@@ -112,6 +112,7 @@ class AppDependencies {
           !assessmentSyncService.isSending &&
           assessmentSyncService.queue.isEmpty,
       queueChanges: assessmentSyncService,
+      connectivityChanges: connectivityService,
       enabled: !kDebugMode || AppConfig.checkUpdatesInDebug,
     );
 

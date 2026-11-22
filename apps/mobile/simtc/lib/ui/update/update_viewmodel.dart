@@ -44,12 +44,14 @@ class UpdateViewModel extends ChangeNotifier {
     required bool Function() isOnline,
     required bool Function() isQueueIdle,
     required Listenable queueChanges,
+    Listenable? connectivityChanges,
     Future<bool> Function()? isOnWifi,
     this.enabled = true,
   })  : _service = service,
         _isOnline = isOnline,
         _isQueueIdle = isQueueIdle,
         _queueChanges = queueChanges,
+        _connectivityChanges = connectivityChanges,
         _isOnWifi = isOnWifi ?? _defaultIsOnWifi;
 
   final AppUpdateService _service;
@@ -61,6 +63,10 @@ class UpdateViewModel extends ChangeNotifier {
 
   /// Avisa quando a fila muda; usado para rodar a checagem adiada.
   final Listenable _queueChanges;
+
+  /// Avisa quando a rede muda; a diferida também é reavaliada então. Opcional:
+  /// sem ele, a diferida ainda é resgatada pela fila e pela reabertura da Home.
+  final Listenable? _connectivityChanges;
 
   final Future<bool> Function() _isOnWifi;
 
@@ -120,8 +126,15 @@ class UpdateViewModel extends ChangeNotifier {
   /// Devolve `true` só se esta chamada achou uma versão nova — é quando a tela
   /// mostra o aviso. Telas que reabrem a Home não repetem o aviso.
   Future<bool> checkOnOpen() async {
-    if (!enabled || _checkedThisSession || _busy || _deferredOpenCheck) {
-      return false;
+    if (!enabled || _checkedThisSession || _busy) return false;
+    if (_deferredOpenCheck) {
+      // Reabrir a Home reavalia a diferida: com a fila ociosa e rede, roda agora
+      // e o aviso sai na hora (promptPending não é ligado nesse caso).
+      if (!_deferredReady()) return false;
+      _stopDeferredOpenCheck();
+      _checkedThisSession = true;
+      await _check(silent: true);
+      return _status == UpdateStatus.available;
     }
     if (!_isOnline()) return false;
     if (!_isQueueIdle()) {
@@ -133,16 +146,34 @@ class UpdateViewModel extends ChangeNotifier {
     return _status == UpdateStatus.available;
   }
 
+  /// Pode rodar a checagem diferida agora? Nunca no meio de uma operação, nem
+  /// com download ou instalador na tela, nem com versão já conhecida.
+  bool _deferredReady() =>
+      !_disposed &&
+      !_busy &&
+      _status != UpdateStatus.downloading &&
+      _status != UpdateStatus.installing &&
+      _release == null &&
+      _isOnline() &&
+      _isQueueIdle();
+
   void _deferOpenCheck() {
+    if (_deferredOpenCheck) return;
     _deferredOpenCheck = true;
-    _queueChanges.addListener(_onQueueChanged);
+    _queueChanges.addListener(_onStateChanged);
+    _connectivityChanges?.addListener(_onStateChanged);
   }
 
-  void _onQueueChanged() {
-    if (!_deferredOpenCheck || _busy || !_isQueueIdle()) return;
-    // Sem rede a checagem continua pendente até a próxima mudança da fila.
-    if (!_isOnline()) return;
+  /// Fila ou rede mudou: tenta a diferida. Depois de uma falha manual não
+  /// roda, para não apagar a mensagem de erro que o usuário está vendo; a
+  /// reabertura da Home ([checkOnOpen]) ainda resgata a checagem.
+  void _onStateChanged() {
+    if (_status == UpdateStatus.failed) return;
+    _tryRunDeferredOpenCheck();
+  }
 
+  void _tryRunDeferredOpenCheck() {
+    if (!_deferredOpenCheck || !_deferredReady()) return;
     _stopDeferredOpenCheck();
     _checkedThisSession = true;
     unawaited(_runDeferredOpenCheck());
@@ -158,8 +189,17 @@ class UpdateViewModel extends ChangeNotifier {
   }
 
   void _stopDeferredOpenCheck() {
+    if (!_deferredOpenCheck) return;
     _deferredOpenCheck = false;
-    _queueChanges.removeListener(_onQueueChanged);
+    _queueChanges.removeListener(_onStateChanged);
+    _connectivityChanges?.removeListener(_onStateChanged);
+  }
+
+  /// Uma checagem manual que deu certo já mostrou o resultado (com ou sem
+  /// versão): a diferida deixa de existir, e a abertura não checa de novo.
+  void _cancelDeferredOpenCheck() {
+    _checkedThisSession = true;
+    _stopDeferredOpenCheck();
   }
 
   /// "Verificar atualização" do Perfil: mostra o resultado, inclusive o erro.
@@ -194,6 +234,7 @@ class UpdateViewModel extends ChangeNotifier {
       final result = await _service.fetchLatest();
       switch (result) {
         case Success(data: final release):
+          _cancelDeferredOpenCheck();
           if (release.isNewerThan(installed)) {
             _release = release;
             _mandatory = release.isMandatoryFor(installed);
@@ -245,6 +286,7 @@ class UpdateViewModel extends ChangeNotifier {
     if (release == null || _busy) return;
     if (!_isQueueIdle()) return;
 
+    _cancelDeferredOpenCheck();
     _busy = true;
     _cancelled = false;
     _progress = 0;
@@ -316,7 +358,7 @@ class UpdateViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    if (_deferredOpenCheck) _stopDeferredOpenCheck();
+    _stopDeferredOpenCheck();
     _cancelToken?.cancel();
     super.dispose();
   }
