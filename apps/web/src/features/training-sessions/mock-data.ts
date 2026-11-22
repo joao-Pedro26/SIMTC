@@ -24,17 +24,17 @@ export const mockTrainingSessions: TrainingSession[] = [
       {
         id: 'mock-p1', name: 'João da Silva', cpf: '123.456.789-00', email: 'joao@email.com',
         cnhCategory: 'B', cnhExpiration: '2028-03-10',
-        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 88, certificateGenerated: true, certificateId: 'cert-1', certificatePdfUrl: null,
+        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 88, certificateGenerated: true, certificateId: 'cert-1', certificatePdfUrl: null, reportId: null,
       },
       {
         id: 'mock-p2', name: 'Maria Souza', cpf: '987.654.321-00', email: 'maria@email.com',
         cnhCategory: 'AB', cnhExpiration: '2027-06-15',
-        type: 'SOMENTE_TEORICA', status: 'PENDENTE', score: null, certificateGenerated: false, certificateId: null, certificatePdfUrl: null,
+        type: 'SOMENTE_TEORICA', status: 'PENDENTE', score: null, certificateGenerated: false, certificateId: null, certificatePdfUrl: null, reportId: null,
       },
       {
         id: 'mock-p3', name: 'Carlos Pereira', cpf: '111.222.333-44', email: 'carlos@email.com',
         cnhCategory: 'B', cnhExpiration: '2026-11-20',
-        type: 'TEORICA_E_PRATICA', status: 'NAO_RECOMENDADO', score: 62, certificateGenerated: false, certificateId: null, certificatePdfUrl: null,
+        type: 'TEORICA_E_PRATICA', status: 'NAO_RECOMENDADO', score: 62, certificateGenerated: false, certificateId: null, certificatePdfUrl: null, reportId: null,
       },
     ],
   },
@@ -55,7 +55,7 @@ export const mockTrainingSessions: TrainingSession[] = [
       {
         id: 'mock-p4', name: 'Ana Lima', cpf: '555.666.777-88', email: 'ana@email.com',
         cnhCategory: 'C', cnhExpiration: '2029-01-05',
-        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 91, certificateGenerated: true, certificateId: 'cert-2', certificatePdfUrl: null,
+        type: 'TEORICA_E_PRATICA', status: 'APROVADO', score: 91, certificateGenerated: true, certificateId: 'cert-2', certificatePdfUrl: null, reportId: null,
       },
     ],
   },

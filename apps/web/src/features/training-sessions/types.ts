@@ -45,6 +45,8 @@ export interface TrainingParticipant {
   certificateGenerated: boolean
   certificateId: string | null
   certificatePdfUrl: string | null
+  /** Id da avaliação prática, só quando o PDF do relatório já foi gerado. */
+  reportId: string | null
   hasSignature?: boolean
   assignedConsultantId?: string | null
   assignedConsultant?: { id: string; name: string } | null
