@@ -834,6 +834,9 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
       {/* Avaliação salva, só para leitura (treinamento concluído) */}
       {reviewParticipant && (
         <AssessmentDrawer
+          // Uma instância por participante: trocar de participante com o modal
+          // aberto descarta a resposta atrasada do anterior
+          key={reviewParticipant.id}
           open
           readOnly
           participantName={reviewParticipant.participant.name}
