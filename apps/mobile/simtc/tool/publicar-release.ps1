@@ -61,7 +61,7 @@ try {
   # pode estar apontando para o backend local, e um APK de release assim nao
   # consegue falar com a producao.
   Write-Host "Gerando o APK $versionName+$versionCode (API: $ApiUrl) ..." -ForegroundColor Cyan
-  & flutter build apk --release "--dart-define=API_BASE_URL=$ApiUrl"
+  & flutter build apk --release --target-platform android-arm64 "--dart-define=API_BASE_URL=$ApiUrl"
   if ($LASTEXITCODE -ne 0) { throw 'O flutter build falhou.' }
 
   $builtApk = Join-Path $appRoot 'build\app\outputs\flutter-apk\app-release.apk'
