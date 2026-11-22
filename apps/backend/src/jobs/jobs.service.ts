@@ -1,8 +1,21 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from '@simtc/shared-types';
 
-export type BulkJobType = 'DELETE_PARTICIPANTS' | 'SEND_CERTIFICATES' | 'DOWNLOAD_ZIP';
+export type BulkJobType = 'DELETE_PARTICIPANTS' | 'SEND_CERTIFICATES' | 'DOWNLOAD_ZIP' | 'GENERATE_DOCUMENTS';
+
+export const ORPHANED_GENERATE_DOCUMENTS_MESSAGE =
+  'Interrompido porque o servidor reiniciou. Os documentos já gerados foram salvos; gere novamente os pendentes.';
+export const ORPHANED_JOB_MESSAGE =
+  'Interrompido porque o servidor reiniciou. O que já foi processado foi mantido; rode a ação de novo para os itens que faltaram.';
+
+const ACTIVE_STATUSES = ['PENDING', 'RUNNING'] as const;
 
 export interface BulkItemResult {
   participantId: string;
@@ -19,8 +32,42 @@ export interface BulkItemResult {
  * frontend em GET /jobs/:jobId. Ver brainstorm-acoes-lote-participantes.md.
  */
 @Injectable()
-export class JobsService {
+export class JobsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * O job roda solto no event loop: se o processo reinicia (deploy, queda),
+   * ele morre no meio e ficaria PENDING/RUNNING para sempre, travando a tela e
+   * a regra de "uma geração por sessão". Ao subir, nenhum job pode estar vivo
+   * (produção roda um único container), então todos os ativos viram FAILED.
+   */
+  async onApplicationBootstrap() {
+    const count = await this.failOrphanedJobs();
+    if (count > 0) this.logger.warn(`${count} job(s) interrompido(s) pelo reinício marcado(s) como FAILED`);
+  }
+
+  async failOrphanedJobs(): Promise<number> {
+    const status = { in: [...ACTIVE_STATUSES] };
+    const generate = await this.prisma.bulkOperationJob.updateMany({
+      where: { status, type: 'GENERATE_DOCUMENTS' },
+      data: { status: 'FAILED', errorMessage: ORPHANED_GENERATE_DOCUMENTS_MESSAGE },
+    });
+    const others = await this.prisma.bulkOperationJob.updateMany({
+      where: { status, type: { not: 'GENERATE_DOCUMENTS' } },
+      data: { status: 'FAILED', errorMessage: ORPHANED_JOB_MESSAGE },
+    });
+    return generate.count + others.count;
+  }
+
+  /** Job ainda em andamento (PENDING/RUNNING) de um tipo numa sessão, o mais recente. */
+  async findActiveJob(trainingSessionId: string, type: BulkJobType) {
+    return this.prisma.bulkOperationJob.findFirst({
+      where: { trainingSessionId, type, status: { in: [...ACTIVE_STATUSES] } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 
   async createJob(params: {
     type: BulkJobType;

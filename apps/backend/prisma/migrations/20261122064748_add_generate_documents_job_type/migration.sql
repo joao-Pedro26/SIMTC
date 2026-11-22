@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "BulkJobType" ADD VALUE 'GENERATE_DOCUMENTS';
