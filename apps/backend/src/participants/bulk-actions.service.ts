@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -318,6 +318,117 @@ export class BulkActionsService {
         reason: problems.length ? problems.join('; ') : undefined,
       },
     };
+  }
+
+  // ─── GERAÇÃO DE CERTIFICADOS/RELATÓRIOS EM LOTE ────────────────────────
+
+  /**
+   * Gera (ou gera de novo) certificado e relatório dos participantes pedidos.
+   * Uma geração ativa por sessão: se já há uma rodando, devolve o id dela com
+   * `alreadyRunning` em vez de criar outra (a tela abre o progresso existente).
+   */
+  async startBulkGenerateDocuments(
+    trainingSessionId: string,
+    participantIds: string[],
+    user: JwtPayload,
+  ): Promise<{ jobId: string; alreadyRunning: boolean }> {
+    const session = await this.prisma.trainingSession.findUnique({
+      where: { id: trainingSessionId },
+      select: { status: true },
+    });
+    if (!session) throw new NotFoundException('Sessão não encontrada');
+    if (session.status !== 'CONCLUIDO') {
+      throw new BadRequestException('Conclua o treinamento antes de gerar os documentos');
+    }
+
+    const active = await this.jobs.findActiveJob(trainingSessionId, 'GENERATE_DOCUMENTS');
+    if (active) return { jobId: active.id, alreadyRunning: true };
+
+    const job = await this.jobs.createJob({
+      type: 'GENERATE_DOCUMENTS',
+      requestedById: user.sub,
+      requestedByRole: user.role,
+      trainingSessionId,
+      totalItems: participantIds.length,
+    });
+    void this.processBulkGenerateDocuments(job.id, trainingSessionId, participantIds);
+    return { jobId: job.id, alreadyRunning: false };
+  }
+
+  async getActiveGenerateDocumentsJob(trainingSessionId: string): Promise<{ jobId: string | null }> {
+    const active = await this.jobs.findActiveJob(trainingSessionId, 'GENERATE_DOCUMENTS');
+    return { jobId: active?.id ?? null };
+  }
+
+  private async processBulkGenerateDocuments(jobId: string, trainingSessionId: string, participantIds: string[]) {
+    try {
+      await this.jobs.markRunning(jobId);
+
+      // Grupos de 2: o PdfGeneratorService já limita o Puppeteer a 2
+      // renderizações simultâneas. Cada documento é gravado assim que fica
+      // pronto, então uma interrupção mantém o que já foi gerado.
+      const chunkSize = 2;
+      for (let i = 0; i < participantIds.length; i += chunkSize) {
+        const chunk = participantIds.slice(i, i + chunkSize);
+        const results = await Promise.all(chunk.map((id) => this.generateDocumentsForOne(id, trainingSessionId)));
+        for (const r of results) {
+          await this.jobs.recordItemResult(jobId, r);
+        }
+      }
+
+      await this.jobs.completeJob(jobId);
+    } catch (err: any) {
+      // Roda solto no event loop: nada pode escapar como rejeição não tratada.
+      try {
+        await this.jobs.failJob(jobId, err?.message ?? 'Falha ao gerar documentos');
+      } catch {
+        // banco fora do ar: o job vira órfão e é limpo no próximo boot
+      }
+    }
+  }
+
+  private async generateDocumentsForOne(trainingParticipantId: string, trainingSessionId: string): Promise<BulkItemResult> {
+    const tp = await this.prisma.trainingParticipant.findUnique({
+      where: { id: trainingParticipantId },
+      include: { participant: true, assessment: { select: { id: true } } },
+    });
+    if (!tp || tp.trainingSessionId !== trainingSessionId) {
+      return {
+        participantId: trainingParticipantId,
+        name: tp?.participant?.name ?? trainingParticipantId,
+        status: 'failed',
+        reason: 'Participante não encontrado nesta sessão',
+      };
+    }
+    const name = tp.participant.name;
+
+    // Mesmas regras de elegibilidade de generateBatch / generateAssessmentReports.
+    const wantsCertificate = tp.status === 'APROVADO' || tp.participationType === 'SOMENTE_TEORICA';
+    const wantsReport = !!tp.assessment;
+    if (!wantsCertificate && !wantsReport) {
+      return {
+        participantId: trainingParticipantId,
+        name,
+        status: 'skipped',
+        reason: 'Sem documento a gerar: não aprovado e sem avaliação prática',
+      };
+    }
+
+    const problems: string[] = [];
+    if (wantsCertificate) {
+      await this.certificates
+        .generateCertificateForParticipant(trainingParticipantId)
+        .catch((err: any) => problems.push(`certificado: ${err?.message ?? 'erro desconhecido'}`));
+    }
+    if (wantsReport) {
+      await this.certificates
+        .generateReportForParticipant(trainingParticipantId)
+        .catch((err: any) => problems.push(`relatório: ${err?.message ?? 'erro desconhecido'}`));
+    }
+
+    return problems.length
+      ? { participantId: trainingParticipantId, name, status: 'failed', reason: problems.join('; ') }
+      : { participantId: trainingParticipantId, name, status: 'success' };
   }
 
   /** Remove acentos e caracteres inválidos para nome de pasta dentro do ZIP. */

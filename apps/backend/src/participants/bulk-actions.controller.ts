@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -43,6 +43,27 @@ export class BulkActionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.service.startBulkSendCertificates(sessionId, dto.participantIds, user);
+  }
+
+  @Post('bulk-generate-documents')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Gera certificado + relatório dos participantes (job em background); devolve o job ativo se já houver um',
+  })
+  bulkGenerateDocuments(
+    @Param('sessionId') sessionId: string,
+    @Body() dto: BulkParticipantIdsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.startBulkGenerateDocuments(sessionId, dto.participantIds, user);
+  }
+
+  @Get('bulk-generate-documents/active')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Id da geração de documentos em andamento na sessão, ou null' })
+  activeGenerateDocuments(@Param('sessionId') sessionId: string) {
+    return this.service.getActiveGenerateDocumentsJob(sessionId);
   }
 
   @Post('bulk-download')

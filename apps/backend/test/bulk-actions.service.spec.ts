@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { BulkActionsService } from 'src/participants/bulk-actions.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JobsService } from 'src/jobs/jobs.service';
@@ -20,6 +20,7 @@ const mockJobs = {
   completeJob: jest.fn(),
   failJob: jest.fn(),
   getJobForUser: jest.fn(),
+  findActiveJob: jest.fn(),
 };
 const mockParticipants = { removeParticipant: jest.fn() };
 const mockCertificates = {
@@ -267,6 +268,184 @@ describe('BulkActionsService', () => {
       expect(result.result.reason).toContain('sem template');
       expect(result.certificateBuffer).toBeNull();
       expect(result.reportBuffer).toBeNull();
+    });
+  });
+
+  // ─── geração de documentos em lote ─────────────────────────────────────
+
+  describe('startBulkGenerateDocuments', () => {
+    const admin = { sub: 'admin-1', role: 'ADMIN' } as any;
+
+    it('recusa sessão que não está CONCLUIDO', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ status: 'EM_ANDAMENTO' });
+
+      await expect(service.startBulkGenerateDocuments('s1', ['tp-1'], admin)).rejects.toThrow(BadRequestException);
+      expect(mockJobs.createJob).not.toHaveBeenCalled();
+    });
+
+    it('recusa sessão inexistente', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue(null);
+
+      await expect(service.startBulkGenerateDocuments('s1', ['tp-1'], admin)).rejects.toThrow(NotFoundException);
+    });
+
+    it('devolve o job em andamento em vez de criar outro', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ status: 'CONCLUIDO' });
+      mockJobs.findActiveJob.mockResolvedValue({ id: 'job-ativo' });
+
+      const result = await service.startBulkGenerateDocuments('s1', ['tp-1'], admin);
+
+      expect(result).toEqual({ jobId: 'job-ativo', alreadyRunning: true });
+      expect(mockJobs.findActiveJob).toHaveBeenCalledWith('s1', 'GENERATE_DOCUMENTS');
+      expect(mockJobs.createJob).not.toHaveBeenCalled();
+    });
+
+    it('cria o job com o total de ids', async () => {
+      mockPrisma.trainingSession.findUnique.mockResolvedValue({ status: 'CONCLUIDO' });
+      mockJobs.findActiveJob.mockResolvedValue(null);
+      const process = jest.spyOn(service as any, 'processBulkGenerateDocuments').mockResolvedValue(undefined);
+
+      const result = await service.startBulkGenerateDocuments('s1', ['tp-1', 'tp-2'], admin);
+
+      expect(result).toEqual({ jobId: 'job-1', alreadyRunning: false });
+      expect(mockJobs.createJob).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'GENERATE_DOCUMENTS', totalItems: 2, trainingSessionId: 's1' }),
+      );
+      expect(process).toHaveBeenCalledWith('job-1', 's1', ['tp-1', 'tp-2']);
+    });
+  });
+
+  describe('getActiveGenerateDocumentsJob', () => {
+    it('devolve o id do job ativo ou null', async () => {
+      mockJobs.findActiveJob.mockResolvedValueOnce({ id: 'job-ativo' }).mockResolvedValueOnce(null);
+
+      await expect(service.getActiveGenerateDocumentsJob('s1')).resolves.toEqual({ jobId: 'job-ativo' });
+      await expect(service.getActiveGenerateDocumentsJob('s1')).resolves.toEqual({ jobId: null });
+    });
+  });
+
+  describe('generateDocumentsForOne', () => {
+    const tp = (overrides: Record<string, unknown> = {}) => ({
+      id: 'tp-1',
+      trainingSessionId: 's1',
+      status: 'APROVADO',
+      participationType: 'TEORICA_E_PRATICA',
+      participant: { name: 'Ana' },
+      assessment: { id: 'a1' },
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      mockCertificates.generateCertificateForParticipant.mockResolvedValue({});
+      mockCertificates.generateReportForParticipant.mockResolvedValue({});
+    });
+
+    it('gera os dois para aprovado com avaliação', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(tp());
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(mockCertificates.generateCertificateForParticipant).toHaveBeenCalledWith('tp-1');
+      expect(mockCertificates.generateReportForParticipant).toHaveBeenCalledWith('tp-1');
+      expect(result).toEqual({ participantId: 'tp-1', name: 'Ana', status: 'success' });
+    });
+
+    it('só certificado para SOMENTE_TEORICA sem avaliação', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(
+        tp({ status: 'PENDENTE', participationType: 'SOMENTE_TEORICA', assessment: null }),
+      );
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(mockCertificates.generateCertificateForParticipant).toHaveBeenCalledWith('tp-1');
+      expect(mockCertificates.generateReportForParticipant).not.toHaveBeenCalled();
+      expect(result.status).toBe('success');
+    });
+
+    it('só relatório para NAO_RECOMENDADO', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(tp({ status: 'NAO_RECOMENDADO' }));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(mockCertificates.generateCertificateForParticipant).not.toHaveBeenCalled();
+      expect(mockCertificates.generateReportForParticipant).toHaveBeenCalledWith('tp-1');
+      expect(result.status).toBe('success');
+    });
+
+    it('pula quem não tem documento a gerar', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(tp({ status: 'PENDENTE', assessment: null }));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(result).toEqual({
+        participantId: 'tp-1',
+        name: 'Ana',
+        status: 'skipped',
+        reason: 'Sem documento a gerar: não aprovado e sem avaliação prática',
+      });
+      expect(mockCertificates.generateCertificateForParticipant).not.toHaveBeenCalled();
+    });
+
+    it('falha parcial mantém o que gerou', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(tp());
+      mockCertificates.generateReportForParticipant.mockRejectedValue(new Error('sem textos'));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(mockCertificates.generateCertificateForParticipant).toHaveBeenCalledWith('tp-1');
+      expect(result).toEqual({ participantId: 'tp-1', name: 'Ana', status: 'failed', reason: 'relatório: sem textos' });
+    });
+
+    it('junta os dois motivos quando os dois falham', async () => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(tp());
+      mockCertificates.generateCertificateForParticipant.mockRejectedValue(new Error('a'));
+      mockCertificates.generateReportForParticipant.mockRejectedValue(new Error('b'));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(result.reason).toBe('certificado: a; relatório: b');
+    });
+
+    it.each([
+      ['de outra sessão', { trainingSessionId: 's2' }],
+      ['removido', null],
+    ])('participante %s falha sem gerar nada', async (_label, value) => {
+      mockPrisma.trainingParticipant.findUnique.mockResolvedValue(value === null ? null : tp(value as any));
+
+      const result = await (service as any).generateDocumentsForOne('tp-1', 's1');
+
+      expect(result).toEqual(
+        expect.objectContaining({ participantId: 'tp-1', status: 'failed', reason: 'Participante não encontrado nesta sessão' }),
+      );
+      expect(mockCertificates.generateCertificateForParticipant).not.toHaveBeenCalled();
+      expect(mockCertificates.generateReportForParticipant).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('processBulkGenerateDocuments', () => {
+    it('processa todos e conclui', async () => {
+      jest
+        .spyOn(service as any, 'generateDocumentsForOne')
+        .mockImplementation(async (id: any) => ({ participantId: id, name: id, status: 'success' }));
+
+      await (service as any).processBulkGenerateDocuments('job-1', 's1', ['tp-1', 'tp-2', 'tp-3']);
+
+      expect(mockJobs.markRunning).toHaveBeenCalledWith('job-1');
+      expect(mockJobs.recordItemResult).toHaveBeenCalledTimes(3);
+      expect(mockJobs.completeJob).toHaveBeenCalledWith('job-1');
+      expect(mockJobs.failJob).not.toHaveBeenCalled();
+    });
+
+    it('marca o job como falho se algo inesperado estourar', async () => {
+      jest
+        .spyOn(service as any, 'generateDocumentsForOne')
+        .mockImplementation(async (id: any) => ({ participantId: id, name: id, status: 'success' }));
+      mockJobs.recordItemResult.mockRejectedValueOnce(new Error('db caiu'));
+
+      await expect((service as any).processBulkGenerateDocuments('job-1', 's1', ['tp-1'])).resolves.toBeUndefined();
+
+      expect(mockJobs.failJob).toHaveBeenCalledWith('job-1', 'db caiu');
+      expect(mockJobs.completeJob).not.toHaveBeenCalled();
     });
   });
 
