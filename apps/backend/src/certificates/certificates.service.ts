@@ -7,6 +7,12 @@ import { SIGNATURE_BUCKET } from '../participants/signature.constants';
 import { withPublicParticipant } from '../participants/participant-view.util';
 import { findCourseCategories } from '../assessment-categories/course-categories.util';
 import {
+  formatCalendarDate,
+  formatClock,
+  formatLongDate,
+  formatMonthYear,
+} from './report-dates.util';
+import {
   JwtPayload,
   calculateCategoryScore,
   calculateOverallScore,
@@ -124,7 +130,7 @@ export class CertificatesService {
     });
 
     const result = this.resolveResult(trainingParticipant);
-    const sessionDate = session.date ? this.formatDate(new Date(session.date)) : null;
+    const sessionDate = session.date ? formatLongDate(new Date(session.date)) : null;
     // Participante SOMENTE_TEORICA não fez a prática: o certificado mostra só
     // as horas teóricas do curso.
     const cargaHoraria = this.formatCargaHoraria(
@@ -189,23 +195,6 @@ export class CertificatesService {
     if (oldPath) await this.storage.delete('certificates', oldPath).catch(() => null);
 
     return updated;
-  }
-
-  private formatDate(date: Date): string {
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-    ];
-    return `${String(date.getDate()).padStart(2, '0')} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
-  }
-
-  /** Formata "Julho/2024" para o rodapé do relatório de avaliação */
-  private formatFooterMonth(date: Date): string {
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-    ];
-    return `${months[date.getMonth()]}/${date.getFullYear()}`;
   }
 
   /** Cor da barra de progresso por tópico — mesmos limiares usados no preview do app web */
@@ -295,23 +284,14 @@ export class CertificatesService {
 
     const conclusionParagraphs = await this.getConclusionParagraphs(overallScorePercent);
 
-    const assessmentDate = assessment.date
-      ? new Date(assessment.date).toLocaleDateString('pt-BR')
-      : null;
-    const startTime = assessment.startTime
-      ? new Date(assessment.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + 'h'
-      : null;
-    const endTime = assessment.endTime
-      ? new Date(assessment.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + 'h'
-      : null;
-    const footerMonth = assessment.date
-      ? this.formatFooterMonth(new Date(assessment.date))
-      : null;
-    const signatureDate = assessment.date
-      ? this.formatDate(new Date(assessment.date))
-      : null;
+    // Fusos: ver report-dates.util.ts (data em UTC, horário em Brasília).
+    const assessmentDate = assessment.date ? formatCalendarDate(new Date(assessment.date)) : null;
+    const startTime = assessment.startTime ? formatClock(new Date(assessment.startTime)) : null;
+    const endTime = assessment.endTime ? formatClock(new Date(assessment.endTime)) : null;
+    const footerMonth = assessment.date ? formatMonthYear(new Date(assessment.date)) : null;
+    const signatureDate = assessment.date ? formatLongDate(new Date(assessment.date)) : null;
     const cnhExpiration = participant.cnhExpiration
-      ? new Date(participant.cnhExpiration).toLocaleDateString('pt-BR')
+      ? formatCalendarDate(new Date(participant.cnhExpiration))
       : null;
 
     const pdf = await this.pdfGenerator.renderAssessmentReport({
