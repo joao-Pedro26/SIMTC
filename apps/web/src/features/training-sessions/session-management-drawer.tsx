@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, X, Loader2, UserPlus, Check } from 'lucide-react'
+import { Plus, X, Loader2, UserPlus, Check, Eye } from 'lucide-react'
 import { DrawerGuardBridge } from '@/components/ui/drawer/drawer-guard-bridge'
 import { Drawer } from '@/components/ui/drawer/drawer'
 import { AssessmentDrawer } from './assessment-drawer'
@@ -162,6 +162,8 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
   // Assessment drawer
   const [assessmentParticipant, setAssessmentParticipant] = useState<BackendParticipant | null>(null)
   const [assessmentOpen, setAssessmentOpen] = useState(false)
+  // Avaliação aberta só para leitura (treinamento concluído)
+  const [reviewParticipant, setReviewParticipant] = useState<BackendParticipant | null>(null)
 
   // Confirmação ao concluir treinamento com participante(s) não aprovado(s)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
@@ -720,8 +722,28 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                     .map((p) => {
                     const action = getAction(p, consultantId, session.status, isAdmin)
                     const displayStatus = getDisplayStatus(p)
+                    // Concluído: quem tem avaliação prática abre a avaliação só para leitura
+                    const canReview =
+                      session.status === 'CONCLUIDO' &&
+                      p.participationType !== 'SOMENTE_TEORICA' &&
+                      p.assessment != null
                     return (
-                      <div key={p.id} className={styles.participantRow}>
+                      <div
+                        key={p.id}
+                        className={`${styles.participantRow}${canReview ? ` ${styles.participantRowClickable}` : ''}`}
+                        {...(canReview && {
+                          role: 'button',
+                          tabIndex: 0,
+                          'aria-label': `Ver avaliação de ${p.participant.name}`,
+                          onClick: () => setReviewParticipant(p),
+                          onKeyDown: (e: React.KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setReviewParticipant(p)
+                            }
+                          },
+                        })}
+                      >
                         <div className={styles.participantInfo}>
                           <span className={styles.participantName}>{p.participant.name}</span>
                           <span className={styles.participantCpf}>{formatCpf(p.participant.cpf)}</span>
@@ -732,6 +754,9 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                               className={styles.typeSelect}
                               value={p.participationType}
                               onChange={(e) => handleChangeType(p, e.target.value)}
+                              // Na linha clicável, mexer no tipo não abre a avaliação
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
                               disabled={busy}
                               aria-label={`Tipo de participação de ${p.participant.name}`}
                             >
@@ -781,6 +806,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
                               {p.assignedConsultant?.name ?? 'Outro consultor'}
                             </span>
                           )}
+                          {canReview && <Eye size={15} className={styles.viewAssessmentIcon} aria-hidden="true" />}
                         </div>
                       </div>
                     )
@@ -802,6 +828,19 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           sessionDate={session?.date ? session.date.split('T')[0] : null}
           onClose={() => { setAssessmentOpen(false); setAssessmentParticipant(null) }}
           onSaved={handleAssessmentSaved}
+        />
+      )}
+
+      {/* Avaliação salva, só para leitura (treinamento concluído) */}
+      {reviewParticipant && (
+        <AssessmentDrawer
+          open
+          readOnly
+          participantName={reviewParticipant.participant.name}
+          trainingParticipantId={reviewParticipant.id}
+          courseId={session?.course.id ?? ''}
+          onClose={() => setReviewParticipant(null)}
+          onSaved={() => setReviewParticipant(null)}
         />
       )}
 

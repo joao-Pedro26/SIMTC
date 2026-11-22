@@ -7,10 +7,18 @@ import { clientApi } from '@/lib/client-api'
 import {
   assessmentTimesError,
   assessmentTimesFrom,
+  assessmentTimesFromSaved,
   assessmentTimesPayload,
   toDateInput,
   type AssessmentTimes,
 } from '@/lib/assessment-times'
+import {
+  categoriesForCourse,
+  categoriesForReview,
+  selectionsFromSaved,
+  type SavedAssessment,
+  type SelectedNote,
+} from './saved-assessment'
 import {
   ASSESSMENT_OBSERVATION_MAX_LENGTH,
   calculateCategoryScore,
@@ -46,24 +54,6 @@ interface AssessmentCategory {
   courseIds?: string[]
 }
 
-/**
- * Só os tópicos vinculados ao curso entram no checklist e na nota. Curso sem
- * nenhum tópico vinculado cai em todos (mesma regra do backend:
- * `findCourseCategories`).
- */
-function categoriesForCourse(all: AssessmentCategory[], courseId: string) {
-  const linked = all.filter((c) => c.courseIds?.includes(courseId))
-  return linked.length > 0 ? linked : all
-}
-
-interface SelectedNote {
-  infractionNoteId: string
-  noteType: 'B' | 'PM' | 'M'
-  deduction: number
-  categoryId: string
-  observation?: string
-}
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface AssessmentDrawerProps {
@@ -74,8 +64,21 @@ interface AssessmentDrawerProps {
   courseId: string
   /** Data do treinamento (AAAA-MM-DD): sugestão para a data da avaliação */
   sessionDate?: string | null
+  /**
+   * Só visualizar a avaliação já salva (treinamento concluído): carrega as
+   * faltas e observações gravadas e não deixa editar nem salvar.
+   */
+  readOnly?: boolean
   onClose: () => void
   onSaved: () => void
+}
+
+/** "Avaliado por Fulano · 20/11/2026, 08:30–09:10" */
+function reviewSubtitle(saved: SavedAssessment): string {
+  const t = assessmentTimesFromSaved(saved)
+  const date = t.date.split('-').reverse().join('/')
+  const when = t.end ? `${date}, ${t.start}–${t.end}` : `${date}, ${t.start}`
+  return `Avaliado por ${saved.consultant?.name ?? 'Consultor removido'} · ${when}`
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -86,6 +89,7 @@ export function AssessmentDrawer({
   trainingParticipantId,
   courseId,
   sessionDate,
+  readOnly = false,
   onClose,
   onSaved,
 }: AssessmentDrawerProps) {
@@ -104,12 +108,12 @@ export function AssessmentDrawer({
   const [times, setTimes] = useState<AssessmentTimes | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  // Modo leitura: a avaliação salva que está sendo visualizada
+  const [saved, setSaved] = useState<SavedAssessment | null>(null)
 
   // Carrega categorias e captura horário de início quando o modal abre
   useEffect(() => {
     if (!open) return
-
-    startTimeRef.current = new Date()
 
     async function loadCategories() {
       setLoadingCategories(true)
@@ -126,8 +130,37 @@ export function AssessmentDrawer({
       }
     }
 
-    loadCategories()
-  }, [open, courseId])
+    /** Modo leitura: tópicos + a avaliação salva, com as faltas já marcadas */
+    async function loadSaved() {
+      setLoadingCategories(true)
+      setSaveError('')
+      try {
+        const [all, assessment] = await Promise.all([
+          clientApi.get<AssessmentCategory[]>('/assessment-categories'),
+          clientApi.get<SavedAssessment | null>(
+            `/practical-assessments/by-participant/${trainingParticipantId}`,
+          ),
+        ])
+        if (!assessment) throw new Error('Avaliação não encontrada')
+        const data = categoriesForReview(all, courseId, assessment.items)
+        setSaved(assessment)
+        setCategories(data)
+        setSelections(selectionsFromSaved(assessment.items))
+        setSelectedCategoryId(data[0]?.id ?? null)
+      } catch {
+        setSaveError('Não foi possível carregar a avaliação.')
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+
+    if (readOnly) {
+      loadSaved()
+    } else {
+      startTimeRef.current = new Date()
+      loadCategories()
+    }
+  }, [open, courseId, readOnly, trainingParticipantId])
 
   // Reseta estado ao fechar
   useEffect(() => {
@@ -142,6 +175,7 @@ export function AssessmentDrawer({
       setOpenObservations(new Set())
       setTimes(null)
       setSaveError('')
+      setSaved(null)
     }
   }, [open])
 
@@ -150,6 +184,8 @@ export function AssessmentDrawer({
     if (!open) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        // Só visualizando: nada a perder, fecha direto
+        if (readOnly) { onClose(); return }
         if (showConfirm) { setShowConfirm(false); return }
         if (removeConfirmId) { setRemoveConfirmId(null); return }
         if (showCancelConfirm) { setShowCancelConfirm(false); return }
@@ -158,7 +194,7 @@ export function AssessmentDrawer({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, showConfirm, showCancelConfirm, removeConfirmId])
+  }, [open, readOnly, onClose, showConfirm, showCancelConfirm, removeConfirmId])
 
   function removeSelection(infractionId: string) {
     setSelections((prev) => {
@@ -300,6 +336,10 @@ export function AssessmentDrawer({
   const confirmCategoryScores = categories
     .map((c) => ({ code: c.code, name: c.name, score: catScoreMap.get(c.id) ?? 100 }))
 
+  // Visualizando: a nota geral é a salva (a que sai no relatório), não um
+  // recálculo — os tópicos do curso podem ter mudado depois da avaliação.
+  const shownOverall = readOnly && saved?.score != null ? saved.score : overall
+
   if (!open) return null
 
   return (
@@ -312,12 +352,15 @@ export function AssessmentDrawer({
 
           {/* Header */}
           <div className={styles.modalHeader}>
-            <h2 id="assessment-modal-title" className={styles.modalTitle}>
-              Avaliando — {participantName}
-            </h2>
+            <div className={styles.modalHeading}>
+              <h2 id="assessment-modal-title" className={styles.modalTitle}>
+                {readOnly ? 'Avaliação' : 'Avaliando'} — {participantName}
+              </h2>
+              {readOnly && saved && <p className={styles.modalSubtitle}>{reviewSubtitle(saved)}</p>}
+            </div>
             <button
               className={styles.closeBtn}
-              onClick={handleCancelar}
+              onClick={readOnly ? onClose : handleCancelar}
               title="Fechar"
               aria-label="Fechar modal de avaliação"
             >
@@ -389,7 +432,8 @@ export function AssessmentDrawer({
                                     <button
                                       key={note.id}
                                       className={`${styles.noteBtn} ${styles[`noteBtn${noteType.replace('/', '')}`]} ${isSelected ? styles.noteBtnSelected : ''}`}
-                                      onClick={() => toggleNote(infraction, note, selectedCategory.id)}
+                                      disabled={readOnly}
+                                      onClick={readOnly ? undefined : () => toggleNote(infraction, note, selectedCategory.id)}
                                       title={note.comment ?? noteType}
                                     >
                                       {noteType}
@@ -397,7 +441,14 @@ export function AssessmentDrawer({
                                   )
                                 })}
                               </div>
-                              {currentSel && (currentSel.observation || openObservations.has(infraction.id)) ? (
+                              {readOnly ? (
+                                currentSel?.observation?.trim() ? (
+                                  <div className={styles.observationBox}>
+                                    <span className={styles.observationLabel}>Observação do instrutor</span>
+                                    <p className={styles.observationText}>{currentSel.observation}</p>
+                                  </div>
+                                ) : null
+                              ) : currentSel && (currentSel.observation || openObservations.has(infraction.id)) ? (
                                 <div className={styles.observationBox}>
                                   <label className={styles.observationLabel} htmlFor={`obs-${infraction.id}`}>
                                     Observação do instrutor
@@ -456,17 +507,26 @@ export function AssessmentDrawer({
                 )
               })}
               <span className={styles.footerOverall}>
-                Geral: <strong>{catScores.length > 0 ? `${Math.round(overall)}%` : '—'}</strong>
+                Geral: <strong>{catScores.length > 0 ? `${Math.round(shownOverall)}%` : '—'}</strong>
+                {readOnly && saved && catScores.length > 0 && <> · {getApprovalLabel(shownOverall)}</>}
               </span>
             </div>
             {saveError && <span className={styles.footerError}>{saveError}</span>}
             <div className={styles.footerActions}>
-              <button className={styles.cancelBtn} onClick={handleCancelar} disabled={saving}>
-                Cancelar
-              </button>
-              <button className={styles.saveBtn} onClick={handleSalvar} disabled={saving}>
-                Salvar
-              </button>
+              {readOnly ? (
+                <button className={styles.cancelBtn} onClick={onClose}>
+                  Fechar
+                </button>
+              ) : (
+                <>
+                  <button className={styles.cancelBtn} onClick={handleCancelar} disabled={saving}>
+                    Cancelar
+                  </button>
+                  <button className={styles.saveBtn} onClick={handleSalvar} disabled={saving}>
+                    Salvar
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

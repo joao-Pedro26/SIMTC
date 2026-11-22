@@ -58,6 +58,21 @@
   text-overflow: ellipsis;
 }
 
+/* Bloco do título: min-width 0 deixa o ellipsis funcionar dentro do flex */
+.modalHeading {
+  min-width: 0;
+}
+
+/* Modo leitura: quem avaliou, data e horários (sobre o fundo do cabeçalho) */
+.modalSubtitle {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .closeBtn {
   display: flex;
   align-items: center;
@@ -291,12 +306,20 @@
   letter-spacing: 0.02em;
 }
 
+/* Modo leitura: botões travados; as notas não marcadas ficam apagadas */
+.noteBtn:disabled {
+  cursor: default;
+}
+.noteBtn:disabled:not(.noteBtnSelected) {
+  opacity: 0.4;
+}
+
 .noteBtnB {
   border-color: #68d391;
   color: #276749;
   background-color: transparent;
 }
-.noteBtnB:hover { background-color: #c6f6d5; }
+.noteBtnB:hover:not(:disabled) { background-color: #c6f6d5; }
 .noteBtnB.noteBtnSelected {
   background-color: #48bb78;
   border-color: #48bb78;
@@ -308,7 +331,7 @@
   color: #744210;
   background-color: transparent;
 }
-.noteBtnPM:hover { background-color: #fefcbf; }
+.noteBtnPM:hover:not(:disabled) { background-color: #fefcbf; }
 .noteBtnPM.noteBtnSelected {
   background-color: #ecc94b;
   border-color: #ecc94b;
@@ -320,7 +343,7 @@
   color: #822727;
   background-color: transparent;
 }
-.noteBtnM:hover { background-color: #fed7d7; }
+.noteBtnM:hover:not(:disabled) { background-color: #fed7d7; }
 .noteBtnM.noteBtnSelected {
   background-color: #fc8181;
   border-color: #fc8181;
@@ -364,6 +387,16 @@
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text, #1a202c);
+}
+
+/* Modo leitura: a observação como texto, com as quebras de linha */
+.observationText {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text, #1a202c);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .observationInput {

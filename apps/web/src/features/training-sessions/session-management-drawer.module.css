@@ -384,6 +384,29 @@
   background-color: var(--bg);
 }
 
+/* Treinamento concluído: a linha abre a avaliação só para leitura */
+.participantRowClickable {
+  cursor: pointer;
+}
+
+.participantRowClickable:hover {
+  border-color: #1d9aa4;
+}
+
+.participantRowClickable:focus-visible {
+  outline: 2px solid #1d9aa4;
+  outline-offset: 1px;
+}
+
+.viewAssessmentIcon {
+  color: var(--text-muted, #718096);
+  flex-shrink: 0;
+}
+
+.participantRowClickable:hover .viewAssessmentIcon {
+  color: #1d9aa4;
+}
+
 .participantInfo {
   display: flex;
   flex-direction: column;
