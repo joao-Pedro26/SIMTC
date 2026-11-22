@@ -799,6 +799,7 @@ export function SessionManagementDrawer({ open, sessionId, onClose, onSaved }: S
           participantName={assessmentParticipant.participant.name}
           trainingParticipantId={assessmentParticipant.id}
           courseId={session?.course.id ?? ''}
+          sessionDate={session?.date ? session.date.split('T')[0] : null}
           onClose={() => { setAssessmentOpen(false); setAssessmentParticipant(null) }}
           onSaved={handleAssessmentSaved}
         />

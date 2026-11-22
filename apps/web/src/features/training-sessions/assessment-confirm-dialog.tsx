@@ -1,6 +1,8 @@
 'use client'
 
 import { Loader2 } from 'lucide-react'
+import { assessmentTimesError, type AssessmentTimes } from '@/lib/assessment-times'
+import { AssessmentTimesFields } from './assessment-times-fields'
 import styles from './assessment-confirm-dialog.module.css'
 
 interface CategoryScore {
@@ -10,8 +12,8 @@ interface CategoryScore {
 }
 
 interface AssessmentConfirmDialogProps {
-  startTime: Date
-  endTime: Date
+  times: AssessmentTimes
+  onTimesChange: (times: AssessmentTimes) => void
   categoryScores: CategoryScore[]
   overallScore: number
   faultCount: number
@@ -22,22 +24,14 @@ interface AssessmentConfirmDialogProps {
   onCancel: () => void
 }
 
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
 function getResultClass(score: number): string {
   if (score >= 70) return styles.resultAprovado
   return styles.resultReprovado
 }
 
 export function AssessmentConfirmDialog({
-  startTime,
-  endTime,
+  times,
+  onTimesChange,
   categoryScores,
   overallScore,
   faultCount,
@@ -47,6 +41,7 @@ export function AssessmentConfirmDialog({
   onConfirm,
   onCancel,
 }: AssessmentConfirmDialogProps) {
+  const timesError = assessmentTimesError(times)
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="assess-confirm-title">
       <div className={styles.dialog}>
@@ -54,23 +49,18 @@ export function AssessmentConfirmDialog({
           Confirmar Avaliação
         </h2>
 
-        {/* Linha de data e horários */}
-        <div className={styles.timeRow}>
-          <div className={styles.timeItem}>
-            <span className={styles.timeLabel}>Data</span>
-            <span className={styles.timeValue}>{formatDate(startTime)}</span>
-          </div>
-          <div className={styles.timeDivider} />
-          <div className={styles.timeItem}>
-            <span className={styles.timeLabel}>H. Início</span>
-            <span className={styles.timeValue}>{formatTime(startTime)}</span>
-          </div>
-          <div className={styles.timeDivider} />
-          <div className={styles.timeItem}>
-            <span className={styles.timeLabel}>H. Fim</span>
-            <span className={styles.timeValue}>{formatTime(endTime)}</span>
-          </div>
-        </div>
+        {/* Data e horários: editáveis, porque a nota pode ser lançada depois
+            da avaliação — o relatório deve mostrar quando ela aconteceu. */}
+        <AssessmentTimesFields
+          idPrefix="assess-confirm"
+          value={times}
+          onChange={onTimesChange}
+          error={timesError}
+          disabled={saving}
+        />
+        <p className={styles.timesHint}>
+          Lançando depois? Ajuste para quando a avaliação aconteceu: é o que sai no relatório.
+        </p>
 
         {/* Scores por categoria */}
         {categoryScores.length > 0 ? (
@@ -121,7 +111,7 @@ export function AssessmentConfirmDialog({
           <button className={styles.cancelBtn} onClick={onCancel} disabled={saving}>
             Voltar
           </button>
-          <button className={styles.confirmBtn} onClick={onConfirm} disabled={saving} autoFocus>
+          <button className={styles.confirmBtn} onClick={onConfirm} disabled={saving || timesError !== null}>
             {saving ? (
               <span className={styles.savingRow}>
                 <Loader2 size={14} className={styles.savingSpinner} />

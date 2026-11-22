@@ -47,6 +47,14 @@ export interface TrainingParticipant {
   certificatePdfUrl: string | null
   /** Id da avaliação prática, só quando o PDF do relatório já foi gerado. */
   reportId: string | null
+  /** Avaliação prática salva (data e horários que saem no relatório), ou null */
+  assessment?: {
+    id: string
+    /** ISO, meia-noite UTC do dia */
+    date: string
+    startTime: string
+    endTime: string | null
+  } | null
   hasSignature?: boolean
   assignedConsultantId?: string | null
   assignedConsultant?: { id: string; name: string } | null

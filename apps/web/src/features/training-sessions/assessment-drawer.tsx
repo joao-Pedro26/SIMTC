@@ -5,6 +5,13 @@ import { X, Loader2 } from 'lucide-react'
 import { AssessmentConfirmDialog } from './assessment-confirm-dialog'
 import { clientApi } from '@/lib/client-api'
 import {
+  assessmentTimesError,
+  assessmentTimesFrom,
+  assessmentTimesPayload,
+  toDateInput,
+  type AssessmentTimes,
+} from '@/lib/assessment-times'
+import {
   ASSESSMENT_OBSERVATION_MAX_LENGTH,
   calculateCategoryScore,
   calculateOverallScore,
@@ -65,6 +72,8 @@ interface AssessmentDrawerProps {
   trainingParticipantId: string
   /** Curso do treinamento — define quais tópicos aparecem no checklist */
   courseId: string
+  /** Data do treinamento (AAAA-MM-DD): sugestão para a data da avaliação */
+  sessionDate?: string | null
   onClose: () => void
   onSaved: () => void
 }
@@ -76,6 +85,7 @@ export function AssessmentDrawer({
   participantName,
   trainingParticipantId,
   courseId,
+  sessionDate,
   onClose,
   onSaved,
 }: AssessmentDrawerProps) {
@@ -90,7 +100,8 @@ export function AssessmentDrawer({
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
   // Infrações com o campo de observação aberto (mesmo sem texto ainda)
   const [openObservations, setOpenObservations] = useState<Set<string>>(new Set())
-  const [endTime, setEndTime] = useState<Date | null>(null)
+  // Data e horários do diálogo de confirmação (preenchidos ao clicar em Salvar)
+  const [times, setTimes] = useState<AssessmentTimes | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -129,7 +140,7 @@ export function AssessmentDrawer({
       setShowCancelConfirm(false)
       setRemoveConfirmId(null)
       setOpenObservations(new Set())
-      setEndTime(null)
+      setTimes(null)
       setSaveError('')
     }
   }, [open])
@@ -223,8 +234,14 @@ export function AssessmentDrawer({
   }
 
   function handleSalvar() {
-    const captured = new Date()
-    setEndTime(captured)
+    // Sugestão: início = quando o checklist abriu, fim = agora, data = a do
+    // treinamento (como no app). Se não for o dia de hoje ou a nota estiver
+    // sendo lançada depois, o admin ajusta no diálogo de confirmação.
+    const now = new Date()
+    const start = startTimeRef.current ?? now
+    const today = toDateInput(now)
+    const date = sessionDate && sessionDate <= today ? sessionDate : today
+    setTimes(assessmentTimesFrom(start, now, date))
     setShowConfirm(true)
   }
 
@@ -238,11 +255,10 @@ export function AssessmentDrawer({
   }
 
   async function handleConfirm() {
-    if (!startTimeRef.current || !endTime) return
+    if (!times || assessmentTimesError(times) !== null) return
     setSaving(true)
     setSaveError('')
     try {
-      const today = new Date()
       const items = Array.from(selections.values()).map((sel) => ({
         infractionNoteId: sel.infractionNoteId,
         observation: sel.observation?.trim() || undefined,
@@ -255,9 +271,7 @@ export function AssessmentDrawer({
       >('/practical-assessments/sync', [
         {
           trainingParticipantId,
-          date: today.toISOString().split('T')[0],
-          startTime: startTimeRef.current.toISOString(),
-          endTime: endTime.toISOString(),
+          ...assessmentTimesPayload(times),
           items,
         },
       ])
@@ -495,10 +509,10 @@ export function AssessmentDrawer({
       </div>
 
       {/* Confirm dialog de salvar */}
-      {showConfirm && startTimeRef.current && endTime && (
+      {showConfirm && times && (
         <AssessmentConfirmDialog
-          startTime={startTimeRef.current}
-          endTime={endTime}
+          times={times}
+          onTimesChange={setTimes}
           categoryScores={confirmCategoryScores}
           overallScore={overall}
           faultCount={faultCount}

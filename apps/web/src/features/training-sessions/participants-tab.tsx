@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { UserPlus, Upload, Check, Trash2, PenLine } from 'lucide-react'
+import { UserPlus, Upload, Check, Trash2, PenLine, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { ColumnFilter } from '@/components/ui/column-filter/column-filter'
 import { clientApi } from '@/lib/client-api'
@@ -12,6 +12,8 @@ import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
 import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
 import { ImportParticipantsModal } from './import-participants-modal'
+import { AssessmentTimesModal } from './assessment-times-modal'
+import { assessmentTimesFromSaved } from '@/lib/assessment-times'
 import type { TrainingSession, TrainingParticipant, ParticipantStatus } from './types'
 import styles from './participants-tab.module.css'
 
@@ -47,6 +49,13 @@ function getDisplayStatus(p: TrainingParticipant): ParticipantStatus {
   return p.status
 }
 
+/** "20/11/2026, 08:30–09:10" para o title do botão de corrigir horário */
+function formatAssessmentWhen(a: NonNullable<TrainingParticipant['assessment']>): string {
+  const t = assessmentTimesFromSaved(a)
+  const date = t.date.split('-').reverse().join('/')
+  return t.end ? `${date}, ${t.start}–${t.end}` : `${date}, ${t.start}`
+}
+
 interface AddParticipantForm {
   name: string
   cpf: string
@@ -70,6 +79,10 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
   const [statusFilter, setStatusFilter] = useState('')
 
   const canEdit = !readOnly && (session.status === 'PLANEJADO' || session.status === 'EM_ANDAMENTO')
+  // Data/horário de avaliação salva: o ADMIN corrige em qualquer status,
+  // inclusive com a sessão concluída (é quando os documentos são gerados).
+  const canEditTimes = !readOnly
+  const [timesTarget, setTimesTarget] = useState<TrainingParticipant | null>(null)
 
   const tipoOptions = [
     { label: 'Teoria',        value: 'SOMENTE_TEORICA'  },
@@ -403,6 +416,18 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
                         {p.status === 'APROVADO' && p.score !== null && (
                           <span className={styles.scoreHint}> {Math.round(p.score)}%</span>
                         )}
+                        {canEditTimes && p.assessment && p.status !== 'EM_AVALIACAO' && (
+                          <button
+                            type="button"
+                            className={styles.timesBtn}
+                            onClick={() => setTimesTarget(p)}
+                            disabled={busy}
+                            title={`Avaliação em ${formatAssessmentWhen(p.assessment)}. Clique para corrigir a data e o horário`}
+                            aria-label={`Corrigir data e horário da avaliação de ${p.name}`}
+                          >
+                            <Clock size={14} />
+                          </button>
+                        )}
                       </td>
                       {canEdit && (
                         <td className={styles.td}>
@@ -459,6 +484,25 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
             onRefresh()
           }}
           onClose={() => setBulkJobId(null)}
+        />
+      )}
+
+      {timesTarget?.assessment && (
+        <AssessmentTimesModal
+          participantName={timesTarget.name}
+          assessment={timesTarget.assessment}
+          hasReport={timesTarget.reportId !== null}
+          onClose={() => setTimesTarget(null)}
+          onSaved={async () => {
+            const hadReport = timesTarget.reportId !== null
+            setTimesTarget(null)
+            toast.success(
+              hadReport
+                ? 'Data e horário atualizados. Gere os documentos de novo para atualizar o relatório.'
+                : 'Data e horário atualizados.',
+            )
+            await onRefresh()
+          }}
         />
       )}
 
