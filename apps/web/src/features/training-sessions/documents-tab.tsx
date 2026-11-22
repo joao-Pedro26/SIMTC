@@ -8,7 +8,7 @@ import { clientApi } from '@/lib/client-api'
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
 import { BulkJobProgressModal } from '@/components/ui/bulk-job-modal/bulk-job-progress-modal'
-import { useBulkJob } from '@/lib/use-bulk-job'
+import { useBulkJob, type BulkJob } from '@/lib/use-bulk-job'
 import type { TrainingSession } from './types'
 import styles from './documents-tab.module.css'
 
@@ -27,7 +27,6 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
   // acompanha pelo hook enquanto o modal (que tem o próprio polling) não está aberto.
   const [genJobId, setGenJobId] = useState<string | null>(null)
   const [genModalOpen, setGenModalOpen] = useState(false)
-  const genFinishedRef = useRef(false)
   const { job: genJob } = useBulkJob(genJobId && !genModalOpen ? genJobId : null)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sentIds, setSentIds] = useState<Set<string>>(new Set())
@@ -48,10 +47,7 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     clientApi
       .get<{ jobId: string | null }>(`/training-sessions/${sessionId}/participants/bulk-generate-documents/active`)
       .then(({ jobId }) => {
-        if (!cancelled && jobId) {
-          genFinishedRef.current = false
-          setGenJobId((cur) => cur ?? jobId)
-        }
+        if (!cancelled && jobId) setGenJobId((cur) => cur ?? jobId)
       })
       .catch(() => null)
     return () => {
@@ -59,22 +55,26 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     }
   }, [canGenerate, sessionId])
 
-  // Job acompanhado com o modal fechado terminou. Tudo certo: só um aviso.
-  // Com falha, pulado ou interrupção: reabre o modal com o resumo e os motivos,
-  // senão o João só veria relógios na tabela sem saber por quê.
-  useEffect(() => {
-    if (!genJob || genModalOpen) return
-    if (genJob.status !== 'COMPLETED' && genJob.status !== 'FAILED') return
+  // Fim da geração (com o modal aberto ou fechado): fecha o modal, sem
+  // resumo, e avisa por toast. Quem falhou continua com o relógio na tabela.
+  function finishGeneration(job: BulkJob) {
+    setGenModalOpen(false)
+    setGenJobId(null)
     bulkSelection.clear()
     onRefresh()
-    const allOk = genJob.status === 'COMPLETED' && genJob.failedItems === 0 && genJob.skippedItems === 0
-    if (allOk) {
-      setGenJobId(null)
-      toast.success('Documentos gerados.')
+    if (job.status === 'FAILED') {
+      toast.error(job.errorMessage ?? 'A geração de documentos foi interrompida.')
+    } else if (job.failedItems > 0) {
+      toast.error(`Documentos gerados, mas ${job.failedItems} participante(s) com erro. Gere novamente para eles.`)
     } else {
-      genFinishedRef.current = true
-      setGenModalOpen(true)
+      toast.success('Certificados e relatórios de avaliação gerados.')
     }
+  }
+
+  // Job acompanhado com o modal fechado terminou.
+  useEffect(() => {
+    if (!genJob || genModalOpen) return
+    if (genJob.status === 'COMPLETED' || genJob.status === 'FAILED') finishGeneration(genJob)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genJob, genModalOpen])
 
@@ -105,7 +105,6 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
         `/training-sessions/${sessionId}/participants/bulk-generate-documents`,
         { participantIds },
       )
-      genFinishedRef.current = false
       setGenJobId(jobId)
       setGenModalOpen(true)
     } catch (e) {
@@ -115,10 +114,10 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
     }
   }
 
+  // Fechar com o job rodando: a aba segue acompanhando pelo hook.
   function handleGenModalClose() {
     setGenModalOpen(false)
     onRefresh()
-    if (genFinishedRef.current) setGenJobId(null)
   }
 
   const generateLabel = genJobId
@@ -359,11 +358,7 @@ export function DocumentsTab({ session, sessionId, onRefresh, readOnly }: Docume
           title="Gerando certificados e relatórios"
           closableWhileRunning
           runningNote="Pode fechar: a geração continua no servidor."
-          onFinished={() => {
-            genFinishedRef.current = true
-            bulkSelection.clear()
-            onRefresh()
-          }}
+          onFinished={finishGeneration}
           onClose={handleGenModalClose}
         />
       )}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2, XCircle, MinusCircle, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
-import { useBulkJob, isBulkJobFinished } from '@/lib/use-bulk-job'
+import { useBulkJob, isBulkJobFinished, type BulkJob } from '@/lib/use-bulk-job'
 import styles from './bulk-job-progress-modal.module.css'
 
 export type { BulkJobKind } from '@/lib/use-bulk-job'
@@ -12,8 +12,8 @@ export type { BulkJobKind } from '@/lib/use-bulk-job'
 interface BulkJobProgressModalProps {
   jobId: string
   title: string
-  /** Chamado uma única vez quando o job chega a COMPLETED ou FAILED. */
-  onFinished?: () => void
+  /** Chamado uma única vez quando o job chega a COMPLETED ou FAILED, com o job final. */
+  onFinished?: (job: BulkJob) => void
   onClose: () => void
   /** Deixa fechar com o job rodando (o processo segue no servidor). Padrão: false. */
   closableWhileRunning?: boolean
@@ -44,9 +44,9 @@ export function BulkJobProgressModal({
   const finishedFiredRef = useRef(false)
 
   useEffect(() => {
-    if (isBulkJobFinished(job) && !finishedFiredRef.current) {
+    if (job && isBulkJobFinished(job) && !finishedFiredRef.current) {
       finishedFiredRef.current = true
-      onFinished?.()
+      onFinished?.(job)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job])
