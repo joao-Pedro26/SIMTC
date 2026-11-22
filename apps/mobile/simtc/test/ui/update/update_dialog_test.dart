@@ -14,11 +14,13 @@ import 'package:simtc/data/repositories/auth_repository.dart';
 import 'package:simtc/data/repositories/session_repository.dart';
 import 'package:simtc/data/services/app_update_service.dart';
 import 'package:simtc/data/services/connectivity_service.dart';
+import 'package:simtc/data/services/local/tables.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/sessions/sessions_screen.dart';
 import 'package:simtc/ui/update/update_dialog.dart';
 import 'package:simtc/ui/update/update_viewmodel.dart';
 import 'package:simtc/utils/result.dart';
+
 
 import '../../support/fake_assessment_sync_service.dart';
 
@@ -67,7 +69,9 @@ void main() {
   UpdateViewModel criar() => UpdateViewModel(
         service: service,
         isOnline: () => true,
-        isQueueIdle: () => !sync.isSending && sync.queue.isEmpty,
+        isQueueIdle: () =>
+            !sync.isSending &&
+            !sync.queue.any((a) => a.syncStatus == LocalSyncStatus.pendingSync),
         queueChanges: sync,
         connectivityChanges: conexao,
         isOnWifi: () async => wifi,
@@ -114,6 +118,8 @@ void main() {
 
   setUp(() {
     service = _MockService();
+    when(() => service.deleteStaleApks(keep: any(named: 'keep')))
+        .thenAnswer((_) async {});
     sync = FakeAssessmentSyncService();
     conexao = ChangeNotifier();
     wifi = true;
@@ -235,6 +241,54 @@ void main() {
             cancelToken: any(named: 'cancelToken'),
           )).called(1);
       verify(() => service.install(any())).called(1);
+    });
+
+    testWidgets('achou no Wi-Fi, mas no toque está fora: pergunta',
+        (tester) async {
+      wifi = true;
+      publicada();
+      await vm.checkNow();
+      await abrirAviso(tester);
+
+      wifi = false;
+      await tester.tap(find.text('Atualizar'));
+      await assentar(tester);
+
+      expect(find.text('Baixar sem Wi-Fi?'), findsOneWidget);
+    });
+
+    testWidgets('achou fora do Wi-Fi, mas no toque está no Wi-Fi: baixa direto',
+        (tester) async {
+      wifi = false;
+      publicada();
+      baixaSemFalha();
+      await vm.checkNow();
+      await abrirAviso(tester);
+
+      wifi = true;
+      await tester.tap(find.text('Atualizar'));
+      await assentar(tester);
+
+      expect(find.text('Baixar sem Wi-Fi?'), findsNothing);
+      verify(() => service.downloadApk(
+            any(),
+            onProgress: any(named: 'onProgress'),
+            cancelToken: any(named: 'cancelToken'),
+          )).called(1);
+    });
+
+    testWidgets('toque duplo em Atualizar abre uma confirmação só',
+        (tester) async {
+      wifi = false;
+      publicada();
+      await vm.checkNow();
+      await abrirAviso(tester);
+
+      await tester.tap(find.text('Atualizar'));
+      await tester.tap(find.text('Atualizar'), warnIfMissed: false);
+      await assentar(tester);
+
+      expect(find.text('Baixar sem Wi-Fi?'), findsOneWidget);
     });
 
     testWidgets('no Wi-Fi, Atualizar baixa direto, sem confirmação',
@@ -434,6 +488,65 @@ void main() {
 
       expect(find.text('Nova versão disponível'), findsNothing);
       verifyNever(() => service.fetchLatest());
+    });
+
+    testWidgets(
+        'com outra tela por cima, a fila esvazia: sem aviso; ao voltar, abre uma vez',
+        (tester) async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1')]);
+      await montarHome(tester);
+      await assentar(tester);
+
+      final navigator = Navigator.of(tester.element(find.byType(SessionsScreen)));
+      navigator.push(MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('checklist')),
+      ));
+      await assentar(tester);
+
+      sync.setQueue([]);
+      await assentar(tester);
+
+      expect(find.text('checklist'), findsOneWidget);
+      expect(find.text('Nova versão disponível'), findsNothing);
+      expect(vm.promptPending, isTrue);
+
+      navigator.pop();
+      await assentar(tester);
+
+      expect(find.text('Nova versão disponível'), findsOneWidget);
+      expect(vm.promptPending, isFalse);
+
+      await tester.tap(find.text('Depois'));
+      await assentar(tester);
+      expect(find.text('Nova versão disponível'), findsNothing);
+    });
+
+    testWidgets(
+        'a checagem imediata termina com outra tela por cima: fica pendente e abre ao voltar',
+        (tester) async {
+      final resposta = Completer<Result<AppRelease>>();
+      when(() => service.installedVersionCode()).thenAnswer((_) async => 1);
+      when(() => service.fetchLatest()).thenAnswer((_) => resposta.future);
+      await montarHome(tester);
+      await tester.pump();
+
+      final navigator = Navigator.of(tester.element(find.byType(SessionsScreen)));
+      navigator.push(MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('checklist')),
+      ));
+      await assentar(tester);
+
+      resposta.complete(Success(_release()));
+      await assentar(tester);
+
+      expect(find.text('Nova versão disponível'), findsNothing);
+      expect(vm.promptPending, isTrue);
+
+      navigator.pop();
+      await assentar(tester);
+
+      expect(find.text('Nova versão disponível'), findsOneWidget);
     });
 
     testWidgets(

@@ -7,8 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/models/app_release.dart';
 import 'package:simtc/data/services/app_update_service.dart';
+import 'package:simtc/data/services/local/tables.dart';
 import 'package:simtc/ui/update/update_viewmodel.dart';
 import 'package:simtc/utils/result.dart';
+
 
 import '../../support/fake_assessment_sync_service.dart';
 
@@ -43,7 +45,9 @@ void main() {
   UpdateViewModel criar({bool enabled = true}) => UpdateViewModel(
         service: service,
         isOnline: () => online,
-        isQueueIdle: () => !sync.isSending && sync.queue.isEmpty,
+        isQueueIdle: () =>
+            !sync.isSending &&
+            !sync.queue.any((a) => a.syncStatus == LocalSyncStatus.pendingSync),
         queueChanges: sync,
         connectivityChanges: conexao,
         isOnWifi: () async => wifi,
@@ -66,6 +70,8 @@ void main() {
 
   setUp(() {
     service = _MockService();
+    when(() => service.deleteStaleApks(keep: any(named: 'keep')))
+        .thenAnswer((_) async {});
     sync = FakeAssessmentSyncService();
     online = true;
     wifi = true;
@@ -231,32 +237,35 @@ void main() {
       expect(vm.promptPending, isTrue);
     });
 
-    test('confirmNotOnWifi true fora do wi-fi e false no wi-fi', () async {
-      publicada();
-      wifi = false;
-      await vm.checkOnOpen();
-      expect(vm.confirmNotOnWifi, isTrue);
-
-      vm.dispose();
-      vmDescartado = true;
-      vm = criar();
+    test('needsWifiConfirmation usa a rede do momento da pergunta', () async {
       publicada();
       wifi = true;
       await vm.checkOnOpen();
-      expect(vm.confirmNotOnWifi, isFalse);
+
+      expect(await vm.needsWifiConfirmation(), isFalse);
+      wifi = false;
+      expect(await vm.needsWifiConfirmation(), isTrue);
+      wifi = true;
+      expect(await vm.needsWifiConfirmation(), isFalse);
     });
 
-    test('confirmNotOnWifi vale também para a checagem diferida', () async {
+    test('deferPrompt liga promptPending só com versão nova', () async {
       publicada();
-      wifi = false;
-      sync.setQueue([queuedAssessment('p1')]);
+      vm.deferPrompt();
+      expect(vm.promptPending, isFalse);
+
       await vm.checkOnOpen();
-
-      sync.setQueue([]);
-      await pumpEventQueue();
-
+      vm.deferPrompt();
       expect(vm.promptPending, isTrue);
-      expect(vm.confirmNotOnWifi, isTrue);
+    });
+
+    test('item em erro não bloqueia a checagem da abertura', () async {
+      publicada();
+      sync.setQueue([queuedAssessment('p1', status: LocalSyncStatus.error)]);
+
+      final achou = await vm.checkOnOpen();
+
+      expect(achou, isTrue);
     });
 
     test('dispose com checagem pendente não lança nem chama o service', () async {
@@ -350,6 +359,7 @@ void main() {
       expect(vm.status, UpdateStatus.failed);
       expect(vm.errorMessage,
           'O arquivo baixado está incompleto ou corrompido. Tente de novo.');
+      verifyNever(() => service.install(any()));
     });
 
     test('duas chamadas seguidas → downloadApk chamado uma vez', () async {
@@ -396,18 +406,76 @@ void main() {
       expect(vm.hasUpdate, isTrue);
     });
 
-    test('fila ocupada → não começa (no-op)', () async {
+    test('fila com pendingSync → não baixa e avisa com failed', () async {
       await carregarVersaoNova();
       sync.setQueue([queuedAssessment('p1')]);
 
       await vm.startUpdate();
 
-      expect(vm.status, UpdateStatus.available);
+      expect(vm.status, UpdateStatus.failed);
+      expect(vm.errorMessage, _mensagemFilaOcupada);
+      expect(vm.hasUpdate, isTrue);
       verifyNever(() => service.downloadApk(
             any(),
             onProgress: any(named: 'onProgress'),
             cancelToken: any(named: 'cancelToken'),
           ));
+    });
+  });
+
+  group('startUpdate: regras da fila e do cancelamento', () {
+    test('fila só com item em erro → baixa normalmente', () async {
+      await carregarVersaoNova();
+      sync.setQueue([queuedAssessment('p1', status: LocalSyncStatus.error)]);
+      when(() => service.downloadApk(
+            any(),
+            onProgress: any(named: 'onProgress'),
+            cancelToken: any(named: 'cancelToken'),
+          )).thenAnswer((_) async => File('simtc-1.1.0-2.apk'));
+      when(() => service.install(any())).thenAnswer((_) async {});
+
+      await vm.startUpdate();
+
+      expect(vm.status, UpdateStatus.installing);
+    });
+
+    test('Cancelar após o download terminar (SHA) → available, sem instalador',
+        () async {
+      await carregarVersaoNova();
+      final pendente = Completer<File>();
+      when(() => service.downloadApk(
+            any(),
+            onProgress: any(named: 'onProgress'),
+            cancelToken: any(named: 'cancelToken'),
+          )).thenAnswer((_) => pendente.future);
+      when(() => service.install(any())).thenAnswer((_) async {});
+
+      final atualizando = vm.startUpdate();
+      vm.cancelDownload();
+      pendente.complete(File('simtc-1.1.0-2.apk'));
+      await atualizando;
+
+      expect(vm.status, UpdateStatus.available);
+      verifyNever(() => service.install(any()));
+    });
+  });
+
+  group('limpeza de APKs antigos', () {
+    test('checagem com versão nova mantém o APK dela', () async {
+      publicada();
+
+      await vm.checkNow();
+
+      verify(() => service.deleteStaleApks(
+          keep: any(named: 'keep', that: isNotNull))).called(1);
+    });
+
+    test('app em dia apaga todos (keep nulo)', () async {
+      publicada(instalada: 2, code: 2);
+
+      await vm.checkNow();
+
+      verify(() => service.deleteStaleApks(keep: null)).called(1);
     });
   });
 

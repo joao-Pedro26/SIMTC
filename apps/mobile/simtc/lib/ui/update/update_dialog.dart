@@ -16,14 +16,28 @@ Future<void> maybePromptUpdate(BuildContext context) async {
 
   final found = await viewModel.checkOnOpen();
   if (!found || !context.mounted) return;
+  if (!isRouteOnTop(context)) {
+    // A checagem pode levar segundos; o usuário já pode ter aberto uma
+    // avaliação. Não abre por cima: fica pendente até a Home voltar ao topo.
+    viewModel.deferPrompt();
+    return;
+  }
   await showUpdateDialog(context, viewModel);
 }
 
+/// A rota de [context] é a do topo da pilha? Falso quando há outra tela (ou
+/// janela) empilhada por cima, como o detalhe ou o checklist. Sem rota (testes
+/// que montam a tela direto), conta como topo.
+bool isRouteOnTop(BuildContext context) =>
+    ModalRoute.of(context)?.isCurrent ?? true;
+
 /// O aviso diferido: a Home o abre quando a checagem adiada (fila ociosa)
-/// achou versão nova. Sem nada pendente, não faz nada.
+/// achou versão nova. Sem nada pendente, ou com outra tela por cima da Home
+/// (fica pendente até ela voltar ao topo), não faz nada.
 Future<void> showPendingUpdatePrompt(BuildContext context) async {
   final viewModel = context.read<UpdateViewModel?>();
   if (viewModel == null || !viewModel.promptPending) return;
+  if (!isRouteOnTop(context)) return;
 
   viewModel.markPromptShown();
   await showUpdateDialog(context, viewModel);
@@ -66,10 +80,21 @@ Future<void> showUpdateDialog(BuildContext context, UpdateViewModel viewModel) {
   );
 }
 
-class _UpdateDialog extends StatelessWidget {
+class _UpdateDialog extends StatefulWidget {
   const _UpdateDialog({required this.viewModel});
 
   final UpdateViewModel viewModel;
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  UpdateViewModel get viewModel => widget.viewModel;
+
+  /// Trava de reentrada do "Atualizar": o toque duplo não abre duas
+  /// confirmações nem duas chamadas.
+  bool _atualizando = false;
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +120,20 @@ class _UpdateDialog extends StatelessWidget {
   /// "Atualizar" e "Tentar de novo": fora do Wi-Fi, pede confirmação antes de
   /// gastar dados móveis. Só baixa se o usuário confirmar.
   Future<void> _atualizar(BuildContext context) async {
-    if (viewModel.confirmNotOnWifi) {
+    if (_atualizando) return;
+    _atualizando = true;
+    try {
+      await _confirmarEBaixar(context);
+    } finally {
+      _atualizando = false;
+    }
+  }
+
+  Future<void> _confirmarEBaixar(BuildContext context) async {
+    // A rede é perguntada agora, no toque: pode ter mudado desde a checagem.
+    final foraDoWifi = await viewModel.needsWifiConfirmation();
+    if (!context.mounted) return;
+    if (foraDoWifi) {
       final size = viewModel.release?.sizeBytes;
       final confirmado = await showConfirmDialog(
         context,
@@ -106,7 +144,7 @@ class _UpdateDialog extends StatelessWidget {
         confirmLabel: 'Baixar',
         destructive: false,
       );
-      if (!confirmado) return;
+      if (!confirmado || !context.mounted) return;
     }
     await viewModel.startUpdate();
   }

@@ -57,8 +57,10 @@ class UpdateViewModel extends ChangeNotifier {
   final AppUpdateService _service;
   final bool Function() _isOnline;
 
-  /// Fila ociosa: nada sendo enviado e nada na fila. Só nesse estado a
-  /// atualização automática e a instalação podem começar.
+  /// Fila ociosa: nada sendo enviado e nenhuma avaliação aguardando envio
+  /// (`pendingSync`). Itens recusados pelo servidor (`error`) não contam: não
+  /// seguem sozinhos e não podem travar a atualização, nem a obrigatória. Só
+  /// com a fila ociosa a atualização (automática ou manual) pode começar.
   final bool Function() _isQueueIdle;
 
   /// Avisa quando a fila muda; usado para rodar a checagem adiada.
@@ -80,7 +82,6 @@ class UpdateViewModel extends ChangeNotifier {
   double _progress = 0;
   String? _errorMessage;
   bool _promptPending = false;
-  bool _confirmNotOnWifi = false;
 
   bool _checkedThisSession = false;
   bool _busy = false;
@@ -107,8 +108,19 @@ class UpdateViewModel extends ChangeNotifier {
   /// ociosa e achou versão nova. A Home deve abri-lo e chamar [markPromptShown].
   bool get promptPending => _promptPending;
 
-  /// A versão foi achada fora do Wi-Fi: o aviso deve falar de dados móveis.
-  bool get confirmNotOnWifi => _confirmNotOnWifi;
+  /// A rede de AGORA não é Wi-Fi nem cabo: antes de baixar, o aviso pergunta
+  /// se pode gastar dados móveis. Consultada no toque em "Atualizar", e não na
+  /// checagem, porque a rede muda entre uma coisa e outra.
+  Future<bool> needsWifiConfirmation() async => !await _safeIsOnWifi();
+
+  /// A checagem achou versão nova, mas a Home não está no topo (o usuário está
+  /// num checklist, por exemplo): em vez de abrir o aviso por cima, deixa-o
+  /// pendente. A Home o abre quando voltar ao topo (ver [promptPending]).
+  void deferPrompt() {
+    if (_promptPending || _release == null) return;
+    _promptPending = true;
+    notifyListeners();
+  }
 
   /// O aviso diferido foi mostrado; desliga [promptPending].
   void markPromptShown() {
@@ -235,11 +247,13 @@ class UpdateViewModel extends ChangeNotifier {
       switch (result) {
         case Success(data: final release):
           _cancelDeferredOpenCheck();
+          await _service.deleteStaleApks(
+            keep: release.isNewerThan(installed) ? release : null,
+          );
           if (release.isNewerThan(installed)) {
             _release = release;
             _mandatory = release.isMandatoryFor(installed);
             _status = UpdateStatus.available;
-            _confirmNotOnWifi = !await _safeIsOnWifi();
           } else {
             _clearRelease();
             _status = UpdateStatus.upToDate;
@@ -277,14 +291,19 @@ class UpdateViewModel extends ChangeNotifier {
   void _clearRelease() {
     _release = null;
     _mandatory = false;
-    _confirmNotOnWifi = false;
   }
 
   /// "Atualizar": baixa, confere o hash e abre o instalador do Android.
   Future<void> startUpdate() async {
     final release = _release;
     if (release == null || _busy) return;
-    if (!_isQueueIdle()) return;
+    if (!_isQueueIdle()) {
+      // Sem isto o botão do aviso pareceria morto. A versão em oferta fica.
+      _status = UpdateStatus.failed;
+      _errorMessage = _mensagemFilaOcupada;
+      notifyListeners();
+      return;
+    }
 
     _cancelDeferredOpenCheck();
     _busy = true;
@@ -304,11 +323,17 @@ class UpdateViewModel extends ChangeNotifier {
           notifyListeners();
         },
       );
+      if (_cancelled) {
+        // "Cancelar" tocado durante o cálculo do SHA-256 ou no reaproveitamento
+        // do arquivo: o download já tinha terminado, mas o pedido vale.
+        _status = UpdateStatus.available;
+        return;
+      }
       _status = UpdateStatus.installing;
       notifyListeners();
       await _service.install(file);
       // O instalador do Android está na tela. Se o usuário confirmar, o app é
-      // substituído e reabre sozinho; se cancelar, continua aqui.
+      // substituído (o instalador oferece "Abrir"); se cancelar, continua aqui.
     } on AppUpdateException catch (e) {
       if (_cancelled) {
         _status = UpdateStatus.available;

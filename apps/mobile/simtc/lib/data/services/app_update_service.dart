@@ -181,6 +181,24 @@ class AppUpdateService {
     if (!opened) throw const AppUpdateException(AppUpdateFailure.install);
   }
 
+  /// Apaga da pasta de download os `simtc-*.apk` que não são mais úteis: todos,
+  /// exceto o da versão em oferta ([keep], se houver). Falhas são silenciosas.
+  Future<void> deleteStaleApks({AppRelease? keep}) async {
+    try {
+      final directory = await _loadDownloadDirectory();
+      if (!await directory.exists()) return;
+      await for (final entity in directory.list()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (!name.startsWith('simtc-') || !name.endsWith('.apk')) continue;
+        if (keep != null && name == keep.fileName) continue;
+        await _deleteQuietly(entity);
+      }
+    } on Exception catch (e) {
+      appLog('Atualização: não consegui limpar APKs antigos ($e)');
+    }
+  }
+
   Future<bool> _matchesHash(File file, String expected) async {
     final digest = await sha256.bind(file.openRead()).first;
     return digest.toString() == expected.toLowerCase();

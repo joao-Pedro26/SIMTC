@@ -280,6 +280,45 @@ void main() {
     });
   });
 
+  group('deleteStaleApks', () {
+    File criar(String nome) {
+      final f = File('${temp.path}${Platform.pathSeparator}$nome')
+        ..writeAsStringSync('x');
+      return f;
+    }
+
+    test('apaga os simtc-*.apk, menos o da versão em oferta', () async {
+      final oferta = releaseComHash(hashApk);
+      final atual = criar(oferta.fileName);
+      final antigo = criar('simtc-0.9.0-1.apk');
+      final outro = criar('foto.png');
+      final apkDeOutro = criar('outro-1.0.apk');
+
+      await service.deleteStaleApks(keep: oferta);
+
+      expect(atual.existsSync(), isTrue);
+      expect(antigo.existsSync(), isFalse);
+      expect(outro.existsSync(), isTrue);
+      expect(apkDeOutro.existsSync(), isTrue);
+    });
+
+    test('sem versão em oferta (em dia), apaga todos os simtc-*.apk', () async {
+      final a = criar('simtc-1.0.0-1.apk');
+      final b = criar('simtc-1.1.0-2.apk');
+
+      await service.deleteStaleApks();
+
+      expect(a.existsSync(), isFalse);
+      expect(b.existsSync(), isFalse);
+    });
+
+    test('pasta inexistente não lança', () async {
+      await temp.delete(recursive: true);
+
+      await expectLater(service.deleteStaleApks(), completes);
+    });
+  });
+
   group('install', () {
     test('quando o instalador abre, completa sem erro', () async {
       final apk = arquivoDoRelease(releaseComHash(hashApk));

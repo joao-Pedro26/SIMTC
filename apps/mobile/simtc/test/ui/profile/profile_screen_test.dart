@@ -352,6 +352,8 @@ void main() {
 
     setUp(() {
       service = _MockAppUpdateService();
+      when(() => service.deleteStaleApks(keep: any(named: 'keep')))
+          .thenAnswer((_) async {});
       vm = UpdateViewModel(
         service: service,
         isOnline: () => true,

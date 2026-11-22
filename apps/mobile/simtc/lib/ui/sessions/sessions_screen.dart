@@ -136,6 +136,22 @@ class _SessionsScreenState extends State<SessionsScreen> {
     });
   }
 
+  /// `ModalRoute.of` faz a Home depender do estado da rota; quando outra tela
+  /// é empilhada ou desempilhada por cima (`isCurrent` muda), o Flutter chama
+  /// isto de novo. É o gatilho de "voltar ao topo" do aviso pendente: mais
+  /// simples que `RouteObserver`, que exigiria registrar o observador no
+  /// roteador e no tablet (split view) também.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (ModalRoute.of(context)?.isCurrent ?? false) {
+      // Depois do frame: abrir diálogo no meio da construção não é permitido.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onUpdateChanged();
+      });
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.removeListener(_updateActiveChipFromScroll);
@@ -148,8 +164,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   /// A checagem adiada da abertura (fila que esvaziou depois) achou versão
-  /// nova: abre o aviso uma vez. `showPendingUpdatePrompt` desliga o pendente
-  /// antes de abrir, então a notificação seguinte não reabre.
+  /// nova: abre o aviso uma vez, e só com a Home no topo (se houver outra tela
+  /// por cima, segue pendente e [didChangeDependencies] tenta ao voltar).
+  /// `showPendingUpdatePrompt` desliga o pendente antes de abrir, então a
+  /// notificação seguinte não reabre.
   void _onUpdateChanged() {
     if (!mounted) return;
     if (_updateViewModel?.promptPending ?? false) {
