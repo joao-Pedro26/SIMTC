@@ -2,6 +2,10 @@
     <!-- Necessária no manifest principal: o APK release (sideload) não herda a
          permissão declarada nos manifests de debug/profile. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Atualização dentro do app: sem ela o Android não deixa o SIMTC abrir o
+         instalador de um APK baixado. Na primeira vez, o próprio Android leva o
+         usuário à tela "Instalar apps desconhecidos" para liberar. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="SIMTC"
         android:name="${applicationName}"

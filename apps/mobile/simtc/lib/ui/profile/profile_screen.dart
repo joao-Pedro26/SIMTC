@@ -21,6 +21,8 @@ import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_nav_bar.dart';
 import '../core/widgets/app_spinner.dart';
 import '../core/widgets/confirm_dialog.dart';
+import '../update/update_dialog.dart';
+import '../update/update_viewmodel.dart';
 import 'profile_labels.dart';
 import 'profile_viewmodel.dart';
 
@@ -263,6 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = _viewModel.user;
     final bytes = _viewModel.cacheBytes;
     final busy = _viewModel.isClearing || _viewModel.isLoggingOut;
+    final update = context.watch<UpdateViewModel?>();
 
     // Um `Container`, e não um `DecoratedBox`: a divisória de cima ocupa o
     // seu 1,5 em vez de ser pintada por cima da primeira linha.
@@ -305,9 +308,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             value: _viewModel.version ?? '—',
             valueColor: AppColors.text3,
           ),
+          // Só aparece quando o app tem a ViewModel de atualização (nos testes
+          // das telas ela não está no provider).
+          if (update != null)
+            _ProfileRow(
+              key: const Key('profile-row-update'),
+              tablet: tablet,
+              icon: AppIcons.appUpdate,
+              label: 'Atualização do app',
+              note: isOffline ? 'Disponível quando houver conexão' : null,
+              value: _updateValue(update),
+              valueColor: update.hasUpdate ? AppColors.primary : null,
+              isLoading: update.status == UpdateStatus.checking,
+              onTap: isOffline || busy || update.status == UpdateStatus.checking
+                  ? null
+                  : () => checkUpdateManually(context),
+            ),
         ],
       ),
     );
+  }
+
+  /// O que a linha "Atualização do app" mostra à direita.
+  String _updateValue(UpdateViewModel update) {
+    final release = update.release;
+    if (release != null) return 'Nova versão ${release.versionName}';
+    if (update.status == UpdateStatus.upToDate) return 'Atualizado';
+    return 'Verificar';
   }
 
   /// No tablet, [compact]: o botão de 48 ao lado do nome, da largura do

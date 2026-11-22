@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
@@ -11,6 +12,7 @@ import 'data/repositories/participant_repository.dart';
 import 'data/repositories/session_consultant_repository.dart';
 import 'data/repositories/session_repository.dart';
 import 'data/services/api/api_client.dart';
+import 'data/services/app_update_service.dart';
 import 'data/services/assessment_sync_service.dart';
 import 'data/services/auth_session.dart';
 import 'data/services/connectivity_service.dart';
@@ -18,6 +20,7 @@ import 'data/services/device_data_service.dart';
 import 'data/services/ibge_city_service.dart';
 import 'data/services/local/app_database.dart';
 import 'data/services/local/token_storage.dart';
+import 'ui/update/update_viewmodel.dart';
 
 /// Dependências vivas do app, criadas uma única vez na abertura.
 ///
@@ -40,6 +43,7 @@ class AppDependencies {
     required this.assessmentSyncService,
     required this.deviceDataService,
     required this.ibgeCityService,
+    required this.updateViewModel,
   });
 
   factory AppDependencies.create({required AppDatabase database}) {
@@ -97,6 +101,16 @@ class AppDependencies {
       connectivityService.initialize().whenComplete(assessmentSyncService.start),
     );
 
+    // Atualização do app dentro do próprio app. A checagem automática fica
+    // desligada em debug (o `flutter run` e os testes não baixam nada); a
+    // manual, no Perfil, funciona sempre.
+    final updateViewModel = UpdateViewModel(
+      service: AppUpdateService(manifestUrl: AppConfig.updateManifestUrl),
+      isOnline: () => connectivityService.isOnline,
+      isSending: () => assessmentSyncService.isSending,
+      enabled: !kDebugMode || AppConfig.checkUpdatesInDebug,
+    );
+
     return AppDependencies._(
       database: database,
       tokenStorage: tokenStorage,
@@ -115,6 +129,7 @@ class AppDependencies {
         storage: tokenStorage,
       ),
       ibgeCityService: IbgeCityService(),
+      updateViewModel: updateViewModel,
     );
   }
 
@@ -132,6 +147,7 @@ class AppDependencies {
   final AssessmentSyncService assessmentSyncService;
   final DeviceDataService deviceDataService;
   final IbgeCityService ibgeCityService;
+  final UpdateViewModel updateViewModel;
 
   /// Providers na ordem de dependência, para o `MultiProvider` do app.
   ///
@@ -158,9 +174,11 @@ class AppDependencies {
         ),
         Provider<DeviceDataService>.value(value: deviceDataService),
         Provider<IbgeCityService>.value(value: ibgeCityService),
+        ChangeNotifierProvider<UpdateViewModel>.value(value: updateViewModel),
       ];
 
   void dispose() {
+    updateViewModel.dispose();
     assessmentSyncService.dispose();
     connectivityService.dispose();
     authRepository.dispose();

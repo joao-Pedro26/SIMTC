@@ -92,6 +92,9 @@ abstract final class AppIcons {
   /// cache local".
   static const IconData accessRole = Icons.badge_outlined;
   static const IconData clearCache = Icons.delete_sweep_outlined;
+
+  /// "Atualização do app" no Perfil: verificar e instalar uma versão nova.
+  static const IconData appUpdate = Icons.system_update_alt_outlined;
   static const IconData addConsultant = Icons.person_add_alt_outlined;
   static const IconData removeConsultant = Icons.person_remove_outlined;
 }

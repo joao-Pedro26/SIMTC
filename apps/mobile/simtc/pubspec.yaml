@@ -49,6 +49,12 @@ dependencies:
   # Versão do app na tela de Perfil (Fase 8A)
   package_info_plus: ^9.0.1
 
+  # Atualização dentro do app: o `crypto` confere o SHA-256 do APK baixado e o
+  # `open_filex` abre o instalador do Android (ver
+  # brainstorm-atualizacao-app-mobile.md na raiz do repositório)
+  crypto: ^3.0.3
+  open_filex: ^4.5.0
+
   # Visualizar relatórios PDF
   pdfx: ^2.7.0
 

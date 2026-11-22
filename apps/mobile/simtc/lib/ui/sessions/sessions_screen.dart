@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +29,7 @@ import '../core/widgets/session_card.dart';
 import '../core/widgets/skeleton.dart';
 import '../core/widgets/status_chip.dart';
 import '../core/widgets/sync_status_indicator.dart';
+import '../update/update_dialog.dart';
 import 'session_filter.dart';
 import 'session_status_style.dart';
 import 'sessions_list_viewmodel.dart';
@@ -113,6 +116,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _viewModel.addListener(_showErrorWhenItArrives);
     _viewModel.addListener(_resyncChipAfterSearch);
     _scrollController.addListener(_updateActiveChipFromScroll);
+    // Versão nova do app? Só depois do primeiro frame, para o aviso abrir por
+    // cima da Home já desenhada. Uma vez por abertura do app (a própria
+    // ViewModel garante); sem a ViewModel no provider, não faz nada.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(maybePromptUpdate(context));
+    });
   }
 
   @override
