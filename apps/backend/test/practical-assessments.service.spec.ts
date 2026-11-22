@@ -787,6 +787,24 @@ describe('PracticalAssessmentsService.findOne (Fase 8D-1)', () => {
   });
 });
 
+describe('PracticalAssessmentsService.findByParticipant', () => {
+  it('inclui o nome de quem avaliou, sem tirar os itens', async () => {
+    const findUnique = jest.fn().mockResolvedValue(null);
+    const service = new PracticalAssessmentsService(
+      { practicalAssessment: { findUnique } } as unknown as PrismaService,
+    );
+
+    await service.findByParticipant('tp-1');
+
+    const args = findUnique.mock.calls[0][0];
+    expect(args.where).toEqual({ trainingParticipantId: 'tp-1' });
+    expect(args.include.consultant).toEqual({ select: { id: true, name: true } });
+    expect(args.include.items).toEqual({
+      include: { infractionNote: { include: { infraction: { include: { category: true } } } } },
+    });
+  });
+});
+
 describe('PracticalAssessmentsController: quem lê uma avaliação (Fase 8D-1)', () => {
   // As duas leituras devolvem notas e infrações: só ADMIN e CONSULTANT. O
   // `JwtAuthGuard` está na classe; o `RolesGuard`, que lê o papel, nos métodos.

@@ -286,6 +286,8 @@ export class PracticalAssessmentsService {
     return this.prisma.practicalAssessment.findUnique({
       where: { trainingParticipantId },
       include: {
+        // Quem avaliou: a visualização da avaliação no web mostra o nome.
+        consultant: { select: { id: true, name: true } },
         items: {
           include: {
             infractionNote: {
