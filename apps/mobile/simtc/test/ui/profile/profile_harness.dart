@@ -17,6 +17,7 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/profile/profile_screen.dart';
+import 'package:simtc/ui/update/update_viewmodel.dart';
 
 import '../../support/fake_assessment_sync_service.dart';
 
@@ -103,6 +104,7 @@ class ProfileHarness {
     DateTime? lastSyncedAt,
     Size size = const Size(412, 915),
     FormFactor formFactor = FormFactor.phone,
+    UpdateViewModel? update,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
@@ -135,6 +137,8 @@ class ProfileHarness {
           Provider<DeviceDataService>.value(value: deviceData),
           ChangeNotifierProvider<AssessmentSyncService>.value(value: sync),
           ChangeNotifierProvider<ConnectivityService>.value(value: connectivity),
+          if (update != null)
+            ChangeNotifierProvider<UpdateViewModel>.value(value: update),
         ],
         child: FormFactorScope(
           formFactor: formFactor,

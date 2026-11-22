@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/widgets/confirm_dialog.dart';
 import '../profile/profile_labels.dart';
 import 'update_viewmodel.dart';
 
@@ -15,6 +16,16 @@ Future<void> maybePromptUpdate(BuildContext context) async {
 
   final found = await viewModel.checkOnOpen();
   if (!found || !context.mounted) return;
+  await showUpdateDialog(context, viewModel);
+}
+
+/// O aviso diferido: a Home o abre quando a checagem adiada (fila ociosa)
+/// achou versão nova. Sem nada pendente, não faz nada.
+Future<void> showPendingUpdatePrompt(BuildContext context) async {
+  final viewModel = context.read<UpdateViewModel?>();
+  if (viewModel == null || !viewModel.promptPending) return;
+
+  viewModel.markPromptShown();
   await showUpdateDialog(context, viewModel);
 }
 
@@ -79,6 +90,25 @@ class _UpdateDialog extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// "Atualizar" e "Tentar de novo": fora do Wi-Fi, pede confirmação antes de
+  /// gastar dados móveis. Só baixa se o usuário confirmar.
+  Future<void> _atualizar(BuildContext context) async {
+    if (viewModel.confirmNotOnWifi) {
+      final size = viewModel.release?.sizeBytes;
+      final confirmado = await showConfirmDialog(
+        context,
+        title: 'Baixar sem Wi-Fi?',
+        message: 'Você não está no Wi-Fi.'
+            '${size == null ? '' : ' A atualização tem ${sizeLabel(size)}.'}'
+            ' Baixar mesmo assim?',
+        confirmLabel: 'Baixar',
+        destructive: false,
+      );
+      if (!confirmado) return;
+    }
+    await viewModel.startUpdate();
   }
 
   Widget _content() {
@@ -146,7 +176,7 @@ class _UpdateDialog extends StatelessWidget {
       UpdateStatus.available => [
           if (canClose) TextButton(onPressed: close, child: const Text('Depois')),
           FilledButton(
-            onPressed: viewModel.startUpdate,
+            onPressed: () => _atualizar(context),
             child: const Text('Atualizar'),
           ),
         ],
@@ -168,7 +198,7 @@ class _UpdateDialog extends StatelessWidget {
             TextButton(onPressed: close, child: const Text('Fechar')),
           if (viewModel.hasUpdate)
             FilledButton(
-              onPressed: viewModel.startUpdate,
+              onPressed: () => _atualizar(context),
               child: const Text('Tentar de novo'),
             ),
         ],

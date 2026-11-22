@@ -8,11 +8,17 @@ import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
 import 'package:simtc/ui/core/widgets/pill_nav_bar.dart';
 import 'package:simtc/ui/profile/profile_labels.dart';
+import 'package:simtc/data/models/app_release.dart';
+import 'package:simtc/data/services/app_update_service.dart';
 import 'package:simtc/ui/profile/profile_screen.dart';
+import 'package:simtc/ui/update/update_viewmodel.dart';
+import 'package:simtc/utils/result.dart';
 
 import '../../support/a11y.dart';
 import '../../support/fake_assessment_sync_service.dart';
 import 'profile_harness.dart';
+
+class _MockAppUpdateService extends Mock implements AppUpdateService {}
 
 void main() {
   late ProfileHarness h;
@@ -337,6 +343,61 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Não foi possível sair. Tente de novo.'), findsOneWidget);
+    });
+  });
+
+  group('Atualização do app', () {
+    late _MockAppUpdateService service;
+    late UpdateViewModel vm;
+
+    setUp(() {
+      service = _MockAppUpdateService();
+      vm = UpdateViewModel(
+        service: service,
+        isOnline: () => true,
+        isQueueIdle: () => true,
+        queueChanges: ChangeNotifier(),
+        isOnWifi: () async => true,
+      );
+    });
+
+    tearDown(() => vm.dispose());
+
+    testWidgets('sem a ViewModel de atualização, a linha não aparece',
+        (tester) async {
+      await h.pump(tester);
+
+      expect(row('update'), findsNothing);
+    });
+
+    testWidgets('com ela, mostra Verificar; o toque checa e diz que já está em dia',
+        (tester) async {
+      when(() => service.installedVersionCode()).thenAnswer((_) async => 1);
+      when(() => service.fetchLatest()).thenAnswer((_) async => Success(
+            AppRelease(
+              versionName: '1.0.0',
+              versionCode: 1,
+              minSupportedVersionCode: 0,
+              apkUrl: 'https://x.supabase.co/storage/v1/object/public/app-releases/simtc-1.0.0-1.apk',
+              sha256: 'a' * 64,
+            ),
+          ));
+      await h.pump(tester, update: vm);
+
+      expect(
+        find.descendant(of: row('update'), matching: find.text('Verificar')),
+        findsOneWidget,
+      );
+
+      await tester.tap(row('update'));
+      await closeDialog(tester);
+
+      verify(() => service.fetchLatest()).called(1);
+      expect(
+        find.descendant(of: row('update'), matching: find.text('Atualizado')),
+        findsOneWidget,
+      );
+      expect(find.text('O app já está na versão mais recente.'), findsOneWidget);
     });
   });
 }

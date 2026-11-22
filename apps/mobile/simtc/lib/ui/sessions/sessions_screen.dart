@@ -30,6 +30,7 @@ import '../core/widgets/skeleton.dart';
 import '../core/widgets/status_chip.dart';
 import '../core/widgets/sync_status_indicator.dart';
 import '../update/update_dialog.dart';
+import '../update/update_viewmodel.dart';
 import 'session_filter.dart';
 import 'session_status_style.dart';
 import 'sessions_list_viewmodel.dart';
@@ -110,17 +111,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
   /// Ver [_resyncChipAfterSearch].
   bool _wasSearching = false;
 
+  /// A atualização do app, quando o provider tem a ViewModel (nos testes das
+  /// telas, não tem). Escutada enquanto a Home está montada: ver
+  /// [_onUpdateChanged].
+  UpdateViewModel? _updateViewModel;
+
   @override
   void initState() {
     super.initState();
     _viewModel.addListener(_showErrorWhenItArrives);
     _viewModel.addListener(_resyncChipAfterSearch);
     _scrollController.addListener(_updateActiveChipFromScroll);
+    _updateViewModel = context.read<UpdateViewModel?>();
+    _updateViewModel?.addListener(_onUpdateChanged);
     // Versão nova do app? Só depois do primeiro frame, para o aviso abrir por
     // cima da Home já desenhada. Uma vez por abertura do app (a própria
     // ViewModel garante); sem a ViewModel no provider, não faz nada.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(maybePromptUpdate(context));
+      if (!mounted) return;
+      unawaited(maybePromptUpdate(context));
+      // Um aviso diferido pode ter ficado pendente enquanto a Home não estava
+      // montada: ele abre agora.
+      _onUpdateChanged();
     });
   }
 
@@ -131,7 +143,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
     _viewModel.removeListener(_showErrorWhenItArrives);
     _viewModel.removeListener(_resyncChipAfterSearch);
     _viewModel.dispose();
+    _updateViewModel?.removeListener(_onUpdateChanged);
     super.dispose();
+  }
+
+  /// A checagem adiada da abertura (fila que esvaziou depois) achou versão
+  /// nova: abre o aviso uma vez. `showPendingUpdatePrompt` desliga o pendente
+  /// antes de abrir, então a notificação seguinte não reabre.
+  void _onUpdateChanged() {
+    if (!mounted) return;
+    if (_updateViewModel?.promptPending ?? false) {
+      unawaited(showPendingUpdatePrompt(context));
+    }
   }
 
   /// A falha de atualização é um aviso passageiro, não um estado da tela: a
