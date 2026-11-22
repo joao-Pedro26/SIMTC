@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -18,6 +21,19 @@ enum UpdateStatus {
   failed,
 }
 
+/// Padrão de [UpdateViewModel.isOnWifi]: Wi-Fi ou cabo. Erro conta como fora do
+/// Wi-Fi, que é o lado seguro (o aviso de dados aparece).
+Future<bool> _defaultIsOnWifi() async {
+  try {
+    final results = await Connectivity().checkConnectivity();
+    return results.any((result) =>
+        result == ConnectivityResult.wifi ||
+        result == ConnectivityResult.ethernet);
+  } on Exception {
+    return false;
+  }
+}
+
 /// Estado da atualização do app dentro do próprio app.
 ///
 /// Criada uma única vez no `AppDependencies`: a checagem da abertura e a do
@@ -26,17 +42,27 @@ class UpdateViewModel extends ChangeNotifier {
   UpdateViewModel({
     required AppUpdateService service,
     required bool Function() isOnline,
-    required bool Function() isSending,
+    required bool Function() isQueueIdle,
+    required Listenable queueChanges,
+    Future<bool> Function()? isOnWifi,
     this.enabled = true,
   })  : _service = service,
         _isOnline = isOnline,
-        _isSending = isSending;
+        _isQueueIdle = isQueueIdle,
+        _queueChanges = queueChanges,
+        _isOnWifi = isOnWifi ?? _defaultIsOnWifi;
 
   final AppUpdateService _service;
   final bool Function() _isOnline;
 
-  /// A fila de avaliações está sendo enviada agora; não vale interromper.
-  final bool Function() _isSending;
+  /// Fila ociosa: nada sendo enviado e nada na fila. Só nesse estado a
+  /// atualização automática e a instalação podem começar.
+  final bool Function() _isQueueIdle;
+
+  /// Avisa quando a fila muda; usado para rodar a checagem adiada.
+  final Listenable _queueChanges;
+
+  final Future<bool> Function() _isOnWifi;
 
   /// Desliga a checagem automática (builds de debug e testes). A checagem
   /// manual do Perfil funciona sempre.
@@ -47,11 +73,14 @@ class UpdateViewModel extends ChangeNotifier {
   bool _mandatory = false;
   double _progress = 0;
   String? _errorMessage;
+  bool _promptPending = false;
+  bool _confirmNotOnWifi = false;
 
   bool _checkedThisSession = false;
   bool _busy = false;
   bool _cancelled = false;
   bool _disposed = false;
+  bool _deferredOpenCheck = false;
   CancelToken? _cancelToken;
 
   UpdateStatus get status => _status;
@@ -68,17 +97,69 @@ class UpdateViewModel extends ChangeNotifier {
 
   String? get errorMessage => _errorMessage;
 
-  /// Checagem da abertura do app: uma vez por abertura, só com rede e sem
-  /// envio da fila em andamento, e sem nunca incomodar com erro.
+  /// Aviso diferido da abertura: a checagem rodou depois que a fila ficou
+  /// ociosa e achou versão nova. A Home deve abri-lo e chamar [markPromptShown].
+  bool get promptPending => _promptPending;
+
+  /// A versão foi achada fora do Wi-Fi: o aviso deve falar de dados móveis.
+  bool get confirmNotOnWifi => _confirmNotOnWifi;
+
+  /// O aviso diferido foi mostrado; desliga [promptPending].
+  void markPromptShown() {
+    if (!_promptPending) return;
+    _promptPending = false;
+    notifyListeners();
+  }
+
+  /// Checagem da abertura do app: uma vez por abertura, só com rede, e sem
+  /// nunca incomodar com erro.
+  ///
+  /// Com a fila ocupada, não consome a checagem: guarda como pendente e roda
+  /// quando a fila ficar ociosa (ver [promptPending]).
   ///
   /// Devolve `true` só se esta chamada achou uma versão nova — é quando a tela
   /// mostra o aviso. Telas que reabrem a Home não repetem o aviso.
   Future<bool> checkOnOpen() async {
-    if (!enabled || _checkedThisSession || _busy) return false;
-    if (!_isOnline() || _isSending()) return false;
+    if (!enabled || _checkedThisSession || _busy || _deferredOpenCheck) {
+      return false;
+    }
+    if (!_isOnline()) return false;
+    if (!_isQueueIdle()) {
+      _deferOpenCheck();
+      return false;
+    }
     _checkedThisSession = true;
     await _check(silent: true);
     return _status == UpdateStatus.available;
+  }
+
+  void _deferOpenCheck() {
+    _deferredOpenCheck = true;
+    _queueChanges.addListener(_onQueueChanged);
+  }
+
+  void _onQueueChanged() {
+    if (!_deferredOpenCheck || _busy || !_isQueueIdle()) return;
+    // Sem rede a checagem continua pendente até a próxima mudança da fila.
+    if (!_isOnline()) return;
+
+    _stopDeferredOpenCheck();
+    _checkedThisSession = true;
+    unawaited(_runDeferredOpenCheck());
+  }
+
+  Future<void> _runDeferredOpenCheck() async {
+    await _check(silent: true);
+    if (_disposed) return;
+    if (_status == UpdateStatus.available) {
+      _promptPending = true;
+      notifyListeners();
+    }
+  }
+
+  void _stopDeferredOpenCheck() {
+    _deferredOpenCheck = false;
+    _queueChanges.removeListener(_onQueueChanged);
   }
 
   /// "Verificar atualização" do Perfil: mostra o resultado, inclusive o erro.
@@ -90,8 +171,17 @@ class UpdateViewModel extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    if (!_isQueueIdle()) {
+      _status = UpdateStatus.failed;
+      _errorMessage = _mensagemFilaOcupada;
+      notifyListeners();
+      return;
+    }
     await _check(silent: false);
   }
+
+  static const String _mensagemFilaOcupada =
+      'Aguarde o envio das avaliações terminar e tente de novo.';
 
   Future<void> _check({required bool silent}) async {
     _busy = true;
@@ -108,6 +198,7 @@ class UpdateViewModel extends ChangeNotifier {
             _release = release;
             _mandatory = release.isMandatoryFor(installed);
             _status = UpdateStatus.available;
+            _confirmNotOnWifi = !await _safeIsOnWifi();
           } else {
             _clearRelease();
             _status = UpdateStatus.upToDate;
@@ -120,6 +211,14 @@ class UpdateViewModel extends ChangeNotifier {
     } finally {
       _busy = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> _safeIsOnWifi() async {
+    try {
+      return await _isOnWifi();
+    } on Exception {
+      return false;
     }
   }
 
@@ -137,12 +236,14 @@ class UpdateViewModel extends ChangeNotifier {
   void _clearRelease() {
     _release = null;
     _mandatory = false;
+    _confirmNotOnWifi = false;
   }
 
   /// "Atualizar": baixa, confere o hash e abre o instalador do Android.
   Future<void> startUpdate() async {
     final release = _release;
     if (release == null || _busy) return;
+    if (!_isQueueIdle()) return;
 
     _busy = true;
     _cancelled = false;
@@ -215,6 +316,7 @@ class UpdateViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    if (_deferredOpenCheck) _stopDeferredOpenCheck();
     _cancelToken?.cancel();
     super.dispose();
   }

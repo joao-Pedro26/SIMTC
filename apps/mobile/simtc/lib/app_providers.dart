@@ -107,7 +107,11 @@ class AppDependencies {
     final updateViewModel = UpdateViewModel(
       service: AppUpdateService(manifestUrl: AppConfig.updateManifestUrl),
       isOnline: () => connectivityService.isOnline,
-      isSending: () => assessmentSyncService.isSending,
+      // A checagem só roda com a fila ociosa: nada de atualizar no meio do envio.
+      isQueueIdle: () =>
+          !assessmentSyncService.isSending &&
+          assessmentSyncService.queue.isEmpty,
+      queueChanges: assessmentSyncService,
       enabled: !kDebugMode || AppConfig.checkUpdatesInDebug,
     );
 
