@@ -330,23 +330,52 @@ function DownloadMenu({ hasCertificate, hasReport, open, busy, onToggle, onClose
     })
   }, [open])
 
+  // Menu posicionado: o foco vai para o primeiro item (teclado). preventScroll
+  // porque qualquer rolagem fecha o menu.
+  useEffect(() => {
+    if (!open || !pos) return
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true })
+  }, [open, pos])
+
   useEffect(() => {
     if (!open) return
+    function focusButton() {
+      btnRef.current?.focus({ preventScroll: true })
+    }
     function handleMouseDown(e: MouseEvent) {
       const target = e.target as Node
       if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return
       onClose()
     }
+    // Em captura e com preventDefault: o Drawer em volta ignora Esc com
+    // defaultPrevented, então o Esc fecha só o menu, não o painel inteiro.
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        focusButton()
+        return
+      }
+      const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
+      const idx = items.indexOf(document.activeElement as HTMLButtonElement)
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length > 0) {
+        e.preventDefault()
+        const delta = e.key === 'ArrowDown' ? 1 : -1
+        const next = idx === -1 ? 0 : (idx + delta + items.length) % items.length
+        items[next].focus({ preventScroll: true })
+      } else if (e.key === 'Tab' && idx !== -1) {
+        e.preventDefault()
+        onClose()
+        focusButton()
+      }
     }
     document.addEventListener('mousedown', handleMouseDown)
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown, true)
     window.addEventListener('scroll', onClose, true)
     window.addEventListener('resize', onClose)
     return () => {
       document.removeEventListener('mousedown', handleMouseDown)
-      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', handleKeyDown, true)
       window.removeEventListener('scroll', onClose, true)
       window.removeEventListener('resize', onClose)
     }
