@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import type { Browser, PDFOptions } from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
@@ -9,19 +10,34 @@ import * as Handlebars from 'handlebars';
 // require(...)` funciona independente de esModuleInterop.
 import pLimit = require('p-limit');
 
+// Sem geração de PDF por este tempo, o Chromium compartilhado é fechado para
+// devolver a RAM; a próxima geração abre um novo.
+const BROWSER_IDLE_CLOSE_MS = 60_000;
+
+const BROWSER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'];
+
 @Injectable()
-export class PdfGeneratorService {
+export class PdfGeneratorService implements OnModuleDestroy {
+  // Um único Chromium para o processo inteiro. Abrir o navegador é a parte
+  // mais cara em CPU (o VPS de produção tem 1 vCPU), então ele é aberto na
+  // primeira geração e reaproveitado; cada PDF usa só uma página nova.
+  private browserPromise: Promise<Browser> | null = null;
+  private browser: Browser | null = null;
+  private activeRenders = 0;
+  private idleTimer: NodeJS.Timeout | null = null;
+
   private footerDataUrl: string | null = null;
   private simLogoDataUrl: string | null = null;
   private simLogoIconDataUrl: string | null = null;
   private certificateTemplate: HandlebarsTemplateDelegate | null = null;
   private assessmentReportTemplate: HandlebarsTemplateDelegate | null = null;
 
-  // Limita a no máximo 2 instâncias de Chromium (Puppeteer) rodando ao mesmo
-  // tempo no processo inteiro, compartilhado entre certificados e relatórios.
-  // O VPS de produção é 1 vCPU / 4GB — sem esse limite, um "gerar todos" ou um
-  // job em lote (que também chama renderCertificate/renderAssessmentReport sob
-  // demanda) poderia abrir dezenas de Chromiums em paralelo e estourar a RAM.
+  // Limita a no máximo 2 renderizações (páginas do Chromium) ao mesmo tempo no
+  // processo inteiro, compartilhado entre certificados e relatórios. O VPS de
+  // produção é 1 vCPU / 4GB — sem esse limite, um "gerar todos" ou um job em
+  // lote (que também chama renderCertificate/renderAssessmentReport sob
+  // demanda) abriria dezenas de páginas em paralelo e estouraria CPU e RAM.
+  // Se a CPU não aguentar 2, é aqui que se baixa para 1.
   private readonly limiter = pLimit(2);
 
   async renderCertificate(data: Record<string, any>): Promise<Buffer> {
@@ -29,14 +45,6 @@ export class PdfGeneratorService {
   }
 
   private async renderCertificateInternal(data: Record<string, any>): Promise<Buffer> {
-    let puppeteer: any;
-    try {
-      const mod = await import('puppeteer');
-      puppeteer = mod.default;
-    } catch (e: any) {
-      throw new Error(`Puppeteer não encontrado: ${e.message}`);
-    }
-
     if (!this.certificateTemplate) {
       this.certificateTemplate = this.compileTemplate('certificate.html');
     }
@@ -47,27 +55,7 @@ export class PdfGeneratorService {
       simLogoDataUrl: this.getAssetDataUrl('simLogoDataUrl', 'sim-logo.png'),
     });
 
-    let browser: any;
-    try {
-      browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-    } catch (e: any) {
-      throw new Error(`Falha ao iniciar Chromium (Puppeteer): ${e.message}`);
-    }
-
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-      const pdf = await page.pdf({
-        format: 'A4',
-        landscape: true,
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close().catch(() => {});
-    }
+    return this.renderPdf(html, { format: 'A4', landscape: true, printBackground: true });
   }
 
   async renderAssessmentReport(data: Record<string, any>): Promise<Buffer> {
@@ -75,14 +63,6 @@ export class PdfGeneratorService {
   }
 
   private async renderAssessmentReportInternal(data: Record<string, any>): Promise<Buffer> {
-    let puppeteer: any;
-    try {
-      const mod = await import('puppeteer');
-      puppeteer = mod.default;
-    } catch (e: any) {
-      throw new Error(`Puppeteer não encontrado: ${e.message}`);
-    }
-
     if (!this.assessmentReportTemplate) {
       this.assessmentReportTemplate = this.compileTemplate('assessment-report.html');
     }
@@ -98,27 +78,108 @@ export class PdfGeneratorService {
       simLogoIconDataUrl: this.getAssetDataUrl('simLogoIconDataUrl', 'sim-logo-icon.png'),
     });
 
-    let browser: any;
+    return this.renderPdf(html, { format: 'A4', landscape: false, printBackground: true });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.cancelIdleClose();
+    await this.closeBrowser();
+  }
+
+  private async renderPdf(html: string, options: PDFOptions): Promise<Buffer> {
+    this.activeRenders++;
+    this.cancelIdleClose();
     try {
-      browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      const browser = await this.getBrowser();
+      try {
+        return await this.renderInPage(browser, html, options);
+      } catch (err) {
+        // Se o navegador caiu no meio (falta de memória, processo morto), a
+        // falha não é do documento: tenta uma vez com um Chromium novo.
+        if (browser.connected) throw err;
+        return await this.renderInPage(await this.getBrowser(), html, options);
+      }
+    } finally {
+      this.activeRenders--;
+      if (this.activeRenders === 0) this.scheduleIdleClose();
+    }
+  }
+
+  private async renderInPage(browser: Browser, html: string, options: PDFOptions): Promise<Buffer> {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      return Buffer.from(await page.pdf(options));
+    } finally {
+      await page.close().catch(() => {});
+    }
+  }
+
+  private getBrowser(): Promise<Browser> {
+    if (!this.browserPromise) {
+      const promise = this.launchBrowser();
+      this.browserPromise = promise;
+      // Falha ao abrir não fica em cache: a próxima geração tenta de novo.
+      promise.catch(() => {
+        if (this.browserPromise === promise) this.browserPromise = null;
       });
+    }
+    return this.browserPromise;
+  }
+
+  private async launchBrowser(): Promise<Browser> {
+    let puppeteer: any;
+    try {
+      const mod = await import('puppeteer');
+      puppeteer = mod.default;
+    } catch (e: any) {
+      throw new Error(`Puppeteer não encontrado: ${e.message}`);
+    }
+
+    let browser: Browser;
+    try {
+      browser = await puppeteer.launch({ args: BROWSER_ARGS });
     } catch (e: any) {
       throw new Error(`Falha ao iniciar Chromium (Puppeteer): ${e.message}`);
     }
 
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-      const pdf = await page.pdf({
-        format: 'A4',
-        landscape: false,
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close().catch(() => {});
+    this.browser = browser;
+    // Chromium morto ou desconectado: esquece a instância para a próxima
+    // geração abrir outra. Só vale se ainda for o navegador corrente (um
+    // fechamento deliberado já zerou os campos antes).
+    browser.on('disconnected', () => {
+      if (this.browser === browser) {
+        this.browser = null;
+        this.browserPromise = null;
+      }
+    });
+    return browser;
+  }
+
+  private scheduleIdleClose(): void {
+    this.cancelIdleClose();
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      void this.closeBrowser();
+    }, BROWSER_IDLE_CLOSE_MS);
+    // Não segura o processo vivo só por causa deste timer.
+    this.idleTimer.unref();
+  }
+
+  private cancelIdleClose(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
     }
+  }
+
+  private async closeBrowser(): Promise<void> {
+    const promise = this.browserPromise;
+    this.browserPromise = null;
+    this.browser = null;
+    if (!promise) return;
+    const browser = await promise.catch(() => null);
+    await browser?.close().catch(() => {});
   }
 
   private compileTemplate(filename: string): HandlebarsTemplateDelegate {

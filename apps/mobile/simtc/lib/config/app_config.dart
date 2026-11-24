@@ -16,12 +16,15 @@ abstract final class AppConfig {
   );
 
   /// Onde o app procura a versão mais recente: o `latest.json` do bucket
-  /// público `app-releases`, no Supabase de produção. Para testar contra o
-  /// bucket do dev, passe `--dart-define=UPDATE_MANIFEST_URL=...`.
+  /// público `app-releases`, no Supabase de produção (São Paulo, desde
+  /// 24/11/2026). A 1.0.0 (2) e anteriores olham o projeto antigo
+  /// (us-west-2): ver "Ponte do projeto antigo" no CLAUDE.md deste app.
+  /// Para testar contra o bucket do dev, passe
+  /// `--dart-define=UPDATE_MANIFEST_URL=...`.
   static const String updateManifestUrl = String.fromEnvironment(
     'UPDATE_MANIFEST_URL',
     defaultValue:
-        'https://gohdttoyatgapamigaep.supabase.co/storage/v1/object/public/app-releases/latest.json',
+        'https://gedkwvonmqfhpkfsbrdk.supabase.co/storage/v1/object/public/app-releases/latest.json',
   );
 
   /// Em build de debug a checagem de atualização fica desligada (o `flutter

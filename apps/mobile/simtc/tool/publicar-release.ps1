@@ -31,7 +31,7 @@
 param(
   [string[]]$Notas = @(),
   [int]$MinSuportada = 1,
-  [string]$BaseUrl = 'https://gohdttoyatgapamigaep.supabase.co/storage/v1/object/public/app-releases',
+  [string]$BaseUrl = 'https://gedkwvonmqfhpkfsbrdk.supabase.co/storage/v1/object/public/app-releases',
   [string]$ApiUrl = 'https://api.simtc.com.br/api'
 )
 
@@ -61,7 +61,7 @@ try {
   # pode estar apontando para o backend local, e um APK de release assim nao
   # consegue falar com a producao.
   Write-Host "Gerando o APK $versionName+$versionCode (API: $ApiUrl) ..." -ForegroundColor Cyan
-  & flutter build apk --release "--dart-define=API_BASE_URL=$ApiUrl"
+  & flutter build apk --release --target-platform android-arm64 "--dart-define=API_BASE_URL=$ApiUrl"
   if ($LASTEXITCODE -ne 0) { throw 'O flutter build falhou.' }
 
   $builtApk = Join-Path $appRoot 'build\app\outputs\flutter-apk\app-release.apk'
@@ -102,10 +102,12 @@ try {
   Write-Host "  Manifesto: $jsonPath"
   Write-Host "  SHA-256: $hash"
   Write-Host ''
-  Write-Host 'Agora, no painel do Supabase de PRODUCAO (Storage > app-releases):' -ForegroundColor Yellow
+  Write-Host 'Agora, no painel do Supabase de PRODUCAO (gedkwvonmqfhpkfsbrdk, Storage > app-releases):' -ForegroundColor Yellow
   Write-Host "  1. Suba o $fileName"
   Write-Host '  2. Depois suba o latest.json (substitui o anterior)'
-  Write-Host '  3. Abra o app em um aparelho com a versao anterior e confira o aviso'
+  Write-Host '  3. PONTE: suba o MESMO latest.json tambem no projeto antigo (gohdttoyatgapamigaep,'
+  Write-Host '     app-releases). A 1.0.0 (2) e anteriores so olham la. Ver CLAUDE.md do app.'
+  Write-Host '  4. Abra o app em um aparelho com a versao anterior e confira o aviso'
 } finally {
   Pop-Location
 }
