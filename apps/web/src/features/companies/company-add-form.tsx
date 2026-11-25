@@ -146,8 +146,8 @@ export function CompanyAddForm({ onSave, onCancel }: CompanyAddFormProps) {
       <div className={styles.actions}>
         <div />
         <div className={styles.actionsRight}>
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+          <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
+          <Button variant="primary" size="md" disabled={pending} onClick={save}>
             {pending ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>

@@ -195,8 +195,8 @@ export function TrainingSessionAddForm({
       <div className={styles.actions}>
         <div />
         <div className={styles.actionsRight}>
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" disabled={!isValid || pending} onClick={save}>
+          <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
+          <Button variant="primary" size="md" disabled={!isValid || pending} onClick={save}>
             {pending ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>

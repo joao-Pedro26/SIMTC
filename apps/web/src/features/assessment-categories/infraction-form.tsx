@@ -158,14 +158,14 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
       <div className={styles.actions}>
         {readOnly ? (
           <div className={styles.actionsRight}>
-            <Button variant="secondary" size="sm" onClick={onCancel}>Fechar</Button>
+            <Button variant="secondary" size="md" onClick={onCancel}>Fechar</Button>
           </div>
         ) : (
           <>
-            <Button variant="danger" size="sm" onClick={onDelete}>Deletar</Button>
+            <Button variant="danger" size="md" onClick={onDelete}>Deletar</Button>
             <div className={styles.actionsRight}>
-              <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-              <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+              <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
+              <Button variant="primary" size="md" disabled={pending} onClick={save}>
                 {pending ? 'Salvando...' : 'Salvar'}
               </Button>
             </div>
@@ -194,8 +194,8 @@ export function InfractionAddForm({ topics, onSave, onCancel }: InfractionAddFor
       <div className={styles.actions}>
         <div />
         <div className={styles.actionsRight}>
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+          <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
+          <Button variant="primary" size="md" disabled={pending} onClick={save}>
             {pending ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>

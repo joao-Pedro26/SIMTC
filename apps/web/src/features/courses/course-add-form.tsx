@@ -147,10 +147,10 @@ export function CourseAddForm({
       <div className={styles.actions}>
         <div />
         <div className={styles.actionsRight}>
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
+          <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
           <Button
             variant="primary"
-            size="sm"
+            size="md"
             onClick={save}
             disabled={pending || topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
           >
