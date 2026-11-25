@@ -32,13 +32,14 @@ export class PdfGeneratorService implements OnModuleDestroy {
   private certificateTemplate: HandlebarsTemplateDelegate | null = null;
   private assessmentReportTemplate: HandlebarsTemplateDelegate | null = null;
 
-  // Limita a no máximo 2 renderizações (páginas do Chromium) ao mesmo tempo no
-  // processo inteiro, compartilhado entre certificados e relatórios. O VPS de
-  // produção é 1 vCPU / 4GB — sem esse limite, um "gerar todos" ou um job em
-  // lote (que também chama renderCertificate/renderAssessmentReport sob
-  // demanda) abriria dezenas de páginas em paralelo e estouraria CPU e RAM.
-  // Se a CPU não aguentar 2, é aqui que se baixa para 1.
-  private readonly limiter = pLimit(2);
+  // Limita a 1 renderização (página do Chromium) por vez no processo inteiro,
+  // compartilhado entre certificados e relatórios. O VPS de produção é 1 vCPU /
+  // 4GB — sem esse limite, um "gerar todos" ou um job em lote (que também chama
+  // renderCertificate/renderAssessmentReport sob demanda) abriria dezenas de
+  // páginas em paralelo e estouraria CPU e RAM. Era 2; baixado para 1 em
+  // 24/11/2026 para testar se uma por vez consome menos CPU e termina antes.
+  // Se ficar mais lento que com 2, é aqui que se volta.
+  private readonly limiter = pLimit(1);
 
   async renderCertificate(data: Record<string, any>): Promise<Buffer> {
     return this.limiter(() => this.renderCertificateInternal(data));

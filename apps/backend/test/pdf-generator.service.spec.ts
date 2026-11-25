@@ -100,7 +100,7 @@ describe('PdfGeneratorService', () => {
     expect(mockLaunch).toHaveBeenCalledTimes(1);
   });
 
-  it('no máximo 2 páginas renderizando ao mesmo tempo', async () => {
+  it('no máximo 1 página renderizando por vez', async () => {
     let running = 0;
     let peak = 0;
     const slowPdf = jest.fn().mockImplementation(async () => {
@@ -115,7 +115,7 @@ describe('PdfGeneratorService', () => {
     await Promise.all([1, 2, 3, 4, 5].map(() => service.renderCertificate({})));
 
     expect(slowPdf).toHaveBeenCalledTimes(5);
-    expect(peak).toBe(2);
+    expect(peak).toBe(1);
     expect(mockLaunch).toHaveBeenCalledTimes(1);
   });
 

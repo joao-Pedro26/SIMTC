@@ -364,10 +364,13 @@ export class BulkActionsService {
     try {
       await this.jobs.markRunning(jobId);
 
-      // Grupos de 2: o PdfGeneratorService já limita o Puppeteer a 2
-      // renderizações simultâneas. Cada documento é gravado assim que fica
-      // pronto, então uma interrupção mantém o que já foi gerado.
-      const chunkSize = 2;
+      // Um participante por vez: o PdfGeneratorService já limita o Puppeteer a
+      // 1 renderização por vez, então processar em grupo só faria os
+      // participantes dividirem a mesma vaga e terminarem juntos. Assim cada
+      // participante fica pronto e o progresso sobe um a um. Cada documento é
+      // gravado assim que fica pronto, então uma interrupção mantém o que já
+      // foi gerado.
+      const chunkSize = 1;
       for (let i = 0; i < participantIds.length; i += chunkSize) {
         const chunk = participantIds.slice(i, i + chunkSize);
         const results = await Promise.all(chunk.map((id) => this.generateDocumentsForOne(id, trainingSessionId)));
