@@ -25,10 +25,11 @@ const BROWSER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'];
  * O VPS de produção é 1 vCPU / 4GB. Medições de 24/11/2026: 2 foi bem mais
  * rápido que abrir um Chromium por PDF, e 1 (com participantes também um por
  * vez) ficou mais lento que 2, porque a CPU fica parada nas esperas de rede,
- * upload e banco. Agora em 3 para descobrir até onde melhora; se a CPU
- * saturar ou aparecer timeout, volte para 2. É o único lugar a mudar.
+ * upload e banco. Teste de estresse em 10 para descobrir até onde melhora;
+ * se a CPU saturar, a RAM encostar no limite ou aparecer timeout, volte para
+ * 2 ou 3. É o único lugar a mudar.
  */
-export const PDF_RENDER_CONCURRENCY = 3;
+export const PDF_RENDER_CONCURRENCY = 10;
 
 @Injectable()
 export class PdfGeneratorService implements OnModuleDestroy {
