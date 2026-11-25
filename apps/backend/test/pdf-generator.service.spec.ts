@@ -84,7 +84,46 @@ describe('PdfGeneratorService', () => {
     await service.renderAssessmentReport({});
 
     expect(pages[0].pdf).toHaveBeenCalledWith({ format: 'A4', landscape: true, printBackground: true });
-    expect(pages[1].pdf).toHaveBeenCalledWith({ format: 'A4', landscape: false, printBackground: true });
+    expect(pages[1].pdf).toHaveBeenCalledWith(
+      expect.objectContaining({ format: 'A4', landscape: false, printBackground: true }),
+    );
+  });
+
+  it('põe o mês do relatório no rodapé nativo do PDF, que se repete em todas as folhas', async () => {
+    const page = makePage();
+    mockLaunch.mockResolvedValue(makeBrowser(() => page));
+
+    await service.renderAssessmentReport({ footerMonth: 'Novembro/2026' });
+
+    const options = page.pdf.mock.calls[0][0];
+    expect(options.displayHeaderFooter).toBe(true);
+    expect(options.footerTemplate).toContain('Novembro/2026');
+    // Sem cabeçalho: o padrão do Chromium imprimiria data e título da página.
+    expect(options.headerTemplate).not.toMatch(/class="(date|title)"/);
+  });
+
+  it('repete ícone, título e topo da faixa cinza no cabeçalho de todas as folhas do relatório', async () => {
+    const page = makePage();
+    mockLaunch.mockResolvedValue(makeBrowser(() => page));
+
+    await service.renderAssessmentReport({});
+
+    const { headerTemplate } = page.pdf.mock.calls[0][0];
+    expect(headerTemplate).toMatch(/<img src="data:image\/png;base64,/);
+    expect(headerTemplate).toContain('Avaliação Técnica de Direção Veicular');
+    expect(headerTemplate).toMatch(/<path d="M 60\.646 68\.206/);
+    expect(headerTemplate).toContain('fill="#EAE8E8"');
+  });
+
+  it('escapa o mês no rodapé do relatório (o template do rodapé é HTML)', async () => {
+    const page = makePage();
+    mockLaunch.mockResolvedValue(makeBrowser(() => page));
+
+    await service.renderAssessmentReport({ footerMonth: '<b>x</b>' });
+
+    const { footerTemplate } = page.pdf.mock.calls[0][0];
+    expect(footerTemplate).toContain('&lt;b&gt;x&lt;/b&gt;');
+    expect(footerTemplate).not.toContain('<b>');
   });
 
   it('fecha a página mesmo quando a geração do PDF falha, e segue usando o mesmo navegador', async () => {

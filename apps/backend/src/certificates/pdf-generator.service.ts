@@ -31,6 +31,71 @@ const BROWSER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'];
  */
 export const PDF_RENDER_CONCURRENCY = 3;
 
+/**
+ * Faixa cinza do relatório de avaliação, em coordenadas do papel A4 (pt), medida
+ * do modelo original. Ela se repete em todas as folhas em duas partes: o topo
+ * (acima de REPORT_MARGIN_TOP_PT) no cabeçalho nativo do PDF e o resto como
+ * elemento `position: fixed` em `assessment-report.html`.
+ */
+const REPORT_SHAPE_PATH =
+  'M 60.646 68.206 C 58.324 71.544 56.001 75.275 53.872 79.399 ' +
+  'C 48.453 89.986 42.065 98.037 35.291 103.536 C 28.710 109.034 21.355 111.963 14.000 111.963 ' +
+  'L 13.420 111.963 L 13.420 799.319 L 189.161 799.319 ' +
+  'C 205.432 799.319 218.588 785.976 218.588 769.494 L 218.588 127.280 ' +
+  'C 218.588 94.699 244.722 68.206 276.844 68.206 L 582.461 68.206 L 582.461 43.299 ' +
+  'L 99.357 43.299 C 85.228 43.299 71.680 52.120 60.646 68.206 Z';
+
+/** Margem de cima do `@page` de `assessment-report.html` (os dois precisam bater). */
+const REPORT_MARGIN_TOP_PT = 80;
+
+/**
+ * Cabeçalho do relatório de avaliação: ícone da SIM, título e o topo da faixa
+ * cinza, nas posições do modelo original. Fica na margem de cima, que o Chromium
+ * desenha em TODAS as folhas, então as folhas de continuação (infrações que não
+ * cabem numa folha) também saem com o padrão visual. O template do cabeçalho não
+ * herda o CSS da página: tudo vai inline. O Chromium desloca o cabeçalho ~15pt
+ * para baixo por conta própria: o margin-top de -14.7pt compensa (medido no PDF
+ * gerado: título a 45.0pt do topo, como no modelo).
+ */
+function reportHeaderTemplate(logoDataUrl: string | null): string {
+  const logo = logoDataUrl
+    ? `<img src="${logoDataUrl}" style="position:absolute;left:28.8pt;top:21.3pt;width:36.96pt;height:36.55pt;object-fit:contain;">`
+    : '';
+  return (
+    `<div style="position:relative;width:595.32pt;height:${REPORT_MARGIN_TOP_PT}pt;margin:-14.7pt 0 0 0;padding:0;">` +
+    `<svg style="position:absolute;top:0;left:0;width:595.32pt;height:${REPORT_MARGIN_TOP_PT}pt;" ` +
+    `viewBox="0 0 595.32 ${REPORT_MARGIN_TOP_PT}" preserveAspectRatio="none">` +
+    `<path d="${REPORT_SHAPE_PATH}" fill="#EAE8E8"/></svg>` +
+    logo +
+    '<div style="position:absolute;left:260.93pt;top:45pt;' +
+    "font-family:'Century Schoolbook',Georgia,'Times New Roman',serif;font-size:15.96pt;" +
+    'font-weight:400;color:#000;-webkit-text-stroke:0.456pt #000;white-space:nowrap;">' +
+    'Avaliação Técnica de Direção Veicular</div>' +
+    '</div>'
+  );
+}
+
+/**
+ * Rodapé do relatório de avaliação (o "Novembro/2026" do modelo). O Chromium o
+ * desenha dentro da margem de baixo do `@page` de `assessment-report.html`, em
+ * todas as folhas. O template do rodapé não herda o CSS da página: fonte,
+ * tamanho e posição vão inline. A posição reproduz a do modelo original:
+ * alinhado à direita do texto (45.56pt da borda direita) e a 27pt do pé.
+ * O Chromium soma ~15pt próprios abaixo do rodapé: por isso o padding é 11.8pt
+ * (medido no PDF gerado: base do texto a 27.1pt do pé, topo a 37.9pt, dentro
+ * da margem de 42pt, sem encostar no texto da página).
+ */
+function reportFooterTemplate(footerMonth: unknown): string {
+  const month = typeof footerMonth === 'string' ? Handlebars.escapeExpression(footerMonth) : '';
+  return (
+    '<div style="width:100%;box-sizing:border-box;padding:0 45.56pt 11.8pt 0;margin:0;' +
+    "text-align:right;font-family:'Century Gothic','CenturyGothic',Verdana,sans-serif;" +
+    'font-size:9pt;color:#000;-webkit-print-color-adjust:exact;">' +
+    month +
+    '</div>'
+  );
+}
+
 @Injectable()
 export class PdfGeneratorService implements OnModuleDestroy {
   // Um único Chromium para o processo inteiro. Abrir o navegador é a parte
@@ -80,18 +145,27 @@ export class PdfGeneratorService implements OnModuleDestroy {
       this.assessmentReportTemplate = this.compileTemplate('assessment-report.html');
     }
 
-    const html = this.assessmentReportTemplate({
-      ...data,
-      // Relatório de avaliação usa apenas o ícone (3 figuras), sem a wordmark
-      // "SIM Treinamentos" por extenso — por isso um arquivo e uma cacheKey
-      // próprios, distintos do simLogoDataUrl usado no certificado (que usa a
-      // logo completa). Reaproveitar a mesma cacheKey aqui causaria colisão de
-      // cache entre os dois templates (o getAssetDataUrl cacheia por cacheKey,
-      // não por filename).
-      simLogoIconDataUrl: this.getAssetDataUrl('simLogoIconDataUrl', 'sim-logo-icon.png'),
-    });
+    // Relatório de avaliação usa apenas o ícone (3 figuras), sem a wordmark
+    // "SIM Treinamentos" por extenso — por isso um arquivo e uma cacheKey
+    // próprios, distintos do simLogoDataUrl usado no certificado (que usa a
+    // logo completa). Reaproveitar a mesma cacheKey aqui causaria colisão de
+    // cache entre os dois templates (o getAssetDataUrl cacheia por cacheKey,
+    // não por filename).
+    const logoDataUrl = this.getAssetDataUrl('simLogoIconDataUrl', 'sim-logo-icon.png');
 
-    return this.renderPdf(html, { format: 'A4', landscape: false, printBackground: true });
+    const html = this.assessmentReportTemplate({ ...data, shapePath: REPORT_SHAPE_PATH });
+
+    return this.renderPdf(html, {
+      format: 'A4',
+      landscape: false,
+      printBackground: true,
+      // Cabeçalho (ícone, título, topo da faixa) e rodapé (mês) nativos do
+      // Chromium, desenhados nas margens de TODAS as folhas, inclusive as de
+      // continuação quando as infrações não cabem numa folha.
+      displayHeaderFooter: true,
+      headerTemplate: reportHeaderTemplate(logoDataUrl),
+      footerTemplate: reportFooterTemplate(data.footerMonth),
+    });
   }
 
   async onModuleDestroy(): Promise<void> {
