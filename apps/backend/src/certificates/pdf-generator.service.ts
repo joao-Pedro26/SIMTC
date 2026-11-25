@@ -29,7 +29,7 @@ const BROWSER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'];
  * se a CPU saturar, a RAM encostar no limite ou aparecer timeout, volte para
  * 2 ou 3. É o único lugar a mudar.
  */
-export const PDF_RENDER_CONCURRENCY = 5;
+export const PDF_RENDER_CONCURRENCY = 3;
 
 @Injectable()
 export class PdfGeneratorService implements OnModuleDestroy {
