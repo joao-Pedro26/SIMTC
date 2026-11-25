@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { Topic } from './topic-table'
 import type { Infraction, InfractionNote } from './infraction-table'
 import styles from './infraction-form.module.css'
@@ -27,7 +28,7 @@ const emptyForm = (): InfractionFormData => ({
 interface InfractionEditFormProps {
   infraction: Infraction
   topics: Topic[]
-  onSave: (data: InfractionFormData) => void
+  onSave: (data: InfractionFormData) => void | Promise<void>
   onDelete: () => void
   onCancel: () => void
   readOnly?: boolean
@@ -35,7 +36,7 @@ interface InfractionEditFormProps {
 
 interface InfractionAddFormProps {
   topics: Topic[]
-  onSave: (data: InfractionFormData) => void
+  onSave: (data: InfractionFormData) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -142,7 +143,10 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
     noteM:  infraction.noteM,
   })
 
-  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save, { enabled: !readOnly })
 
   function handleChange(updates: Partial<InfractionFormData>) {
     setForm((prev) => ({ ...prev, ...updates }))
@@ -161,7 +165,9 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
             <Button variant="danger" size="sm" onClick={onDelete}>Deletar</Button>
             <div className={styles.actionsRight}>
               <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-              <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+              <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+                {pending ? 'Salvando...' : 'Salvar'}
+              </Button>
             </div>
           </>
         )}
@@ -173,7 +179,10 @@ export function InfractionEditForm({ infraction, topics, onSave, onDelete, onCan
 export function InfractionAddForm({ topics, onSave, onCancel }: InfractionAddFormProps) {
   const [form, setForm] = useState<InfractionFormData>(emptyForm())
 
-  useDrawerGuard(form, () => onSave(form))
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save)
 
   function handleChange(updates: Partial<InfractionFormData>) {
     setForm((prev) => ({ ...prev, ...updates }))
@@ -186,7 +195,9 @@ export function InfractionAddForm({ topics, onSave, onCancel }: InfractionAddFor
         <div />
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

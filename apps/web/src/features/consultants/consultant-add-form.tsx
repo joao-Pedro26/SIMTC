@@ -5,11 +5,12 @@ import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { PenLine } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { ConsultantFormData } from './consultant-edit-form'
 import styles from './consultant-edit-form.module.css'
 
 interface ConsultantAddFormProps {
-  onSave: (data: ConsultantFormData, signatureFile?: File) => void
+  onSave: (data: ConsultantFormData, signatureFile?: File) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -36,7 +37,10 @@ export function ConsultantAddForm({ onSave, onCancel }: ConsultantAddFormProps) 
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined)
 
-  useDrawerGuard({ form, hasSignature: !!signatureFile }, () => onSave(form, signatureFile ?? undefined))
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form, signatureFile ?? undefined))
+
+  useDrawerGuard({ form, hasSignature: !!signatureFile }, save)
 
   // Cria/revoga URL de preview local ao selecionar arquivo
   useEffect(() => {
@@ -142,7 +146,9 @@ export function ConsultantAddForm({ onSave, onCancel }: ConsultantAddFormProps) 
         <div />
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" onClick={() => onSave(form, signatureFile ?? undefined)}>Salvar</Button>
+          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

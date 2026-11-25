@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { Topic } from './topic-table'
 import styles from './topic-form.module.css'
 
@@ -14,7 +15,7 @@ export interface TopicFormData {
 
 interface TopicEditFormProps {
   topic: Topic
-  onSave: (data: TopicFormData) => void
+  onSave: (data: TopicFormData) => void | Promise<void>
   onDelete: () => void
   onCancel: () => void
   /** Modo somente-leitura (ex.: CONSULTANT) — trava campos e some com salvar/excluir */
@@ -22,7 +23,7 @@ interface TopicEditFormProps {
 }
 
 interface TopicAddFormProps {
-  onSave: (data: TopicFormData) => void
+  onSave: (data: TopicFormData) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -33,7 +34,10 @@ export function TopicEditForm({ topic, onSave, onDelete, onCancel, readOnly = fa
     disciplinaryText: topic.disciplinaryText,
   })
 
-  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save, { enabled: !readOnly })
 
   function handleChange(field: keyof TopicFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -69,7 +73,9 @@ export function TopicEditForm({ topic, onSave, onDelete, onCancel, readOnly = fa
             <Button variant="danger" size="sm" onClick={onDelete}>Deletar</Button>
             <div className={styles.actionsRight}>
               <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-              <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+              <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+                {pending ? 'Salvando...' : 'Salvar'}
+              </Button>
             </div>
           </>
         )}
@@ -83,7 +89,10 @@ const emptyTopic: TopicFormData = { sigla: '', name: '', disciplinaryText: '' }
 export function TopicAddForm({ onSave, onCancel }: TopicAddFormProps) {
   const [form, setForm] = useState<TopicFormData>(emptyTopic)
 
-  useDrawerGuard(form, () => onSave(form))
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save)
 
   function handleChange(field: keyof TopicFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -113,7 +122,9 @@ export function TopicAddForm({ onSave, onCancel }: TopicAddFormProps) {
         <div />
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

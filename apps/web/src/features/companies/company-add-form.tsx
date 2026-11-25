@@ -5,11 +5,12 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button/button'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { CompanyFormData } from './company-edit-form'
 import styles from './company-edit-form.module.css'
 
 interface CompanyAddFormProps {
-  onSave: (data: CompanyFormData, logoFile?: File) => void
+  onSave: (data: CompanyFormData, logoFile?: File) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -38,7 +39,10 @@ export function CompanyAddForm({ onSave, onCancel }: CompanyAddFormProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useDrawerGuard({ form, hasLogo: !!logoFile }, () => onSave(form, logoFile ?? undefined))
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form, logoFile ?? undefined))
+
+  useDrawerGuard({ form, hasLogo: !!logoFile }, save)
 
   function handleChange(field: keyof CompanyFormData, value: string) {
     const formatted = field === 'cnpj' ? applyCnpjMask(value) : value
@@ -143,7 +147,9 @@ export function CompanyAddForm({ onSave, onCancel }: CompanyAddFormProps) {
         <div />
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" onClick={() => onSave(form, logoFile ?? undefined)}>Salvar</Button>
+          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

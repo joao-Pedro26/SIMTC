@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button/button'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
 import { clientApi } from '@/lib/client-api'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import styles from './company-edit-form.module.css'
 
 type Tab = 'info' | 'contacts' | 'trainings'
@@ -60,7 +61,7 @@ interface CompanyEditFormProps {
   contactEmail: string
   contacts?: Contact[]
   logoUrl?: string
-  onSave: (data: CompanyFormData) => void
+  onSave: (data: CompanyFormData) => void | Promise<void>
   onDelete: () => void
   onCancel: () => void
   onLogoUploaded?: (newUrl: string) => void
@@ -196,7 +197,10 @@ export function CompanyEditForm({
     contactEmail,
   })
 
-  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save, { enabled: !readOnly })
 
   const [currentLogoUrl, setCurrentLogoUrl] = useState(logoUrl)
   const [uploadTs, setUploadTs] = useState<number | null>(null)
@@ -559,7 +563,9 @@ export function CompanyEditForm({
             <Button variant="danger" size="md" onClick={onDelete}>Deletar</Button>
             <div className={styles.actionsRight}>
               <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
-              <Button variant="primary" size="md" onClick={() => onSave(form)}>Salvar</Button>
+              <Button variant="primary" size="md" disabled={pending} onClick={save}>
+                {pending ? 'Salvando...' : 'Salvar'}
+              </Button>
             </div>
           </>
         )}

@@ -5,6 +5,7 @@ import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
 import { Select } from '@/components/ui/select/select'
 import { CityAutocomplete } from '@/components/ui/city-autocomplete/city-autocomplete'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { TrainingCompany, TrainingCourse, TrainingConsultant } from './types'
 import styles from './training-session-add-form.module.css'
 
@@ -23,7 +24,7 @@ interface TrainingSessionAddFormProps {
   companies: TrainingCompany[]
   courses: TrainingCourse[]
   consultants: TrainingConsultant[]
-  onSave: (data: TrainingSessionFormData) => void
+  onSave: (data: TrainingSessionFormData) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -76,7 +77,11 @@ export function TrainingSessionAddForm({
     form.date !== ''
 
   // Salvar pelo aviso só vale com os campos obrigatórios preenchidos (como o botão Salvar).
-  useDrawerGuard(form, () => { if (isValid) onSave(form) })
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  // Salvar pelo aviso só vale com os campos obrigatórios preenchidos (como o botão Salvar).
+  useDrawerGuard(form, () => { if (isValid) return save() })
 
   return (
     <div className={styles.wrapper}>
@@ -191,8 +196,8 @@ export function TrainingSessionAddForm({
         <div />
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" disabled={!isValid} onClick={() => onSave(form)}>
-            Salvar
+          <Button variant="primary" size="sm" disabled={!isValid || pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>
       </div>

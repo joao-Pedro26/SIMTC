@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Select } from '@/components/ui/select/select'
 import { Button } from '@/components/ui/button/button'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import styles from './demand-form.module.css'
 
 export interface DemandFormData {
@@ -25,7 +26,7 @@ interface DemandFormProps {
   companyOptions: SelectOption[]
   consultantOptions: SelectOption[]
   courseOptions: SelectOption[]
-  onSave: (data: DemandFormData) => void
+  onSave: (data: DemandFormData) => void | Promise<void>
   onDelete?: () => void
   onCancel: () => void
 }
@@ -62,8 +63,11 @@ export function DemandForm({
 
   const isValid = form.companyId !== '' && form.consultantId !== '' && form.courseId !== ''
 
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
   // Salvar pelo aviso só vale com os campos obrigatórios preenchidos (como o botão Salvar).
-  useDrawerGuard(form, () => { if (isValid) onSave(form) })
+  useDrawerGuard(form, () => { if (isValid) return save() })
 
   return (
     <div className={styles.wrapper}>
@@ -145,7 +149,9 @@ export function DemandForm({
         )}
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="md" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="md" disabled={!isValid} onClick={() => onSave(form)}>Salvar</Button>
+          <Button variant="primary" size="md" disabled={!isValid || pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

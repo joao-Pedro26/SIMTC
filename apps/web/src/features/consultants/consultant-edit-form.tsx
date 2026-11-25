@@ -5,6 +5,7 @@ import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Loader2, PenLine, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button/button'
 import { clientApi } from '@/lib/client-api'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { Consultant } from './consultant-table'
 import styles from './consultant-edit-form.module.css'
 
@@ -20,7 +21,7 @@ export interface ConsultantFormData {
 interface ConsultantEditFormProps {
   consultantId: string
   consultant: Consultant
-  onSave: (data: ConsultantFormData) => void
+  onSave: (data: ConsultantFormData) => void | Promise<void>
   onDelete: () => void
   onCancel: () => void
   onResetPassword: () => void
@@ -45,7 +46,9 @@ export function ConsultantEditForm({ consultantId, consultant, onSave, onDelete,
     status: consultant.status,
   })
   // A assinatura é enviada na hora em que é escolhida; só os campos do formulário ficam pendentes.
-  useDrawerGuard(form, () => onSave(form))
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+  useDrawerGuard(form, save)
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   // signatureExists: se há path salvo no banco (para label do botão)
   const [signatureExists, setSignatureExists] = useState(!!consultant.signatureUrl)
@@ -210,7 +213,9 @@ export function ConsultantEditForm({ consultantId, consultant, onSave, onDelete,
         <Button variant="danger" size="sm" onClick={onDelete}>Deletar</Button>
         <div className={styles.actionsRight}>
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary" size="sm" onClick={() => onSave(form)}>Salvar</Button>
+          <Button variant="primary" size="sm" disabled={pending} onClick={save}>
+            {pending ? 'Salvando...' : 'Salvar'}
+          </Button>
         </div>
       </div>
     </div>

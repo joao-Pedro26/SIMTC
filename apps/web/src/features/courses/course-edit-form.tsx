@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import type { Course } from './course-table'
 import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
 import { ContentItemsEditor, type ContentItem } from './content-items-editor'
@@ -32,7 +33,7 @@ interface CourseEditFormProps {
   vehicleTypeActions?: VehicleTypeActions
   topics: CourseTopicOption[]
   topicsLoading?: boolean
-  onSave: (data: CourseFormData) => void
+  onSave: (data: CourseFormData) => void | Promise<void>
   onDelete: () => void
   onCancel: () => void
   /** Modo somente-leitura (ex.: CONSULTANT) — trava todos os campos e some com salvar/excluir */
@@ -70,7 +71,10 @@ export function CourseEditForm({
     categoryIds: course.categoryIds ?? [],
   })
 
-  useDrawerGuard(form, () => onSave(form), { enabled: !readOnly })
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
+  useDrawerGuard(form, save, { enabled: !readOnly })
 
   function handleChange(field: keyof Omit<CourseFormData, 'contentItems' | 'categoryIds'>, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -156,10 +160,10 @@ export function CourseEditForm({
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => onSave(form)}
-                disabled={topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
+                onClick={save}
+                disabled={pending || topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
               >
-                Salvar
+                {pending ? 'Salvando...' : 'Salvar'}
               </Button>
             </div>
           </>

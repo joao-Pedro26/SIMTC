@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDrawerGuard } from '@/components/ui/drawer/drawer-guard'
 import { Button } from '@/components/ui/button/button'
+import { useSubmitLock } from '@/lib/use-submit-lock'
 import { VehicleTypeField, type VehicleTypeActions, type VehicleTypeOption } from './vehicle-type-field'
 import { isMissingTopics, type CourseFormData } from './course-edit-form'
 import { ContentItemsEditor } from './content-items-editor'
@@ -14,7 +15,7 @@ interface CourseAddFormProps {
   vehicleTypeActions: VehicleTypeActions
   topics: CourseTopicOption[]
   topicsLoading?: boolean
-  onSave: (data: CourseFormData) => void
+  onSave: (data: CourseFormData) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -42,8 +43,11 @@ export function CourseAddForm({
     categoryIds: topics.map((t) => t.id),
   }))
 
+  const { pending, run } = useSubmitLock()
+  const save = () => run(() => onSave(form))
+
   // O estado inicial se completa depois de abrir (tipos e tópicos carregam): compara com o padrão atual.
-  useDrawerGuard(form, () => onSave(form), {
+  useDrawerGuard(form, save, {
     baseline: {
       ...empty,
       vehicleTypeId: vehicleTypes[0]?.id ?? '',
@@ -147,10 +151,10 @@ export function CourseAddForm({
           <Button
             variant="primary"
             size="sm"
-            onClick={() => onSave(form)}
-            disabled={topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
+            onClick={save}
+            disabled={pending || topicsLoading || isMissingTopics(form) || !form.vehicleTypeId}
           >
-            Salvar
+            {pending ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>
       </div>
