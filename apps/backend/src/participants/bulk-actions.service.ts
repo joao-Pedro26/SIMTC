@@ -9,6 +9,7 @@ import archiver = require('archiver');
 import { PrismaService } from '../prisma/prisma.service';
 import { ParticipantsService } from './participants.service';
 import { CertificatesService } from '../certificates/certificates.service';
+import { PDF_RENDER_CONCURRENCY } from '../certificates/pdf-generator.service';
 import { StorageService } from '../storage/storage.service';
 import { EmailService, EmailRateLimitError } from '../email/email.service';
 import { JobsService, BulkItemResult } from '../jobs/jobs.service';
@@ -364,20 +365,40 @@ export class BulkActionsService {
     try {
       await this.jobs.markRunning(jobId);
 
-      // Um participante por vez: o PdfGeneratorService já limita o Puppeteer a
-      // 1 renderização por vez, então processar em grupo só faria os
-      // participantes dividirem a mesma vaga e terminarem juntos. Assim cada
-      // participante fica pronto e o progresso sobe um a um. Cada documento é
-      // gravado assim que fica pronto, então uma interrupção mantém o que já
-      // foi gerado.
-      const chunkSize = 1;
-      for (let i = 0; i < participantIds.length; i += chunkSize) {
-        const chunk = participantIds.slice(i, i + chunkSize);
-        const results = await Promise.all(chunk.map((id) => this.generateDocumentsForOne(id, trainingSessionId)));
-        for (const r of results) {
-          await this.jobs.recordItemResult(jobId, r);
+      // Pool: PDF_RENDER_CONCURRENCY participantes em andamento ao mesmo
+      // tempo. Quando um termina, o resultado dele é gravado na hora e o
+      // trabalhador já pega o próximo da fila, sem esperar os outros (em
+      // grupos, quem terminava antes ficava parado e o progresso subia aos
+      // saltos). Cada documento é gravado assim que fica pronto, então uma
+      // interrupção mantém o que já foi gerado.
+      let next = 0;
+      let stopped = false;
+      // `recordItemResult` lê o array de resultados, acrescenta e salva de
+      // volta: duas chamadas ao mesmo tempo perderiam resultados. Os
+      // trabalhadores gravam em fila, uma de cada vez.
+      let recording: Promise<unknown> = Promise.resolve();
+      const record = (result: BulkItemResult) => {
+        const run = recording.then(() => this.jobs.recordItemResult(jobId, result));
+        recording = run;
+        return run;
+      };
+
+      const worker = async () => {
+        while (!stopped && next < participantIds.length) {
+          const id = participantIds[next++];
+          try {
+            const result = await this.generateDocumentsForOne(id, trainingSessionId);
+            await record(result);
+          } catch (err) {
+            // Falha ao gravar o progresso: ninguém começa participante novo.
+            stopped = true;
+            throw err;
+          }
         }
-      }
+      };
+
+      const workers = Math.min(PDF_RENDER_CONCURRENCY, participantIds.length);
+      await Promise.all(Array.from({ length: workers }, worker));
 
       await this.jobs.completeJob(jobId);
     } catch (err: any) {

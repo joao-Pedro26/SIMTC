@@ -97,11 +97,10 @@ export class JobsService implements OnApplicationBootstrap {
 
   /**
    * Registra o resultado de 1 item processado (sucesso/pulado/falha) e
-   * incrementa os contadores. Não há concorrência real entre chamadas desta
-   * função dentro de um mesmo job (cada job processa sequencialmente ou em
-   * pequenos grupos, sempre agregando os resultados de um grupo antes de
-   * seguir para o próximo), então o padrão "lê job → concatena → salva" não
-   * precisa de lock otimista.
+   * incrementa os contadores. Quem chama deve garantir que não há duas chamadas
+   * ao mesmo tempo para o mesmo job (o job de geração de documentos, que tem
+   * vários participantes em andamento, grava os resultados em fila), então o
+   * padrão "lê job → concatena → salva" não precisa de lock otimista.
    */
   async recordItemResult(jobId: string, result: BulkItemResult) {
     const job = await this.prisma.bulkOperationJob.findUniqueOrThrow({ where: { id: jobId } });

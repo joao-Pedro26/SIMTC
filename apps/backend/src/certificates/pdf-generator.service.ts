@@ -16,6 +16,20 @@ const BROWSER_IDLE_CLOSE_MS = 60_000;
 
 const BROWSER_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'];
 
+/**
+ * Quantas renderizações (páginas do Chromium) rodam ao mesmo tempo no processo
+ * inteiro, compartilhado entre certificados e relatórios. O job em lote de
+ * documentos usa o mesmo número como quantidade de participantes em andamento,
+ * para que sempre haja trabalho esperando uma vaga livre.
+ *
+ * O VPS de produção é 1 vCPU / 4GB. Medições de 24/11/2026: 2 foi bem mais
+ * rápido que abrir um Chromium por PDF, e 1 (com participantes também um por
+ * vez) ficou mais lento que 2, porque a CPU fica parada nas esperas de rede,
+ * upload e banco. Agora em 3 para descobrir até onde melhora; se a CPU
+ * saturar ou aparecer timeout, volte para 2. É o único lugar a mudar.
+ */
+export const PDF_RENDER_CONCURRENCY = 3;
+
 @Injectable()
 export class PdfGeneratorService implements OnModuleDestroy {
   // Um único Chromium para o processo inteiro. Abrir o navegador é a parte
@@ -32,14 +46,11 @@ export class PdfGeneratorService implements OnModuleDestroy {
   private certificateTemplate: HandlebarsTemplateDelegate | null = null;
   private assessmentReportTemplate: HandlebarsTemplateDelegate | null = null;
 
-  // Limita a 1 renderização (página do Chromium) por vez no processo inteiro,
-  // compartilhado entre certificados e relatórios. O VPS de produção é 1 vCPU /
-  // 4GB — sem esse limite, um "gerar todos" ou um job em lote (que também chama
+  // Sem esse limite, um "gerar todos" ou um job em lote (que também chama
   // renderCertificate/renderAssessmentReport sob demanda) abriria dezenas de
-  // páginas em paralelo e estouraria CPU e RAM. Era 2; baixado para 1 em
-  // 24/11/2026 para testar se uma por vez consome menos CPU e termina antes.
-  // Se ficar mais lento que com 2, é aqui que se volta.
-  private readonly limiter = pLimit(1);
+  // páginas em paralelo e estouraria CPU e RAM. Valor e histórico de
+  // medições em PDF_RENDER_CONCURRENCY.
+  private readonly limiter = pLimit(PDF_RENDER_CONCURRENCY);
 
   async renderCertificate(data: Record<string, any>): Promise<Buffer> {
     return this.limiter(() => this.renderCertificateInternal(data));

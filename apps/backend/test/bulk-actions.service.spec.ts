@@ -5,6 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { JobsService } from 'src/jobs/jobs.service';
 import { ParticipantsService } from 'src/participants/participants.service';
 import { CertificatesService } from 'src/certificates/certificates.service';
+import { PDF_RENDER_CONCURRENCY } from 'src/certificates/pdf-generator.service';
 import { EmailService, EmailRateLimitError } from 'src/email/email.service';
 import { StorageService } from 'src/storage/storage.service';
 
@@ -454,6 +455,107 @@ describe('BulkActionsService', () => {
 
       expect(mockJobs.failJob).toHaveBeenCalledWith('job-1', 'db caiu');
       expect(mockJobs.completeJob).not.toHaveBeenCalled();
+    });
+
+    describe('pool de participantes', () => {
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      // `clearAllMocks` não zera implementações; estes testes trocam a de
+      // `recordItemResult`, então ela é restaurada ao redor de cada um.
+      beforeEach(() => mockJobs.recordItemResult.mockReset());
+      afterEach(() => mockJobs.recordItemResult.mockReset());
+
+      it('mantém no máximo PDF_RENDER_CONCURRENCY participantes em andamento', async () => {
+        let running = 0;
+        let peak = 0;
+        jest.spyOn(service as any, 'generateDocumentsForOne').mockImplementation(async (id: any) => {
+          running++;
+          peak = Math.max(peak, running);
+          await sleep(5);
+          running--;
+          return { participantId: id, name: id, status: 'success' };
+        });
+        const ids = Array.from({ length: PDF_RENDER_CONCURRENCY * 3 }, (_, i) => `tp-${i}`);
+
+        await (service as any).processBulkGenerateDocuments('job-1', 's1', ids);
+
+        expect(peak).toBe(PDF_RENDER_CONCURRENCY);
+        expect(mockJobs.recordItemResult).toHaveBeenCalledTimes(ids.length);
+        expect(mockJobs.completeJob).toHaveBeenCalledWith('job-1');
+      });
+
+      it('grava cada resultado assim que o participante termina, sem esperar os outros', async () => {
+        const delays: Record<string, number> = { 'tp-slow': 30, 'tp-fast': 1 };
+        jest.spyOn(service as any, 'generateDocumentsForOne').mockImplementation(async (id: any) => {
+          await sleep(delays[id]);
+          return { participantId: id, name: id, status: 'success' };
+        });
+
+        await (service as any).processBulkGenerateDocuments('job-1', 's1', ['tp-slow', 'tp-fast']);
+
+        const order = mockJobs.recordItemResult.mock.calls.map((call: any[]) => call[1].participantId);
+        expect(order).toEqual(['tp-fast', 'tp-slow']);
+      });
+
+      it('um trabalhador que termina cedo já pega o próximo da fila', async () => {
+        const started: string[] = [];
+        const finished: string[] = [];
+        jest.spyOn(service as any, 'generateDocumentsForOne').mockImplementation(async (id: any) => {
+          started.push(id);
+          await sleep(id === 'tp-0' ? 40 : 2);
+          finished.push(id);
+          return { participantId: id, name: id, status: 'success' };
+        });
+        const ids = Array.from({ length: PDF_RENDER_CONCURRENCY + 3 }, (_, i) => `tp-${i}`);
+
+        await (service as any).processBulkGenerateDocuments('job-1', 's1', ids);
+
+        // O tp-0 é lento e segura um trabalhador; os demais seguem andando e
+        // começam todos os participantes da fila antes de o tp-0 terminar.
+        expect(started).toHaveLength(ids.length);
+        expect(finished[finished.length - 1]).toBe('tp-0');
+      });
+
+      it('nunca grava dois resultados ao mesmo tempo', async () => {
+        let recording = 0;
+        let peak = 0;
+        mockJobs.recordItemResult.mockImplementation(async () => {
+          recording++;
+          peak = Math.max(peak, recording);
+          await sleep(3);
+          recording--;
+        });
+        jest
+          .spyOn(service as any, 'generateDocumentsForOne')
+          .mockImplementation(async (id: any) => ({ participantId: id, name: id, status: 'success' }));
+        const ids = Array.from({ length: PDF_RENDER_CONCURRENCY * 2 }, (_, i) => `tp-${i}`);
+
+        await (service as any).processBulkGenerateDocuments('job-1', 's1', ids);
+
+        expect(peak).toBe(1);
+        expect(mockJobs.recordItemResult).toHaveBeenCalledTimes(ids.length);
+      });
+
+      it('falha ao gravar o progresso para de pegar participantes novos e marca o job como falho', async () => {
+        const generate = jest
+          .spyOn(service as any, 'generateDocumentsForOne')
+          .mockImplementation(async (id: any) => ({ participantId: id, name: id, status: 'success' }));
+        mockJobs.recordItemResult.mockRejectedValue(new Error('db caiu'));
+        const ids = Array.from({ length: 20 }, (_, i) => `tp-${i}`);
+
+        await expect((service as any).processBulkGenerateDocuments('job-1', 's1', ids)).resolves.toBeUndefined();
+
+        expect(mockJobs.failJob).toHaveBeenCalledWith('job-1', 'db caiu');
+        expect(mockJobs.completeJob).not.toHaveBeenCalled();
+        expect(generate.mock.calls.length).toBeLessThan(ids.length);
+      });
+
+      it('lista vazia conclui o job sem gravar nada', async () => {
+        await (service as any).processBulkGenerateDocuments('job-1', 's1', []);
+
+        expect(mockJobs.recordItemResult).not.toHaveBeenCalled();
+        expect(mockJobs.completeJob).toHaveBeenCalledWith('job-1');
+      });
     });
   });
 

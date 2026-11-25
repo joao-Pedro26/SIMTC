@@ -1,4 +1,4 @@
-import { PdfGeneratorService } from 'src/certificates/pdf-generator.service';
+import { PdfGeneratorService, PDF_RENDER_CONCURRENCY } from 'src/certificates/pdf-generator.service';
 
 const mockLaunch = jest.fn();
 jest.mock('puppeteer', () => ({ default: { launch: (...args: any[]) => mockLaunch(...args) } }));
@@ -100,7 +100,7 @@ describe('PdfGeneratorService', () => {
     expect(mockLaunch).toHaveBeenCalledTimes(1);
   });
 
-  it('no máximo 1 página renderizando por vez', async () => {
+  it('renderiza no máximo PDF_RENDER_CONCURRENCY páginas ao mesmo tempo', async () => {
     let running = 0;
     let peak = 0;
     const slowPdf = jest.fn().mockImplementation(async () => {
@@ -112,10 +112,11 @@ describe('PdfGeneratorService', () => {
     });
     mockLaunch.mockResolvedValue(makeBrowser(() => makePage({ pdf: slowPdf })));
 
-    await Promise.all([1, 2, 3, 4, 5].map(() => service.renderCertificate({})));
+    const total = PDF_RENDER_CONCURRENCY * 2 + 1;
+    await Promise.all(Array.from({ length: total }, () => service.renderCertificate({})));
 
-    expect(slowPdf).toHaveBeenCalledTimes(5);
-    expect(peak).toBe(1);
+    expect(slowPdf).toHaveBeenCalledTimes(total);
+    expect(peak).toBe(PDF_RENDER_CONCURRENCY);
     expect(mockLaunch).toHaveBeenCalledTimes(1);
   });
 
