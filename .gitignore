@@ -66,6 +66,8 @@ apps/backend/documents-tab.png
 # e ícones do launcher Android (referenciados pelo AndroidManifest.xml)
 !apps/mobile/simtc/assets/**
 !apps/mobile/simtc/android/app/src/main/res/**
+# Exceção: favicon do web (o Next serve src/app/icon.png)
+!apps/web/src/app/icon.png
 
 # Arquivos de design e brainstorm
 simtc-design.docx
