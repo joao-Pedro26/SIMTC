@@ -10,6 +10,7 @@ import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/api/api_exception.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../utils/calendar_date.dart';
 import '../../utils/cpf.dart';
 import '../../utils/email.dart';
 import '../../utils/result.dart';
@@ -44,7 +45,9 @@ enum CpfCheck {
 ///
 /// O CPF é o primeiro campo (decisão de 06/10/2026): completo e válido, é
 /// consultado no servidor, que diz se já está nesta sessão e, se a pessoa
-/// tem cadastro de outro treinamento, devolve nome e e-mail para preencher.
+/// tem cadastro de outro treinamento, devolve nome, e-mail e CNH para
+/// preencher. A CNH (categoria e vencimento) é obrigatória — decisão de
+/// 28/11/2026; vencida é aceita.
 /// Os campos continuam editáveis — o que estiver na tela ao adicionar é o que
 /// o backend grava no cadastro, como já fazia.
 ///
@@ -95,6 +98,10 @@ class AddParticipantViewModel extends ChangeNotifier {
   String _name = '';
   String _email = '';
   ParticipationType _type = ParticipationType.teoricaEPratica;
+
+  /// Categoria escolhida e vencimento digitado (`dd/mm/aaaa`, com máscara).
+  String? _cnhCategory;
+  String _cnhExpirationText = '';
   CpfCheck _cpfCheck = CpfCheck.incomplete;
 
   /// Nome de quem já está na sessão com este CPF, quando a consulta o trouxe.
@@ -104,6 +111,8 @@ class AddParticipantViewModel extends ChangeNotifier {
   /// valor, trocar o CPF o limpa — a pessoa passou a ser outra.
   String? _autoName;
   String? _autoEmail;
+  String? _autoCnhCategory;
+  String? _autoCnhExpirationText;
   bool _filledFromRegistry = false;
 
   /// Conta as consultas: a resposta só vale se for a da última (Fase 8D).
@@ -135,6 +144,16 @@ class AddParticipantViewModel extends ChangeNotifier {
   String get name => _name;
   String get email => _email;
   ParticipationType get participationType => _type;
+  String? get cnhCategory => _cnhCategory;
+  String get cnhExpirationText => _cnhExpirationText;
+
+  /// Só acusa a data quando o texto está completo e não é um dia de
+  /// calendário real; incompleta não é erro, só não libera o envio.
+  String? get cnhExpirationError =>
+      _cnhExpirationText.length == 10 &&
+              calendarDateFromBr(_cnhExpirationText) == null
+          ? 'Data inválida.'
+          : null;
   CpfCheck get cpfCheck => _cpfCheck;
 
   /// A consulta está no ar: nome e e-mail ficam travados até ela responder.
@@ -147,11 +166,15 @@ class AddParticipantViewModel extends ChangeNotifier {
   /// nulo quando nada veio de lá.
   String? get registryNotice {
     if (!_filledFromRegistry) return null;
-    final filled = _autoName != null && _autoEmail != null
-        ? 'nome e e-mail preenchidos'
-        : _autoName != null
-            ? 'nome preenchido'
-            : 'e-mail preenchido';
+    final items = [
+      if (_autoName != null) 'nome',
+      if (_autoEmail != null) 'e-mail',
+      if (_autoCnhCategory != null || _autoCnhExpirationText != null) 'CNH',
+    ];
+    final filled = items.length == 1
+        ? '${items.first} ${items.first == 'CNH' ? 'preenchida' : 'preenchido'}'
+        : '${items.sublist(0, items.length - 1).join(', ')} e '
+            '${items.last} preenchidos';
     return 'Já cadastrado em outro treinamento: $filled. Altere se precisar.';
   }
 
@@ -168,7 +191,11 @@ class AddParticipantViewModel extends ChangeNotifier {
 
   /// Há algo digitado: fechar a tela pede confirmação.
   bool get hasInput =>
-      _cpf.isNotEmpty || _name.trim().isNotEmpty || _email.trim().isNotEmpty;
+      _cpf.isNotEmpty ||
+      _name.trim().isNotEmpty ||
+      _email.trim().isNotEmpty ||
+      _cnhCategory != null ||
+      _cnhExpirationText.isNotEmpty;
 
   /// Por que o formulário está travado; nulo quando dá para adicionar.
   ///
@@ -231,7 +258,9 @@ class AddParticipantViewModel extends ChangeNotifier {
       !_submitting &&
       (_cpfCheck == CpfCheck.available || _cpfCheck == CpfCheck.unverified) &&
       _name.trim().isNotEmpty &&
-      isEmailValid;
+      isEmailValid &&
+      _cnhCategory != null &&
+      calendarDateFromBr(_cnhExpirationText) != null;
 
   /// Assina o cache da sessão e a volta da conexão. Chamado uma vez pela
   /// tela.
@@ -299,6 +328,17 @@ class AddParticipantViewModel extends ChangeNotifier {
     _edited();
   }
 
+  void setCnhCategory(String? value) {
+    _cnhCategory = value;
+    _edited();
+  }
+
+  /// O texto já vem mascarado pela tela (`dd/mm/aaaa`).
+  void setCnhExpiration(String text) {
+    _cnhExpirationText = text;
+    _edited();
+  }
+
   void setParticipationType(ParticipationType value) {
     _type = value;
     _edited();
@@ -345,11 +385,19 @@ class AddParticipantViewModel extends ChangeNotifier {
   }
 
   /// O cadastro toma o lugar do que estiver nos campos — é o dado que a
-  /// pessoa já tem no sistema. Sem e-mail no cadastro, o campo fica como está.
+  /// pessoa já tem no sistema. O que o cadastro não tem (e-mail, CNH) fica
+  /// como está.
   void _fillFromRegistry(CpfLookup lookup) {
     final name = lookup.name;
     final email = lookup.email;
-    if (name == null && email == null) return;
+    final category = lookup.cnhCategory;
+    final expiration = lookup.cnhExpiration;
+    if (name == null &&
+        email == null &&
+        category == null &&
+        expiration == null) {
+      return;
+    }
 
     if (name != null) {
       _name = name;
@@ -358,6 +406,15 @@ class AddParticipantViewModel extends ChangeNotifier {
     if (email != null) {
       _email = email;
       _autoEmail = email;
+    }
+    if (category != null) {
+      _cnhCategory = category;
+      _autoCnhCategory = category;
+    }
+    if (expiration != null) {
+      final text = brDateFromCalendar(expiration);
+      _cnhExpirationText = text;
+      _autoCnhExpirationText = text;
     }
     _filledFromRegistry = true;
   }
@@ -368,8 +425,17 @@ class AddParticipantViewModel extends ChangeNotifier {
   void _clearRegistryFill() {
     if (_autoName != null && _name == _autoName) _name = '';
     if (_autoEmail != null && _email == _autoEmail) _email = '';
+    if (_autoCnhCategory != null && _cnhCategory == _autoCnhCategory) {
+      _cnhCategory = null;
+    }
+    if (_autoCnhExpirationText != null &&
+        _cnhExpirationText == _autoCnhExpirationText) {
+      _cnhExpirationText = '';
+    }
     _autoName = null;
     _autoEmail = null;
+    _autoCnhCategory = null;
+    _autoCnhExpirationText = null;
     _filledFromRegistry = false;
   }
 
@@ -391,6 +457,8 @@ class AddParticipantViewModel extends ChangeNotifier {
         name: _name.trim(),
         email: email.isEmpty ? null : email,
         participationType: _type,
+        cnhCategory: _cnhCategory!,
+        cnhExpiration: calendarDateFromBr(_cnhExpirationText)!,
       );
       switch (result) {
         case Success(:final data):
@@ -444,10 +512,14 @@ class AddParticipantViewModel extends ChangeNotifier {
     _name = '';
     _email = '';
     _type = ParticipationType.teoricaEPratica;
+    _cnhCategory = null;
+    _cnhExpirationText = '';
     _cpfCheck = CpfCheck.incomplete;
     _enrolledName = null;
     _autoName = null;
     _autoEmail = null;
+    _autoCnhCategory = null;
+    _autoCnhExpirationText = null;
     _filledFromRegistry = false;
     _nameFocusPending = false;
   }

@@ -58,4 +58,40 @@ void main() {
       reason: 'sem enrolled não dá para dizer se já está na sessão',
     );
   });
+
+  group('CNH', () {
+    test('lê categoria e vencimento', () {
+      final lookup = CpfLookup.tryParse({
+        'registered': true,
+        'enrolled': false,
+        'cnhCategory': 'AB',
+        'cnhExpiration': '2027-03-12',
+      });
+
+      expect(lookup!.cnhCategory, 'AB');
+      expect(lookup.cnhExpiration, '2027-03-12');
+    });
+
+    test('categoria fora da lista vira nula', () {
+      final lookup = CpfLookup.tryParse({
+        'registered': true,
+        'enrolled': false,
+        'cnhCategory': 'Z',
+        'cnhExpiration': '2027-03-12',
+      });
+
+      expect(lookup!.cnhCategory, isNull);
+      expect(lookup.cnhExpiration, '2027-03-12');
+    });
+
+    test('ausentes ficam nulos', () {
+      final lookup = CpfLookup.tryParse({
+        'registered': false,
+        'enrolled': false,
+      });
+
+      expect(lookup!.cnhCategory, isNull);
+      expect(lookup.cnhExpiration, isNull);
+    });
+  });
 }

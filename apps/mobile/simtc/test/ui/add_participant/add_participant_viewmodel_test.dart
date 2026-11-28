@@ -118,6 +118,8 @@ void main() {
           name: any(named: 'name'),
           email: any(named: 'email'),
           participationType: any(named: 'participationType'),
+            cnhCategory: any(named: 'cnhCategory'),
+            cnhExpiration: any(named: 'cnhExpiration'),
         )).thenAnswer((_) async => result);
   }
 
@@ -164,12 +166,19 @@ void main() {
     return vm;
   }
 
-  /// CPF livre e nome preenchidos: pronto para adicionar.
+  /// A CNH é obrigatória (decisão de 28/11/2026): categoria e vencimento.
+  void fillCnh(AddParticipantViewModel vm) {
+    vm.setCnhCategory('AB');
+    vm.setCnhExpiration('12/03/2027');
+  }
+
+  /// CPF livre, nome e CNH preenchidos: pronto para adicionar.
   Future<AddParticipantViewModel> filled() async {
     final vm = await open();
     vm.setCpf(cpf);
     await pumpEventQueue();
     vm.setName('Fernanda Lopes Meireles');
+    fillCnh(vm);
     return vm;
   }
 
@@ -344,6 +353,7 @@ void main() {
       vm.setCpf(cpf);
       await pumpEventQueue();
       vm.setName('Fernanda Lopes Meireles');
+      fillCnh(vm);
 
       expect(vm.cpfCheck, CpfCheck.unverified);
       expect(
@@ -434,6 +444,7 @@ void main() {
           .thenAnswer((_) => answer.future);
       final vm = await open();
       vm.setName('Fernanda Lopes Meireles');
+      fillCnh(vm);
 
       vm.setCpf(cpf);
 
@@ -494,6 +505,7 @@ void main() {
         'Não foi possível consultar o CPF. Preencha os dados e adicione assim mesmo.',
       );
       vm.setName('Digitado À Mão');
+      fillCnh(vm);
       expect(vm.canSubmit, isTrue);
 
       answer.complete(const Success(registered));
@@ -579,11 +591,14 @@ void main() {
             name: any(named: 'name'),
             email: any(named: 'email'),
             participationType: any(named: 'participationType'),
+            cnhCategory: any(named: 'cnhCategory'),
+            cnhExpiration: any(named: 'cnhExpiration'),
           )).thenAnswer((_) => adding.future);
       final vm = await open();
       vm.setCpf(cpf);
       await pumpEventQueue();
       vm.setName('Fernanda Lopes Meireles');
+      fillCnh(vm);
       final submitted = vm.submit(addAnother: true);
 
       connectivity.reconnect();
@@ -698,6 +713,8 @@ void main() {
         'Já cadastrado em outro treinamento: nome e e-mail preenchidos. '
         'Altere se precisar.',
       );
+      expect(vm.canSubmit, isFalse, reason: 'o cadastro não trouxe a CNH');
+      fillCnh(vm);
       expect(vm.canSubmit, isTrue);
     });
 
@@ -793,11 +810,182 @@ void main() {
     });
   });
 
+  group('CNH', () {
+    const registeredWithCnh = CpfLookup(
+      registered: true,
+      enrolled: false,
+      name: 'Fernanda Lopes Meireles',
+      email: 'fernanda@empresa.com.br',
+      cnhCategory: 'AB',
+      cnhExpiration: '2027-03-12',
+    );
+
+    test('sem categoria ou com a data incompleta não adiciona', () async {
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      vm.setName('Fernanda Lopes Meireles');
+      expect(vm.canSubmit, isFalse);
+
+      vm.setCnhExpiration('12/03/2027');
+      expect(vm.canSubmit, isFalse, reason: 'falta a categoria');
+
+      vm.setCnhCategory('AB');
+      expect(vm.canSubmit, isTrue);
+
+      vm.setCnhExpiration('12/03/20');
+      expect(vm.canSubmit, isFalse, reason: 'data incompleta');
+
+      vm.setCnhExpiration('12/03/2027');
+      expect(vm.canSubmit, isTrue);
+      expect(vm.cnhCategory, 'AB');
+      expect(vm.cnhExpirationText, '12/03/2027');
+    });
+
+    test('data impossível dá "Data inválida."; incompleta ou vencida, não',
+        () async {
+      final vm = await open();
+
+      for (final wrong in ['31/02/2027', '00/13/2027', '12/03/0227']) {
+        vm.setCnhExpiration(wrong);
+        expect(vm.cnhExpirationError, 'Data inválida.', reason: wrong);
+      }
+      for (final fine in ['', '12/03/20', '12/03/2025']) {
+        vm.setCnhExpiration(fine);
+        expect(vm.cnhExpirationError, isNull, reason: fine);
+      }
+    });
+
+    test('a consulta com cadastro preenche a CNH e o aviso a inclui',
+        () async {
+      lookupAnswers(registeredWithCnh);
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      expect(vm.cnhCategory, 'AB');
+      expect(vm.cnhExpirationText, '12/03/2027');
+      expect(
+        vm.registryNotice,
+        'Já cadastrado em outro treinamento: nome, e-mail e CNH preenchidos. '
+        'Altere se precisar.',
+      );
+      expect(vm.canSubmit, isTrue);
+    });
+
+    test('cadastro só com a CNH: o aviso diz só "CNH preenchida"', () async {
+      lookupAnswers(const CpfLookup(
+        registered: true,
+        enrolled: false,
+        cnhCategory: 'B',
+        cnhExpiration: '2027-03-12',
+      ));
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      expect(
+        vm.registryNotice,
+        'Já cadastrado em outro treinamento: CNH preenchida. '
+        'Altere se precisar.',
+      );
+    });
+
+    test('cadastro com nome e CNH, sem e-mail: "nome e CNH preenchidos"',
+        () async {
+      lookupAnswers(const CpfLookup(
+        registered: true,
+        enrolled: false,
+        name: 'Fernanda',
+        cnhCategory: 'B',
+        cnhExpiration: '2027-03-12',
+      ));
+      final vm = await open();
+
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      expect(
+        vm.registryNotice,
+        'Já cadastrado em outro treinamento: nome e CNH preenchidos. '
+        'Altere se precisar.',
+      );
+    });
+
+    test('trocar o CPF limpa a CNH que veio do cadastro', () async {
+      lookupAnswers(registeredWithCnh);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+
+      expect(vm.cnhCategory, isNull);
+      expect(vm.cnhExpirationText, '');
+      expect(vm.filledFromRegistry, isFalse);
+    });
+
+    test('trocar o CPF não apaga a CNH que o admin mexeu', () async {
+      lookupAnswers(registeredWithCnh);
+      final vm = await open();
+      vm.setCpf(cpf);
+      await pumpEventQueue();
+      vm.setCnhCategory('C');
+
+      vm.setCpf(otherCpf);
+      await pumpEventQueue();
+
+      expect(vm.cnhCategory, 'C');
+      expect(vm.cnhExpirationText, '', reason: 'a data não foi editada');
+    });
+
+    test('a CNH conta como algo a perder ao fechar', () async {
+      final vm = await open();
+
+      vm.setCnhCategory('A');
+      expect(vm.hasInput, isTrue);
+      vm.setCnhCategory(null);
+      expect(vm.hasInput, isFalse);
+      vm.setCnhExpiration('1');
+      expect(vm.hasInput, isTrue);
+    });
+
+    test('"Salvar e adicionar outro" zera categoria e data', () async {
+      final vm = await filled();
+
+      await vm.submit(addAnother: true);
+
+      expect(vm.cnhCategory, isNull);
+      expect(vm.cnhExpirationText, '');
+      expect(vm.hasInput, isFalse);
+    });
+
+    test('o envio leva a categoria e o vencimento em AAAA-MM-DD', () async {
+      final vm = await filled();
+
+      await vm.submit();
+
+      verify(() => participants.add(
+            'sess-1',
+            cpf: cpf,
+            name: 'Fernanda Lopes Meireles',
+            email: null,
+            participationType: ParticipationType.teoricaEPratica,
+            cnhCategory: 'AB',
+            cnhExpiration: '2027-03-12',
+          )).called(1);
+    });
+  });
+
   group('demais campos', () {
     test('sem nome não adiciona', () async {
       final vm = await open();
       vm.setCpf(cpf);
       await pumpEventQueue();
+      fillCnh(vm);
 
       expect(vm.canSubmit, isFalse);
       vm.setName('   ');
@@ -853,6 +1041,7 @@ void main() {
       vm.setCpf('529.982.247-25');
       await pumpEventQueue();
       vm.setName('  Fernanda Lopes Meireles ');
+      fillCnh(vm);
       vm.setEmail(' fernanda@empresa.com.br ');
       vm.setParticipationType(ParticipationType.somenteTeorica);
 
@@ -865,6 +1054,8 @@ void main() {
             name: 'Fernanda Lopes Meireles',
             email: 'fernanda@empresa.com.br',
             participationType: ParticipationType.somenteTeorica,
+            cnhCategory: 'AB',
+            cnhExpiration: '2027-03-12',
           )).called(1);
       expect(vm.addedCount, 1);
       expect(vm.isSubmitting, isFalse);
@@ -883,6 +1074,8 @@ void main() {
             name: 'Fernanda Lopes Meireles',
             email: null,
             participationType: ParticipationType.teoricaEPratica,
+            cnhCategory: 'AB',
+            cnhExpiration: '2027-03-12',
           )).called(1);
     });
 
@@ -906,6 +1099,7 @@ void main() {
       vm.setCpf(otherCpf);
       await pumpEventQueue();
       vm.setName('Diego Barbosa');
+      fillCnh(vm);
       await vm.submit(addAnother: true);
       expect(vm.addedCount, 2);
     });
@@ -918,6 +1112,7 @@ void main() {
       vm.setCpf(cpf);
       await pumpEventQueue();
       expect(vm.registryNotice, isNotNull, reason: 'nome e e-mail vieram do cadastro');
+      fillCnh(vm);
 
       await vm.submit(addAnother: true);
 
@@ -938,6 +1133,8 @@ void main() {
             name: any(named: 'name'),
             email: any(named: 'email'),
             participationType: any(named: 'participationType'),
+            cnhCategory: any(named: 'cnhCategory'),
+            cnhExpiration: any(named: 'cnhExpiration'),
           ));
     });
 
@@ -1035,6 +1232,8 @@ void main() {
             name: any(named: 'name'),
             email: any(named: 'email'),
             participationType: any(named: 'participationType'),
+            cnhCategory: any(named: 'cnhCategory'),
+            cnhExpiration: any(named: 'cnhExpiration'),
           )).thenThrow(StateError('banco fechado'));
       final vm = await filled();
 
@@ -1066,6 +1265,8 @@ void main() {
             name: any(named: 'name'),
             email: any(named: 'email'),
             participationType: any(named: 'participationType'),
+            cnhCategory: any(named: 'cnhCategory'),
+            cnhExpiration: any(named: 'cnhExpiration'),
           )).thenAnswer((_) => answer.future);
       final vm = await filled();
 

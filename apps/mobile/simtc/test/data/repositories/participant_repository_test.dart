@@ -1100,6 +1100,8 @@ void main() {
         name: 'Fernanda Lopes Meireles',
         email: 'fernanda@empresa.com.br',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(sentBody(), {
@@ -1107,10 +1109,14 @@ void main() {
         'name': 'Fernanda Lopes Meireles',
         'email': 'fernanda@empresa.com.br',
         'participationType': 'TEORICA_E_PRATICA',
+        'cnhCategory': 'AB',
+        'cnhExpiration': '2027-03-12',
       });
       final added = (result as Success<SessionParticipant>).data;
       expect(added.id, 'tp-9');
       expect(added.name, 'Fernanda Lopes Meireles');
+      expect(added.cnhCategory, 'AB');
+      expect(added.cnhExpiration, '2027-03-12');
 
       final row = await db.select(db.participants).getSingle();
       expect(row.id, 'tp-9');
@@ -1120,6 +1126,8 @@ void main() {
       expect(row.status, 'PENDENTE');
       expect(row.participationType, 'TEORICA_E_PRATICA');
       expect(row.assignedConsultantId, isNull);
+      expect(row.cnhCategory, 'AB');
+      expect(row.cnhExpiration, '2027-03-12');
     });
 
     test('sem e-mail, o campo nem é enviado; somente teórica vai com o tipo',
@@ -1133,12 +1141,16 @@ void main() {
         name: 'Fernanda Lopes Meireles',
         email: '',
         participationType: ParticipationType.somenteTeorica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(sentBody(), {
         'cpf': '52998224725',
         'name': 'Fernanda Lopes Meireles',
         'participationType': 'SOMENTE_TEORICA',
+        'cnhCategory': 'AB',
+        'cnhExpiration': '2027-03-12',
       });
       final row = await db.select(db.participants).getSingle();
       expect(row.participationType, 'SOMENTE_TEORICA');
@@ -1159,6 +1171,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(
@@ -1184,6 +1198,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(
@@ -1205,6 +1221,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(
@@ -1226,6 +1244,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(
@@ -1251,6 +1271,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(
@@ -1271,12 +1293,16 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       // Falhar aqui faria o admin tentar de novo e receber "CPF já inscrito".
       final added = (result as Success<SessionParticipant>).data;
       expect(added.name, 'Fernanda Lopes Meireles');
       expect(added.maskedCpf, '529.982.***-**');
+      expect(added.cnhCategory, 'AB');
+      expect(added.cnhExpiration, '2027-03-12');
       expect(await db.select(db.participants).get(), isEmpty);
     });
 
@@ -1289,6 +1315,8 @@ void main() {
         cpf: '52998224725',
         name: 'Fernanda Lopes Meireles',
         participationType: ParticipationType.teoricaEPratica,
+        cnhCategory: 'AB',
+        cnhExpiration: '2027-03-12',
       );
 
       expect(result.isSuccess, isTrue);

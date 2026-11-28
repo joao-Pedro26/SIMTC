@@ -410,6 +410,8 @@ class ParticipantRepository {
     required String name,
     String? email,
     required ParticipationType participationType,
+    required String cnhCategory,
+    required String cnhExpiration,
   }) async {
     final SessionParticipant added;
     try {
@@ -420,11 +422,30 @@ class ParticipantRepository {
           'name': name,
           if (email != null && email.isNotEmpty) 'email': email,
           'participationType': participationType.wireValue,
+          'cnhCategory': cnhCategory,
+          'cnhExpiration': cnhExpiration,
         },
       );
-      added = SessionParticipant.fromJson(
+      final parsed = SessionParticipant.fromJson(
         response.data ?? const <String, dynamic>{},
         sessionId: sessionId,
+      );
+      // O que acabou de ir é o que o servidor gravou: a linha nova já mostra
+      // a CNH, mesmo que a resposta não a repita.
+      added = SessionParticipant(
+        id: parsed.id,
+        sessionId: parsed.sessionId,
+        name: parsed.name,
+        maskedCpf: parsed.maskedCpf,
+        participationType: parsed.participationType,
+        status: parsed.status,
+        assignedConsultantId: parsed.assignedConsultantId,
+        assignedConsultantName: parsed.assignedConsultantName,
+        score: parsed.score,
+        assessedByConsultantId: parsed.assessedByConsultantId,
+        assessedAt: parsed.assessedAt,
+        cnhCategory: parsed.cnhCategory ?? cnhCategory,
+        cnhExpiration: parsed.cnhExpiration ?? cnhExpiration,
       );
     } on ApiException catch (error) {
       final ownMessage = error.statusCode == 409 ||
@@ -449,6 +470,8 @@ class ParticipantRepository {
           maskedCpf: maskCpf(cpf),
           participationType: participationType,
           status: ParticipantStatus.pendente,
+          cnhCategory: cnhCategory,
+          cnhExpiration: cnhExpiration,
         ),
       );
     }
@@ -463,6 +486,8 @@ class ParticipantRepository {
               participationType: added.participationType.wireValue,
               status: added.status.wireValue,
               cachedAt: _now(),
+              cnhCategory: Value(added.cnhCategory),
+              cnhExpiration: Value(added.cnhExpiration),
             ),
           );
     } catch (_) {
