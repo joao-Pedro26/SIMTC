@@ -79,6 +79,19 @@ describe('CertificatesService', () => {
     mockStorage.getSignedUrl.mockImplementation(async (_bucket: string, path: string) => `https://signed/${path}`);
   });
 
+  describe('formatCargaHoraria: texto da carga horaria no certificado', () => {
+    const format = (theory: number, practice: number): string =>
+      (service as any).formatCargaHoraria(theory, practice);
+
+    it('teoria + pratica: "horas praticas" no plural', () => {
+      expect(format(4, 2)).toBe('6 horas (4 horas teóricas e 2h00 horas práticas)');
+    });
+
+    it('so teoria: mostra so as horas teoricas', () => {
+      expect(format(4, 0)).toBe('4 horas teóricas');
+    });
+  });
+
   describe('generateCertificateForParticipant (assinatura do participante)', () => {
     it('resolve a signed URL (300s, bucket signatures) da assinatura do participante e passa ao renderer', async () => {
       mockPrisma.trainingParticipant.findUniqueOrThrow.mockResolvedValue(buildTrainingParticipant());

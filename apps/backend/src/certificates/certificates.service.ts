@@ -218,7 +218,7 @@ export class CertificatesService {
       const practiceStr = Number.isInteger(practiceHours)
         ? `${practiceHours}h00`
         : `${practiceHours}h`;
-      return `${total} horas (${theoryHours} horas teóricas e ${practiceStr} horas prática)`;
+      return `${total} horas (${theoryHours} horas teóricas e ${practiceStr} horas práticas)`;
     }
     return `${total} horas teóricas`;
   }
