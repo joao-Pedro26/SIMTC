@@ -13,6 +13,7 @@ abstract final class AppIcons {
   static const IconData hidePassword = Icons.visibility_off_outlined;
   static const IconData check = Icons.check;
   static const IconData chevronRight = Icons.chevron_right;
+  static const IconData chevronDown = Icons.expand_more;
   static const IconData search = Icons.search;
   static const IconData offline = Icons.cloud_off_outlined;
   static const IconData noSignal = Icons.wifi_off_outlined;

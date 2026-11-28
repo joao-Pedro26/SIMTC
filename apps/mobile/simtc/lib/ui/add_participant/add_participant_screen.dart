@@ -7,7 +7,9 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
+import '../../data/models/cnh.dart';
 import '../core/cpf_input_formatter.dart';
+import '../core/date_input_formatter.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
 import '../core/theme/app_colors.dart';
@@ -17,6 +19,7 @@ import '../core/theme/app_typography.dart';
 import '../core/widgets/admin_dialog.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_footer_bar.dart';
+import '../core/widgets/app_select_field.dart';
 import '../core/widgets/app_spinner.dart';
 import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
@@ -56,6 +59,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
   final TextEditingController _cpfController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _cnhExpirationController = TextEditingController();
   final FocusNode _cpfFocus = FocusNode();
   final FocusNode _nameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
@@ -75,6 +79,7 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     _cpfController.dispose();
     _nameController.dispose();
     _emailController.dispose();
+    _cnhExpirationController.dispose();
     _cpfFocus.dispose();
     _nameFocus.dispose();
     _emailFocus.dispose();
@@ -91,6 +96,9 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
     }
     if (_emailController.text != _viewModel.email) {
       _emailController.text = _viewModel.email;
+    }
+    if (_cnhExpirationController.text != _viewModel.cnhExpirationText) {
+      _cnhExpirationController.text = _viewModel.cnhExpirationText;
     }
     if (_viewModel.cpf.isEmpty && _cpfController.text.isNotEmpty) {
       _cpfController.clear();
@@ -244,6 +252,10 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
         const SizedBox(height: AppSpacing.lg + 2),
         _buildEmailField(),
         const SizedBox(height: AppSpacing.lg + 2),
+        _buildCnhCategoryField(),
+        const SizedBox(height: AppSpacing.lg + 2),
+        _buildCnhExpirationField(),
+        const SizedBox(height: AppSpacing.lg + 2),
         _buildTypeSelector(),
       ],
     );
@@ -349,6 +361,37 @@ class _AddParticipantScreenState extends State<AddParticipantScreen> {
       enabled: _registryFieldsEnabled,
       errorText: _showEmailError ? 'E-mail inválido.' : null,
       onChanged: _viewModel.setEmail,
+    );
+  }
+
+  /// A CNH é obrigatória e, como nome e e-mail, o cadastro pode preenchê-la:
+  /// fica travada enquanto o CPF é consultado.
+  Widget _buildCnhCategoryField() {
+    return AppSelectField<String>(
+      key: const Key('campo-cnh-categoria'),
+      label: 'Categoria da CNH',
+      hintText: 'Selecione',
+      value: _viewModel.cnhCategory,
+      options: cnhCategories,
+      optionLabel: (category) => category,
+      enabled: _registryFieldsEnabled,
+      onChanged: _viewModel.setCnhCategory,
+    );
+  }
+
+  Widget _buildCnhExpirationField() {
+    return AppTextField(
+      key: const Key('campo-cnh-vencimento'),
+      label: 'Vencimento da CNH',
+      controller: _cnhExpirationController,
+      hintText: 'dd/mm/aaaa',
+      mono: true,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      inputFormatters: const [DateInputFormatter()],
+      enabled: _registryFieldsEnabled,
+      errorText: _viewModel.cnhExpirationError,
+      onChanged: _viewModel.setCnhExpiration,
     );
   }
 

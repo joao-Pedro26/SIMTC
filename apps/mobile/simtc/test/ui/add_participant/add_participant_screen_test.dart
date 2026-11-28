@@ -20,10 +20,12 @@ import 'package:simtc/data/services/local/app_database.dart';
 import 'package:simtc/router.dart';
 import 'package:simtc/ui/add_participant/add_participant_screen.dart';
 import 'package:simtc/ui/core/app_localization.dart';
+import 'package:simtc/ui/core/form_factor.dart';
 import 'package:simtc/ui/core/theme/app_colors.dart';
 import 'package:simtc/ui/core/theme/app_icons.dart';
 import 'package:simtc/ui/core/theme/app_theme.dart';
 import 'package:simtc/ui/core/widgets/app_buttons.dart';
+import 'package:simtc/ui/core/widgets/app_select_field.dart';
 import 'package:simtc/ui/core/widgets/app_text_field.dart';
 
 import '../../support/a11y.dart';
@@ -187,6 +189,7 @@ void main() {
     WidgetTester tester, {
     Size screen = const Size(412, 1400),
     double textScale = 1,
+    FormFactor formFactor = FormFactor.phone,
   }) async {
     tester.view.physicalSize = screen;
     tester.view.devicePixelRatio = 1.0;
@@ -227,7 +230,7 @@ void main() {
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context)
                 .copyWith(textScaler: TextScaler.linear(textScale)),
-            child: child!,
+            child: FormFactorScope(formFactor: formFactor, child: child!),
           ),
         ),
       ),
@@ -270,6 +273,24 @@ void main() {
   Future<void> typeCpf(WidgetTester tester, [String digits = cpf]) async {
     await tester.enterText(field('campo-cpf'), digits);
     await tester.pumpAndSettle();
+  }
+
+  /// Escolhe a categoria no menu e digita o vencimento: a CNH é obrigatória
+  /// para adicionar.
+  Future<void> fillCnh(
+    WidgetTester tester, {
+    String category = 'AB',
+    String expiration = '12032027',
+  }) async {
+    // Num celular baixo os campos da CNH ficam abaixo da dobra.
+    await tester.ensureVisible(find.byKey(const Key('campo-cnh-categoria')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('campo-cnh-categoria')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(MenuItemButton, category));
+    await tester.pumpAndSettle();
+    await tester.enterText(field('campo-cnh-vencimento'), expiration);
+    await tester.pump();
   }
 
   testWidgets(
@@ -365,6 +386,7 @@ void main() {
     expect(addButton(tester).onPressed, isNull, reason: 'falta o nome');
 
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
     await tester.pump();
     await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
     await tester.pumpAndSettle();
@@ -373,6 +395,8 @@ void main() {
       'cpf': cpf,
       'name': 'Fernanda Lopes Meireles',
       'participationType': 'TEORICA_E_PRATICA',
+      'cnhCategory': 'AB',
+      'cnhExpiration': '2027-03-12',
     });
     expect(find.text('origem'), findsOneWidget);
     expect(find.byType(AddParticipantScreen), findsNothing);
@@ -421,10 +445,12 @@ void main() {
           'preenchidos. Altere se precisar.'),
       findsOneWidget,
     );
-    expect(addButton(tester).onPressed, isNotNull);
+    expect(addButton(tester).onPressed, isNull, reason: 'falta a CNH');
 
     // Os campos continuam editáveis: o que está na tela é o que vai.
     await tester.enterText(field('campo-nome'), 'Fernanda L. Meireles');
+    await fillCnh(tester);
+    expect(addButton(tester).onPressed, isNotNull);
     await tester.pump();
     await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
     await tester.pumpAndSettle();
@@ -434,6 +460,8 @@ void main() {
       'name': 'Fernanda L. Meireles',
       'email': 'fernanda@empresa.com.br',
       'participationType': 'TEORICA_E_PRATICA',
+      'cnhCategory': 'AB',
+      'cnhExpiration': '2027-03-12',
     });
   });
 
@@ -608,6 +636,7 @@ void main() {
 
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
     await tester.pump();
 
     expect(
@@ -628,6 +657,7 @@ void main() {
     await pumpAdd(tester);
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
     await tester.pump();
     await tester.tap(find.byKey(const Key('tipo-somenteTeorica')));
     await tester.pump();
@@ -640,11 +670,18 @@ void main() {
     expect(textOf(tester, 'campo-cpf'), '');
     expect(textOf(tester, 'campo-nome'), '');
     expect(textOf(tester, 'campo-email'), '');
+    expect(textOf(tester, 'campo-cnh-vencimento'), '');
+    expect(
+      tester.widget<AppSelectField<String>>(find.byKey(const Key('campo-cnh-categoria'))).value,
+      isNull,
+    );
     expect(addButton(tester).onPressed, isNull);
     expect(sentBodies().single, {
       'cpf': cpf,
       'name': 'Fernanda Lopes Meireles',
       'participationType': 'SOMENTE_TEORICA',
+      'cnhCategory': 'AB',
+      'cnhExpiration': '2027-03-12',
     });
 
     // Formulário vazio: o X fecha sem perguntar.
@@ -675,6 +712,7 @@ void main() {
     await pumpAdd(tester);
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
     await tester.pump();
 
     await tester.tap(find.text('Salvar e adicionar outro'));
@@ -708,6 +746,7 @@ void main() {
     await pumpAdd(tester);
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
 
     await tester.tap(field('campo-email'));
     await tester.enterText(field('campo-email'), 'fernanda@empresa');
@@ -726,6 +765,128 @@ void main() {
 
     expect(find.text('E-mail inválido.'), findsNothing);
     expect(addButton(tester).onPressed, isNotNull);
+  });
+
+  group('CNH', () {
+    String? selectedCategory(WidgetTester tester) => tester
+        .widget<AppSelectField<String>>(find.byKey(const Key('campo-cnh-categoria')))
+        .value;
+
+    testWidgets(
+        'o botão só habilita com a categoria e a data válidas', (tester) async {
+      await seedSession();
+      cpfIsFree();
+      await pumpAdd(tester);
+      await typeCpf(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await tester.pump();
+      expect(find.text('Categoria da CNH'), findsOneWidget);
+      expect(find.text('Selecione'), findsOneWidget);
+      expect(find.text('dd/mm/aaaa'), findsOneWidget);
+      expect(addButton(tester).onPressed, isNull, reason: 'sem CNH');
+
+      await tester.tap(find.byKey(const Key('campo-cnh-categoria')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(MenuItemButton, 'AB'));
+      await tester.pumpAndSettle();
+      expect(selectedCategory(tester), 'AB');
+      expect(addButton(tester).onPressed, isNull, reason: 'falta a data');
+
+      await tester.enterText(field('campo-cnh-vencimento'), '1203');
+      await tester.pump();
+      expect(textOf(tester, 'campo-cnh-vencimento'), '12/03');
+      expect(find.text('Data inválida.'), findsNothing, reason: 'incompleta');
+      expect(addButton(tester).onPressed, isNull);
+
+      await tester.enterText(field('campo-cnh-vencimento'), '12032027');
+      await tester.pump();
+      expect(textOf(tester, 'campo-cnh-vencimento'), '12/03/2027');
+      expect(addButton(tester).onPressed, isNotNull);
+    });
+
+    testWidgets('data que não existe mostra "Data inválida." e não libera',
+        (tester) async {
+      await seedSession();
+      cpfIsFree();
+      await pumpAdd(tester);
+      await typeCpf(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await fillCnh(tester, expiration: '31022027');
+
+      expect(textOf(tester, 'campo-cnh-vencimento'), '31/02/2027');
+      expect(find.text('Data inválida.'), findsOneWidget);
+      expect(addButton(tester).onPressed, isNull);
+    });
+
+    testWidgets('o cadastro preenche a categoria e o vencimento',
+        (tester) async {
+      await seedSession();
+      lookupAnswers({
+        'registered': true,
+        'name': 'Fernanda Lopes Meireles',
+        'email': null,
+        'enrolled': false,
+        'cnhCategory': 'C',
+        'cnhExpiration': '2027-03-12T00:00:00.000Z',
+      });
+      await pumpAdd(tester);
+
+      await typeCpf(tester);
+
+      expect(selectedCategory(tester), 'C');
+      expect(textOf(tester, 'campo-cnh-vencimento'), '12/03/2027');
+      expect(addButton(tester).onPressed, isNotNull);
+    });
+
+    testWidgets('travados enquanto o CPF é consultado, como nome e e-mail',
+        (tester) async {
+      await seedSession();
+      final lookup = Completer<Response<Map<String, dynamic>>>();
+      when(() => api.post<Map<String, dynamic>>(lookupPath, data: any(named: 'data')))
+          .thenAnswer((_) => lookup.future);
+      await pumpAdd(tester);
+
+      await tester.enterText(field('campo-cpf'), cpf);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(tester.widget<TextField>(field('campo-cnh-vencimento')).enabled, isFalse);
+      await tester.tap(find.byKey(const Key('campo-cnh-categoria')),
+          warnIfMissed: false);
+      await tester.pump();
+      expect(find.byType(MenuItemButton), findsNothing);
+
+      lookup.complete(Response<Map<String, dynamic>>(
+        requestOptions: RequestOptions(path: lookupPath),
+        statusCode: 200,
+        data: {'registered': false, 'name': null, 'email': null, 'enrolled': false},
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field('campo-cnh-vencimento')).enabled, isTrue);
+    });
+
+    testWidgets('no tablet os dois campos aparecem e funcionam', (tester) async {
+      await seedSession();
+      cpfIsFree();
+      addAnswers(addedJson());
+      await pumpAdd(
+        tester,
+        screen: const Size(1280, 800),
+        formFactor: FormFactor.tablet,
+      );
+      await typeCpf(tester);
+      await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      expect(find.text('Categoria da CNH'), findsOneWidget);
+      expect(find.text('Vencimento da CNH'), findsOneWidget);
+
+      await fillCnh(tester, category: 'B', expiration: '01122030');
+
+      expect(selectedCategory(tester), 'B');
+      expect(textOf(tester, 'campo-cnh-vencimento'), '01/12/2030');
+      expect(addButton(tester).onPressed, isNotNull);
+      await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
+      await tester.pumpAndSettle();
+      expect(sentBodies().single, containsPair('cnhExpiration', '2030-12-01'));
+    });
   });
 
   group('fechar a tela', () {
@@ -807,6 +968,8 @@ void main() {
       await pumpAdd(tester);
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await fillCnh(tester);
+    await fillCnh(tester);
       await tester.pump();
 
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
@@ -901,6 +1064,8 @@ void main() {
       await pumpAdd(tester);
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await fillCnh(tester);
+    await fillCnh(tester);
       await tester.pump();
 
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
@@ -938,6 +1103,7 @@ void main() {
     await pumpAdd(tester);
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
     await tester.pump();
 
     expect(
@@ -960,6 +1126,10 @@ void main() {
     await pumpAdd(tester, screen: const Size(360, 640));
     await typeCpf(tester);
     await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+    await fillCnh(tester);
+    // Num celular baixo a faixa de sem conexão rola junto com o formulário:
+    // o fillCnh a deixou lá em cima, fora da vista.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 1000));
     await tester.pump();
     expect(find.text('Disponível quando houver conexão'), findsOneWidget);
 
@@ -1021,6 +1191,8 @@ void main() {
     Future<void> fillAndAdd(WidgetTester tester) async {
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
+      await fillCnh(tester);
+    await fillCnh(tester);
       await tester.pump();
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
       await tester.pumpAndSettle();
