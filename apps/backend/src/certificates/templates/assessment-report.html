@@ -93,8 +93,13 @@
     text-align: justify;
     line-height: 15.35pt;
     margin: 0 0 14pt 0;
+    /* Recuo de parágrafo (1,25 cm, o padrão ABNT). */
+    text-indent: 35.4pt;
   }
   .body-text.intro-para { line-height: 13.4pt; }
+  /* O comentário da nota de cada infração é um item curto embaixo do título
+     dela, não um parágrafo: sem recuo. */
+  .body-text.infraction-body { text-indent: 0; }
 
   .section-header {
     font-family: Verdana, Geneva, sans-serif;
@@ -237,7 +242,7 @@
         {{#if this.description}}<div class="body-text">{{this.description}}</div>{{/if}}
         {{#each this.infractions}}
         <div class="infraction-title">{{this.title}}</div>
-        {{#if this.body}}<div class="body-text">{{this.body}}</div>{{/if}}
+        {{#if this.body}}<div class="body-text infraction-body">{{this.body}}</div>{{/if}}
         {{#if this.observation}}
         <div class="instructor-note"><span class="instructor-note-label">Observação do instrutor:</span> {{this.observation}}</div>
         {{/if}}
