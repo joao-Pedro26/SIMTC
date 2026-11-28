@@ -337,9 +337,37 @@ void main() {
 
       await pickClock(tester, 'campo-inicio', 23, 59);
 
+      final error = find.text('A hora de término precisa ser depois da hora de início.');
+      expect(error, findsOneWidget);
+      // Fora dos campos: em largura total, sob a linha dos dois.
       expect(
-        find.text('A hora de término precisa ser depois da hora de início.'),
-        findsOneWidget,
+        find.descendant(of: find.byKey(const Key('campo-fim')), matching: error),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: find.byKey(const Key('campo-inicio')), matching: error),
+        findsNothing,
+      );
+      expect(
+        tester.widget<AppCtaButton>(find.widgetWithText(AppCtaButton, 'Confirmar')).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets(
+        'fim depois de agora mostra o erro uma vez, fora dos campos, e trava o '
+        '"Confirmar"', (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await startThreeHoursAgo();
+      await pumpSummary(tester);
+
+      await pickClock(tester, 'campo-fim', 23, 59);
+
+      final error = find.text('A hora de término não pode ser depois de agora.');
+      expect(error, findsOneWidget);
+      expect(
+        find.descendant(of: find.byKey(const Key('campo-fim')), matching: error),
+        findsNothing,
       );
       expect(
         tester.widget<AppCtaButton>(find.widgetWithText(AppCtaButton, 'Confirmar')).onPressed,

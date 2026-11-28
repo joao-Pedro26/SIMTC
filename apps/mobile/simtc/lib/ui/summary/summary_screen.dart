@@ -397,8 +397,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
   }
 
   /// Início e fim da avaliação, lado a lado. Não se digita: o toque abre o
-  /// seletor de hora (mesmo padrão do campo de data da edição da sessão). Só
-  /// o fim mostra o erro de horário, que é onde o consultor mexe quase sempre.
+  /// seletor de hora (mesmo padrão do campo de data da edição da sessão). O erro
+  /// de horário, se houver, aparece sob os dois campos.
   Widget _buildClockFields() {
     final enabled = !_viewModel.isConfirming;
     return Column(
@@ -433,7 +433,6 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 readOnly: true,
                 mono: true,
                 enabled: enabled,
-                errorText: _viewModel.timesError,
                 onTap: () => _pickClock(
                   current: _viewModel.endTime,
                   helpText: 'Fim da avaliação',
@@ -443,6 +442,18 @@ class _SummaryScreenState extends State<SummaryScreen> {
             ),
           ],
         ),
+        // O erro vale para o par início/fim, e a coluna do Fim é estreita
+        // demais para a frase: aparece uma vez, em largura total. O
+        // `AppTextField` só marca a borda junto de um texto de erro, então os
+        // campos ficam sem borda de erro.
+        if (_viewModel.timesError case final error?) ...[
+          const SizedBox(height: AppSpacing.xs + 2),
+          Text(
+            error,
+            key: const Key('erro-horario'),
+            style: AppTypography.meta.copyWith(color: AppColors.dangerInk),
+          ),
+        ],
         const SizedBox(height: AppSpacing.xs + 2),
         Text(
           'Ajuste se a avaliação começou ou terminou em outro horário: é o que sai no relatório.',
