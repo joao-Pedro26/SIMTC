@@ -429,8 +429,8 @@ export class ParticipantsService {
   /**
    * Consulta de CPF da tela "Adicionar participante" do app mobile: diz se o
    * CPF já tem cadastro (`Participant`, compartilhado entre treinamentos) —
-   * devolvendo nome e e-mail para a tela preencher — e se já está inscrito
-   * nesta sessão. Só lê: quem grava é o `addParticipant`.
+   * devolvendo nome, e-mail e CNH para a tela preencher — e se já está
+   * inscrito nesta sessão. Só lê: quem grava é o `addParticipant`.
    */
   async lookupByCpf(trainingSessionId: string, cpf: string) {
     const session = await this.prisma.trainingSession.findUnique({
@@ -441,7 +441,14 @@ export class ParticipantsService {
 
     const participant = await this.prisma.participant.findUnique({ where: { cpf } });
     if (!participant) {
-      return { registered: false, name: null, email: null, enrolled: false };
+      return {
+        registered: false,
+        name: null,
+        email: null,
+        enrolled: false,
+        cnhCategory: null,
+        cnhExpiration: null,
+      };
     }
 
     const enrollment = await this.prisma.trainingParticipant.findUnique({
@@ -454,11 +461,16 @@ export class ParticipantsService {
       select: { id: true },
     });
 
+    // A CNH é data de calendário: vai como AAAA-MM-DD, sem conversão de fuso.
     return {
       registered: true,
       name: participant.name,
       email: participant.email ?? null,
       enrolled: enrollment !== null,
+      cnhCategory: participant.cnhCategory ?? null,
+      cnhExpiration: participant.cnhExpiration
+        ? participant.cnhExpiration.toISOString().slice(0, 10)
+        : null,
     };
   }
 

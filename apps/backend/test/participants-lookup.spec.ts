@@ -54,6 +54,8 @@ describe('ParticipantsService.lookupByCpf', () => {
       name: null,
       email: null,
       enrolled: false,
+      cnhCategory: null,
+      cnhExpiration: null,
     });
     expect(mockPrisma.participant.findUnique).toHaveBeenCalledWith({ where: { cpf: CPF } });
     expect(mockPrisma.trainingParticipant.findUnique).not.toHaveBeenCalled();
@@ -64,6 +66,8 @@ describe('ParticipantsService.lookupByCpf', () => {
       id: 'part-1',
       name: 'Fernanda Lopes Meireles',
       email: 'fernanda@empresa.com.br',
+      cnhCategory: 'AB',
+      cnhExpiration: new Date('2027-03-12T00:00:00.000Z'),
     });
     mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
 
@@ -72,6 +76,8 @@ describe('ParticipantsService.lookupByCpf', () => {
       name: 'Fernanda Lopes Meireles',
       email: 'fernanda@empresa.com.br',
       enrolled: false,
+      cnhCategory: 'AB',
+      cnhExpiration: '2027-03-12',
     });
     expect(mockPrisma.trainingParticipant.findUnique).toHaveBeenCalledWith({
       where: {
@@ -102,6 +108,8 @@ describe('ParticipantsService.lookupByCpf', () => {
       id: 'part-1',
       name: 'Fernanda Lopes Meireles',
       email: null,
+      cnhCategory: 'AB',
+      cnhExpiration: new Date('2027-03-12T00:00:00.000Z'),
     });
     mockPrisma.trainingParticipant.findUnique.mockResolvedValue({ id: 'tp-1' });
 
@@ -110,6 +118,24 @@ describe('ParticipantsService.lookupByCpf', () => {
       name: 'Fernanda Lopes Meireles',
       email: null,
       enrolled: true,
+      cnhCategory: 'AB',
+      cnhExpiration: '2027-03-12',
+    });
+  });
+
+  it('cadastro sem CNH devolve os dois campos nulos', async () => {
+    mockPrisma.participant.findUnique.mockResolvedValue({
+      id: 'part-1',
+      name: 'Fernanda Lopes Meireles',
+      email: null,
+      cnhCategory: null,
+      cnhExpiration: null,
+    });
+    mockPrisma.trainingParticipant.findUnique.mockResolvedValue(null);
+
+    await expect(service.lookupByCpf('sess-1', CPF)).resolves.toMatchObject({
+      cnhCategory: null,
+      cnhExpiration: null,
     });
   });
 
