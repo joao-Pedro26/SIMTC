@@ -891,6 +891,18 @@ class $ParticipantsTable extends Participants
   late final GeneratedColumn<DateTime> assessedAt = GeneratedColumn<DateTime>(
       'assessed_at', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _cnhCategoryMeta =
+      const VerificationMeta('cnhCategory');
+  @override
+  late final GeneratedColumn<String> cnhCategory = GeneratedColumn<String>(
+      'cnh_category', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cnhExpirationMeta =
+      const VerificationMeta('cnhExpiration');
+  @override
+  late final GeneratedColumn<String> cnhExpiration = GeneratedColumn<String>(
+      'cnh_expiration', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _cachedAtMeta =
       const VerificationMeta('cachedAt');
   @override
@@ -911,6 +923,8 @@ class $ParticipantsTable extends Participants
         score,
         assessedByConsultantId,
         assessedAt,
+        cnhCategory,
+        cnhExpiration,
         cachedAt
       ];
   @override
@@ -992,6 +1006,18 @@ class $ParticipantsTable extends Participants
           assessedAt.isAcceptableOrUnknown(
               data['assessed_at']!, _assessedAtMeta));
     }
+    if (data.containsKey('cnh_category')) {
+      context.handle(
+          _cnhCategoryMeta,
+          cnhCategory.isAcceptableOrUnknown(
+              data['cnh_category']!, _cnhCategoryMeta));
+    }
+    if (data.containsKey('cnh_expiration')) {
+      context.handle(
+          _cnhExpirationMeta,
+          cnhExpiration.isAcceptableOrUnknown(
+              data['cnh_expiration']!, _cnhExpirationMeta));
+    }
     if (data.containsKey('cached_at')) {
       context.handle(_cachedAtMeta,
           cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
@@ -1034,6 +1060,10 @@ class $ParticipantsTable extends Participants
           data['${effectivePrefix}assessed_by_consultant_id']),
       assessedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}assessed_at']),
+      cnhCategory: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cnh_category']),
+      cnhExpiration: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cnh_expiration']),
       cachedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
     );
@@ -1065,6 +1095,12 @@ class Participant extends DataClass implements Insertable<Participant> {
 
   /// Fim (ou início) da avaliação sincronizada — a linha "hoje 08:12".
   final DateTime? assessedAt;
+
+  /// Categoria da CNH do participante (`A`…`AE`), do cadastro.
+  final String? cnhCategory;
+
+  /// Vencimento da CNH: data de calendário, texto `AAAA-MM-DD`, sem fuso.
+  final String? cnhExpiration;
   final DateTime cachedAt;
   const Participant(
       {required this.id,
@@ -1079,6 +1115,8 @@ class Participant extends DataClass implements Insertable<Participant> {
       this.score,
       this.assessedByConsultantId,
       this.assessedAt,
+      this.cnhCategory,
+      this.cnhExpiration,
       required this.cachedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1109,6 +1147,12 @@ class Participant extends DataClass implements Insertable<Participant> {
     if (!nullToAbsent || assessedAt != null) {
       map['assessed_at'] = Variable<DateTime>(assessedAt);
     }
+    if (!nullToAbsent || cnhCategory != null) {
+      map['cnh_category'] = Variable<String>(cnhCategory);
+    }
+    if (!nullToAbsent || cnhExpiration != null) {
+      map['cnh_expiration'] = Variable<String>(cnhExpiration);
+    }
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
   }
@@ -1137,6 +1181,12 @@ class Participant extends DataClass implements Insertable<Participant> {
       assessedAt: assessedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(assessedAt),
+      cnhCategory: cnhCategory == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnhCategory),
+      cnhExpiration: cnhExpiration == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cnhExpiration),
       cachedAt: Value(cachedAt),
     );
   }
@@ -1160,6 +1210,8 @@ class Participant extends DataClass implements Insertable<Participant> {
       assessedByConsultantId:
           serializer.fromJson<String?>(json['assessedByConsultantId']),
       assessedAt: serializer.fromJson<DateTime?>(json['assessedAt']),
+      cnhCategory: serializer.fromJson<String?>(json['cnhCategory']),
+      cnhExpiration: serializer.fromJson<String?>(json['cnhExpiration']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -1181,6 +1233,8 @@ class Participant extends DataClass implements Insertable<Participant> {
       'assessedByConsultantId':
           serializer.toJson<String?>(assessedByConsultantId),
       'assessedAt': serializer.toJson<DateTime?>(assessedAt),
+      'cnhCategory': serializer.toJson<String?>(cnhCategory),
+      'cnhExpiration': serializer.toJson<String?>(cnhExpiration),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -1198,6 +1252,8 @@ class Participant extends DataClass implements Insertable<Participant> {
           Value<double?> score = const Value.absent(),
           Value<String?> assessedByConsultantId = const Value.absent(),
           Value<DateTime?> assessedAt = const Value.absent(),
+          Value<String?> cnhCategory = const Value.absent(),
+          Value<String?> cnhExpiration = const Value.absent(),
           DateTime? cachedAt}) =>
       Participant(
         id: id ?? this.id,
@@ -1218,6 +1274,9 @@ class Participant extends DataClass implements Insertable<Participant> {
             ? assessedByConsultantId.value
             : this.assessedByConsultantId,
         assessedAt: assessedAt.present ? assessedAt.value : this.assessedAt,
+        cnhCategory: cnhCategory.present ? cnhCategory.value : this.cnhCategory,
+        cnhExpiration:
+            cnhExpiration.present ? cnhExpiration.value : this.cnhExpiration,
         cachedAt: cachedAt ?? this.cachedAt,
       );
   Participant copyWithCompanion(ParticipantsCompanion data) {
@@ -1243,6 +1302,11 @@ class Participant extends DataClass implements Insertable<Participant> {
           : this.assessedByConsultantId,
       assessedAt:
           data.assessedAt.present ? data.assessedAt.value : this.assessedAt,
+      cnhCategory:
+          data.cnhCategory.present ? data.cnhCategory.value : this.cnhCategory,
+      cnhExpiration: data.cnhExpiration.present
+          ? data.cnhExpiration.value
+          : this.cnhExpiration,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -1262,6 +1326,8 @@ class Participant extends DataClass implements Insertable<Participant> {
           ..write('score: $score, ')
           ..write('assessedByConsultantId: $assessedByConsultantId, ')
           ..write('assessedAt: $assessedAt, ')
+          ..write('cnhCategory: $cnhCategory, ')
+          ..write('cnhExpiration: $cnhExpiration, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
@@ -1281,6 +1347,8 @@ class Participant extends DataClass implements Insertable<Participant> {
       score,
       assessedByConsultantId,
       assessedAt,
+      cnhCategory,
+      cnhExpiration,
       cachedAt);
   @override
   bool operator ==(Object other) =>
@@ -1298,6 +1366,8 @@ class Participant extends DataClass implements Insertable<Participant> {
           other.score == this.score &&
           other.assessedByConsultantId == this.assessedByConsultantId &&
           other.assessedAt == this.assessedAt &&
+          other.cnhCategory == this.cnhCategory &&
+          other.cnhExpiration == this.cnhExpiration &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -1314,6 +1384,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
   final Value<double?> score;
   final Value<String?> assessedByConsultantId;
   final Value<DateTime?> assessedAt;
+  final Value<String?> cnhCategory;
+  final Value<String?> cnhExpiration;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const ParticipantsCompanion({
@@ -1329,6 +1401,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
     this.score = const Value.absent(),
     this.assessedByConsultantId = const Value.absent(),
     this.assessedAt = const Value.absent(),
+    this.cnhCategory = const Value.absent(),
+    this.cnhExpiration = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1345,6 +1419,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
     this.score = const Value.absent(),
     this.assessedByConsultantId = const Value.absent(),
     this.assessedAt = const Value.absent(),
+    this.cnhCategory = const Value.absent(),
+    this.cnhExpiration = const Value.absent(),
     required DateTime cachedAt,
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -1367,6 +1443,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
     Expression<double>? score,
     Expression<String>? assessedByConsultantId,
     Expression<DateTime>? assessedAt,
+    Expression<String>? cnhCategory,
+    Expression<String>? cnhExpiration,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -1386,6 +1464,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
       if (assessedByConsultantId != null)
         'assessed_by_consultant_id': assessedByConsultantId,
       if (assessedAt != null) 'assessed_at': assessedAt,
+      if (cnhCategory != null) 'cnh_category': cnhCategory,
+      if (cnhExpiration != null) 'cnh_expiration': cnhExpiration,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1404,6 +1484,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
       Value<double?>? score,
       Value<String?>? assessedByConsultantId,
       Value<DateTime?>? assessedAt,
+      Value<String?>? cnhCategory,
+      Value<String?>? cnhExpiration,
       Value<DateTime>? cachedAt,
       Value<int>? rowid}) {
     return ParticipantsCompanion(
@@ -1421,6 +1503,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
       assessedByConsultantId:
           assessedByConsultantId ?? this.assessedByConsultantId,
       assessedAt: assessedAt ?? this.assessedAt,
+      cnhCategory: cnhCategory ?? this.cnhCategory,
+      cnhExpiration: cnhExpiration ?? this.cnhExpiration,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1468,6 +1552,12 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
     if (assessedAt.present) {
       map['assessed_at'] = Variable<DateTime>(assessedAt.value);
     }
+    if (cnhCategory.present) {
+      map['cnh_category'] = Variable<String>(cnhCategory.value);
+    }
+    if (cnhExpiration.present) {
+      map['cnh_expiration'] = Variable<String>(cnhExpiration.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -1492,6 +1582,8 @@ class ParticipantsCompanion extends UpdateCompanion<Participant> {
           ..write('score: $score, ')
           ..write('assessedByConsultantId: $assessedByConsultantId, ')
           ..write('assessedAt: $assessedAt, ')
+          ..write('cnhCategory: $cnhCategory, ')
+          ..write('cnhExpiration: $cnhExpiration, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4451,6 +4543,8 @@ typedef $$ParticipantsTableCreateCompanionBuilder = ParticipantsCompanion
   Value<double?> score,
   Value<String?> assessedByConsultantId,
   Value<DateTime?> assessedAt,
+  Value<String?> cnhCategory,
+  Value<String?> cnhExpiration,
   required DateTime cachedAt,
   Value<int> rowid,
 });
@@ -4468,6 +4562,8 @@ typedef $$ParticipantsTableUpdateCompanionBuilder = ParticipantsCompanion
   Value<double?> score,
   Value<String?> assessedByConsultantId,
   Value<DateTime?> assessedAt,
+  Value<String?> cnhCategory,
+  Value<String?> cnhExpiration,
   Value<DateTime> cachedAt,
   Value<int> rowid,
 });
@@ -4537,6 +4633,12 @@ class $$ParticipantsTableFilterComposer
 
   ColumnFilters<DateTime> get assessedAt => $composableBuilder(
       column: $table.assessedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cnhCategory => $composableBuilder(
+      column: $table.cnhCategory, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cnhExpiration => $composableBuilder(
+      column: $table.cnhExpiration, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnFilters(column));
@@ -4608,6 +4710,13 @@ class $$ParticipantsTableOrderingComposer
   ColumnOrderings<DateTime> get assessedAt => $composableBuilder(
       column: $table.assessedAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get cnhCategory => $composableBuilder(
+      column: $table.cnhCategory, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cnhExpiration => $composableBuilder(
+      column: $table.cnhExpiration,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
 
@@ -4674,6 +4783,12 @@ class $$ParticipantsTableAnnotationComposer
   GeneratedColumn<DateTime> get assessedAt => $composableBuilder(
       column: $table.assessedAt, builder: (column) => column);
 
+  GeneratedColumn<String> get cnhCategory => $composableBuilder(
+      column: $table.cnhCategory, builder: (column) => column);
+
+  GeneratedColumn<String> get cnhExpiration => $composableBuilder(
+      column: $table.cnhExpiration, builder: (column) => column);
+
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
 
@@ -4733,6 +4848,8 @@ class $$ParticipantsTableTableManager extends RootTableManager<
             Value<double?> score = const Value.absent(),
             Value<String?> assessedByConsultantId = const Value.absent(),
             Value<DateTime?> assessedAt = const Value.absent(),
+            Value<String?> cnhCategory = const Value.absent(),
+            Value<String?> cnhExpiration = const Value.absent(),
             Value<DateTime> cachedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4749,6 +4866,8 @@ class $$ParticipantsTableTableManager extends RootTableManager<
             score: score,
             assessedByConsultantId: assessedByConsultantId,
             assessedAt: assessedAt,
+            cnhCategory: cnhCategory,
+            cnhExpiration: cnhExpiration,
             cachedAt: cachedAt,
             rowid: rowid,
           ),
@@ -4765,6 +4884,8 @@ class $$ParticipantsTableTableManager extends RootTableManager<
             Value<double?> score = const Value.absent(),
             Value<String?> assessedByConsultantId = const Value.absent(),
             Value<DateTime?> assessedAt = const Value.absent(),
+            Value<String?> cnhCategory = const Value.absent(),
+            Value<String?> cnhExpiration = const Value.absent(),
             required DateTime cachedAt,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4781,6 +4902,8 @@ class $$ParticipantsTableTableManager extends RootTableManager<
             score: score,
             assessedByConsultantId: assessedByConsultantId,
             assessedAt: assessedAt,
+            cnhCategory: cnhCategory,
+            cnhExpiration: cnhExpiration,
             cachedAt: cachedAt,
             rowid: rowid,
           ),

@@ -218,6 +218,27 @@ void main() {
       ]);
     });
 
+    test('grava a categoria e o vencimento da CNH do participante', () async {
+      await seedSession();
+      final withCnh = participantJson('tp-1');
+      (withCnh['participant'] as Map<String, dynamic>)
+        ..['cnhCategory'] = 'AB'
+        ..['cnhExpiration'] = '2027-03-12T00:00:00.000Z';
+      when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(
+        (_) async => ok(detailJson([withCnh])),
+      );
+
+      await repository.syncSession('sess-1');
+
+      final row = await db.select(db.participants).getSingle();
+      expect(row.cnhCategory, 'AB');
+      expect(row.cnhExpiration, '2027-03-12');
+
+      final shown = await repository.watchBySession('sess-1').first;
+      expect(shown.single.cnhCategory, 'AB');
+      expect(shown.single.cnhExpiration, '2027-03-12');
+    });
+
     test('o consultor que saiu da sessão no servidor sai do cache', () async {
       await seedSession();
       when(() => api.get<Map<String, dynamic>>(detailPath)).thenAnswer(

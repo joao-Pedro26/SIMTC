@@ -1,3 +1,4 @@
+import '../../utils/calendar_date.dart';
 import '../services/local/app_database.dart';
 
 /// Tipo de participação no treinamento. Espelha `ParticipationType` do
@@ -71,6 +72,8 @@ class SessionParticipant {
     this.score,
     this.assessedByConsultantId,
     this.assessedAt,
+    this.cnhCategory,
+    this.cnhExpiration,
   });
 
   /// Id do `TrainingParticipant` — é o que `assign` e `sync` recebem.
@@ -95,6 +98,14 @@ class SessionParticipant {
 
   /// Fim (ou início, se não houver fim) da última avaliação sincronizada.
   final DateTime? assessedAt;
+
+  /// Categoria da CNH do cadastro (`A`…`AE`, ver `cnhCategories`). Nula se
+  /// não foi informada.
+  final String? cnhCategory;
+
+  /// Vencimento da CNH como data de calendário `AAAA-MM-DD`. Nulo se não foi
+  /// informado. Não é um instante: não passa por `toLocal()`.
+  final String? cnhExpiration;
 
   /// Já tem resultado: aprovado ou aguardando reavaliação.
   bool get isAssessed =>
@@ -141,6 +152,8 @@ class SessionParticipant {
       // `endTime`/`startTime` são instantes de verdade (não datas de
       // calendário como `TrainingSession.date`): a hora local é a certa.
       assessedAt: DateTime.tryParse(end ?? start ?? ''),
+      cnhCategory: participant['cnhCategory'] as String?,
+      cnhExpiration: calendarDateFromApi(participant['cnhExpiration']),
     );
   }
 
@@ -158,6 +171,8 @@ class SessionParticipant {
       score: row.score,
       assessedByConsultantId: row.assessedByConsultantId,
       assessedAt: row.assessedAt,
+      cnhCategory: row.cnhCategory,
+      cnhExpiration: row.cnhExpiration,
     );
   }
 }

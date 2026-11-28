@@ -219,6 +219,8 @@ class ParticipantRepository {
                 score: Value(p.score),
                 assessedByConsultantId: Value(p.assessedByConsultantId),
                 assessedAt: Value(p.assessedAt),
+                cnhCategory: Value(p.cnhCategory),
+                cnhExpiration: Value(p.cnhExpiration),
                 cachedAt: now,
               ),
             );

@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -99,6 +99,13 @@ class AppDatabase extends _$AppDatabase {
                 localAssessmentItems,
                 localAssessmentItems.observation,
               );
+            }
+            if (from < 8) {
+              // CNH do participante (28/11/2026): anuláveis — o próximo sync da
+              // sessão preenche. O vencimento fica como texto `AAAA-MM-DD`,
+              // data de calendário, para não mudar de dia com o fuso.
+              await m.addColumn(participants, participants.cnhCategory);
+              await m.addColumn(participants, participants.cnhExpiration);
             }
           });
         },

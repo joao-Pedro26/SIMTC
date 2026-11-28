@@ -120,6 +120,32 @@ void main() {
     expect(p.participationType, ParticipationType.somenteTeorica);
   });
 
+  test('lê a categoria e o vencimento da CNH de participant', () {
+    final p = SessionParticipant.fromJson(
+      {
+        ...json(),
+        'participant': {
+          'id': 'p-1',
+          'name': 'Ana Paula Ribeiro',
+          'cpf': '04211899001',
+          'cnhCategory': 'AB',
+          'cnhExpiration': '2027-03-12T00:00:00.000Z',
+        },
+      },
+      sessionId: 'sess-1',
+    );
+
+    expect(p.cnhCategory, 'AB');
+    expect(p.cnhExpiration, '2027-03-12');
+  });
+
+  test('sem os campos de CNH, categoria e vencimento ficam nulos', () {
+    final p = SessionParticipant.fromJson(json(), sessionId: 'sess-1');
+
+    expect(p.cnhCategory, isNull);
+    expect(p.cnhExpiration, isNull);
+  });
+
   group('maskCpf', () {
     test('mantém só os 6 primeiros dígitos, com pontuação ou sem', () {
       expect(maskCpf('04211899001'), '042.118.***-**');

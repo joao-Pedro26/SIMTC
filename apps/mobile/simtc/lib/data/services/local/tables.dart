@@ -77,6 +77,12 @@ class Participants extends Table {
 
   /// Fim (ou início) da avaliação sincronizada — a linha "hoje 08:12".
   DateTimeColumn get assessedAt => dateTime().nullable()();
+
+  /// Categoria da CNH do participante (`A`…`AE`), do cadastro.
+  TextColumn get cnhCategory => text().nullable()();
+
+  /// Vencimento da CNH: data de calendário, texto `AAAA-MM-DD`, sem fuso.
+  TextColumn get cnhExpiration => text().nullable()();
   DateTimeColumn get cachedAt => dateTime()();
 
   @override

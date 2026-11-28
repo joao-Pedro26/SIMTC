@@ -511,6 +511,8 @@ void main() {
     expect(participant.name, 'Ana Paula Ribeiro');
     expect(participant.assessedByConsultantId, isNull);
     expect(participant.assessedAt, isNull);
+    expect(participant.cnhCategory, isNull);
+    expect(participant.cnhExpiration, isNull);
   });
 
   test(
@@ -621,6 +623,7 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
+          raw.execute(_participantsV1);
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
           raw.execute(_localAssessmentItemsV6);
@@ -702,6 +705,7 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
+          raw.execute(_participantsV1);
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
           raw.execute(_localAssessmentItemsV6);
@@ -750,6 +754,7 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
+          raw.execute(_participantsV1);
           raw.execute(_sessionsV4);
           raw.execute(_assessmentCategoriesV1);
           raw.execute(_localAssessmentItemsV6);
@@ -793,6 +798,7 @@ void main() {
       NativeDatabase(
         file,
         setup: (raw) {
+          raw.execute(_participantsV1);
           raw.execute(_localAssessmentItemsV6);
           raw.execute('''
             INSERT INTO local_assessment_items (id, local_assessment_id,
