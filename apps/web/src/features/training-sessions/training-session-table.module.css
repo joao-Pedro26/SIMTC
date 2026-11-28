@@ -45,6 +45,9 @@
 
 .center { text-align: center; }
 
+/* A coluna Empresa é mais larga para o logo não tirar espaço do nome. */
+.companyColumn { max-width: 17rem; }
+
 .companyCell {
   display: flex;
   align-items: center;
@@ -52,17 +55,19 @@
   min-width: 0;
 }
 
+/* Logos de empresa são quase sempre largos: caixa 2:1 e `contain`, sem cortar.
+   O espaço das iniciais tem a mesma largura, para os nomes ficarem alinhados. */
 .logo {
-  width: 2rem;
-  height: 2rem;
+  width: 5rem;
+  height: 2.5rem;
   border-radius: 4px;
-  object-fit: cover;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
 .logoFallback {
-  width: 2rem;
-  height: 2rem;
+  width: 5rem;
+  height: 2.5rem;
   border-radius: 4px;
   background-color: var(--teal-soft);
   color: var(--teal-dark);

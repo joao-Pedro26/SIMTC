@@ -97,7 +97,7 @@ export function TrainingSessionTable({ sessions, onSelect, onDelete }: TrainingS
                 className={styles.row}
                 onClick={() => onSelect(s)}
               >
-                <td className={styles.td}>
+                <td className={`${styles.td} ${styles.companyColumn}`}>
                   <div className={styles.companyCell}>
                     <CompanyLogo name={s.company.name} logoUrl={s.company.logoUrl ?? null} />
                     <span className={styles.companyName}>{s.company.name}</span>
