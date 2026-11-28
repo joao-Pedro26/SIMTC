@@ -26,6 +26,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? startTime,
     DateTime? endTime,
   }) =>
       Future.error(Exception('disco cheio'));

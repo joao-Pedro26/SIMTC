@@ -324,14 +324,17 @@ class AssessmentRepository {
     return loadItems(localAssessmentId);
   }
 
-  /// "Confirmar" da tela 1.6: grava `endTime` (o fim que a tela mostrou, ou a
-  /// hora do toque se nenhum for dado), o nome do participante e o % que a
-  /// tela mostrou, e põe a avaliação na fila de envio. Quem sobe é o
-  /// `AssessmentSyncService`, que observa a fila.
+  /// "Confirmar" da tela 1.6: grava `startTime` e `endTime` (os horários que
+  /// a tela mostrou, ou a hora do toque no fim se nenhum for dado), o nome do
+  /// participante e o % que a tela mostrou, e põe a avaliação na fila de
+  /// envio. `startTime` nulo não mexe na coluna: o consultor pode ter
+  /// ajustado o fim e não o início. Quem sobe é o `AssessmentSyncService`,
+  /// que observa a fila.
   Future<void> confirm(
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? startTime,
     DateTime? endTime,
   }) {
     final now = DateTime.now();
@@ -339,6 +342,7 @@ class AssessmentRepository {
           ..where((t) => t.id.equals(localAssessmentId)))
         .write(
       LocalAssessmentsCompanion(
+        startTime: startTime == null ? const Value.absent() : Value(startTime),
         endTime: Value(endTime ?? now),
         participantName: Value(participantName),
         score: Value(score),

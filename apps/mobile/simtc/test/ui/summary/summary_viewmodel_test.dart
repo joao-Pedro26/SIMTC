@@ -20,6 +20,7 @@ class _FailingConfirmRepository extends AssessmentRepository {
     String localAssessmentId, {
     required String? participantName,
     required double score,
+    DateTime? startTime,
     DateTime? endTime,
   }) =>
       Future.error(Exception('disco cheio'));
@@ -207,6 +208,116 @@ void main() {
           ..where((t) => t.id.equals(draft.id)))
         .getSingle();
     expect(row.endTime, DateTime(2026, 9, 30, 8, 31));
+  });
+
+  group('ajuste de início e fim', () {
+    Future<void> startAt(DateTime start) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await (db.update(db.localAssessments)
+            ..where((t) => t.trainingParticipantId.equals('tp-1')))
+          .write(LocalAssessmentsCompanion(startTime: Value(start)));
+    }
+
+    test('setEndClock troca a hora do fim, no mesmo dia, com segundos zerados',
+        () async {
+      await startAt(DateTime(2026, 9, 30, 8, 12));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setEndClock(8, 25);
+
+      expect(vm.endTime, DateTime(2026, 9, 30, 8, 25));
+      expect(vm.timesLabel, 'Início 08:12 · Fim 08:25');
+      expect(vm.timesError, isNull);
+    });
+
+    test('fim antes do início: erro e não confirma', () async {
+      await startAt(DateTime(2026, 9, 30, 8, 12));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setEndClock(8, 5);
+
+      expect(vm.timesError,
+          'A hora de término precisa ser depois da hora de início.');
+      expect(vm.canConfirm, isFalse);
+    });
+
+    test('fim depois de agora: erro e não confirma', () async {
+      await startAt(DateTime(2026, 9, 30, 8, 12));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setEndClock(8, 40);
+
+      expect(vm.timesError, 'A hora de término não pode ser depois de agora.');
+      expect(vm.canConfirm, isFalse);
+    });
+
+    test('fim igual a agora, com segundos a menos, não é erro', () async {
+      await startAt(DateTime(2026, 9, 30, 8, 12));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31, 45));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setEndClock(8, 31);
+
+      expect(vm.timesError, isNull);
+    });
+
+    test('meia-noite: o fim fica no dia de hoje, depois do início de ontem',
+        () async {
+      await startAt(DateTime(2026, 9, 29, 23, 50));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 0, 10));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setEndClock(0, 5);
+
+      expect(vm.endTime, DateTime(2026, 9, 30, 0, 5));
+      expect(vm.timesError, isNull);
+    });
+
+    test('setStartClock e setEndClock, depois confirmar, gravam os dois',
+        () async {
+      final draft = await draftWith({'inf-1': 'inf-1-PM'});
+      await (db.update(db.localAssessments)
+            ..where((t) => t.id.equals(draft.id)))
+          .write(LocalAssessmentsCompanion(
+              startTime: Value(DateTime(2026, 9, 30, 8, 12))));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setStartClock(8, 10);
+      vm.setEndClock(8, 25);
+      await vm.confirm();
+
+      final row = await (db.select(db.localAssessments)
+            ..where((t) => t.id.equals(draft.id)))
+          .getSingle();
+      expect(row.startTime, DateTime(2026, 9, 30, 8, 10));
+      expect(row.endTime, DateTime(2026, 9, 30, 8, 25));
+    });
+
+    test('setStartClock sem confirmar não mexe no que está gravado', () async {
+      final draft = await draftWith({'inf-1': 'inf-1-PM'});
+      await (db.update(db.localAssessments)
+            ..where((t) => t.id.equals(draft.id)))
+          .write(LocalAssessmentsCompanion(
+              startTime: Value(DateTime(2026, 9, 30, 8, 12))));
+      final vm = buildViewModel(now: () => DateTime(2026, 9, 30, 8, 31));
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      vm.setStartClock(8, 10);
+
+      final stored = await assessmentRepository.findByParticipant('tp-1');
+      expect(stored?.startTime, DateTime(2026, 9, 30, 8, 12));
+    });
   });
 
   test('sem rascunho, não há o que confirmar', () async {

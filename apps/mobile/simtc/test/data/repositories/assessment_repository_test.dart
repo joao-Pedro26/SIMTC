@@ -232,6 +232,23 @@ void main() {
     expect(rows[b.id], isNotNull);
   });
 
+  test('confirmar grava o início pedido; sem ele, o início do rascunho fica',
+      () async {
+    final a = await insertDraft('tp-1', startTime: DateTime(2026, 9, 30, 8, 10));
+    final b = await insertDraft('tp-2', startTime: DateTime(2026, 9, 30, 8, 10));
+
+    await repository.confirm(a.id,
+        participantName: 'A',
+        score: 90,
+        startTime: DateTime(2026, 9, 30, 8, 5),
+        endTime: DateTime(2026, 9, 30, 8, 31));
+    await repository.confirm(b.id,
+        participantName: 'B', score: 90, endTime: DateTime(2026, 9, 30, 8, 31));
+
+    expect((await row(a.id)).startTime, DateTime(2026, 9, 30, 8, 5));
+    expect((await row(b.id)).startTime, DateTime(2026, 9, 30, 8, 10));
+  });
+
   group('um por vez', () {
     // A sessão em andamento e o tp-1 com o consultor: é o que faz o rascunho
     // dele contar — só bloqueia a avaliação que ainda dá para abrir (decisão
