@@ -41,9 +41,13 @@ final class SummaryReviewCategory extends SummaryExit {
 /// cálculo real em 29/09/2026: sem a conta de pontos, com o selo de % de cada
 /// categoria e sem a etapa de assinatura).
 class SummaryScreen extends StatefulWidget {
-  const SummaryScreen({super.key, required this.participantId});
+  const SummaryScreen({super.key, required this.participantId, this.now});
 
   final String participantId;
+
+  /// Relógio da tela; os testes fixam um para os horários não dependerem da
+  /// hora em que rodam. Nulo, vale a hora do aparelho.
+  final DateTime Function()? now;
 
   @override
   State<SummaryScreen> createState() => _SummaryScreenState();
@@ -64,6 +68,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
     assessmentRepository: context.read<AssessmentRepository>(),
     participantRepository: context.read<ParticipantRepository>(),
     catalogRepository: context.read<AssessmentCatalogRepository>(),
+    now: widget.now,
   )..init();
 
   bool _closing = false;

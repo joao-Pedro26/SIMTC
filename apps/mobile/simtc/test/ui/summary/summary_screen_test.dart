@@ -118,6 +118,9 @@ void main() {
 
   tearDown(() => db.close());
 
+  /// O relógio fixo das telas: os horários não dependem da hora do teste.
+  final fixedNow = DateTime(2026, 11, 28, 10, 0);
+
   Future<void> draftWith(Map<String, String> marks) async {
     final draft = await assessmentRepository.openDraft(
       trainingParticipantId: 'tp-1',
@@ -125,6 +128,11 @@ void main() {
       ownerUserId: 'user-1',
       consultantId: 'c-eu',
     );
+    // Início fixo (meia hora antes do relógio fixo): sem isso valeria a hora
+    // em que o teste roda.
+    await (db.update(db.localAssessments)..where((t) => t.id.equals(draft.id)))
+        .write(LocalAssessmentsCompanion(
+            startTime: Value(fixedNow.subtract(const Duration(minutes: 30)))));
     for (final MapEntry(key: infraction, value: note) in marks.entries) {
       await assessmentRepository.mark(
         localAssessmentId: draft.id,
@@ -165,7 +173,7 @@ void main() {
                   onPressed: () async {
                     exit = await Navigator.of(context).push<SummaryExit>(
                       MaterialPageRoute(
-                        builder: (_) => const SummaryScreen(participantId: 'tp-1'),
+                        builder: (_) => SummaryScreen(participantId: 'tp-1', now: () => fixedNow),
                       ),
                     );
                     closed = true;
@@ -284,7 +292,7 @@ void main() {
 
     /// Recua o início do rascunho, para haver espaço de escolher um fim.
     Future<DateTime> startThreeHoursAgo() async {
-      final start = DateTime.now().subtract(const Duration(hours: 3));
+      final start = fixedNow.subtract(const Duration(hours: 3));
       await (db.update(db.localAssessments))
           .write(LocalAssessmentsCompanion(startTime: Value(start)));
       return start;
@@ -293,7 +301,6 @@ void main() {
     testWidgets('os campos mostram o início do rascunho e a hora da abertura',
         (tester) async {
       await draftWith({'inf-1': 'inf-1-PM'});
-      final before = DateTime.now();
       final start = (await db.select(db.localAssessments).getSingle()).startTime;
 
       await pumpSummary(tester);
@@ -301,11 +308,9 @@ void main() {
       expect(find.text('Início'), findsOneWidget);
       expect(find.text('Fim'), findsOneWidget);
       expect(fieldText(tester, 'campo-inicio'), hhmm(start.toLocal()));
-      final end = fieldText(tester, 'campo-fim');
-      expect(end, matches(RegExp(r'^\d\d:\d\d$')));
       expect(
-        end.compareTo(hhmm(before)) >= 0 || before.hour == 23,
-        isTrue,
+        fieldText(tester, 'campo-fim'),
+        hhmm(fixedNow),
         reason: 'o fim é a hora em que a tela abriu',
       );
       expect(
@@ -322,7 +327,7 @@ void main() {
       await startThreeHoursAgo();
       await pumpSummary(tester);
 
-      final target = DateTime.now().subtract(const Duration(minutes: 2));
+      final target = fixedNow.subtract(const Duration(minutes: 2));
       await pickClock(tester, 'campo-fim', target.hour, target.minute);
 
       expect(fieldText(tester, 'campo-fim'), hhmm(target));
@@ -381,7 +386,7 @@ void main() {
       await startThreeHoursAgo();
       await pumpSummary(tester);
 
-      final target = DateTime.now().subtract(const Duration(minutes: 2));
+      final target = fixedNow.subtract(const Duration(minutes: 2));
       await pickClock(tester, 'campo-fim', target.hour, target.minute);
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -462,6 +467,7 @@ void main() {
     await pumpSummary(tester);
 
     // O rodapé agora tem os campos de horário: a categoria sai da vista.
+    // `.first`: a origem é só um botão, então a única lista é a da conferência.
     await tester.drag(find.byType(ListView).first, const Offset(0, -200));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Respeito às Regras'));
