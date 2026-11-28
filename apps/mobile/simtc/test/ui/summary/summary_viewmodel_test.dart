@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:simtc/data/repositories/assessment_catalog_repository.dart';
@@ -255,6 +256,32 @@ void main() {
 
       expect(vm.timesError, 'A hora de término não pode ser depois de agora.');
       expect(vm.canConfirm, isFalse);
+    });
+
+    test(
+        'fim ajustado no futuro libera o "Confirmar" sozinho quando o '
+        'horário chega', () async {
+      await startAt(DateTime(2026, 9, 30, 8, 12));
+      var now = () => DateTime(2026, 9, 30, 8, 31, 40);
+      final vm = buildViewModel(now: () => now());
+      addTearDown(vm.dispose);
+      await vm.init();
+
+      fakeAsync((async) {
+        now = async.getClock(DateTime(2026, 9, 30, 8, 31, 40)).now;
+        var notified = 0;
+        vm.addListener(() => notified++);
+
+        vm.setEndClock(8, 32); // 20 s à frente
+        final afterSet = notified;
+        expect(vm.canConfirm, isFalse);
+
+        async.elapse(const Duration(seconds: 21));
+
+        expect(notified, greaterThan(afterSet));
+        expect(vm.timesError, isNull);
+        expect(vm.canConfirm, isTrue);
+      });
     });
 
     test('fim igual a agora, com segundos a menos, não é erro', () async {

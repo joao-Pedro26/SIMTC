@@ -45,6 +45,9 @@ class SummaryViewModel extends ChangeNotifier {
 
   StreamSubscription<SessionParticipant?>? _participantSubscription;
 
+  /// Dispara quando o fim ajustado, que estava à frente do relógio, chega.
+  Timer? _endTimer;
+
   bool _disposed = false;
   bool _loading = true;
   bool _confirming = false;
@@ -100,6 +103,7 @@ class SummaryViewModel extends ChangeNotifier {
     if (current == null) return;
     _startTime = _withClock(current, hour, minute);
     _errorMessage = null;
+    _scheduleEndCheck();
     notifyListeners();
   }
 
@@ -109,7 +113,22 @@ class SummaryViewModel extends ChangeNotifier {
     if (current == null) return;
     _endTime = _withClock(current, hour, minute);
     _errorMessage = null;
+    _scheduleEndCheck();
     notifyListeners();
+  }
+
+  /// Fim ajustado para daqui a pouco: o erro "depois de agora" some sozinho
+  /// quando o relógio alcança o fim, mas nada reconstruiria a tela nesse
+  /// instante e o "Confirmar" ficaria travado. Um aviso único no momento do
+  /// fim resolve; cada ajuste cancela o anterior.
+  void _scheduleEndCheck() {
+    _endTimer?.cancel();
+    _endTimer = null;
+    final end = _endTime;
+    if (end == null) return;
+    final wait = end.difference(_now());
+    if (wait <= Duration.zero) return;
+    _endTimer = Timer(wait, notifyListeners);
   }
 
   /// Mantém o dia local de [moment] — o rascunho pode ter começado ontem, e
@@ -207,6 +226,7 @@ class SummaryViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _endTimer?.cancel();
     _participantSubscription?.cancel();
     super.dispose();
   }
