@@ -639,6 +639,9 @@ void main() {
 
     await tester.tap(find.text('Finalizar avaliação'));
     await tester.pumpAndSettle();
+    // O rodapé da conferência agora tem os campos de horário e encurta a lista.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -200));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Respeito às Regras'));
     await tester.pumpAndSettle();
 

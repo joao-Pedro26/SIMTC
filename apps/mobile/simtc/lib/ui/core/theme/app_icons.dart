@@ -44,6 +44,9 @@ abstract final class AppIcons {
 
   /// Checklist (Fase 4): cronômetro, acordeão e "Finalizar avaliação".
   static const IconData timer = Icons.timer_outlined;
+
+  /// Horário de início e fim, na tela "Conferir e finalizar".
+  static const IconData time = Icons.access_time;
   static const IconData expandMore = Icons.expand_more;
   static const IconData expandLess = Icons.expand_less;
   static const IconData finish = Icons.task_alt;

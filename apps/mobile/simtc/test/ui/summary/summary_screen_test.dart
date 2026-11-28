@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show DatabaseConnection;
+import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -248,6 +248,146 @@ void main() {
     await expectAccessibleTargets(tester);
   });
 
+  group('horário de início e fim', () {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String hhmm(DateTime d) => '${two(d.hour)}:${two(d.minute)}';
+
+    String fieldText(WidgetTester tester, String key) => tester
+        .widget<TextField>(find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(TextField),
+        ))
+        .controller!
+        .text;
+
+    /// Abre o seletor do campo, troca para digitação e confirma [hour]:[minute].
+    Future<void> pickClock(
+      WidgetTester tester,
+      String key,
+      int hour,
+      int minute,
+    ) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.pumpAndSettle();
+      final inputs = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(inputs.at(0), two(hour));
+      await tester.enterText(inputs.at(1), two(minute));
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Recua o início do rascunho, para haver espaço de escolher um fim.
+    Future<DateTime> startThreeHoursAgo() async {
+      final start = DateTime.now().subtract(const Duration(hours: 3));
+      await (db.update(db.localAssessments))
+          .write(LocalAssessmentsCompanion(startTime: Value(start)));
+      return start;
+    }
+
+    testWidgets('os campos mostram o início do rascunho e a hora da abertura',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      final before = DateTime.now();
+      final start = (await db.select(db.localAssessments).getSingle()).startTime;
+
+      await pumpSummary(tester);
+
+      expect(find.text('Início'), findsOneWidget);
+      expect(find.text('Fim'), findsOneWidget);
+      expect(fieldText(tester, 'campo-inicio'), hhmm(start.toLocal()));
+      final end = fieldText(tester, 'campo-fim');
+      expect(end, matches(RegExp(r'^\d\d:\d\d$')));
+      expect(
+        end.compareTo(hhmm(before)) >= 0 || before.hour == 23,
+        isTrue,
+        reason: 'o fim é a hora em que a tela abriu',
+      );
+      expect(
+        find.text(
+          'Ajuste se a avaliação começou ou terminou em outro horário: é o que sai no relatório.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('escolher outro fim atualiza o campo e a linha da nota',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await startThreeHoursAgo();
+      await pumpSummary(tester);
+
+      final target = DateTime.now().subtract(const Duration(minutes: 2));
+      await pickClock(tester, 'campo-fim', target.hour, target.minute);
+
+      expect(fieldText(tester, 'campo-fim'), hhmm(target));
+      expect(find.textContaining('Fim ${hhmm(target)}'), findsOneWidget);
+    });
+
+    testWidgets(
+        'fim antes do início mostra o erro e o "Confirmar" fica desabilitado',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester);
+
+      await pickClock(tester, 'campo-inicio', 23, 59);
+
+      expect(
+        find.text('A hora de término precisa ser depois da hora de início.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<AppCtaButton>(find.widgetWithText(AppCtaButton, 'Confirmar')).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('"Confirmar" depois do ajuste grava o fim ajustado',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await startThreeHoursAgo();
+      await pumpSummary(tester);
+
+      final target = DateTime.now().subtract(const Duration(minutes: 2));
+      await pickClock(tester, 'campo-fim', target.hour, target.minute);
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      expect(exit, isA<SummaryConfirmed>());
+      final row = await db.select(db.localAssessments).getSingle();
+      final saved = row.endTime!.toLocal();
+      expect((saved.hour, saved.minute, saved.second), (target.hour, target.minute, 0));
+    });
+
+    testWidgets('no tablet em retrato os dois campos aparecem', (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(800, 1280));
+
+      expect(find.byKey(const Key('campo-inicio')), findsOneWidget);
+      expect(find.byKey(const Key('campo-fim')), findsOneWidget);
+    });
+
+    testWidgets(
+        'no tablet em paisagem os campos ficam acima do "Confirmar" do fim da coluna',
+        (tester) async {
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await pumpSummary(tester, tablet: const Size(1280, 800));
+
+      final confirm = find.widgetWithText(AppCtaButton, 'Confirmar');
+      expect(find.byKey(const Key('campo-inicio')), findsOneWidget);
+      expect(find.byKey(const Key('campo-fim')), findsOneWidget);
+      expect(
+        tester.getBottomLeft(find.byKey(const Key('campo-fim'))).dy,
+        lessThanOrEqualTo(tester.getTopLeft(confirm).dy),
+      );
+    });
+  });
+
   testWidgets('abaixo de 70% mostra "Não recomendado"', (tester) async {
     await draftWith({'inf-1': 'inf-1-M', 'inf-2': 'inf-2-M'});
 
@@ -293,6 +433,9 @@ void main() {
     await draftWith({'inf-1': 'inf-1-PM'});
     await pumpSummary(tester);
 
+    // O rodapé agora tem os campos de horário: a categoria sai da vista.
+    await tester.drag(find.byType(ListView).first, const Offset(0, -200));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Respeito às Regras'));
     await tester.pumpAndSettle();
 

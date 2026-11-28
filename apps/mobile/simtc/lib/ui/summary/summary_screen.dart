@@ -13,6 +13,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../core/widgets/app_buttons.dart';
 import '../core/widgets/app_footer_bar.dart';
+import '../core/widgets/app_text_field.dart';
 import '../core/widgets/app_top_bar.dart';
 import '../core/widgets/final_score_block.dart';
 import '../core/widgets/inline_notice.dart';
@@ -67,8 +68,39 @@ class _SummaryScreenState extends State<SummaryScreen> {
 
   bool _closing = false;
 
+  final TextEditingController _startController = TextEditingController();
+  final TextEditingController _endController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Os campos de horário só mostram o que o viewmodel guarda; atualizar fora
+    // do `build` evita mexer no controller no meio da construção do campo.
+    _viewModel.addListener(_syncClockFields);
+    _syncClockFields();
+  }
+
+  void _syncClockFields() {
+    final start = _clockText(_viewModel.startTime);
+    final end = _clockText(_viewModel.endTime);
+    if (_startController.text != start) _startController.text = start;
+    if (_endController.text != end) _endController.text = end;
+  }
+
+  /// "08:05" no horário local; sempre dois dígitos, mesmo em outro dia (o dia
+  /// não se edita aqui).
+  static String _clockText(DateTime? moment) {
+    if (moment == null) return '';
+    final local = moment.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
+    _viewModel.removeListener(_syncClockFields);
+    _startController.dispose();
+    _endController.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -343,6 +375,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        _buildClockFields(),
+        const SizedBox(height: AppSpacing.md),
         if (error != null) ...[
           InlineNotice(
             icon: AppIcons.needsReview,
@@ -360,5 +394,81 @@ class _SummaryScreenState extends State<SummaryScreen> {
           ),
       ],
     );
+  }
+
+  /// Início e fim da avaliação, lado a lado. Não se digita: o toque abre o
+  /// seletor de hora (mesmo padrão do campo de data da edição da sessão). Só
+  /// o fim mostra o erro de horário, que é onde o consultor mexe quase sempre.
+  Widget _buildClockFields() {
+    final enabled = !_viewModel.isConfirming;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: AppTextField(
+                key: const Key('campo-inicio'),
+                label: 'Início',
+                controller: _startController,
+                icon: AppIcons.time,
+                readOnly: true,
+                mono: true,
+                enabled: enabled,
+                onTap: () => _pickClock(
+                  current: _viewModel.startTime,
+                  helpText: 'Início da avaliação',
+                  onPicked: _viewModel.setStartClock,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: AppTextField(
+                key: const Key('campo-fim'),
+                label: 'Fim',
+                controller: _endController,
+                icon: AppIcons.time,
+                readOnly: true,
+                mono: true,
+                enabled: enabled,
+                errorText: _viewModel.timesError,
+                onTap: () => _pickClock(
+                  current: _viewModel.endTime,
+                  helpText: 'Fim da avaliação',
+                  onPicked: _viewModel.setEndClock,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs + 2),
+        Text(
+          'Ajuste se a avaliação começou ou terminou em outro horário: é o que sai no relatório.',
+          style: AppTypography.meta,
+        ),
+      ],
+    );
+  }
+
+  /// Seletor de hora em 24h, como o resto do app mostra os horários.
+  Future<void> _pickClock({
+    required DateTime? current,
+    required String helpText,
+    required void Function(int hour, int minute) onPicked,
+  }) async {
+    if (current == null) return;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current.toLocal()),
+      helpText: helpText,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    onPicked(picked.hour, picked.minute);
   }
 }
