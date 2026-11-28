@@ -14,6 +14,7 @@ import '../../data/repositories/session_consultant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
 import '../../router.dart';
+import '../core/cnh_labels.dart';
 import '../core/date_labels.dart';
 import '../core/form_factor.dart';
 import '../core/open_once.dart';
@@ -914,6 +915,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final showsLocal = progress == LocalProgress.queued ||
         progress == LocalProgress.failed ||
         progress == LocalProgress.sent;
+    final cnh = cnhLabel(
+      participant.cnhCategory,
+      participant.cnhExpiration,
+      _viewModel.now,
+    );
 
     return RevealFlash(
       key: _rowKeys.putIfAbsent(participant.id, () => GlobalKey()),
@@ -921,7 +927,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       child: ParticipantRow(
         key: ValueKey('participante-${participant.id}'),
         name: participant.name,
-        maskedCpf: participant.maskedCpf,
+        cnh: cnh.text,
+        cnhExpired: cnh.expired,
         chip: showsLocal
             ? _buildQueueChip(progress!)
             : _buildSituationChip(participant, situation),

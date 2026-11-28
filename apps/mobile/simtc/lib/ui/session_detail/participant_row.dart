@@ -5,7 +5,7 @@ import '../core/theme/app_icons.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 
-/// Uma linha da lista de participantes da tela 1.4: nome, CPF mascarado,
+/// Uma linha da lista de participantes da tela 1.4: nome, CNH,
 /// chip de situação e, conforme o caso, o horário da avaliação, a nota de
 /// bloqueio ou o botão "Atribuir a mim".
 ///
@@ -15,7 +15,8 @@ class ParticipantRow extends StatelessWidget {
   const ParticipantRow({
     super.key,
     required this.name,
-    required this.maskedCpf,
+    required this.cnh,
+    this.cnhExpired = false,
     required this.chip,
     this.meta,
     this.blockedNote,
@@ -28,7 +29,11 @@ class ParticipantRow extends StatelessWidget {
   });
 
   final String name;
-  final String maskedCpf;
+  /// "Cat. AB · Vence 12/03/2027": o consultor confere a CNH antes de iniciar.
+  final String cnh;
+
+  /// CNH vencida: o texto fica em vermelho, sem bloquear nada.
+  final bool cnhExpired;
   final Widget chip;
 
   /// "hoje 08:12" dos concluídos, "Iniciada às 08:12" do rascunho,
@@ -134,7 +139,12 @@ class ParticipantRow extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(maskedCpf, style: AppTypography.code),
+        Text(
+          cnh,
+          style: cnhExpired
+              ? AppTypography.code.copyWith(color: AppColors.dangerInk)
+              : AppTypography.code,
+        ),
         if (meta != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Text(meta!, style: AppTypography.meta),

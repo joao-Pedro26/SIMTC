@@ -126,12 +126,18 @@ void main() {
     String? assignedName,
     double? score,
     String cpf = '042.118.***-**',
+    String? cnhCategory = 'AB',
+    // Longe no futuro: o relógio da tela é o real, e a linha padrão não pode
+    // virar "vencida" com o tempo.
+    String? cnhExpiration = '2099-03-12',
   }) {
     return SessionParticipant(
       id: id,
       sessionId: 'sess-1',
       name: name,
       maskedCpf: cpf,
+      cnhCategory: cnhCategory,
+      cnhExpiration: cnhExpiration,
       participationType: type,
       status: status,
       assignedConsultantId: assignedTo,
@@ -337,7 +343,33 @@ void main() {
     expect(find.text('Aprovado · 86%'), findsOneWidget);
     expect(find.text('Reavaliar · 62%'), findsOneWidget);
     expect(find.text('Somente teórica'), findsOneWidget);
-    expect(find.text('042.118.***-**'), findsNWidgets(6));
+    // A linha mostra a CNH no lugar do CPF mascarado.
+    expect(find.text('Cat. AB · Vence 12/03/2099'), findsNWidgets(6));
+    expect(find.text('042.118.***-**'), findsNothing);
+  });
+
+  testWidgets('CNH vencida aparece em vermelho; a válida, na cor padrão',
+      (tester) async {
+    await show(tester, withParticipants: [
+      participant('1', 'Ana Paula Ribeiro', cnhExpiration: '2020-03-12'),
+      participant('2', 'Carlos Eduardo Nunes'),
+    ]);
+
+    final expired =
+        tester.widget<Text>(find.text('Cat. AB · Vencida em 12/03/2020'));
+    expect(expired.style?.color, AppColors.dangerInk);
+    final valid = tester.widget<Text>(find.text('Cat. AB · Vence 12/03/2099'));
+    expect(valid.style?.color, isNot(AppColors.dangerInk));
+  });
+
+  testWidgets('sem CNH cadastrada, a linha diz "CNH não informada"',
+      (tester) async {
+    await show(tester, withParticipants: [
+      participant('1', 'Ana Paula Ribeiro',
+          cnhCategory: null, cnhExpiration: null),
+    ]);
+
+    expect(find.text('CNH não informada'), findsOneWidget);
   });
 
   testWidgets('"Atribuir a mim" chama o repositório com o consultor logado',
@@ -587,6 +619,20 @@ void main() {
       await tester.pump();
       expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
       expect(find.text('Mariana Costa'), findsNothing);
+    });
+
+    testWidgets('a busca por CPF continua achando a linha, que mostra a CNH',
+        (tester) async {
+      await show(tester, withParticipants: turma());
+      await openSearch(tester);
+
+      await tester.enterText(find.byType(TextField), '042118');
+      await tester.pump();
+
+      expect(find.text('Ana Paula Ribeiro'), findsOneWidget);
+      expect(find.text('Mariana Costa'), findsNothing);
+      expect(find.text('Cat. AB · Vence 12/03/2099'), findsOneWidget);
+      expect(find.text('042.118.***-**'), findsNothing);
     });
 
     testWidgets('sem resultado, diz que não achou', (tester) async {
