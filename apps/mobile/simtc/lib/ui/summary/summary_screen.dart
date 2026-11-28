@@ -479,10 +479,19 @@ class _SummaryScreenState extends State<SummaryScreen> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(current.toLocal()),
       helpText: helpText,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
+      // A escala do texto não desce de 100% no seletor: com a fonte do
+      // aparelho reduzida (85%), o modo digitação do Flutter 3.41 calcula a
+      // altura máxima (252 × escala) abaixo da mínima fixa (216) e quebra.
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            alwaysUse24HourFormat: true,
+            textScaler: media.textScaler.clamp(minScaleFactor: 1),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked == null || !mounted) return;
     onPicked(picked.hour, picked.minute);

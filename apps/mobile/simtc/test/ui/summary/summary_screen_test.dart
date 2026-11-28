@@ -334,6 +334,24 @@ void main() {
       expect(find.textContaining('Fim ${hhmm(target)}'), findsOneWidget);
     });
 
+    // Com a fonte do sistema em 85%, o modo digitação do seletor do Flutter
+    // pedia altura mínima 216 com máxima 252 × 0,85 = 214,2 e quebrava a
+    // tela (visto no aparelho em 28/11/2026).
+    testWidgets('com a fonte do aparelho reduzida, o modo digitação abre',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 0.85;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await draftWith({'inf-1': 'inf-1-PM'});
+      await startThreeHoursAgo();
+      await pumpSummary(tester);
+
+      final target = fixedNow.subtract(const Duration(minutes: 2));
+      await pickClock(tester, 'campo-fim', target.hour, target.minute);
+
+      expect(tester.takeException(), isNull);
+      expect(fieldText(tester, 'campo-fim'), hhmm(target));
+    });
+
     testWidgets(
         'fim antes do início mostra o erro e o "Confirmar" fica desabilitado',
         (tester) async {
