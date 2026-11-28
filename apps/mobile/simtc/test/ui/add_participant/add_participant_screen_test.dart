@@ -969,7 +969,6 @@ void main() {
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
       await fillCnh(tester);
-    await fillCnh(tester);
       await tester.pump();
 
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
@@ -1065,7 +1064,6 @@ void main() {
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
       await fillCnh(tester);
-    await fillCnh(tester);
       await tester.pump();
 
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
@@ -1192,7 +1190,6 @@ void main() {
       await typeCpf(tester);
       await tester.enterText(field('campo-nome'), 'Fernanda Lopes Meireles');
       await fillCnh(tester);
-    await fillCnh(tester);
       await tester.pump();
       await tester.tap(find.widgetWithText(AppCtaButton, 'Adicionar participante'));
       await tester.pumpAndSettle();

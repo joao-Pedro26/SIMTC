@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/models/cnh.dart';
 import '../../data/models/session_participant.dart';
 import '../../data/models/training_session.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/participant_repository.dart';
 import '../../data/repositories/session_repository.dart';
 import '../../data/services/connectivity_service.dart';
-import '../../data/models/cnh.dart';
 import '../core/cpf_input_formatter.dart';
 import '../core/date_input_formatter.dart';
 import '../core/date_labels.dart';

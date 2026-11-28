@@ -36,7 +36,8 @@ class DateInputFormatter extends TextInputFormatter {
     final digitsBefore = _digits(newValue.text.substring(0, cursor)).length;
     return TextEditingValue(
       text: text,
-      selection: TextSelection.collapsed(offset: _offsetAfter(text, digitsBefore)),
+      selection:
+          TextSelection.collapsed(offset: _offsetAfter(text, digitsBefore)),
     );
   }
 
