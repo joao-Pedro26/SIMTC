@@ -10,18 +10,28 @@ import '../../utils/calendar_date.dart';
   String? expiration,
   DateTime now,
 ) {
-  if (category == null && expiration == null) {
+  // Vazio (ou só espaços) vem do formulário ou do cache como "não informado":
+  // tratar como nulo evita montar "Cat.  · " ou parsear uma data em branco.
+  final cat = _nullIfBlank(category);
+  final exp = _nullIfBlank(expiration);
+
+  if (cat == null && exp == null) {
     return (text: 'CNH não informada', expired: false);
   }
-  if (expiration == null) {
-    return (text: 'Cat. $category · Vencimento não informado', expired: false);
+  if (exp == null) {
+    return (text: 'Cat. $cat · Vencimento não informado', expired: false);
   }
 
-  final expired = isCalendarDateBefore(expiration, now);
-  final date = brDateFromCalendar(expiration);
+  final expired = isCalendarDateBefore(exp, now);
+  final date = brDateFromCalendar(exp);
   final dateText = expired ? 'Vencida em $date' : 'Vence $date';
   return (
-    text: category == null ? dateText : 'Cat. $category · $dateText',
+    text: cat == null ? dateText : 'Cat. $cat · $dateText',
     expired: expired,
   );
+}
+
+String? _nullIfBlank(String? value) {
+  final trimmed = value?.trim();
+  return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
 }

@@ -46,4 +46,22 @@ void main() {
     expect(label.text, 'Vencida em 12/03/2025');
     expect(label.expired, isTrue);
   });
+
+  test('categoria e vencimento vazios contam como não informados', () {
+    final label = cnhLabel('', '', now);
+    expect(label.text, 'CNH não informada');
+    expect(label.expired, isFalse);
+  });
+
+  test('vencimento vazio conta como não informado', () {
+    final label = cnhLabel('AB', '', now);
+    expect(label.text, 'Cat. AB · Vencimento não informado');
+    expect(label.expired, isFalse);
+  });
+
+  test('categoria vazia conta como ausente', () {
+    final label = cnhLabel('', '2027-03-13', now);
+    expect(label.text, 'Vence 13/03/2027');
+    expect(label.expired, isFalse);
+  });
 }
