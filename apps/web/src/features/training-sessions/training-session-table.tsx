@@ -50,6 +50,9 @@ export function TrainingSessionTable({ sessions, onSelect, onDelete }: TrainingS
     const matchStatus  = statusFilter === '' || s.status === statusFilter
     return matchCompany && matchStatus
   })
+    // Pela data do treinamento (`AAAA-MM-DD`), mais recente primeiro. Sem data é
+    // texto vazio e fica no fim. Empate mantém a ordem da API.
+    .sort((a, b) => b.date.localeCompare(a.date))
 
   if (sessions.length === 0) {
     return <p className={styles.empty}>Nenhum treinamento encontrado.</p>
