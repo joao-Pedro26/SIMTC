@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button/button'
 import { ColumnFilter } from '@/components/ui/column-filter/column-filter'
 import { clientApi } from '@/lib/client-api'
 import { formatCpf } from '@/lib/utils'
-import { CNH_CATEGORIES, CPF_PATTERN, cpfError, maskCpf, validateCpf } from '@/lib/validate-cpf'
+import { CNH_CATEGORIES, CPF_PATTERN } from '@/lib/validate-cpf'
+import { useAddParticipantForm } from './use-add-participant-form'
 import { useConfirm } from '@/components/ui/confirm-dialog/confirm-dialog-provider'
 import { useToast } from '@/components/ui/toast/toast-provider'
 import { useBulkSelection } from '@/lib/use-bulk-selection'
@@ -56,21 +57,11 @@ function formatAssessmentWhen(a: NonNullable<TrainingParticipant['assessment']>)
   return t.end ? `${date}, ${t.start}–${t.end}` : `${date}, ${t.start}`
 }
 
-interface AddParticipantForm {
-  name: string
-  cpf: string
-  email: string
-  cnhCategory: string
-  cnhExpiration: string
-}
-
-const emptyForm: AddParticipantForm = { name: '', cpf: '', email: '', cnhCategory: '', cnhExpiration: '' }
-
 export function ParticipantsTab({ session, sessionId, onRefresh, currentConsultantId, readOnly }: ParticipantsTabProps) {
   const confirm = useConfirm()
   const toast = useToast()
   const [showAddForm, setShowAddForm] = useState(false)
-  const [form, setForm] = useState<AddParticipantForm>(emptyForm)
+  const addForm = useAddParticipantForm(sessionId, { onEnrolled: () => void onRefresh() })
   const [busy, setBusy] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -115,10 +106,6 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
   const [bulkJobId, setBulkJobId] = useState<string | null>(null)
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false)
 
-  function setField(field: keyof AddParticipantForm, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setActionError('')
@@ -132,28 +119,11 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
     }
   }
 
-  // CPF: o erro "incompleto" só aparece depois de sair do campo; o de dígito
-  // verificador aparece assim que os 11 dígitos são digitados.
-  const [cpfTouched, setCpfTouched] = useState(false)
-  const cpfDigits = form.cpf.replace(/\D/g, '')
-  const cpfIsValid = validateCpf(cpfDigits)
-  const visibleCpfError = cpfTouched || cpfDigits.length === 11 ? cpfError(form.cpf) : null
-
   async function addParticipant() {
-    setCpfTouched(true)
-    if (!form.name.trim() || !cpfIsValid) return
-    await run(() =>
-      clientApi.post(`/training-sessions/${sessionId}/participants`, {
-        name: form.name.trim(),
-        cpf: cpfDigits,
-        email: form.email.trim() || undefined,
-        cnhCategory: form.cnhCategory || undefined,
-        cnhExpiration: form.cnhExpiration || undefined,
-      })
-    )
-    setForm(emptyForm)
-    setCpfTouched(false)
-    setShowAddForm(false)
+    await run(async () => {
+      await addForm.submit()
+      setShowAddForm(false)
+    })
   }
 
   async function changeType(p: TrainingParticipant) {
@@ -264,41 +234,43 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
           <p className={styles.addFormTitle}>Novo Participante</p>
           <div className={styles.addFormGrid}>
             <div className={styles.field}>
-              <label className={styles.label}>Nome *</label>
-              <input className={styles.input} value={form.name} onChange={(e) => setField('name', e.target.value)} />
-            </div>
-            <div className={styles.field}>
               <label className={styles.label} htmlFor="add-participant-cpf">CPF *</label>
               <input
                 id="add-participant-cpf"
-                className={`${styles.input}${visibleCpfError ? ` ${styles.inputInvalid}` : ''}`}
-                value={form.cpf}
-                onChange={(e) => setField('cpf', maskCpf(e.target.value))}
-                onBlur={() => setCpfTouched(true)}
+                className={`${styles.input}${addForm.cpfError ? ` ${styles.inputInvalid}` : ''}`}
+                value={addForm.values.cpf}
+                onChange={(e) => addForm.setCpf(e.target.value)}
+                onBlur={addForm.touchCpf}
                 placeholder="000.000.000-00"
                 inputMode="numeric"
                 autoComplete="off"
+                autoFocus
                 maxLength={14}
                 pattern={CPF_PATTERN}
                 title="CPF no formato 000.000.000-00"
-                aria-invalid={!!visibleCpfError}
-                aria-describedby={visibleCpfError ? 'add-participant-cpf-error' : undefined}
+                aria-invalid={!!addForm.cpfError}
+                aria-describedby="add-participant-cpf-message"
               />
-              {visibleCpfError && (
-                <span id="add-participant-cpf-error" className={styles.fieldError}>{visibleCpfError}</span>
-              )}
+              <span id="add-participant-cpf-message" aria-live="polite" className={addForm.cpfError ? styles.fieldError : styles.fieldHint}>
+                {addForm.cpfError ?? addForm.cpfHelper}
+              </span>
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>E-mail</label>
-              <input className={styles.input} type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
+              <label className={styles.label} htmlFor="add-participant-name">Nome *</label>
+              <input id="add-participant-name" ref={addForm.nameRef} className={styles.input} value={addForm.values.name} disabled={addForm.isCheckingCpf} onChange={(e) => addForm.setField('name', e.target.value)} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="add-participant-cnh">Cat. CNH</label>
+              <label className={styles.label} htmlFor="add-participant-email">E-mail</label>
+              <input id="add-participant-email" className={styles.input} type="email" value={addForm.values.email} disabled={addForm.isCheckingCpf} onChange={(e) => addForm.setField('email', e.target.value)} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="add-participant-cnh">Cat. CNH *</label>
               <select
                 id="add-participant-cnh"
                 className={styles.input}
-                value={form.cnhCategory}
-                onChange={(e) => setField('cnhCategory', e.target.value)}
+                value={addForm.values.cnhCategory}
+                disabled={addForm.isCheckingCpf}
+                onChange={(e) => addForm.setField('cnhCategory', e.target.value)}
               >
                 <option value="">Selecione…</option>
                 {CNH_CATEGORIES.map((cat) => (
@@ -307,16 +279,27 @@ export function ParticipantsTab({ session, sessionId, onRefresh, currentConsulta
               </select>
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Vencimento CNH</label>
-              <input className={styles.input} type="date" value={form.cnhExpiration} onChange={(e) => setField('cnhExpiration', e.target.value)} />
+              <label className={styles.label} htmlFor="add-participant-cnh-expiration">Vencimento CNH *</label>
+              <input
+                id="add-participant-cnh-expiration"
+                className={`${styles.input}${addForm.expirationError ? ` ${styles.inputInvalid}` : ''}`}
+                type="date"
+                value={addForm.values.cnhExpiration}
+                disabled={addForm.isCheckingCpf}
+                onChange={(e) => addForm.setField('cnhExpiration', e.target.value)}
+                onBlur={addForm.touchExpiration}
+                aria-invalid={!!addForm.expirationError}
+              />
+              {addForm.expirationError && <span className={styles.fieldError}>{addForm.expirationError}</span>}
             </div>
           </div>
+          {addForm.registryNotice && <p className={styles.registryNotice}>{addForm.registryNotice}</p>}
           <div className={styles.addFormActions}>
-            <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(false); setForm(emptyForm); setCpfTouched(false) }}>Cancelar</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setShowAddForm(false); addForm.reset() }}>Cancelar</Button>
             <Button
               variant="primary"
               size="sm"
-              disabled={!form.name.trim() || !cpfIsValid || busy}
+              disabled={!addForm.canSubmit || busy}
               onClick={addParticipant}
             >
               <Check size={14} /> Confirmar

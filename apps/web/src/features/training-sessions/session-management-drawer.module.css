@@ -700,3 +700,16 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ── Consulta de CPF ao adicionar participante ── */
+
+.fieldHint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.registryNotice {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
